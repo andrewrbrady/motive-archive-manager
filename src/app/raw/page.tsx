@@ -3,8 +3,8 @@
 import React from "react";
 import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
-import AssetRow from '@/components/raw/AssetRow';
-import { PencilIcon, CheckIcon, XIcon } from "lucide-react";
+import AssetRow from "@/components/raw/AssetRow";
+import { PencilIcon } from "lucide-react";
 
 interface Location {
   [key: string]: string;
@@ -17,33 +17,41 @@ interface Asset {
   location: Location;
 }
 
-export default function RawPage() {
+const RawPage: React.FC = () => {
   const [assets, setAssets] = React.useState<Asset[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
 
   const fetchAssets = async () => {
+    setLoading(true);
+    setError(null); // Reset error state before fetching
     try {
-      const response = await fetch('/api/assets');
-      if (!response.ok) throw new Error('Failed to fetch assets');
+      const response = await fetch("/api/assets");
+      if (!response.ok) {
+        throw new Error("Failed to fetch assets");
+      }
       const data = await response.json();
       setAssets(data.assets);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
   };
 
   const deleteAsset = async (id: string) => {
-    try {
-      const response = await fetch(`/api/assets/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete asset');
-      setAssets((prev) => prev.filter((asset) => asset._id !== id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    if (confirm("Are you sure you want to delete this asset?")) {
+      try {
+        const response = await fetch(`/api/assets/${id}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          throw new Error("Failed to delete asset");
+        }
+        setAssets((prev) => prev.filter((asset) => asset._id !== id));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      }
     }
   };
 
@@ -56,9 +64,15 @@ export default function RawPage() {
       <Navbar />
       <div className="h-screen overflow-y-auto">
         <div className="container mx-auto px-4 py-24">
-          <Link href="/add-asset" className="bg-red-500 text-white px-6 py-3 rounded mb-8 hover:bg-red-600 transition-all duration-200">
-            Add New Asset
-          </Link>
+          <div className="flex justify-end mb-4">
+            <Link
+              href="/add-asset"
+              className="bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-all duration-200"
+              aria-label="Add New Asset"
+            >
+              <PencilIcon className="w-5 h-5" />
+            </Link>
+          </div>
           {error && <div className="text-red-500 mb-4">Error: {error}</div>}
           {loading ? (
             <div className="text-gray-600 mb-4">Loading assets...</div>
@@ -87,4 +101,6 @@ export default function RawPage() {
       </div>
     </>
   );
-}
+};
+
+export default RawPage;
