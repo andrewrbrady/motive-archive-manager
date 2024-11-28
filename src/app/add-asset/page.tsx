@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/layout/navbar';
+import { PlusIcon } from 'lucide-react';
 
 interface Asset {
   name: string;
@@ -29,7 +30,8 @@ const AddAssetPage: React.FC = () => {
   };
 
   const removeLocation = (index: number) => {
-    setLocations(locations.filter((_, i) => i !== index));
+    const newLocations = locations.filter((_, i) => i !== index);
+    setLocations(newLocations);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -37,7 +39,11 @@ const AddAssetPage: React.FC = () => {
     setLoading(true);
     setError('');
 
-    const asset: Asset = { name, description, locations };
+    const asset: Asset = {
+      name,
+      description,
+      locations: locations.filter(location => location.trim() !== ''),
+    };
 
     try {
       const response = await fetch('/api/assets', {
@@ -55,7 +61,7 @@ const AddAssetPage: React.FC = () => {
 
       router.push('/raw');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -106,13 +112,15 @@ const AddAssetPage: React.FC = () => {
               </button>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={addLocation}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-all duration-200"
-          >
-            Add Location
-          </button>
+          <div className="flex items-center mt-2">
+            <button
+              type="button"
+              onClick={addLocation}
+              className="flex items-center bg-blue-500 text-white px-2 py-2 rounded hover:bg-blue-600 transition-all duration-200"
+            >
+              <PlusIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <button
           type="submit"
