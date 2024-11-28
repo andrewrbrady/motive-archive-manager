@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react';
-import { PencilIcon } from 'lucide-react';
+import { PencilIcon, TrashIcon } from 'lucide-react';
 import Link from 'next/link';
 
 interface Location {
@@ -29,8 +29,11 @@ const AssetRow: React.FC<{ asset: Asset; deleteAsset: (id: string) => void }> = 
             className="text-red-500 hover:text-red-700"
             title="Delete asset"
           >
-            Delete
+            <TrashIcon className="h-4 w-4" />
           </button>
+          <Link href={`/raw/${asset._id}`} className="text-gray-500 hover:text-blue-600" title="Edit asset">
+            <PencilIcon className="h-4 w-4" />
+          </Link>
         </div>
       </td>
       <td className="px-6 py-4">

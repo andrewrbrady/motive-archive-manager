@@ -7,9 +7,23 @@ export default function AddAssetPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
+  const [locations, setLocations] = useState(['']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleLocationChange = (index: number, value: string) => {
+    const newLocations = [...locations];
+    newLocations[index] = value;
+    setLocations(newLocations);
+  };
+
+  const addLocation = () => {
+    setLocations([...locations, '']);
+  };
+
+  const removeLocation = (index: number) => {
+    setLocations(locations.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +36,7 @@ export default function AddAssetPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, description, location }),
+        body: JSON.stringify({ name, description, location: locations }),
       });
 
       if (!response.ok) {
@@ -51,8 +65,20 @@ export default function AddAssetPage() {
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} required className="w-full border rounded p-2" />
         </div>
         <div>
-          <label className="block text-sm font-medium">Location</label>
-          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} required className="w-full border rounded p-2" />
+          <label className="block text-sm font-medium">Locations</label>
+          {locations.map((location, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => handleLocationChange(index, e.target.value)}
+                required
+                className="w-full border rounded p-2"
+              />
+              <button type="button" onClick={() => removeLocation(index)} className="text-red-500">Remove</button>
+            </div>
+          ))}
+          <button type="button" onClick={addLocation} className="bg-blue-500 text-white px-4 py-2 rounded">Add Location</button>
         </div>
         <button type="submit" disabled={loading} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">
           {loading ? 'Adding...' : 'Add Asset'}
