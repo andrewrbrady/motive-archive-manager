@@ -183,6 +183,9 @@ export default function RawPage() {
       <Navbar />
       <div className="h-screen overflow-y-auto" onClick={handleClickOutside}>
         <div className="container mx-auto px-4 py-24">
+          <Link href="/add-asset" className="bg-blue-500 text-white px-4 py-2 rounded mb-4">
+            Add New Asset
+          </Link>
           {/* Existing search and sort controls */}
           <div className="space-y-4 mb-6">
             <div className="flex justify-between items-center">
@@ -327,8 +330,7 @@ export default function RawPage() {
                                   asset._id,
                                   "description",
                                   asset.description
-                                )
-                              }
+                                )}
                               className="text-gray-500 hover:text-blue-600"
                               title="Edit description"
                             >
