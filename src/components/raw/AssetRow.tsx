@@ -24,16 +24,6 @@ const AssetRow: React.FC<{ asset: Asset; deleteAsset: (id: string) => void }> = 
           <Link href={`/raw/${asset._id}`} className="flex-grow hover:text-blue-600">
             {asset.name}
           </Link>
-          <button
-            onClick={() => deleteAsset(asset._id)}
-            className="text-red-500 hover:text-red-700"
-            title="Delete asset"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </button>
-          <Link href={`/raw/${asset._id}`} className="text-gray-500 hover:text-blue-600" title="Edit asset">
-            <PencilIcon className="h-4 w-4" />
-          </Link>
         </div>
       </td>
       <td className="px-6 py-4">
@@ -52,9 +42,18 @@ const AssetRow: React.FC<{ asset: Asset; deleteAsset: (id: string) => void }> = 
         ))}
       </td>
       <td className="px-6 py-4">
-        <Link href={`/raw/${asset._id}`} className="text-gray-500 hover:text-blue-600" title="Edit asset">
-          <PencilIcon className="h-4 w-4" />
-        </Link>
+        <div className="flex space-x-2">
+          <Link href={`/raw/${asset._id}`} className="text-gray-500 hover:text-blue-600" title="Edit asset">
+            <PencilIcon className="h-4 w-4" />
+          </Link>
+          <button
+            onClick={() => deleteAsset(asset._id)}
+            className="text-red-500 hover:text-red-700"
+            title="Delete asset"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </td>
     </tr>
   );
