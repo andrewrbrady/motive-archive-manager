@@ -3,12 +3,12 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/layout/navbar';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, TrashIcon } from 'lucide-react';
 
 interface Asset {
   name: string;
   description: string;
-  locations: string[];
+  location: string[];
 }
 
 const AddAssetPage: React.FC = () => {
@@ -42,7 +42,7 @@ const AddAssetPage: React.FC = () => {
     const asset: Asset = {
       name,
       description,
-      locations: locations.filter(location => location.trim() !== ''),
+      location: locations.filter(location => location.trim() !== ''),
     };
 
     try {
@@ -94,25 +94,25 @@ const AddAssetPage: React.FC = () => {
         </div>
         <div>
           <label className="block text-sm font-medium">Locations</label>
-          {locations.map((location, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => handleLocationChange(index, e.target.value)}
-                required
-                className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                onClick={() => removeLocation(index)}
-                className="text-red-500 hover:text-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <div className="flex items-center mt-2">
+          <div className="flex items-center space-x-2">
+            {locations.map((location, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => handleLocationChange(index, e.target.value)}
+                  required
+                  className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeLocation(index)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
             <button
               type="button"
               onClick={addLocation}
