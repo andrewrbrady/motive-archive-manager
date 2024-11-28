@@ -120,3 +120,37 @@ export async function PATCH(
     }
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  let client;
+  try {
+    const { id } = await context.params;
+
+    client = await MongoClient.connect(uri);
+    const db = client.db(dbName);
+
+    const result = await db.collection("raw").deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error("Delete error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete asset",
+      },
+      { status: 500 }
+    );
+  } finally {
+    if (client) {
+      await client.close();
+    }
+  }
+}

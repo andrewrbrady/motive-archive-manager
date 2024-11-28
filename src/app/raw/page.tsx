@@ -3,7 +3,7 @@
 import React from "react";
 import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, CheckIcon, XIcon } from "lucide-react";
 
 interface Location {
   [key: string]: string;
@@ -45,7 +45,6 @@ export default function RawPage() {
     sortOrder: "desc",
   });
 
-  // Existing debounce effect
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -108,11 +107,9 @@ export default function RawPage() {
 
     if (e.key === "Enter") {
       try {
-        // Find the asset being edited
         const asset = assets.find((a) => a._id === editState.id);
         if (!asset) throw new Error("Asset not found");
 
-        // Only proceed if the value has changed
         if (
           asset[
             editState.field as keyof Pick<Asset, "name" | "description">
@@ -138,13 +135,10 @@ export default function RawPage() {
           throw new Error(errorData.error || "Failed to update asset");
         }
 
-        // Update local state
         setAssets(
           assets.map((asset) => {
             if (asset._id === editState.id) {
-              // Create a new object with all the existing properties
               const updatedAsset = { ...asset };
-              // Only update the specific field that was edited
               if (editState.field === "name") {
                 updatedAsset.name = editState.value;
               } else if (editState.field === "description") {
@@ -160,7 +154,6 @@ export default function RawPage() {
       } catch (err) {
         console.error("Update error:", err);
         setError(err instanceof Error ? err.message : "Failed to update asset");
-        // Refresh the data to ensure we're in sync with the server
         fetchAssets(
           pagination.currentPage,
           pagination.sortOrder,
@@ -178,6 +171,24 @@ export default function RawPage() {
     }
   };
 
+  const deleteAsset = async (id: string) => {
+    try {
+      const response = await fetch(`/api/assets/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete asset");
+      }
+
+      setAssets(assets.filter(asset => asset._id !== id));
+    } catch (err) {
+      console.error("Delete error:", err);
+      setError(err instanceof Error ? err.message : "Failed to delete asset");
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -186,7 +197,6 @@ export default function RawPage() {
           <Link href="/add-asset" className="bg-blue-500 text-white px-4 py-2 rounded mb-4">
             Add New Asset
           </Link>
-          {/* Existing search and sort controls */}
           <div className="space-y-4 mb-6">
             <div className="flex justify-between items-center">
               <h1 className="text-2xl font-bold">Raw Assets Data</h1>
@@ -232,7 +242,6 @@ export default function RawPage() {
             </div>
           </div>
 
-          {/* Loading and error states */}
           {loading && (
             <div className="flex justify-center items-center h-32">
               <div className="text-gray-600">Loading...</div>
@@ -251,7 +260,6 @@ export default function RawPage() {
             </div>
           )}
 
-          {/* Updated table with editable cells */}
           {!loading && !error && assets.length > 0 && (
             <div className="overflow-x-auto shadow-md rounded-lg mb-8">
               <table className="w-full text-sm text-left">
@@ -265,6 +273,9 @@ export default function RawPage() {
                     </th>
                     <th scope="col" className="px-6 py-3">
                       Location
+                    </th>
+                    <th scope="col" className="px-6 py-3">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -353,6 +364,15 @@ export default function RawPage() {
                           )
                         )}
                       </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => deleteAsset(asset._id)}
+                          className="text-red-500 hover:text-red-700"
+                          title="Delete asset"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -360,7 +380,6 @@ export default function RawPage() {
             </div>
           )}
 
-          {/* Existing pagination controls */}
           {pagination.totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 pb-8">
               <button
