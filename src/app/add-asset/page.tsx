@@ -64,9 +64,9 @@ const AddAssetPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-24">
       <Navbar />
-      <h1 className="text-2xl font-bold mb-4">Add New Asset</h1>
-      {error && <div className="text-red-500 mb-4">Error: {error}</div>}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <h1 className="text-3xl font-bold mb-6 text-center">Add New Asset</h1>
+      {error && <div className="text-red-500 mb-4 text-center">Error: {error}</div>}
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white shadow-md rounded-lg p-6">
         <div>
           <label className="block text-sm font-medium">Name</label>
           <input
@@ -74,7 +74,7 @@ const AddAssetPage: React.FC = () => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="w-full border rounded p-2"
+            className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div>
@@ -83,7 +83,7 @@ const AddAssetPage: React.FC = () => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
-            className="w-full border rounded p-2"
+            className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div>
@@ -95,12 +95,12 @@ const AddAssetPage: React.FC = () => {
                 value={location}
                 onChange={(e) => handleLocationChange(index, e.target.value)}
                 required
-                className="w-full border rounded p-2"
+                className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="button"
                 onClick={() => removeLocation(index)}
-                className="text-red-500"
+                className="text-red-500 hover:text-red-700"
               >
                 Remove
               </button>
@@ -109,7 +109,7 @@ const AddAssetPage: React.FC = () => {
           <button
             type="button"
             onClick={addLocation}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-all duration-200"
           >
             Add Location
           </button>
