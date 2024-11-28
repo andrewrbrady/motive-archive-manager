@@ -1,26 +1,29 @@
+// app/api/assets/[id]/route.ts
 import { MongoClient, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
-const uri = "mongodb://localhost:27017";
-const dbName = "arb_assets";
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+const dbName = process.env.MONGODB_DB || "arb_assets";
 
-// Add allowed methods
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-export const revalidate = 0;
+async function getClient() {
+  const client = await MongoClient.connect(uri);
+  return client;
+}
 
+// GET single asset
 export async function GET(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
   let client;
   try {
-    const { id } = await context.params;
-
-    client = await MongoClient.connect(uri);
+    const id = context.params.id;
+    client = await getClient();
     const db = client.db(dbName);
 
-    const asset = await db.collection("raw").findOne({ _id: new ObjectId(id) });
+    const asset = await db.collection("raw").findOne({
+      _id: new ObjectId(id),
+    });
 
     if (!asset) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
@@ -36,22 +39,21 @@ export async function GET(
       { status: 500 }
     );
   } finally {
-    if (client) {
-      await client.close();
-    }
+    if (client) await client.close();
   }
 }
 
+// PATCH single asset
 export async function PATCH(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
   let client;
   try {
-    const { id } = await context.params;
-    const { field, value } = await request.json();
+    const id = context.params.id;
+    const data = await request.json();
+    const { field, value } = data;
 
-    // Validate the input
     if (!field || value === undefined) {
       return NextResponse.json(
         { error: "Field and value are required" },
@@ -59,54 +61,26 @@ export async function PATCH(
       );
     }
 
-    // Validate field is one we allow updating
-    const allowedFields = ["name", "description"];
-    if (!allowedFields.includes(field)) {
-      return NextResponse.json(
-        { error: "Invalid field for update" },
-        { status: 400 }
-      );
-    }
-
-    // Connect to MongoDB
-    client = await MongoClient.connect(uri);
+    client = await getClient();
     const db = client.db(dbName);
 
-    // Get the current document
-    const currentDoc = await db
-      .collection("raw")
-      .findOne({ _id: new ObjectId(id) });
-
-    if (!currentDoc) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-    }
-
-    // Update the document
-    const result = await db.collection("raw").updateOne(
+    const updateResult = await db.collection("raw").updateOne(
       { _id: new ObjectId(id) },
       {
         $set: {
           [field]: value,
-          // Add any other fields that need to be preserved
-          ...Object.fromEntries(
-            Object.entries(currentDoc).filter(
-              ([key]) => key !== "_id" && key !== field
-            )
-          ),
+          updatedAt: new Date(),
         },
       }
     );
 
-    if (result.matchedCount === 0) {
+    if (updateResult.matchedCount === 0) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    // Log successful update
-    console.log(`Successfully updated ${field} for asset ${id}`);
-
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Update error:", error);
+    console.error("Error:", error);
     return NextResponse.json(
       {
         error:
@@ -115,32 +89,32 @@ export async function PATCH(
       { status: 500 }
     );
   } finally {
-    if (client) {
-      await client.close();
-    }
+    if (client) await client.close();
   }
 }
 
+// DELETE single asset
 export async function DELETE(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
   let client;
   try {
-    const { id } = await context.params;
-
-    client = await MongoClient.connect(uri);
+    const id = context.params.id;
+    client = await getClient();
     const db = client.db(dbName);
 
-    const result = await db.collection("raw").deleteOne({ _id: new ObjectId(id) });
+    const deleteResult = await db.collection("raw").deleteOne({
+      _id: new ObjectId(id),
+    });
 
-    if (result.deletedCount === 0) {
+    if (deleteResult.deletedCount === 0) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete error:", error);
+    console.error("Error:", error);
     return NextResponse.json(
       {
         error:
@@ -149,8 +123,18 @@ export async function DELETE(
       { status: 500 }
     );
   } finally {
-    if (client) {
-      await client.close();
-    }
+    if (client) await client.close();
   }
+}
+
+// OPTIONS handler for CORS
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

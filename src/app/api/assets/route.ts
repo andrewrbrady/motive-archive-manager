@@ -1,81 +1,118 @@
-import { MongoClient } from 'mongodb';
-import { NextRequest, NextResponse } from 'next/server';
+import { MongoClient } from "mongodb";
+import { NextRequest, NextResponse } from "next/server";
 
-const uri = 'mongodb://localhost:27017';
-const dbName = 'arb_assets';
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+const dbName = process.env.MONGODB_DB || "arb_assets";
+
+async function getClient() {
+  const client = await MongoClient.connect(uri);
+  return client;
+}
 
 export async function GET(request: NextRequest) {
   let client;
   try {
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
-    const searchQuery = searchParams.get('search') || '';
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const search = searchParams.get("search") || "";
+    const sortField = searchParams.get("sortField") || "createdAt";
+    const sortDirection = searchParams.get("sortDirection") || "desc";
     const skip = (page - 1) * limit;
 
-    client = await MongoClient.connect(uri);
+    client = await getClient();
     const db = client.db(dbName);
+    const collection = db.collection("raw");
 
-    const query = searchQuery
+    // Build search query
+    const searchQuery = search
       ? {
           $or: [
-            { name: { $regex: searchQuery, $options: 'i' } },
-            { description: { $regex: searchQuery, $options: 'i' } },
+            { name: { $regex: search, $options: "i" } },
+            { description: { $regex: search, $options: "i" } },
           ],
         }
       : {};
 
-    const [assets, totalCount] = await Promise.all([
-      db
-        .collection('raw')
-        .find(query)
-        .sort({ name: sortOrder === 'desc' ? -1 : 1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
-      db.collection('raw').countDocuments(query),
-    ]);
+    // Build sort object
+    const sortObject: { [key: string]: 1 | -1 } = {
+      [sortField]: sortDirection === "desc" ? -1 : 1,
+    };
+
+    // Get total count with search filter
+    const total = await collection.countDocuments(searchQuery);
+
+    // Get paginated, filtered, and sorted assets
+    const assets = await collection
+      .find(searchQuery)
+      .sort(sortObject)
+      .skip(skip)
+      .limit(limit)
+      .toArray();
 
     return NextResponse.json({
       assets,
       pagination: {
-        totalItems: totalCount,
-        currentPage: page,
-        totalPages: Math.ceil(totalCount / limit),
-        itemsPerPage: limit,
-        sortOrder,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch assets' }, { status: 500 });
+    console.error("Error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to fetch assets",
+      },
+      { status: 500 }
+    );
   } finally {
-    if (client) {
-      await client.close();
-    }
+    if (client) await client.close();
   }
 }
 
 export async function POST(request: NextRequest) {
   let client;
   try {
-    const { name, description, location } = await request.json();
-    if (!name || !description || !location) {
-      return NextResponse.json({ error: 'Name, description, and location are required' }, { status: 400 });
+    const body = await request.json();
+
+    // Validate required fields
+    if (!body.name || !body.description) {
+      return NextResponse.json(
+        { error: "Name and description are required" },
+        { status: 400 }
+      );
     }
 
-    client = await MongoClient.connect(uri);
+    client = await getClient();
     const db = client.db(dbName);
+    const collection = db.collection("raw");
 
-    const newAsset = { name, description, location, createdAt: new Date() };
-    await db.collection('raw').insertOne(newAsset);
+    // Add timestamp to the document
+    const document = {
+      ...body,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    const result = await collection.insertOne(document);
+
+    return NextResponse.json({
+      message: "Asset created successfully",
+      assetId: result.insertedId,
+    });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to add asset' }, { status: 500 });
+    console.error("Error creating asset:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to create asset",
+      },
+      { status: 500 }
+    );
   } finally {
-    if (client) {
-      await client.close();
-    }
+    if (client) await client.close();
   }
 }
