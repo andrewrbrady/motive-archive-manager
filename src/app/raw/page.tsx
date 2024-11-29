@@ -4,9 +4,10 @@ import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import AssetRow from "@/components/raw/AssetRow";
 import Pagination from "@/components/Pagination";
-import SearchBar from "@/components/SearchBar";
+import { FuzzySearchBar } from "@/components/SearchBar";
 import { PencilIcon, ArrowDown, ArrowUp } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import _ from "lodash";
 
 interface Location {
   [key: string]: string;
@@ -45,6 +46,9 @@ const RawPage: React.FC = () => {
   const [sortField, setSortField] = React.useState<SortField>("name");
   const [sortDirection, setSortDirection] =
     React.useState<SortDirection>("desc");
+  const [searchSuggestions, setSearchSuggestions] = React.useState<string[]>(
+    []
+  );
   const [pagination, setPagination] = React.useState<PaginationData>({
     total: 0,
     page: 1,
@@ -78,7 +82,6 @@ const RawPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Update URL with search, sort, and limit params
       const queryString = createQueryString({
         page,
         search: search || null,
@@ -100,6 +103,10 @@ const RawPage: React.FC = () => {
       const data = await response.json();
       setAssets(data.assets);
       setPagination({ ...data.pagination, limit });
+
+      // Update search suggestions based on all asset names
+      const uniqueNames = _.uniq(data.assets.map((asset: Asset) => asset.name));
+      setSearchSuggestions(uniqueNames);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -107,8 +114,14 @@ const RawPage: React.FC = () => {
     }
   };
 
+  const debouncedFetch = React.useCallback(
+    _.debounce((searchValue: string) => {
+      fetchAssets(1, searchValue, sortField, sortDirection, pagination.limit);
+    }, 300),
+    [sortField, sortDirection, pagination.limit]
+  );
+
   const handleSort = () => {
-    // If currently sorting by name, switch to createdAt sorting
     if (sortField === "name") {
       setSortField("createdAt");
       setSortDirection("desc");
@@ -122,12 +135,10 @@ const RawPage: React.FC = () => {
       return;
     }
 
-    // If sorting by createdAt, cycle through directions
     let newDirection: SortDirection;
     if (sortDirection === "asc") {
       newDirection = "desc";
     } else if (sortDirection === "desc") {
-      // Reset to default name sorting
       setSortField("name");
       setSortDirection("desc");
       fetchAssets(
@@ -156,6 +167,13 @@ const RawPage: React.FC = () => {
     fetchAssets(1, searchTerm, sortField, sortDirection, pagination.limit);
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    if (value.length >= 2) {
+      debouncedFetch(value);
+    }
+  };
+
   const handlePageChange = (page: number) => {
     fetchAssets(page, searchTerm, sortField, sortDirection, pagination.limit);
   };
@@ -174,7 +192,6 @@ const RawPage: React.FC = () => {
         if (!response.ok) {
           throw new Error("Failed to delete asset");
         }
-        // Refresh current page after deletion
         fetchAssets(
           pagination.page,
           searchTerm,
@@ -286,10 +303,12 @@ const RawPage: React.FC = () => {
                 <PencilIcon className="w-5 h-5" />
               </Link>
             </div>
-            <SearchBar
+            <FuzzySearchBar
               value={searchTerm}
-              onChange={setSearchTerm}
+              onChange={handleSearchChange}
               onSearch={handleSearch}
+              suggestions={searchSuggestions}
+              maxSuggestions={5}
             />
           </div>
 

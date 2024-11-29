@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
-import { PlusIcon, TrashIcon } from "lucide-react";
+import { PlusIcon, TrashIcon, UploadIcon } from "lucide-react";
+import Papa from "papaparse";
 
 interface LocationPair {
   key: string;
@@ -24,7 +25,9 @@ const AddAssetPage: React.FC = () => {
     { key: "", value: "" },
   ]);
   const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   const handleLocationChange = (
     index: number,
@@ -47,12 +50,94 @@ const AddAssetPage: React.FC = () => {
     );
   };
 
+  const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const assets: Asset[] = [];
+        const errors: string[] = [];
+
+        results.data.forEach((row: any, index: number) => {
+          if (!row.date || !row.description) {
+            errors.push(`Row ${index + 1}: Missing required fields`);
+            return;
+          }
+
+          const locationObj: { [key: string]: string } = {};
+          Object.entries(row).forEach(([key, value]) => {
+            if (key.startsWith("location") && value) {
+              locationObj[`Location ${key.split(" ")[1]}`] = value as string;
+            }
+          });
+
+          assets.push({
+            name: row.date,
+            description: row.description,
+            location: locationObj,
+          });
+        });
+
+        if (errors.length > 0) {
+          setError(`CSV parsing errors:\n${errors.join("\n")}`);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          let successCount = 0;
+          for (const asset of assets) {
+            await handleAssetSubmit(asset);
+            successCount++;
+            setUploadProgress((successCount / assets.length) * 100);
+          }
+          setSuccess(`Successfully imported ${successCount} assets`);
+          setTimeout(() => router.push("/raw"), 2000);
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Failed to import assets"
+          );
+        } finally {
+          setLoading(false);
+          setUploadProgress(0);
+        }
+      },
+      error: (error: Papa.ParseError) => {
+        setError(`Failed to parse CSV: ${error.message}`);
+        setLoading(false);
+      },
+    });
+  };
+
+  const handleAssetSubmit = async (asset: Asset) => {
+    const response = await fetch("/api/assets", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(asset),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to add asset");
+    }
+
+    return response.json();
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Convert locations array to object
     const locationObject = locations.reduce((acc, { key, value }) => {
       if (key.trim() !== "") {
         acc[key.trim()] = value.trim();
@@ -67,19 +152,7 @@ const AddAssetPage: React.FC = () => {
     };
 
     try {
-      const response = await fetch("/api/assets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(asset),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to add asset");
-      }
-
+      await handleAssetSubmit(asset);
       router.push("/raw");
     } catch (err) {
       setError(
@@ -95,12 +168,57 @@ const AddAssetPage: React.FC = () => {
       <Navbar />
       <div className="container mx-auto px-4 py-24">
         <h1 className="text-3xl font-bold mb-6 text-center">Add New Asset</h1>
+
         {error && (
-          <div className="text-red-500 mb-4 text-center">Error: {error}</div>
+          <div className="mb-4 p-4 text-red-700 bg-red-100 border border-red-400 rounded">
+            {error}
+          </div>
         )}
+
+        {success && (
+          <div className="mb-4 p-4 text-green-700 bg-green-100 border border-green-400 rounded">
+            {success}
+          </div>
+        )}
+
+        <div className="mb-8 bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Batch Import</h2>
+          <div className="space-y-4">
+            <label className="block">
+              <span className="text-sm font-medium">Upload CSV</span>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleCSVUpload}
+                className="mt-1 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                disabled={loading}
+              />
+            </label>
+            {uploadProgress > 0 && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-gray-100 text-gray-500">
+              Or add manually
+            </span>
+          </div>
+        </div>
+
         <form
           onSubmit={handleSubmit}
-          className="space-y-6 bg-white shadow-md rounded-lg p-6"
+          className="mt-8 space-y-6 bg-white shadow-md rounded-lg p-6"
         >
           <div>
             <label className="block text-sm font-medium">Name</label>
