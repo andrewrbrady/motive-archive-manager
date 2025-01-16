@@ -7,7 +7,16 @@ interface Engine {
   features: string[];
 }
 
-interface CarImage {
+export interface AIImageAnalysis {
+  angle: string;
+  primaryColor: string;
+  shotType: string;
+  timeOfDay: string;
+  description: string;
+  notableFeatures: string;
+}
+
+export interface CarImage {
   id: string;
   url: string;
   filename: string;
@@ -18,6 +27,7 @@ interface CarImage {
     tod?: string;
     view?: string;
     side?: string;
+    aiAnalysis?: AIImageAnalysis;
   };
   variants?: {
     [key: string]: string;
@@ -30,26 +40,14 @@ export interface Car {
   _id: string;
   brand: string;
   model: string;
-  year: string | number;
-  price: string;
-  mileage: string | number;
-  color: string | number;
-  engine: Engine;
-  horsepower: number | null;
-  condition: "New" | "Used" | "";
-  location: string;
-  description: string;
+  year: number;
+  price?: string;
+  mileage?: string;
+  color?: string;
+  description?: string;
   images: CarImage[];
-  history_report: string;
-  owner_id: string;
-  documents: string[];
-  client: string;
-  type?: string;
-  clientInfo?: {
-    _id: string;
-    name: string;
-    [key: string]: string | undefined;
-  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Client {
