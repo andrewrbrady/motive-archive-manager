@@ -44,11 +44,11 @@ const CarCard: React.FC<CarCardProps> = ({ car }) => {
             </div>
           )}
         </div>
-        <div className="p-4">
-          <h2 className="text-lg font-semibold mb-2">
+        <div className="p-4 h-[160px] flex flex-col justify-between">
+          <h2 className="text-lg font-semibold">
             {car.brand} {car.model} ({car.year})
           </h2>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className="text-sm text-gray-600">{car.price}</p>
             {typeof car.mileage === "number" && !isNaN(car.mileage) && (
               <p className="text-sm text-gray-600">
