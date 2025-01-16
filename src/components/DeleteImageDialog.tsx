@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { X, Loader2, Check } from "lucide-react";
+import { X, Loader2, Check, AlertTriangle } from "lucide-react";
 
 interface DeleteStatus {
   imageId: string;
@@ -36,6 +36,22 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
     return Math.round((completed / deleteStatus.length) * 100);
   };
 
+  const getStatusSummary = () => {
+    const completed = deleteStatus.filter(
+      (status) => status.status === "complete"
+    ).length;
+    const errors = deleteStatus.filter(
+      (status) => status.status === "error"
+    ).length;
+    const pending = deleteStatus.filter(
+      (status) => status.status === "pending" || status.status === "deleting"
+    ).length;
+
+    return { completed, errors, pending };
+  };
+
+  const { completed, errors, pending } = getStatusSummary();
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -56,20 +72,42 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
         {isDeleting ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Deleting images...</span>
-              <span className="text-sm text-gray-500">
+              <div className="space-y-1">
+                <span className="text-sm text-gray-600">
+                  Deleting images...
+                </span>
+                <div className="text-xs text-gray-500 space-x-2">
+                  <span>{completed} completed</span>
+                  {errors > 0 && (
+                    <span className="text-red-500">{errors} failed</span>
+                  )}
+                  {pending > 0 && <span>{pending} pending</span>}
+                </div>
+              </div>
+              <span className="text-sm font-medium">
                 {getOverallProgress()}% Complete
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  errors > 0 ? "bg-red-500" : "bg-blue-500"
+                }`}
                 style={{ width: `${getOverallProgress()}%` }}
               />
             </div>
-            <div className="space-y-3 max-h-60 overflow-y-auto">
+            <div className="space-y-2 max-h-60 overflow-y-auto">
               {deleteStatus.map((status, index) => (
-                <div key={index} className="flex items-center justify-between">
+                <div
+                  key={index}
+                  className={`flex items-center justify-between p-2 rounded-md ${
+                    status.status === "error"
+                      ? "bg-red-50"
+                      : status.status === "complete"
+                      ? "bg-green-50"
+                      : "bg-gray-50"
+                  }`}
+                >
                   <div className="flex items-center gap-2">
                     {status.status === "pending" && (
                       <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
@@ -81,7 +119,7 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
                       <Check className="w-4 h-4 text-green-500" />
                     )}
                     {status.status === "error" && (
-                      <X className="w-4 h-4 text-red-500" />
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
                     )}
                     <span className="text-sm">
                       Image {status.imageId.slice(-6)}
