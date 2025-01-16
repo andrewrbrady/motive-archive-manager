@@ -18,7 +18,7 @@ async function resizeImage(imageUrl: string): Promise<Buffer> {
   const buffer = Buffer.from(arrayBuffer);
 
   return sharp(buffer)
-    .resize(800, 800, {
+    .resize(150, 150, {
       fit: "inside",
       withoutEnlargement: true,
     })
@@ -28,7 +28,7 @@ async function resizeImage(imageUrl: string): Promise<Buffer> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl } = await request.json();
+    const { imageUrl, vehicleInfo } = await request.json();
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -37,39 +37,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const publicImageUrl = `${imageUrl}/public`;
+    const imageResponse = await fetch(`${imageUrl}/public`);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString("base64");
 
-    // Resize image before sending to OpenAI
-    const resizedImageBuffer = await resizeImage(publicImageUrl);
-    const base64Image = resizedImageBuffer.toString("base64");
-    const dataUrl = `data:image/jpeg;base64,${base64Image}`;
+    const vehicleContext = vehicleInfo
+      ? `This is a ${vehicleInfo.year} ${vehicleInfo.brand} ${
+          vehicleInfo.model
+        }${vehicleInfo.type ? ` ${vehicleInfo.type}` : ""}.`
+      : "";
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: `Analyze this car image and provide the following details in JSON format with these exact keys:
-{
-  "angle": "front" | "rear" | "side" | "3/4 front" | "3/4 rear" | "interior" | "engine" | "other",
-  "view": "exterior" | "interior",
-  "movement": "static" | "moving",
-  "tod": "day" | "night" | "dusk/dawn",
-  "side": "driver" | "passenger" | "rear" | "aerial",
-  "primaryColor": string,
-  "description": string,
-  "notableFeatures": string
-}
-
-Choose only from the provided options for each field where options are given. Keep descriptions concise.`,
+              text: `${vehicleContext} Analyze this car image and provide the following details in a JSON format:
+              - angle: The viewing angle of the car (front, rear, side, 3/4 front, 3/4 rear)
+              - view: The type of view (exterior, interior, detail, engine, interior detail, engine detail)
+              - movement: Whether the car appears to be in motion or stationary (static, moving)
+              - tod: The time of day (day, night, dusk, dawn, indoors)
+              - side: Which side of the car is visible (driver, passenger, n/a)
+              - description: A brief description of what's shown in the image`,
             },
             {
               type: "image_url",
               image_url: {
-                url: dataUrl,
+                url: `data:image/jpeg;base64,${base64Image}`,
               },
             },
           ],

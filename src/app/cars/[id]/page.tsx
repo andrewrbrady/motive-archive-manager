@@ -67,8 +67,9 @@ interface Car {
 interface UploadProgress {
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "complete" | "error";
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
   error?: string;
+  currentStep?: string;
 }
 
 interface DeleteStatus {
@@ -149,6 +150,7 @@ export default function CarPage() {
         fileName: file.name,
         progress: 0,
         status: "pending" as const,
+        currentStep: "Preparing upload...",
       }))
     );
 
@@ -157,6 +159,15 @@ export default function CarPage() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
+        formData.append(
+          "vehicleInfo",
+          JSON.stringify({
+            year: car.year,
+            brand: car.brand,
+            model: car.model,
+            type: car.type,
+          })
+        );
 
         const xhr = new XMLHttpRequest();
 
@@ -172,7 +183,12 @@ export default function CarPage() {
               setUploadProgress((prev) =>
                 prev.map((p) =>
                   p.fileName === file.name
-                    ? { ...p, progress, status: "uploading" as const }
+                    ? {
+                        ...p,
+                        progress,
+                        status: "uploading" as const,
+                        currentStep: `Uploading: ${progress}%`,
+                      }
                     : p
                 )
               );
@@ -181,6 +197,18 @@ export default function CarPage() {
 
           xhr.addEventListener("load", () => {
             if (xhr.status >= 200 && xhr.status < 300) {
+              setUploadProgress((prev) =>
+                prev.map((p) =>
+                  p.fileName === file.name
+                    ? {
+                        ...p,
+                        progress: 100,
+                        status: "analyzing" as const,
+                        currentStep: "Analyzing image with AI...",
+                      }
+                    : p
+                )
+              );
               const response = JSON.parse(xhr.responseText);
               resolve({
                 id: response.imageId,
@@ -206,7 +234,12 @@ export default function CarPage() {
           setUploadProgress((prev) =>
             prev.map((p) =>
               p.fileName === file.name
-                ? { ...p, progress: 100, status: "complete" as const }
+                ? {
+                    ...p,
+                    progress: 100,
+                    status: "complete" as const,
+                    currentStep: "Upload complete!",
+                  }
                 : p
             )
           );
@@ -218,10 +251,10 @@ export default function CarPage() {
               ...imageData.metadata,
               angle: imageData.metadata?.aiAnalysis?.angle || "",
               description: imageData.metadata?.aiAnalysis?.description || "",
-              movement: imageData.metadata?.aiAnalysis?.shotType || "",
-              tod: imageData.metadata?.aiAnalysis?.timeOfDay || "",
-              view: "",
-              side: "",
+              movement: imageData.metadata?.aiAnalysis?.movement || "",
+              tod: imageData.metadata?.aiAnalysis?.tod || "",
+              view: imageData.metadata?.aiAnalysis?.view || "",
+              side: imageData.metadata?.aiAnalysis?.side || "",
             },
             variants: {},
             createdAt: new Date().toISOString(),
@@ -235,6 +268,7 @@ export default function CarPage() {
                     ...p,
                     status: "error" as const,
                     error: "Failed to upload image",
+                    currentStep: "Upload failed",
                   }
                 : p
             )
@@ -269,12 +303,17 @@ export default function CarPage() {
                 ...p,
                 status: "error" as const,
                 error: "Upload failed",
+                currentStep: "Upload failed",
               }
             : p
         )
       );
     } finally {
-      setUploadingImages(false);
+      // Wait a moment to show completion status before clearing
+      setTimeout(() => {
+        setUploadingImages(false);
+        setUploadProgress([]);
+      }, 2000);
     }
   };
 
@@ -504,6 +543,12 @@ export default function CarPage() {
               uploading={uploadingImages}
               uploadProgress={uploadProgress}
               showMetadata={true}
+              vehicleInfo={{
+                year: car.year,
+                brand: car.brand,
+                model: car.model,
+                type: car.type,
+              }}
             />
 
             <DeleteImageDialog
