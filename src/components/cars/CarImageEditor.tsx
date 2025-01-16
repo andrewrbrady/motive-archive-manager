@@ -6,7 +6,23 @@ import { Loader2 } from "lucide-react";
 
 interface CarImageEditorProps {
   carId: string;
-  currentImages: string[];
+  currentImages: {
+    id: string;
+    url: string;
+    filename: string;
+    metadata: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+    };
+    variants?: {
+      [key: string]: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }[];
   onImagesUpdate?: () => void;
 }
 
@@ -20,12 +36,17 @@ export default function CarImageEditor({
   const handleImagesChange = async (selectedImages: string[]) => {
     setSaving(true);
     try {
+      // Map the selected image URLs to their corresponding image objects
+      const selectedImageObjects = currentImages.filter((img) =>
+        selectedImages.includes(img.url)
+      );
+
       const response = await fetch(`/api/cars/${carId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ images: selectedImages }),
+        body: JSON.stringify({ images: selectedImageObjects }),
       });
 
       if (!response.ok) {
@@ -35,7 +56,6 @@ export default function CarImageEditor({
       onImagesUpdate?.();
     } catch (error) {
       console.error("Error updating car images:", error);
-      // You might want to add toast notifications here
     } finally {
       setSaving(false);
     }
@@ -54,12 +74,24 @@ export default function CarImageEditor({
       </div>
 
       <ImageManager
-        selectedImages={currentImages}
+        selectedImages={currentImages.map((img) => img.url)}
         onSelect={(imageUrl) => {
-          const newImages = currentImages.includes(imageUrl)
-            ? currentImages.filter((url) => url !== imageUrl)
-            : [...currentImages, imageUrl];
-          handleImagesChange(newImages);
+          const newImages = currentImages
+            .map((img) => img.url)
+            .includes(imageUrl)
+            ? currentImages.filter((img) => img.url !== imageUrl)
+            : [
+                ...currentImages,
+                {
+                  id: imageUrl, // This should be replaced with proper ID generation
+                  url: imageUrl,
+                  filename: imageUrl.split("/").pop() || "",
+                  metadata: {},
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+              ];
+          handleImagesChange(newImages.map((img) => img.url));
         }}
         maxSelection={10}
         showUploader={true}

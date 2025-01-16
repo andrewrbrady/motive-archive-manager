@@ -28,13 +28,34 @@ interface Car {
   condition: string;
   location: string;
   description: string;
-  images: string[];
+  images: {
+    id: string;
+    url: string;
+    filename: string;
+    metadata: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+    };
+    variants?: {
+      [key: string]: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }[];
   owner_id?: string;
   engine?: Engine;
   clientInfo?: {
     _id: string;
     name: string;
-    [key: string]: any;
+    email?: string;
+    phone?: string;
+    address?: string;
+    company?: string;
+    role?: string;
+    [key: string]: string | undefined;
   } | null;
   createdAt: string;
   updatedAt: string;
@@ -64,15 +85,11 @@ export default function CarPage() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [imagesToDelete, setImagesToDelete] = useState<
-    Array<{ index: number; url: string }>
+    Array<{ index: number; image: { id: string; url: string } }>
   >([]);
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const formatImageUrl = (url: string) => {
-    return url.endsWith("/public") ? url : `${url}/public`;
-  };
 
   // Add escape key handler
   useEffect(() => {
@@ -93,8 +110,7 @@ export default function CarPage() {
         const carResponse = await fetch(`/api/cars/${id}`);
         if (!carResponse.ok) throw new Error("Failed to fetch car");
         const carData = await carResponse.json();
-        // Format image URLs when initially loading the car
-        carData.images = (carData.images || []).map(formatImageUrl);
+        // No need to format image URLs anymore as they're now objects
         setCar(carData);
 
         // Then try to fetch documents if available
@@ -142,11 +158,14 @@ export default function CarPage() {
 
         const xhr = new XMLHttpRequest();
 
-        const uploadPromise = new Promise<string>((resolve, reject) => {
+        const uploadPromise = new Promise<{
+          id: string;
+          url: string;
+          filename: string;
+        }>((resolve, reject) => {
           xhr.upload.addEventListener("progress", (event) => {
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded * 100) / event.total);
-              // Update progress in ImageGallery component
               setUploadProgress((prev) =>
                 prev.map((p) =>
                   p.fileName === file.name
@@ -160,7 +179,11 @@ export default function CarPage() {
           xhr.addEventListener("load", () => {
             if (xhr.status >= 200 && xhr.status < 300) {
               const response = JSON.parse(xhr.responseText);
-              resolve(response.imageUrl);
+              resolve({
+                id: response.imageId,
+                url: response.imageUrl,
+                filename: file.name,
+              });
             } else {
               reject(new Error(`Upload failed with status ${xhr.status}`));
             }
@@ -175,8 +198,7 @@ export default function CarPage() {
         });
 
         try {
-          const imageUrl = await uploadPromise;
-          // Update progress to complete for this file
+          const imageData = await uploadPromise;
           setUploadProgress((prev) =>
             prev.map((p) =>
               p.fileName === file.name
@@ -184,9 +206,14 @@ export default function CarPage() {
                 : p
             )
           );
-          return imageUrl;
+          return {
+            ...imageData,
+            metadata: {},
+            variants: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
         } catch (error) {
-          // Update progress to error for this file
           setUploadProgress((prev) =>
             prev.map((p) =>
               p.fileName === file.name
@@ -202,33 +229,25 @@ export default function CarPage() {
         }
       });
 
-      const uploadedUrls = await Promise.all(uploadPromises);
+      const uploadedImages = await Promise.all(uploadPromises);
 
-      // Then update the car with new image URLs
+      // Then update the car with new image objects
       const response = await fetch(`/api/cars/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          images: [
-            ...(car.images || []).map((url) => url.replace("/public", "")),
-            ...uploadedUrls,
-          ],
+          images: [...(car.images || []), ...uploadedImages],
         }),
       });
 
       if (!response.ok) throw new Error("Failed to update car images");
 
       const data = await response.json();
-      // Format all URLs when setting the state
-      setCar((prev) => ({
-        ...prev!,
-        images: (data.images || []).map(formatImageUrl),
-      }));
+      setCar(data);
     } catch (error) {
       console.error("Error uploading images:", error);
-      // Update all pending files to error state
       setUploadProgress((prev) =>
         prev.map((p) =>
           p.status === "pending" || p.status === "uploading"
@@ -249,7 +268,7 @@ export default function CarPage() {
     if (!car) return;
     const imagesToRemove = indices.map((index) => ({
       index,
-      url: car.images[index].replace("/public", ""),
+      image: car.images[index],
     }));
     setImagesToDelete(imagesToRemove);
     setDeleteDialogOpen(true);
@@ -263,8 +282,8 @@ export default function CarPage() {
       if (deleteFromCloudflare) {
         setIsDeleting(true);
         setDeleteStatus(
-          imagesToDelete.map(({ url }) => ({
-            imageId: url.split("/").pop()?.split("?")[0] || "",
+          imagesToDelete.map(({ image }) => ({
+            imageId: image.id,
             status: "pending",
           }))
         );
@@ -272,9 +291,7 @@ export default function CarPage() {
 
       // First remove from car
       const indicesToRemove = new Set(imagesToDelete.map((img) => img.index));
-      const newImages = car.images
-        .map((url) => url.replace("/public", ""))
-        .filter((_, i) => !indicesToRemove.has(i));
+      const newImages = car.images.filter((_, i) => !indicesToRemove.has(i));
 
       const response = await fetch(`/api/cars/${id}`, {
         method: "PATCH",
@@ -289,8 +306,8 @@ export default function CarPage() {
       // If also deleting from Cloudflare
       if (deleteFromCloudflare) {
         await Promise.all(
-          imagesToDelete.map(async ({ url }, index) => {
-            const imageId = url.split("/").pop()?.split("?")[0];
+          imagesToDelete.map(async ({ image }, index) => {
+            const imageId = image.id;
             if (imageId) {
               try {
                 // Update status to deleting
@@ -349,7 +366,7 @@ export default function CarPage() {
       // Update local state
       setCar((prev) => ({
         ...prev!,
-        images: newImages.map(formatImageUrl),
+        images: newImages,
       }));
     } catch (error) {
       console.error("Error removing images:", error);
@@ -461,12 +478,13 @@ export default function CarPage() {
             />
 
             <ImageGallery
-              images={car.images || []}
+              images={car.images}
               isEditMode={isEditMode}
               onRemoveImage={handleRemoveImage}
               onImagesChange={handleImageUpload}
               uploading={uploadingImages}
               uploadProgress={uploadProgress}
+              showMetadata={true}
             />
 
             <DeleteImageDialog
