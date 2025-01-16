@@ -16,6 +16,14 @@ import {
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
 
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  error?: string;
+  currentStep?: string;
+}
+
 interface ImageGalleryProps {
   images: {
     id: string;
@@ -43,14 +51,15 @@ interface ImageGalleryProps {
   onRemoveImage?: (indices: number[]) => void;
   onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
-  uploadProgress?: {
-    fileName: string;
-    progress: number;
-    status: "pending" | "uploading" | "complete" | "error";
-    error?: string;
-  }[];
+  uploadProgress?: UploadProgress[];
   showMetadata?: boolean;
   showFilters?: boolean;
+  vehicleInfo?: {
+    year: number;
+    brand: string;
+    model: string;
+    type?: string;
+  };
 }
 
 const MetadataSection = ({
@@ -146,8 +155,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onRemoveImage,
   onImagesChange,
   uploading = false,
+  uploadProgress = [],
   showMetadata = true,
   showFilters = true,
+  vehicleInfo,
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -619,6 +630,50 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           >
             <ChevronRight className="w-8 h-8" />
           </button>
+        </div>
+      )}
+
+      {/* Upload Progress */}
+      {uploadProgress.length > 0 && (
+        <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
+          <h3 className="text-sm font-medium">Upload Progress</h3>
+          {uploadProgress.map((progress, index) => (
+            <div key={index} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="truncate">{progress.fileName}</span>
+                <span className="text-gray-500">{progress.currentStep}</span>
+              </div>
+              <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`absolute left-0 top-0 h-full transition-all duration-300 ${
+                    progress.status === "error"
+                      ? "bg-red-500"
+                      : progress.status === "complete"
+                      ? "bg-green-500"
+                      : "bg-blue-500"
+                  }`}
+                  style={{ width: `${progress.progress}%` }}
+                />
+              </div>
+              {progress.error && (
+                <p className="text-sm text-red-500">{progress.error}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Vehicle Info */}
+      {vehicleInfo && (
+        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+          <h3 className="text-lg font-semibold">
+            {vehicleInfo.year} {vehicleInfo.brand} {vehicleInfo.model}
+            {vehicleInfo.type && (
+              <span className="text-sm text-gray-500 ml-2">
+                {vehicleInfo.type}
+              </span>
+            )}
+          </h3>
         </div>
       )}
     </div>
