@@ -18,10 +18,18 @@ export async function GET(
 ) {
   const client = await getMongoClient();
   try {
-    const { id } = context.params;
+    const { id } = await Promise.resolve(context.params);
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
+    const objectId = new ObjectId(id);
+
     const db = client.db(DB_NAME);
     const car = await db.collection("cars").findOne({
-      _id: new ObjectId(id),
+      _id: objectId,
     });
 
     if (!car) {
@@ -30,6 +38,7 @@ export async function GET(
 
     return NextResponse.json(car);
   } catch (error) {
+    console.error("Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });
   } finally {
     await client.close();
@@ -43,7 +52,14 @@ export async function PUT(
 ) {
   const client = await getMongoClient();
   try {
-    const { id } = context.params;
+    const { id } = await Promise.resolve(context.params);
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
+    const objectId = new ObjectId(id);
     const updates = await request.json();
 
     // Remove _id from updates if present to prevent MongoDB errors
@@ -52,7 +68,7 @@ export async function PUT(
     const db = client.db(DB_NAME);
     const result = await db
       .collection("cars")
-      .updateOne({ _id: new ObjectId(id) }, { $set: updates });
+      .updateOne({ _id: objectId }, { $set: updates });
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
@@ -60,11 +76,12 @@ export async function PUT(
 
     // Fetch and return the updated car
     const updatedCar = await db.collection("cars").findOne({
-      _id: new ObjectId(id),
+      _id: objectId,
     });
 
     return NextResponse.json(updatedCar);
   } catch (error) {
+    console.error("Error updating car:", error);
     return NextResponse.json(
       { error: "Failed to update car" },
       { status: 500 }
@@ -81,12 +98,19 @@ export async function DELETE(
 ) {
   const client = await getMongoClient();
   try {
-    const { id } = context.params;
+    const { id } = await Promise.resolve(context.params);
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
+    const objectId = new ObjectId(id);
     const db = client.db(DB_NAME);
 
     // First, get the car to check if it exists and get associated documents
     const car = await db.collection("cars").findOne({
-      _id: new ObjectId(id),
+      _id: objectId,
     });
 
     if (!car) {
@@ -96,19 +120,20 @@ export async function DELETE(
     // Delete associated documents if they exist
     if (car.documents?.length > 0) {
       await db.collection("receipts").deleteMany({
-        _id: { $in: car.documents.map((id: string) => new ObjectId(id)) },
+        _id: { $in: car.documents.map((docId: string) => new ObjectId(docId)) },
       });
     }
 
     // Delete the car
     await db.collection("cars").deleteOne({
-      _id: new ObjectId(id),
+      _id: objectId,
     });
 
     return NextResponse.json({
       message: "Car and associated documents deleted successfully",
     });
   } catch (error) {
+    console.error("Error deleting car:", error);
     return NextResponse.json(
       { error: "Failed to delete car" },
       { status: 500 }
@@ -125,20 +150,32 @@ export async function PATCH(
 ) {
   const client = await getMongoClient();
   try {
-    const { id } = context.params;
+    const { id } = await Promise.resolve(context.params);
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
+    const objectId = new ObjectId(id);
     const body = await request.json();
     const { documentId, images } = body;
     const db = client.db(DB_NAME);
 
     // Handle document removal
     if (documentId) {
+      if (!ObjectId.isValid(documentId)) {
+        return NextResponse.json(
+          { error: "Invalid document ID format" },
+          { status: 400 }
+        );
+      }
+      const docObjectId = new ObjectId(documentId);
+
       // Remove document reference from car
       const updateResult = await db
         .collection("cars")
-        .updateOne(
-          { _id: new ObjectId(id) },
-          { $pull: { documents: documentId } }
-        );
+        .updateOne({ _id: objectId }, { $pull: { documents: documentId } });
 
       if (updateResult.matchedCount === 0) {
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
@@ -146,7 +183,7 @@ export async function PATCH(
 
       // Delete the document from receipts collection
       await db.collection("receipts").deleteOne({
-        _id: new ObjectId(documentId),
+        _id: docObjectId,
       });
 
       return NextResponse.json({ message: "Document removed successfully" });
@@ -163,7 +200,7 @@ export async function PATCH(
 
       const updateResult = await db
         .collection("cars")
-        .updateOne({ _id: new ObjectId(id) }, { $set: { images } });
+        .updateOne({ _id: objectId }, { $set: { images } });
 
       if (updateResult.matchedCount === 0) {
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
@@ -171,7 +208,7 @@ export async function PATCH(
 
       // Fetch the updated car to return the new state
       const updatedCar = await db.collection("cars").findOne({
-        _id: new ObjectId(id),
+        _id: objectId,
       });
 
       return NextResponse.json(updatedCar);
