@@ -28,6 +28,7 @@ interface Car {
   condition: string;
   location: string;
   description: string;
+  type?: string;
   images: {
     id: string;
     url: string;
@@ -38,6 +39,7 @@ interface Car {
       movement?: string;
       tod?: string;
       view?: string;
+      side?: string;
     };
     variants?: {
       [key: string]: string;
@@ -207,8 +209,17 @@ export default function CarPage() {
             )
           );
           return {
-            ...imageData,
-            metadata: {},
+            id: imageData.id,
+            url: imageData.url,
+            filename: imageData.filename,
+            metadata: {
+              angle: "",
+              description: "",
+              movement: "",
+              tod: "",
+              view: "",
+              side: "",
+            },
             variants: {},
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
