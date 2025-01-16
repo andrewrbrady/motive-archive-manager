@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, X, ZoomIn, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ZoomIn,
+  Loader2,
+  Check,
+} from "lucide-react";
 import Image from "next/image";
 
 interface UploadProgress {
@@ -18,7 +25,7 @@ interface ImageGalleryProps {
   thumbnailsPerRow?: number;
   rowsPerPage?: number;
   isEditMode?: boolean;
-  onRemoveImage?: (index: number) => void;
+  onRemoveImage?: (indices: number[]) => void;
   onImagesChange?: (files: FileList) => Promise<void>;
   uploading?: boolean;
   uploadProgress: UploadProgress[];
@@ -42,6 +49,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [startX, setStartX] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isMainVisible, setIsMainVisible] = useState(true);
+  const [selectedImages, setSelectedImages] = useState<number[]>([]);
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -195,6 +203,38 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     currentPage * itemsPerPage
   );
 
+  const handleImageSelect = (index: number, event: React.MouseEvent) => {
+    if (!isEditMode) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    setSelectedImages((prev) => {
+      const isSelected = prev.includes(index);
+      if (isSelected) {
+        return prev.filter((i) => i !== index);
+      } else {
+        return [...prev, index];
+      }
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    if (onRemoveImage && selectedImages.length > 0) {
+      onRemoveImage(selectedImages);
+      setSelectedImages([]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedImages.length === images.length) {
+      // If all are selected, deselect all
+      setSelectedImages([]);
+    } else {
+      // Select all images
+      setSelectedImages(images.map((_, index) => index));
+    }
+  };
+
   if (!images || images.length === 0) {
     return (
       <div className="space-y-4">
@@ -305,36 +345,89 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       <div className="space-y-4">
         {isEditMode && (
-          <div className="flex justify-end gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              className="hidden"
-              multiple
-              accept="image/*"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
-            >
-              {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {uploading ? "Uploading..." : "Add Images"}
-            </button>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSelectAll}
+                className={`px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2 ${
+                  selectedImages.length === images.length
+                    ? "border-blue-200 text-blue-600"
+                    : "border-gray-200 text-gray-600"
+                }`}
+              >
+                {selectedImages.length === images.length ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Deselect All
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 9l7 7L20 5"
+                      />
+                    </svg>
+                    Select All
+                  </>
+                )}
+              </button>
+              {selectedImages.length > 0 && (
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Delete Selected ({selectedImages.length})
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                multiple
+                accept="image/*"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+              >
+                {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {uploading ? "Uploading..." : "Add Images"}
+              </button>
+            </div>
           </div>
         )}
 
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
           {paginatedImages.map((image, index) => {
             const actualIndex = (currentPage - 1) * itemsPerPage + index;
+            const isSelected = selectedImages.includes(actualIndex);
             return (
               <div key={actualIndex} className="relative group">
                 <button
-                  onClick={() => setMainIndex(actualIndex)}
+                  onClick={() => {
+                    if (!isEditMode) {
+                      setMainIndex(actualIndex);
+                    }
+                  }}
+                  onContextMenu={(e) => handleImageSelect(actualIndex, e)}
                   className={`aspect-square relative w-full transition-opacity duration-200 ${
-                    actualIndex === mainIndex
+                    actualIndex === mainIndex && !isEditMode
                       ? "ring-2 ring-blue-500"
+                      : isSelected
+                      ? "ring-2 ring-green-500"
                       : "opacity-75 hover:opacity-100"
                   }`}
                   aria-label={`View image ${actualIndex + 1}`}
@@ -345,16 +438,33 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     alt={`Thumbnail ${actualIndex + 1}`}
                     className="w-full h-full object-cover rounded-md"
                   />
+                  {isEditMode && (
+                    <div
+                      onClick={(e) => handleImageSelect(actualIndex, e)}
+                      className={`absolute top-2 left-2 w-5 h-5 rounded border-2 ${
+                        isSelected
+                          ? "bg-green-500 border-green-500"
+                          : "border-white bg-black/20"
+                      } cursor-pointer transition-colors duration-200`}
+                    >
+                      {isSelected && (
+                        <svg
+                          className="w-full h-full text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  )}
                 </button>
-                {isEditMode && onRemoveImage && (
-                  <button
-                    onClick={() => onRemoveImage(actualIndex)}
-                    className="absolute top-1 right-1 p-1 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label={`Remove image ${actualIndex + 1}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
               </div>
             );
           })}
@@ -406,8 +516,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           />
           <button
             onClick={handlePrev}
-            className="absolute left-4 p-2 text-wh:w
-            ite"
+            className="absolute left-4 p-2 text-white"
             aria-label="Previous image"
           >
             <ChevronLeft className="w-8 h-8" />
