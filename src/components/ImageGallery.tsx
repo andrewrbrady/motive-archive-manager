@@ -98,10 +98,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        handlePrev();
+        if (e.shiftKey) {
+          handlePageChange(currentPage - 1);
+        } else {
+          handlePrev();
+        }
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        handleNext();
+        if (e.shiftKey) {
+          handlePageChange(currentPage + 1);
+        } else {
+          handleNext();
+        }
       } else if (e.key === "Escape" && isModalOpen) {
         setIsModalOpen(false);
       }
@@ -109,7 +117,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNext, handlePrev, isModalOpen]);
+  }, [handleNext, handlePrev, isModalOpen, currentPage]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].clientX);
@@ -127,6 +135,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
+      // Update mainIndex to first image of new page
+      const firstImageIndex = (newPage - 1) * itemsPerPage;
+      if (firstImageIndex < images.length) {
+        setMainIndex(firstImageIndex);
+      }
     }
   };
 
@@ -287,212 +300,218 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     <div className="space-y-4">
       <UploadProgressOverlay />
 
-      <div
-        ref={mainImageRef}
-        className={`sticky top-4 mb-4 transition-opacity duration-300 ${
-          isMainVisible ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <div
-          className={`relative aspect-[${aspectRatio}] w-full overflow-hidden rounded-lg bg-gray-100`}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <img
-            src={images[mainIndex]}
-            alt={
-              title
-                ? `${title} - View ${mainIndex + 1}`
-                : `View ${mainIndex + 1} of ${images.length}`
-            }
-            className="w-full h-full object-cover"
-          />
-          {uploading && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <div className="bg-white rounded-lg p-4 flex items-center gap-3">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                <span className="text-sm font-medium">Uploading images...</span>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={() => {
-              setModalIndex(mainIndex);
-              setIsModalOpen(true);
-            }}
-            className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
-            aria-label="Open fullscreen view"
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <div
+            ref={mainImageRef}
+            className={`sticky top-4 transition-opacity duration-300 ${
+              isMainVisible ? "opacity-100" : "opacity-0"
+            }`}
           >
-            <ZoomIn className="w-5 h-5" />
-          </button>
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
-          <button
-            onClick={handlePrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
-            aria-label="Previous image"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
-            aria-label="Next image"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {isEditMode && (
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSelectAll}
-                className={`px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2 ${
-                  selectedImages.length === images.length
-                    ? "border-blue-200 text-blue-600"
-                    : "border-gray-200 text-gray-600"
-                }`}
-              >
-                {selectedImages.length === images.length ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Deselect All
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 9l7 7L20 5"
-                      />
-                    </svg>
-                    Select All
-                  </>
-                )}
-              </button>
-              {selectedImages.length > 0 && (
-                <button
-                  onClick={handleDeleteSelected}
-                  className="px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  Delete Selected ({selectedImages.length})
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                className="hidden"
-                multiple
-                accept="image/*"
+            <div
+              className={`relative aspect-[${aspectRatio}] w-full overflow-hidden rounded-lg bg-gray-100`}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <img
+                src={images[mainIndex]}
+                alt={
+                  title
+                    ? `${title} - View ${mainIndex + 1}`
+                    : `View ${mainIndex + 1} of ${images.length}`
+                }
+                className="w-full h-full object-cover"
               />
+              {uploading && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                  <div className="bg-white rounded-lg p-4 flex items-center gap-3">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                    <span className="text-sm font-medium">
+                      Uploading images...
+                    </span>
+                  </div>
+                </div>
+              )}
               <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+                onClick={() => {
+                  setModalIndex(mainIndex);
+                  setIsModalOpen(true);
+                }}
+                className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                aria-label="Open fullscreen view"
               >
-                {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {uploading ? "Uploading..." : "Add Images"}
+                <ZoomIn className="w-5 h-5" />
+              </button>
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
+              <button
+                onClick={handlePrev}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleNext}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
           </div>
-        )}
+        </div>
 
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-          {paginatedImages.map((image, index) => {
-            const actualIndex = (currentPage - 1) * itemsPerPage + index;
-            const isSelected = selectedImages.includes(actualIndex);
-            return (
-              <div key={actualIndex} className="relative group">
+        <div className="w-96 space-y-4">
+          {isEditMode && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    if (!isEditMode) {
-                      setMainIndex(actualIndex);
-                    }
-                  }}
-                  onContextMenu={(e) => handleImageSelect(actualIndex, e)}
-                  className={`aspect-square relative w-full transition-opacity duration-200 ${
-                    actualIndex === mainIndex && !isEditMode
-                      ? "ring-2 ring-blue-500"
-                      : isSelected
-                      ? "ring-2 ring-green-500"
-                      : "opacity-75 hover:opacity-100"
+                  onClick={handleSelectAll}
+                  className={`px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2 w-full ${
+                    selectedImages.length === images.length
+                      ? "border-blue-200 text-blue-600"
+                      : "border-gray-200 text-gray-600"
                   }`}
-                  aria-label={`View image ${actualIndex + 1}`}
-                  aria-current={actualIndex === mainIndex ? "true" : "false"}
                 >
-                  <img
-                    src={image}
-                    alt={`Thumbnail ${actualIndex + 1}`}
-                    className="w-full h-full object-cover rounded-md"
-                  />
-                  {isEditMode && (
-                    <div
-                      onClick={(e) => handleImageSelect(actualIndex, e)}
-                      className={`absolute top-2 left-2 w-5 h-5 rounded border-2 ${
-                        isSelected
-                          ? "bg-green-500 border-green-500"
-                          : "border-white bg-black/20"
-                      } cursor-pointer transition-colors duration-200`}
-                    >
-                      {isSelected && (
-                        <svg
-                          className="w-full h-full text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )}
-                    </div>
+                  {selectedImages.length === images.length ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Deselect All
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 9l7 7L20 5"
+                        />
+                      </svg>
+                      Select All
+                    </>
                   )}
                 </button>
               </div>
-            );
-          })}
-        </div>
+              {selectedImages.length > 0 && (
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center gap-2 w-full justify-center"
+                >
+                  <X className="w-4 h-4" />
+                  Delete ({selectedImages.length})
+                </button>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  multiple
+                  accept="image/*"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 w-full justify-center"
+                >
+                  {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {uploading ? "Uploading..." : "Add Images"}
+                </button>
+              </div>
+            </div>
+          )}
 
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-4">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <span className="text-sm">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+          <div className="grid grid-cols-4 gap-2">
+            {paginatedImages.map((image, index) => {
+              const actualIndex = (currentPage - 1) * itemsPerPage + index;
+              const isSelected = selectedImages.includes(actualIndex);
+              return (
+                <div key={actualIndex} className="relative group">
+                  <button
+                    onClick={() => {
+                      if (!isEditMode) {
+                        setMainIndex(actualIndex);
+                      }
+                    }}
+                    onContextMenu={(e) => handleImageSelect(actualIndex, e)}
+                    className={`aspect-square relative w-full transition-opacity duration-200 ${
+                      actualIndex === mainIndex && !isEditMode
+                        ? "ring-2 ring-blue-500"
+                        : isSelected
+                        ? "ring-2 ring-green-500"
+                        : "opacity-75 hover:opacity-100"
+                    }`}
+                    aria-label={`View image ${actualIndex + 1}`}
+                    aria-current={actualIndex === mainIndex ? "true" : "false"}
+                  >
+                    <img
+                      src={image}
+                      alt={`Thumbnail ${actualIndex + 1}`}
+                      className="w-full h-full object-cover rounded-md"
+                    />
+                    {isEditMode && (
+                      <div
+                        onClick={(e) => handleImageSelect(actualIndex, e)}
+                        className={`absolute top-2 left-2 w-5 h-5 rounded border-2 ${
+                          isSelected
+                            ? "bg-green-500 border-green-500"
+                            : "border-white bg-black/20"
+                        } cursor-pointer transition-colors duration-200`}
+                      >
+                        {isSelected && (
+                          <svg
+                            className="w-full h-full text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        )}
+
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="text-sm">
+                {currentPage}/{totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
+                aria-label="Next page"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {isModalOpen && (
