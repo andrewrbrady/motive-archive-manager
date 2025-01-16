@@ -2,9 +2,26 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
+import { transformImageUrl, imagePresets } from "@/lib/imageTransform";
 
 interface ImageGalleryProps {
-  images: string[];
+  images: {
+    id: string;
+    url: string;
+    filename: string;
+    metadata: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+    };
+    variants?: {
+      [key: string]: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }[];
 }
 
 export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
@@ -117,10 +134,36 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
           onTouchEnd={handleTouchEnd}
         >
           <img
-            src={images[mainIndex]}
+            src={transformImageUrl(
+              `${images[mainIndex].url}/public`,
+              imagePresets.mainView
+            )}
             alt={`Vehicle view ${mainIndex + 1} of ${images.length}`}
             className="w-full h-full object-cover"
           />
+          {images[mainIndex].metadata && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-sm">
+              <div className="flex flex-wrap gap-2">
+                {images[mainIndex].metadata.angle && (
+                  <span>Angle: {images[mainIndex].metadata.angle}</span>
+                )}
+                {images[mainIndex].metadata.view && (
+                  <span>View: {images[mainIndex].metadata.view}</span>
+                )}
+                {images[mainIndex].metadata.tod && (
+                  <span>Time: {images[mainIndex].metadata.tod}</span>
+                )}
+                {images[mainIndex].metadata.movement && (
+                  <span>Movement: {images[mainIndex].metadata.movement}</span>
+                )}
+                {images[mainIndex].metadata.description && (
+                  <span>
+                    Description: {images[mainIndex].metadata.description}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <button
             onClick={() => {
               setModalIndex(mainIndex);
@@ -166,7 +209,10 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 aria-current={actualIndex === mainIndex ? "true" : "false"}
               >
                 <img
-                  src={image}
+                  src={transformImageUrl(
+                    `${image.url}/public`,
+                    imagePresets.thumbnail
+                  )}
                   alt={`Thumbnail ${actualIndex + 1}`}
                   className="w-full h-full object-cover rounded-md"
                 />
@@ -215,7 +261,10 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
             <X className="w-6 h-6" />
           </button>
           <img
-            src={images[modalIndex]}
+            src={transformImageUrl(
+              `${images[modalIndex].url}/public`,
+              imagePresets.fullscreen
+            )}
             alt={`Full size view ${modalIndex + 1} of ${images.length}`}
             className="max-w-full max-h-[90vh] object-contain"
           />

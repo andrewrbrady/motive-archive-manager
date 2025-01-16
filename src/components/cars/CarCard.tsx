@@ -11,7 +11,23 @@ interface Car {
   price: string;
   mileage: string | number;
   color: string | number;
-  images?: string[];
+  images?: {
+    id: string;
+    url: string;
+    filename: string;
+    metadata: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+    };
+    variants?: {
+      [key: string]: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }[];
   clientInfo?: {
     name: string;
   };
@@ -23,7 +39,7 @@ interface CarCardProps {
 
 const CarCard: React.FC<CarCardProps> = ({ car }) => {
   const thumbnail =
-    car.images && car.images.length > 0 ? `${car.images[0]}/public` : null;
+    car.images && car.images.length > 0 ? `${car.images[0].url}/public` : null;
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">

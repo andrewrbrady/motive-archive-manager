@@ -8,50 +8,52 @@ import {
   ZoomIn,
   Loader2,
   Check,
-  Edit,
   Compass,
   Eye,
   Sun,
   Move,
 } from "lucide-react";
-import Image from "next/image";
-import {
-  getCloudflareImageMetadata,
-  extractImageIdFromUrl,
-} from "@/lib/cloudflare";
-import { ImageMetadataEditor } from "./ImageMetadataEditor";
 import { cn } from "@/lib/utils";
 
-interface UploadProgress {
-  fileName: string;
-  progress: number;
-  status: "pending" | "uploading" | "complete" | "error";
-  error?: string;
-}
-
 interface ImageGalleryProps {
-  images: string[];
+  images: {
+    id: string;
+    url: string;
+    filename: string;
+    metadata: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+    };
+    variants?: {
+      [key: string]: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }[];
   title?: string;
   aspectRatio?: string;
   thumbnailsPerRow?: number;
   rowsPerPage?: number;
   isEditMode?: boolean;
   onRemoveImage?: (indices: number[]) => void;
-  onImagesChange?: (files: FileList) => Promise<void>;
+  onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
-  uploadProgress: UploadProgress[];
+  showMetadata?: boolean;
 }
 
 const MetadataSection = ({
   metadata,
   currentIndex,
 }: {
-  metadata: Record<string, any>[];
+  metadata: ImageGalleryProps["images"];
   currentIndex: number;
 }) => {
   if (!metadata.length || !metadata[currentIndex]) return null;
 
-  const currentMetadata = metadata[currentIndex];
+  const currentMetadata = metadata[currentIndex].metadata;
 
   return (
     <div className="bg-white rounded-lg shadow p-3">
@@ -135,7 +137,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onRemoveImage,
   onImagesChange,
   uploading = false,
-  uploadProgress = [],
+  showMetadata = true,
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -146,16 +148,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [cloudflareMetadata, setCloudflareMetadata] = useState<
-    Record<string, any>[]
-  >([]);
-  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
-  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(
-    null
-  );
-  const [loadedImages, setLoadedImages] = useState<{ [key: string]: boolean }>(
-    {}
-  );
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
 
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
@@ -203,18 +195,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (e.shiftKey) {
-          handlePageChange(currentPage - 1);
-        } else {
-          handlePrev();
-        }
+        handlePrev();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (e.shiftKey) {
-          handlePageChange(currentPage + 1);
-        } else {
-          handleNext();
-        }
+        handleNext();
       } else if (e.key === "Escape" && isModalOpen) {
         setIsModalOpen(false);
       }
@@ -222,7 +206,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNext, handlePrev, isModalOpen, currentPage]);
+  }, [handleNext, handlePrev, isModalOpen]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].clientX);
@@ -240,86 +224,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
-      // Update mainIndex to first image of new page
-      const firstImageIndex = (newPage - 1) * itemsPerPage;
-      if (firstImageIndex < images.length) {
-        setMainIndex(firstImageIndex);
-      }
     }
   };
 
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    if (event.target.files && onImagesChange) {
-      await onImagesChange(event.target.files);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && onImagesChange) {
+      onImagesChange(e.target.files);
     }
   };
-
-  const getOverallProgress = () => {
-    if (uploadProgress.length === 0) return 0;
-    const total = uploadProgress.reduce((sum, file) => sum + file.progress, 0);
-    return Math.round(total / uploadProgress.length);
-  };
-
-  const UploadProgressOverlay = () => {
-    if (!uploading || uploadProgress.length === 0) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Uploading Images</h3>
-              <span className="text-sm text-gray-500">
-                {getOverallProgress()}% Complete
-              </span>
-            </div>
-
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
-                style={{ width: `${getOverallProgress()}%` }}
-              />
-            </div>
-
-            <div className="space-y-3 max-h-60 overflow-y-auto">
-              {uploadProgress.map((file, index) => (
-                <div key={index} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="truncate max-w-[200px]">
-                      {file.fileName}
-                    </span>
-                    <span className="text-gray-500">{file.progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full transition-all duration-300 ${
-                        file.status === "error"
-                          ? "bg-red-500"
-                          : file.status === "complete"
-                          ? "bg-green-500"
-                          : "bg-blue-500"
-                      }`}
-                      style={{ width: `${file.progress}%` }}
-                    />
-                  </div>
-                  {file.error && (
-                    <p className="text-xs text-red-500">{file.error}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const paginatedImages = images.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
 
   const handleImageSelect = (index: number, event: React.MouseEvent) => {
     if (!isEditMode) return;
@@ -343,119 +255,39 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  const handleSelectAll = () => {
-    if (selectedImages.length === images.length) {
-      // If all are selected, deselect all
-      setSelectedImages([]);
-    } else {
-      // Select all images
-      setSelectedImages(images.map((_, index) => index));
-    }
-  };
-
-  // Fetch Cloudflare metadata for images
-  useEffect(() => {
-    const fetchMetadata = async () => {
-      setIsLoadingMetadata(true);
-      try {
-        const metadataPromises = images.map(async (imageUrl) => {
-          const imageId = extractImageIdFromUrl(imageUrl);
-          if (!imageId) return null;
-          return getCloudflareImageMetadata(imageId);
-        });
-
-        const results = await Promise.all(metadataPromises);
-        setCloudflareMetadata(
-          results.filter((meta): meta is Record<string, any> => meta !== null)
-        );
-      } catch (error) {
-        console.error("Error fetching image metadata:", error);
-      } finally {
-        setIsLoadingMetadata(false);
-      }
-    };
-
-    if (images.length > 0) {
-      fetchMetadata();
-    }
-  }, [images]);
-
-  // Function to handle image load
-  const handleImageLoad = (imageUrl: string) => {
-    setLoadedImages((prev) => ({
-      ...prev,
-      [imageUrl]: true,
-    }));
-  };
+  const paginatedImages = images.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   if (!images || images.length === 0) {
     return (
-      <div className="space-y-4">
-        <UploadProgressOverlay />
-        <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg overflow-hidden">
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-            <div className="text-gray-400 text-center space-y-2">
-              <svg
-                className="mx-auto h-12 w-12"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <p className="text-sm font-medium">No images available</p>
-            </div>
-          </div>
+      <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-gray-400">No images available</span>
         </div>
-        {isEditMode && (
-          <div className="flex justify-center">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              className="hidden"
-              multiple
-              accept="image/*"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 font-medium"
-            >
-              {uploading && <Loader2 className="w-5 h-5 animate-spin" />}
-              {uploading ? "Uploading..." : "Upload Vehicle Images"}
-            </button>
-          </div>
-        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <UploadProgressOverlay />
-
       <div className="flex gap-6">
         <div className="w-2/3 space-y-3">
           <div
             ref={mainImageRef}
-            className={`sticky top-4 transition-opacity duration-300 ${
+            className={`sticky top-4 mb-4 transition-opacity duration-300 ${
               isMainVisible ? "opacity-100" : "opacity-0"
             }`}
           >
             <div
-              className={`relative aspect-[${aspectRatio}] w-full overflow-hidden rounded-lg bg-gray-100`}
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-gray-100"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
               {!mainImageLoaded && <ImageSkeleton aspectRatio={aspectRatio} />}
               <img
-                src={images[mainIndex]}
+                src={`${images[mainIndex].url}/public`}
                 alt={
                   title
                     ? `${title} - View ${mainIndex + 1}`
@@ -467,6 +299,31 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 )}
                 onLoad={() => setMainImageLoaded(true)}
               />
+              {showMetadata && images[mainIndex]?.metadata && (
+                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-sm">
+                  <div className="flex flex-wrap gap-2">
+                    {images[mainIndex].metadata.angle && (
+                      <span>Angle: {images[mainIndex].metadata.angle}</span>
+                    )}
+                    {images[mainIndex].metadata.view && (
+                      <span>View: {images[mainIndex].metadata.view}</span>
+                    )}
+                    {images[mainIndex].metadata.tod && (
+                      <span>Time: {images[mainIndex].metadata.tod}</span>
+                    )}
+                    {images[mainIndex].metadata.movement && (
+                      <span>
+                        Movement: {images[mainIndex].metadata.movement}
+                      </span>
+                    )}
+                    {images[mainIndex].metadata.description && (
+                      <span>
+                        Description: {images[mainIndex].metadata.description}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               {uploading && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <div className="bg-white rounded-lg p-4 flex items-center gap-3">
@@ -487,7 +344,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               >
                 <ZoomIn className="w-5 h-5" />
               </button>
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
               <button
                 onClick={handlePrev}
                 className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
@@ -505,10 +361,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
           </div>
 
-          <MetadataSection
-            metadata={cloudflareMetadata}
-            currentIndex={mainIndex}
-          />
+          <MetadataSection metadata={images} currentIndex={mainIndex} />
         </div>
 
         <div className="w-1/3 space-y-4">
@@ -516,47 +369,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleSelectAll}
+                  onClick={handleDeleteSelected}
+                  disabled={selectedImages.length === 0}
                   className={`px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2 w-full ${
-                    selectedImages.length === images.length
-                      ? "border-blue-200 text-blue-600"
-                      : "border-gray-200 text-gray-600"
+                    selectedImages.length > 0
+                      ? "border-red-200 text-red-600"
+                      : "border-gray-200 text-gray-400"
                   }`}
                 >
-                  {selectedImages.length === images.length ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      Deselect All
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 9l7 7L20 5"
-                        />
-                      </svg>
-                      Select All
-                    </>
-                  )}
+                  <X className="w-4 h-4" />
+                  Delete Selected ({selectedImages.length})
                 </button>
               </div>
-              {selectedImages.length > 0 && (
-                <button
-                  onClick={handleDeleteSelected}
-                  className="px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center gap-2 w-full justify-center"
-                >
-                  <X className="w-4 h-4" />
-                  Delete ({selectedImages.length})
-                </button>
-              )}
               <div className="flex gap-2">
                 <input
                   type="file"
@@ -582,8 +406,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             {paginatedImages.map((image, index) => {
               const actualIndex = (currentPage - 1) * itemsPerPage + index;
               const isSelected = selectedImages.includes(actualIndex);
-              const imageId = extractImageIdFromUrl(image);
-              const isLoaded = loadedImages[image];
 
               return (
                 <div
@@ -592,26 +414,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   onClick={() => {
                     if (!isEditMode) {
                       setMainIndex(actualIndex);
-                      setMainImageLoaded(!!loadedImages[images[actualIndex]]);
+                      setMainImageLoaded(true);
                     }
                   }}
                   style={{ aspectRatio }}
                 >
-                  {!isLoaded && <ImageSkeleton aspectRatio={aspectRatio} />}
-                  <Image
-                    src={image}
+                  <img
+                    src={`${image.url}/public`}
                     alt={`Image ${actualIndex + 1}`}
-                    fill
                     className={cn(
-                      "object-cover transition-all duration-300",
-                      !isLoaded && "opacity-0",
+                      "w-full h-full object-cover rounded-lg transition-all duration-300",
                       isMainVisible && actualIndex === mainIndex
                         ? ""
                         : "opacity-75",
                       isSelected ? "opacity-75" : ""
                     )}
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    onLoadingComplete={() => handleImageLoad(image)}
                   />
                   {isEditMode && (
                     <div
@@ -629,17 +446,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       </div>
                     </div>
                   )}
-                  {isEditMode && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingImageIndex(actualIndex);
-                      }}
-                      className="absolute bottom-2 right-2 p-1 bg-black/50 rounded text-white hover:bg-black/70"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -656,7 +462,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <span className="text-sm">
-                {currentPage}/{totalPages}
+                Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
@@ -686,7 +492,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <X className="w-6 h-6" />
           </button>
           <img
-            src={images[modalIndex]}
+            src={`${images[modalIndex].url}/public`}
             alt={`Full size view ${modalIndex + 1} of ${images.length}`}
             className="max-w-full max-h-[90vh] object-contain"
           />
