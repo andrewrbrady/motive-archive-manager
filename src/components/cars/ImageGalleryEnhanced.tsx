@@ -55,7 +55,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
 
   useEffect(() => {
     // Ensure selected image is visible in current page
-    const selectedImagePage = Math.ceil((mainIndex + 1) / itemsPerPage);
+    const selectedImagePage = Math.floor(mainIndex / itemsPerPage) + 1;
     if (selectedImagePage !== currentPage) {
       setCurrentPage(selectedImagePage);
     }
@@ -77,22 +77,19 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     }
   }, [isModalOpen, images.length]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        handlePrev();
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        handleNext();
-      } else if (e.key === "Escape" && isModalOpen) {
-        setIsModalOpen(false);
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      if (newPage >= 1 && newPage <= totalPages) {
+        setCurrentPage(newPage);
+        // Set mainIndex to first image of the new page
+        const newMainIndex = (newPage - 1) * itemsPerPage;
+        if (newMainIndex < images.length) {
+          setMainIndex(newMainIndex);
+        }
       }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNext, handlePrev, isModalOpen]);
+    },
+    [totalPages, itemsPerPage, images.length]
+  );
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].clientX);
@@ -107,12 +104,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
-  };
-
   const paginatedImages = images.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -121,7 +112,48 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   const [isMainVisible, setIsMainVisible] = useState(true);
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        console.log("Key pressed:", {
+          key: e.key,
+          shiftKey: e.shiftKey,
+          currentPage,
+          totalPages,
+        });
+
+        // Handle Shift + Arrow combinations first
+        if (e.shiftKey) {
+          e.preventDefault();
+          console.log("Shift key detected");
+
+          if (e.key === "ArrowLeft") {
+            console.log("Attempting to go to previous page");
+            handlePageChange(Math.max(1, currentPage - 1));
+          } else if (e.key === "ArrowRight") {
+            console.log("Attempting to go to next page");
+            handlePageChange(Math.min(totalPages, currentPage + 1));
+          }
+          return;
+        }
+
+        // Handle regular arrow keys
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          if (e.key === "ArrowLeft") {
+            handlePrev();
+          } else {
+            handleNext();
+          }
+        }
+
+        // Handle escape
+        if (e.key === "Escape" && isModalOpen) {
+          setIsModalOpen(false);
+        }
+      }}
+    >
       <div
         ref={mainImageRef}
         className={`sticky top-4 mb-4 transition-opacity duration-300 ${
@@ -141,29 +173,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
             alt={`Vehicle view ${mainIndex + 1} of ${images.length}`}
             className="w-full h-full object-cover"
           />
-          {images[mainIndex].metadata && (
-            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-sm">
-              <div className="flex flex-wrap gap-2">
-                {images[mainIndex].metadata.angle && (
-                  <span>Angle: {images[mainIndex].metadata.angle}</span>
-                )}
-                {images[mainIndex].metadata.view && (
-                  <span>View: {images[mainIndex].metadata.view}</span>
-                )}
-                {images[mainIndex].metadata.tod && (
-                  <span>Time: {images[mainIndex].metadata.tod}</span>
-                )}
-                {images[mainIndex].metadata.movement && (
-                  <span>Movement: {images[mainIndex].metadata.movement}</span>
-                )}
-                {images[mainIndex].metadata.description && (
-                  <span>
-                    Description: {images[mainIndex].metadata.description}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
           <button
             onClick={() => {
               setModalIndex(mainIndex);
