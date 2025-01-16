@@ -43,6 +43,12 @@ interface ImageGalleryProps {
   onRemoveImage?: (indices: number[]) => void;
   onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
+  uploadProgress?: {
+    fileName: string;
+    progress: number;
+    status: "pending" | "uploading" | "complete" | "error";
+    error?: string;
+  }[];
   showMetadata?: boolean;
   showFilters?: boolean;
 }
