@@ -4,6 +4,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, X, ZoomIn, Loader2 } from "lucide-react";
 import Image from "next/image";
 
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "complete" | "error";
+  error?: string;
+}
+
 interface ImageGalleryProps {
   images: string[];
   title?: string;
@@ -14,6 +21,7 @@ interface ImageGalleryProps {
   onRemoveImage?: (index: number) => void;
   onImagesChange?: (files: FileList) => Promise<void>;
   uploading?: boolean;
+  uploadProgress: UploadProgress[];
 }
 
 export const ImageGallery: React.FC<ImageGalleryProps> = ({
@@ -26,6 +34,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onRemoveImage,
   onImagesChange,
   uploading = false,
+  uploadProgress = [],
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -113,10 +122,72 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     if (event.target.files && onImagesChange) {
-      onImagesChange(event.target.files);
+      await onImagesChange(event.target.files);
     }
+  };
+
+  const getOverallProgress = () => {
+    if (uploadProgress.length === 0) return 0;
+    const total = uploadProgress.reduce((sum, file) => sum + file.progress, 0);
+    return Math.round(total / uploadProgress.length);
+  };
+
+  const UploadProgressOverlay = () => {
+    if (!uploading || uploadProgress.length === 0) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Uploading Images</h3>
+              <span className="text-sm text-gray-500">
+                {getOverallProgress()}% Complete
+              </span>
+            </div>
+
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div
+                className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${getOverallProgress()}%` }}
+              />
+            </div>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {uploadProgress.map((file, index) => (
+                <div key={index} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="truncate max-w-[200px]">
+                      {file.fileName}
+                    </span>
+                    <span className="text-gray-500">{file.progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        file.status === "error"
+                          ? "bg-red-500"
+                          : file.status === "complete"
+                          ? "bg-green-500"
+                          : "bg-blue-500"
+                      }`}
+                      style={{ width: `${file.progress}%` }}
+                    />
+                  </div>
+                  {file.error && (
+                    <p className="text-xs text-red-500">{file.error}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const paginatedImages = images.slice(
@@ -127,6 +198,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   if (!images || images.length === 0) {
     return (
       <div className="space-y-4">
+        <UploadProgressOverlay />
         <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg overflow-hidden">
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <div className="text-gray-400 text-center space-y-2">
@@ -173,6 +245,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   return (
     <div className="space-y-4">
+      <UploadProgressOverlay />
+
       <div
         ref={mainImageRef}
         className={`sticky top-4 mb-4 transition-opacity duration-300 ${
