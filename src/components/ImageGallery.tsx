@@ -606,9 +606,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       "object-cover transition-all duration-300",
                       !isLoaded && "opacity-0",
                       isMainVisible && actualIndex === mainIndex
-                        ? "opacity-50"
-                        : "",
-                      isSelected ? "opacity-50" : ""
+                        ? ""
+                        : "opacity-75",
+                      isSelected ? "opacity-75" : ""
                     )}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     onLoadingComplete={() => handleImageLoad(image)}
