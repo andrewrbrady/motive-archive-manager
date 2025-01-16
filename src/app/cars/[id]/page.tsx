@@ -142,21 +142,24 @@ export default function CarPage() {
 
   const handleImageUpload = async (files: FileList) => {
     if (!car) return;
-    setUploadingImages(true);
-
-    // Initialize progress tracking for each file
-    setUploadProgress(
-      Array.from(files).map((file) => ({
-        fileName: file.name,
-        progress: 0,
-        status: "pending" as const,
-        currentStep: "Preparing upload...",
-      }))
-    );
 
     try {
-      // First upload images to Cloudflare
-      const uploadPromises = Array.from(files).map(async (file) => {
+      // Initialize progress tracking immediately
+      const fileArray = Array.from(files);
+      setUploadProgress(
+        fileArray.map((file) => ({
+          fileName: file.name,
+          progress: 0,
+          status: "pending" as const,
+          currentStep: "Preparing upload...",
+        }))
+      );
+      setUploadingImages(true);
+
+      // Upload each file sequentially to ensure progress is tracked properly
+      const uploadedImages = [];
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
         const formData = new FormData();
         formData.append("file", file);
         formData.append(
@@ -169,24 +172,31 @@ export default function CarPage() {
           })
         );
 
-        const xhr = new XMLHttpRequest();
+        // Update status to uploading
+        setUploadProgress((prev) =>
+          prev.map((p, index) =>
+            index === i
+              ? {
+                  ...p,
+                  status: "uploading",
+                  currentStep: "Starting upload...",
+                }
+              : p
+          )
+        );
 
-        const uploadPromise = new Promise<{
-          id: string;
-          url: string;
-          filename: string;
-          metadata: Record<string, any>;
-        }>((resolve, reject) => {
+        try {
+          // Create XHR for upload progress
+          const xhr = new XMLHttpRequest();
           xhr.upload.addEventListener("progress", (event) => {
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded * 100) / event.total);
               setUploadProgress((prev) =>
-                prev.map((p) =>
-                  p.fileName === file.name
+                prev.map((p, index) =>
+                  index === i
                     ? {
                         ...p,
                         progress,
-                        status: "uploading" as const,
                         currentStep: `Uploading: ${progress}%`,
                       }
                     : p
@@ -195,78 +205,87 @@ export default function CarPage() {
             }
           });
 
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              setUploadProgress((prev) =>
-                prev.map((p) =>
-                  p.fileName === file.name
-                    ? {
-                        ...p,
-                        progress: 100,
-                        status: "analyzing" as const,
-                        currentStep: "Analyzing image with AI...",
-                      }
-                    : p
-                )
-              );
-              const response = JSON.parse(xhr.responseText);
-              resolve({
-                id: response.imageId,
-                url: response.imageUrl,
-                filename: file.name,
-                metadata: response.metadata || {},
-              });
-            } else {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
+          const uploadPromise = new Promise<{
+            imageId: string;
+            imageUrl: string;
+            metadata?: {
+              aiAnalysis?: {
+                angle?: string;
+                description?: string;
+                movement?: string;
+                tod?: string;
+                view?: string;
+                side?: string;
+              };
+            };
+          }>((resolve, reject) => {
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(JSON.parse(xhr.responseText));
+              } else {
+                reject(new Error(`Upload failed with status ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error("Upload failed"));
+            xhr.open("POST", "/api/cloudflare/images");
+            xhr.send(formData);
           });
 
-          xhr.addEventListener("error", () => {
-            reject(new Error("Upload failed"));
-          });
-
-          xhr.open("POST", "/api/cloudflare/images");
-          xhr.send(formData);
-        });
-
-        try {
-          const imageData = await uploadPromise;
+          // Update status to analyzing
           setUploadProgress((prev) =>
-            prev.map((p) =>
-              p.fileName === file.name
+            prev.map((p, index) =>
+              index === i
                 ? {
                     ...p,
                     progress: 100,
-                    status: "complete" as const,
-                    currentStep: "Upload complete!",
+                    status: "analyzing",
+                    currentStep: "Analyzing image with AI...",
                   }
                 : p
             )
           );
-          return {
-            id: imageData.id,
-            url: imageData.url,
-            filename: imageData.filename,
+
+          const response = await uploadPromise;
+          const imageData = {
+            id: response.imageId,
+            url: response.imageUrl,
+            filename: file.name,
             metadata: {
-              ...imageData.metadata,
-              angle: imageData.metadata?.aiAnalysis?.angle || "",
-              description: imageData.metadata?.aiAnalysis?.description || "",
-              movement: imageData.metadata?.aiAnalysis?.movement || "",
-              tod: imageData.metadata?.aiAnalysis?.tod || "",
-              view: imageData.metadata?.aiAnalysis?.view || "",
-              side: imageData.metadata?.aiAnalysis?.side || "",
+              ...response.metadata,
+              angle: response.metadata?.aiAnalysis?.angle || "",
+              description: response.metadata?.aiAnalysis?.description || "",
+              movement: response.metadata?.aiAnalysis?.movement || "",
+              tod: response.metadata?.aiAnalysis?.tod || "",
+              view: response.metadata?.aiAnalysis?.view || "",
+              side: response.metadata?.aiAnalysis?.side || "",
             },
             variants: {},
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-        } catch (error) {
+
+          uploadedImages.push(imageData);
+
+          // Update status to complete
           setUploadProgress((prev) =>
-            prev.map((p) =>
-              p.fileName === file.name
+            prev.map((p, index) =>
+              index === i
                 ? {
                     ...p,
-                    status: "error" as const,
+                    status: "complete",
+                    currentStep: "Upload complete!",
+                  }
+                : p
+            )
+          );
+        } catch (error) {
+          // Update status to error
+          setUploadProgress((prev) =>
+            prev.map((p, index) =>
+              index === i
+                ? {
+                    ...p,
+                    status: "error",
                     error: "Failed to upload image",
                     currentStep: "Upload failed",
                   }
@@ -275,11 +294,9 @@ export default function CarPage() {
           );
           throw error;
         }
-      });
+      }
 
-      const uploadedImages = await Promise.all(uploadPromises);
-
-      // Then update the car with new image objects
+      // Update car with new images
       const response = await fetch(`/api/cars/${id}`, {
         method: "PATCH",
         headers: {
@@ -296,24 +313,18 @@ export default function CarPage() {
       setCar(data);
     } catch (error) {
       console.error("Error uploading images:", error);
-      setUploadProgress((prev) =>
-        prev.map((p) =>
-          p.status === "pending" || p.status === "uploading"
-            ? {
-                ...p,
-                status: "error" as const,
-                error: "Upload failed",
-                currentStep: "Upload failed",
-              }
-            : p
-        )
-      );
     } finally {
-      // Wait a moment to show completion status before clearing
-      setTimeout(() => {
-        setUploadingImages(false);
-        setUploadProgress([]);
-      }, 2000);
+      // Only clear states if all files are complete or errored
+      const allComplete = uploadProgress.every(
+        (p) => p.status === "complete" || p.status === "error"
+      );
+      if (allComplete) {
+        // Wait a moment to show completion status before clearing
+        setTimeout(() => {
+          setUploadingImages(false);
+          setUploadProgress([]);
+        }, 2000);
+      }
     }
   };
 
@@ -478,23 +489,19 @@ export default function CarPage() {
                   className="p-2 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:bg-gray-100 border border-gray-200"
                   aria-label="Add images"
                 >
-                  {uploadingImages ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  )}
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
                 </button>
                 <button
                   onClick={() => setIsEditMode(!isEditMode)}
@@ -527,7 +534,18 @@ export default function CarPage() {
               ref={fileInputRef}
               onChange={(e) => {
                 if (e.target.files) {
-                  handleImageUpload(e.target.files);
+                  const files = Array.from(e.target.files);
+                  setUploadProgress(
+                    files.map((file) => ({
+                      fileName: file.name,
+                      progress: 0,
+                      status: "pending" as const,
+                      currentStep: "Preparing upload...",
+                    }))
+                  );
+                  setUploadingImages(true);
+                  // Call handleImageUpload after state is set
+                  setTimeout(() => handleImageUpload(e.target.files), 0);
                 }
               }}
               className="hidden"
@@ -539,9 +557,13 @@ export default function CarPage() {
               images={car.images}
               isEditMode={isEditMode}
               onRemoveImage={handleRemoveImage}
-              onImagesChange={handleImageUpload}
+              onImagesChange={(files) => {
+                // Remove duplicate initialization here since it's handled in the input onChange
+                handleImageUpload(files);
+              }}
               uploading={uploadingImages}
               uploadProgress={uploadProgress}
+              setUploadProgress={setUploadProgress}
               showMetadata={true}
               vehicleInfo={{
                 year: car.year,

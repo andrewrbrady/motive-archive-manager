@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
+import { UploadProgressDialog } from "./UploadProgressDialog";
 
 interface UploadProgress {
   fileName: string;
@@ -52,6 +53,7 @@ interface ImageGalleryProps {
   onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
   uploadProgress?: UploadProgress[];
+  setUploadProgress?: (progress: UploadProgress[]) => void;
   showMetadata?: boolean;
   showFilters?: boolean;
   vehicleInfo?: {
@@ -156,6 +158,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onImagesChange,
   uploading = false,
   uploadProgress = [],
+  setUploadProgress,
   showMetadata = true,
   showFilters = true,
   vehicleInfo,
@@ -320,6 +323,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         } else if (e.key === "ArrowRight") {
           e.preventDefault();
           handlePageChange(Math.min(totalPages, currentPage + 1));
+        } else if (
+          e.key === "Delete" &&
+          isEditMode &&
+          selectedImages.length > 0
+        ) {
+          e.preventDefault();
+          handleDeleteSelected();
         }
         return;
       }
@@ -390,15 +400,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   if (!images || images.length === 0 || filteredImages.length === 0) {
     return (
-      <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-gray-400">
-            {!images || images.length === 0
-              ? "No images available"
-              : "No images match the selected filters"}
-          </span>
+      <>
+        <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-gray-400">
+              {!images || images.length === 0
+                ? "No images available"
+                : "No images match the selected filters"}
+            </span>
+          </div>
         </div>
-      </div>
+
+        {/* Always show upload progress dialog */}
+        <UploadProgressDialog
+          isOpen={uploadProgress.length > 0}
+          uploadProgress={uploadProgress}
+        />
+      </>
     );
   }
 
@@ -482,6 +500,40 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => {
+                    const currentPageImages = filteredImages
+                      .slice(
+                        (currentPage - 1) * itemsPerPage,
+                        currentPage * itemsPerPage
+                      )
+                      .map(
+                        (_, index) => (currentPage - 1) * itemsPerPage + index
+                      );
+
+                    const allSelected = currentPageImages.every((index) =>
+                      selectedImages.includes(index)
+                    );
+
+                    if (allSelected) {
+                      setSelectedImages((prev) =>
+                        prev.filter(
+                          (index) => !currentPageImages.includes(index)
+                        )
+                      );
+                    } else {
+                      setSelectedImages((prev) => [
+                        ...new Set([...prev, ...currentPageImages]),
+                      ]);
+                    }
+                  }}
+                  className="px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  {selectedImages.length === filteredImages.length
+                    ? "Deselect All"
+                    : "Select All on Page"}
+                </button>
+                <button
                   onClick={handleDeleteSelected}
                   disabled={selectedImages.length === 0}
                   className={`px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2 w-full ${
@@ -492,6 +544,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 >
                   <X className="w-4 h-4" />
                   Delete Selected ({selectedImages.length})
+                  {selectedImages.length > 0 && (
+                    <span className="text-xs text-gray-500 ml-auto">
+                      Shift + Delete
+                    </span>
+                  )}
                 </button>
               </div>
               <div className="flex gap-2">
@@ -634,34 +691,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       )}
 
       {/* Upload Progress */}
-      {uploadProgress.length > 0 && (
-        <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-sm font-medium">Upload Progress</h3>
-          {uploadProgress.map((progress, index) => (
-            <div key={index} className="space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="truncate">{progress.fileName}</span>
-                <span className="text-gray-500">{progress.currentStep}</span>
-              </div>
-              <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className={`absolute left-0 top-0 h-full transition-all duration-300 ${
-                    progress.status === "error"
-                      ? "bg-red-500"
-                      : progress.status === "complete"
-                      ? "bg-green-500"
-                      : "bg-blue-500"
-                  }`}
-                  style={{ width: `${progress.progress}%` }}
-                />
-              </div>
-              {progress.error && (
-                <p className="text-sm text-red-500">{progress.error}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <UploadProgressDialog
+        isOpen={uploadProgress.length > 0}
+        uploadProgress={uploadProgress}
+      />
 
       {/* Vehicle Info */}
       {vehicleInfo && (

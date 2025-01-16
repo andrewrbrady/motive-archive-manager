@@ -55,11 +55,12 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: "text",
-              text: `${vehicleContext} Analyze this car image and provide the following details in a JSON format:
+              text: `${vehicleContext} Analyze this car image and provide the following details in a JSON format.
+              DO NOT INCLUDE ANY OTHER TEXT IN YOUR RESPONSE ASIDE FROM THESE OPTIONS:
               - angle: The viewing angle of the car (front, rear, side, 3/4 front, 3/4 rear)
               - view: The type of view (exterior, interior, detail, engine, interior detail, engine detail)
               - movement: Whether the car appears to be in motion or stationary (static, moving)
-              - tod: The time of day (day, night, dusk, dawn, indoors)
+              - tod: The time of day (day, night, dusk, dawn, indoor)
               - side: Which side of the car is visible (driver, passenger, n/a)
               - description: A brief description of what's shown in the image`,
             },
