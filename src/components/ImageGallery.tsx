@@ -153,6 +153,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
   const totalPages = Math.ceil(images.length / itemsPerPage);
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      const firstImageIndexOfNewPage = (newPage - 1) * itemsPerPage;
+      setMainIndex(firstImageIndexOfNewPage);
+      setMainImageLoaded(true);
+    }
+  };
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -193,6 +202,19 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Handle Shift + Arrow combinations first
+      if (e.shiftKey) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          handlePageChange(Math.max(1, currentPage - 1));
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          handlePageChange(Math.min(totalPages, currentPage + 1));
+        }
+        return;
+      }
+
+      // Handle regular arrow keys
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         handlePrev();
@@ -206,7 +228,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNext, handlePrev, isModalOpen]);
+  }, [
+    handleNext,
+    handlePrev,
+    isModalOpen,
+    currentPage,
+    totalPages,
+    handlePageChange,
+  ]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].clientX);
@@ -218,12 +247,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (Math.abs(diff) > 50) {
       if (diff > 0) handleNext();
       else handlePrev();
-    }
-  };
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
     }
   };
 
@@ -299,41 +322,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 )}
                 onLoad={() => setMainImageLoaded(true)}
               />
-              {showMetadata && images[mainIndex]?.metadata && (
-                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-sm">
-                  <div className="flex flex-wrap gap-2">
-                    {images[mainIndex].metadata.angle && (
-                      <span>Angle: {images[mainIndex].metadata.angle}</span>
-                    )}
-                    {images[mainIndex].metadata.view && (
-                      <span>View: {images[mainIndex].metadata.view}</span>
-                    )}
-                    {images[mainIndex].metadata.tod && (
-                      <span>Time: {images[mainIndex].metadata.tod}</span>
-                    )}
-                    {images[mainIndex].metadata.movement && (
-                      <span>
-                        Movement: {images[mainIndex].metadata.movement}
-                      </span>
-                    )}
-                    {images[mainIndex].metadata.description && (
-                      <span>
-                        Description: {images[mainIndex].metadata.description}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {uploading && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="bg-white rounded-lg p-4 flex items-center gap-3">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                    <span className="text-sm font-medium">
-                      Uploading images...
-                    </span>
-                  </div>
-                </div>
-              )}
               <button
                 onClick={() => {
                   setModalIndex(mainIndex);
@@ -361,7 +349,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
           </div>
 
-          <MetadataSection metadata={images} currentIndex={mainIndex} />
+          {showMetadata && (
+            <div className="mt-4">
+              <MetadataSection metadata={images} currentIndex={mainIndex} />
+            </div>
+          )}
         </div>
 
         <div className="w-1/3 space-y-4">
