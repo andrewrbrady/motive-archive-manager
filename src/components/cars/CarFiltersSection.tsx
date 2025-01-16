@@ -10,8 +10,11 @@ interface CarFiltersSectionProps {
     minYear: string;
     maxYear: string;
     condition: string;
-    engineFeatures: string; // Changed from string[] to string
+    engineFeatures: string;
     clientId: string;
+    minPrice: string;
+    maxPrice: string;
+    status: string;
   };
   brands: string[];
   clients: { _id: string; name: string }[];
