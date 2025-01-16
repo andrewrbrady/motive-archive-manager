@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { ImageGallery } from "@/components/ImageGallery";
 import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
+import { Loader2 } from "lucide-react";
 
 interface Engine {
   type: string;
@@ -39,6 +40,13 @@ interface Car {
   status?: "available" | "sold" | "pending";
 }
 
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "complete" | "error";
+  error?: string;
+}
+
 export default function CarPage() {
   const { id } = useParams() as { id: string };
   const [car, setCar] = useState<Car | null>(null);
@@ -46,10 +54,24 @@ export default function CarPage() {
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatImageUrl = (url: string) => {
     return url.endsWith("/public") ? url : `${url}/public`;
   };
+
+  // Add escape key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isEditMode) {
+        setIsEditMode(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isEditMode]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -90,24 +112,81 @@ export default function CarPage() {
     if (!car) return;
     setUploadingImages(true);
 
+    // Initialize progress tracking for each file
+    setUploadProgress(
+      Array.from(files).map((file) => ({
+        fileName: file.name,
+        progress: 0,
+        status: "pending" as const,
+      }))
+    );
+
     try {
       // First upload images to Cloudflare
       const uploadPromises = Array.from(files).map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
 
-        const uploadResponse = await fetch("/api/cloudflare/images", {
-          method: "POST",
-          body: formData,
+        const xhr = new XMLHttpRequest();
+
+        const uploadPromise = new Promise<string>((resolve, reject) => {
+          xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded * 100) / event.total);
+              // Update progress in ImageGallery component
+              setUploadProgress((prev) =>
+                prev.map((p) =>
+                  p.fileName === file.name
+                    ? { ...p, progress, status: "uploading" as const }
+                    : p
+                )
+              );
+            }
+          });
+
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response.imageUrl);
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          });
+
+          xhr.addEventListener("error", () => {
+            reject(new Error("Upload failed"));
+          });
+
+          xhr.open("POST", "/api/cloudflare/images");
+          xhr.send(formData);
         });
 
-        if (!uploadResponse.ok) {
-          throw new Error("Failed to upload image to Cloudflare");
+        try {
+          const imageUrl = await uploadPromise;
+          // Update progress to complete for this file
+          setUploadProgress((prev) =>
+            prev.map((p) =>
+              p.fileName === file.name
+                ? { ...p, progress: 100, status: "complete" as const }
+                : p
+            )
+          );
+          return imageUrl;
+        } catch (error) {
+          // Update progress to error for this file
+          setUploadProgress((prev) =>
+            prev.map((p) =>
+              p.fileName === file.name
+                ? {
+                    ...p,
+                    status: "error" as const,
+                    error: "Failed to upload image",
+                  }
+                : p
+            )
+          );
+          throw error;
         }
-
-        const { imageUrl } = await uploadResponse.json();
-        // Don't format the URL here, as it will be stored without /public in the database
-        return imageUrl;
       });
 
       const uploadedUrls = await Promise.all(uploadPromises);
@@ -136,6 +215,18 @@ export default function CarPage() {
       }));
     } catch (error) {
       console.error("Error uploading images:", error);
+      // Update all pending files to error state
+      setUploadProgress((prev) =>
+        prev.map((p) =>
+          p.status === "pending" || p.status === "uploading"
+            ? {
+                ...p,
+                status: "error" as const,
+                error: "Upload failed",
+              }
+            : p
+        )
+      );
     } finally {
       setUploadingImages(false);
     }
@@ -198,27 +289,81 @@ export default function CarPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Image Gallery */}
           <div className="md:col-span-2">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">
                 {car.brand} {car.model} {car.year}
               </h1>
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isEditMode
-                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {isEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImages}
+                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:bg-gray-100 border border-gray-200"
+                  aria-label="Add images"
+                >
+                  {uploadingImages ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`p-2 transition-colors rounded-full hover:bg-gray-100 border ${
+                    isEditMode
+                      ? "text-blue-500 hover:text-blue-600 border-blue-200"
+                      : "text-gray-500 hover:text-gray-700 border-gray-200"
+                  }`}
+                  aria-label="Edit images"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={(e) => {
+                if (e.target.files) {
+                  handleImageUpload(e.target.files);
+                }
+              }}
+              className="hidden"
+              multiple
+              accept="image/*"
+            />
+
             <ImageGallery
               images={car.images || []}
               isEditMode={isEditMode}
               onRemoveImage={handleRemoveImage}
               onImagesChange={handleImageUpload}
               uploading={uploadingImages}
+              uploadProgress={uploadProgress}
             />
           </div>
 
