@@ -10,6 +10,8 @@ import CarFiltersSection from "@/components/cars/CarFiltersSection";
 import Footer from "@/components/layout/footer";
 import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import ViewModeSelector from "@/components/cars/ViewModeSelector";
+import CarImageEditor from "@/components/cars/CarImageEditor";
+import EditModeToggle from "@/components/cars/EditModeToggle";
 
 export const metadata: Metadata = {
   title: "Cars Collection | Premium Vehicles",
@@ -179,6 +181,7 @@ export default async function CarsPage({
     const page = Number(params.page) || 1;
     const pageSize = Number(params.pageSize) || 12;
     const viewMode = (params.view?.toString() || "grid") as "grid" | "list";
+    const isEditMode = params.edit === "true";
 
     const filters: FilterParams = {
       brand: params.brand?.toString(),
@@ -207,7 +210,7 @@ export default async function CarsPage({
 
     return (
       <div className="flex flex-col min-h-screen bg-gray-50">
-        <Navbar className="sticky top-0 z-50" />
+        <Navbar />
 
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
@@ -215,7 +218,10 @@ export default async function CarsPage({
               <h1 className="text-3xl font-bold">
                 Our Collection ({total.toLocaleString()} vehicles)
               </h1>
-              <ViewModeSelector viewMode={viewMode} />
+              <div className="flex items-center gap-4">
+                <ViewModeSelector viewMode={viewMode} />
+                <EditModeToggle isEditMode={isEditMode} />
+              </div>
             </div>
 
             <CarFiltersSection
@@ -239,19 +245,41 @@ export default async function CarsPage({
                 <Pagination
                   currentPage={page}
                   totalPages={Math.ceil(total / pageSize)}
-                  pageSize={pageSize}
                 />
               </div>
             )}
 
-            <CarsViewWrapper cars={cars} viewMode={viewMode} />
+            {isEditMode ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cars.map((car: Car) => (
+                  <div
+                    key={car._id}
+                    className="bg-white rounded-lg shadow-md p-4"
+                  >
+                    <h3 className="text-lg font-semibold mb-4">
+                      {car.year} {car.brand} {car.model}
+                    </h3>
+                    <CarImageEditor
+                      carId={car._id}
+                      currentImages={car.images}
+                      onImagesUpdate={() => window.location.reload()}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <CarsViewWrapper
+                cars={cars}
+                viewMode={viewMode}
+                searchParams={searchParams}
+              />
+            )}
 
             {total > pageSize && (
               <div className="mt-8">
                 <Pagination
                   currentPage={page}
                   totalPages={Math.ceil(total / pageSize)}
-                  pageSize={pageSize}
                 />
               </div>
             )}

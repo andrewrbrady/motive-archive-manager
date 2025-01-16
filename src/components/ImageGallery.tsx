@@ -160,6 +160,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             }
             className="w-full h-full object-cover"
           />
+          {uploading && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="bg-white rounded-lg p-4 flex items-center gap-3">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                <span className="text-sm font-medium">Uploading images...</span>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => {
               setModalIndex(mainIndex);
@@ -291,7 +299,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           />
           <button
             onClick={handlePrev}
-            className="absolute left-4 p-2 text-white"
+            className="absolute left-4 p-2 text-wh:w
+            ite"
             aria-label="Previous image"
           >
             <ChevronLeft className="w-8 h-8" />

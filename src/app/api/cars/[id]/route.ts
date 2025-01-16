@@ -14,13 +14,14 @@ async function getMongoClient() {
 // GET car by ID
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   const client = await getMongoClient();
   try {
+    const { id } = context.params;
     const db = client.db(DB_NAME);
     const car = await db.collection("cars").findOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (!car) {
@@ -38,10 +39,11 @@ export async function GET(
 // PUT/PATCH to update car information
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   const client = await getMongoClient();
   try {
+    const { id } = context.params;
     const updates = await request.json();
 
     // Remove _id from updates if present to prevent MongoDB errors
@@ -50,13 +52,18 @@ export async function PUT(
     const db = client.db(DB_NAME);
     const result = await db
       .collection("cars")
-      .updateOne({ _id: new ObjectId(params.id) }, { $set: updates });
+      .updateOne({ _id: new ObjectId(id) }, { $set: updates });
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "Car updated successfully" });
+    // Fetch and return the updated car
+    const updatedCar = await db.collection("cars").findOne({
+      _id: new ObjectId(id),
+    });
+
+    return NextResponse.json(updatedCar);
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update car" },
@@ -70,15 +77,16 @@ export async function PUT(
 // DELETE car
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   const client = await getMongoClient();
   try {
+    const { id } = context.params;
     const db = client.db(DB_NAME);
 
     // First, get the car to check if it exists and get associated documents
     const car = await db.collection("cars").findOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (!car) {
@@ -94,7 +102,7 @@ export async function DELETE(
 
     // Delete the car
     await db.collection("cars").deleteOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     return NextResponse.json({
@@ -110,44 +118,73 @@ export async function DELETE(
   }
 }
 
-// PATCH to remove a specific document from a car
+// PATCH to remove a specific document from a car or update images
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   const client = await getMongoClient();
   try {
-    const { documentId } = await request.json();
-    if (!documentId) {
-      return NextResponse.json(
-        { error: "Document ID is required" },
-        { status: 400 }
-      );
-    }
-
+    const { id } = context.params;
+    const body = await request.json();
+    const { documentId, images } = body;
     const db = client.db(DB_NAME);
 
-    // Remove document reference from car
-    const updateResult = await db
-      .collection("cars")
-      .updateOne(
-        { _id: new ObjectId(params.id) },
-        { $pull: { documents: new ObjectId(documentId) } }
-      );
+    // Handle document removal
+    if (documentId) {
+      // Remove document reference from car
+      const updateResult = await db
+        .collection("cars")
+        .updateOne(
+          { _id: new ObjectId(id) },
+          { $pull: { documents: documentId } }
+        );
 
-    if (updateResult.matchedCount === 0) {
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json({ error: "Car not found" }, { status: 404 });
+      }
+
+      // Delete the document from receipts collection
+      await db.collection("receipts").deleteOne({
+        _id: new ObjectId(documentId),
+      });
+
+      return NextResponse.json({ message: "Document removed successfully" });
     }
 
-    // Delete the document from receipts collection
-    await db.collection("receipts").deleteOne({
-      _id: new ObjectId(documentId),
-    });
+    // Handle image updates
+    if (images) {
+      if (!Array.isArray(images)) {
+        return NextResponse.json(
+          { error: "Invalid images array provided" },
+          { status: 400 }
+        );
+      }
 
-    return NextResponse.json({ message: "Document removed successfully" });
-  } catch (error) {
+      const updateResult = await db
+        .collection("cars")
+        .updateOne({ _id: new ObjectId(id) }, { $set: { images } });
+
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json({ error: "Car not found" }, { status: 404 });
+      }
+
+      // Fetch the updated car to return the new state
+      const updatedCar = await db.collection("cars").findOne({
+        _id: new ObjectId(id),
+      });
+
+      return NextResponse.json(updatedCar);
+    }
+
     return NextResponse.json(
-      { error: "Failed to remove document" },
+      { error: "No valid operation specified" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error updating car:", error);
+    return NextResponse.json(
+      { error: "Failed to update car" },
       { status: 500 }
     );
   } finally {
