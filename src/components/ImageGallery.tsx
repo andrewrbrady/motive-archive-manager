@@ -9,6 +9,10 @@ import {
   Loader2,
   Check,
   Edit,
+  Compass,
+  Eye,
+  Sun,
+  Move,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -50,37 +54,66 @@ const MetadataSection = ({
   const currentMetadata = metadata[currentIndex];
 
   return (
-    <div className="mb-4 bg-white rounded-lg shadow p-4">
-      <h3 className="text-lg font-semibold mb-3">Image Metadata</h3>
-      <div className="space-y-2">
+    <div className="bg-white rounded-lg shadow p-3">
+      <div className="grid grid-cols-4 divide-x divide-gray-200">
         {currentMetadata.angle && (
-          <div>
-            <span className="font-medium">Angle:</span> {currentMetadata.angle}
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-500 uppercase text-xs font-medium">
+                Angle
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto">
+              {currentMetadata.angle}
+            </span>
           </div>
         )}
         {currentMetadata.view && (
-          <div>
-            <span className="font-medium">View:</span> {currentMetadata.view}
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-500 uppercase text-xs font-medium">
+                View
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto">
+              {currentMetadata.view}
+            </span>
           </div>
         )}
         {currentMetadata.tod && (
-          <div>
-            <span className="font-medium">Time of Day:</span>{" "}
-            {currentMetadata.tod}
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Sun className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-500 uppercase text-xs font-medium">
+                Time of Day
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto">
+              {currentMetadata.tod}
+            </span>
           </div>
         )}
         {currentMetadata.movement && (
-          <div>
-            <span className="font-medium">Movement:</span>{" "}
-            {currentMetadata.movement}
-          </div>
-        )}
-        {currentMetadata.description && (
-          <div className="mt-2 text-sm text-gray-600">
-            {currentMetadata.description}
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Move className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-500 uppercase text-xs font-medium">
+                Movement
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto">
+              {currentMetadata.movement}
+            </span>
           </div>
         )}
       </div>
+      {currentMetadata.description && (
+        <div className="mt-2 text-gray-600 border-t pt-2">
+          {currentMetadata.description}
+        </div>
+      )}
     </div>
   );
 };
@@ -407,8 +440,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     <div className="space-y-4">
       <UploadProgressOverlay />
 
-      <div className="flex gap-4">
-        <div className="flex-1">
+      <div className="flex gap-6">
+        <div className="w-2/3 space-y-3">
           <div
             ref={mainImageRef}
             className={`sticky top-4 transition-opacity duration-300 ${
@@ -471,9 +504,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               </button>
             </div>
           </div>
+
+          <MetadataSection
+            metadata={cloudflareMetadata}
+            currentIndex={mainIndex}
+          />
         </div>
 
-        <div className="w-96 space-y-4">
+        <div className="w-1/3 space-y-4">
           {isEditMode && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
@@ -540,12 +578,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
           )}
 
-          <MetadataSection
-            metadata={cloudflareMetadata}
-            currentIndex={mainIndex}
-          />
-
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {paginatedImages.map((image, index) => {
               const actualIndex = (currentPage - 1) * itemsPerPage + index;
               const isSelected = selectedImages.includes(actualIndex);
@@ -606,35 +639,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     >
                       <Edit className="w-4 h-4" />
                     </button>
-                  )}
-                  {editingImageIndex === actualIndex && imageId && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                      <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-lg font-semibold">
-                            Edit Metadata
-                          </h3>
-                          <button
-                            onClick={() => setEditingImageIndex(null)}
-                            className="p-1 hover:bg-gray-100 rounded"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                        <ImageMetadataEditor
-                          imageId={imageId}
-                          metadata={cloudflareMetadata[actualIndex] || {}}
-                          onMetadataChange={(newMetadata) => {
-                            setCloudflareMetadata((prev) => {
-                              const updated = [...prev];
-                              updated[actualIndex] = newMetadata;
-                              return updated;
-                            });
-                            setEditingImageIndex(null);
-                          }}
-                        />
-                      </div>
-                    </div>
                   )}
                 </div>
               );
