@@ -1,8 +1,14 @@
+import React from "react";
 import Link from "next/link";
+import { Car } from "@/types/car";
 
-const ListView = ({ cars }) => {
+interface ListViewProps {
+  cars: Car[];
+}
+
+const ListView: React.FC<ListViewProps> = ({ cars }) => {
   // Helper function to safely get the ID
-  const getCarId = (car) => {
+  const getCarId = (car: Car) => {
     if (typeof car._id === "string") return car._id;
     return car._id?.$oid || car._id?.toString();
   };
@@ -35,7 +41,17 @@ const ListView = ({ cars }) => {
                   href={`/cars/${getCarId(car)}`}
                   className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                 >
-                  {car.model}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold truncate">
+                      {car.year} {car.brand} {car.model}
+                      {car.type && (
+                        <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                          {car.type}
+                        </span>
+                      )}
+                    </h3>
+                    <div className="mt-2 space-y-1.5">
+                  </div>
                 </Link>
               </td>
               <td className="py-2 px-3 text-right border">

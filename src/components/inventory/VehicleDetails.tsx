@@ -26,6 +26,11 @@ export const VehicleDetails: React.FC<VehicleDetailsProps> = ({
       <Link href={`/inventory/${item.id}`}>
         <h2 className="text-xl font-semibold hover:text-blue-600 transition-colors">
           {item.year} {item.make} {item.model}
+          {item.type && (
+            <span className="text-xs uppercase text-gray-500 ml-1">
+              {item.type}
+            </span>
+          )}
         </h2>
       </Link>
 

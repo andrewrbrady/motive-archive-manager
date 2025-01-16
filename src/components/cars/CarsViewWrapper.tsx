@@ -52,7 +52,14 @@ export const ListView = ({ cars }: { cars: Car[] }) => {
             <tr key={car._id} className="border-b hover:bg-gray-50">
               <td className="py-2 px-3 border">{car.year}</td>
               <td className="py-2 px-3 border">{car.brand}</td>
-              <td className="py-2 px-3 border">{car.model}</td>
+              <td className="py-2 px-3 border">
+                {car.year} {car.brand} {car.model}
+                {car.type && (
+                  <span className="text-xs uppercase text-gray-500 ml-1">
+                    {car.type}
+                  </span>
+                )}
+              </td>
               <td className="py-2 px-3 text-right border">${car.price}</td>
               <td className="py-2 px-3 text-right border">{car.mileage}</td>
               <td className="py-2 px-3 text-right border">{car.horsepower}</td>
