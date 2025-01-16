@@ -126,14 +126,47 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   if (!images || images.length === 0) {
     return (
-      <div className="space-y-2">
-        <div className="w-full h-64 relative">
-          <img
-            src="/api/placeholder/800/600"
-            alt="No image available"
-            className="w-full h-full object-cover rounded-lg"
-          />
+      <div className="space-y-4">
+        <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg overflow-hidden">
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+            <div className="text-gray-400 text-center space-y-2">
+              <svg
+                className="mx-auto h-12 w-12"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="text-sm font-medium">No images available</p>
+            </div>
+          </div>
         </div>
+        {isEditMode && (
+          <div className="flex justify-center">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple
+              accept="image/*"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 font-medium"
+            >
+              {uploading && <Loader2 className="w-5 h-5 animate-spin" />}
+              {uploading ? "Uploading..." : "Upload Vehicle Images"}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
