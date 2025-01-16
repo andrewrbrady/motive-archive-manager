@@ -164,6 +164,7 @@ export default function CarPage() {
           id: string;
           url: string;
           filename: string;
+          metadata: Record<string, any>;
         }>((resolve, reject) => {
           xhr.upload.addEventListener("progress", (event) => {
             if (event.lengthComputable) {
@@ -185,6 +186,7 @@ export default function CarPage() {
                 id: response.imageId,
                 url: response.imageUrl,
                 filename: file.name,
+                metadata: response.metadata || {},
               });
             } else {
               reject(new Error(`Upload failed with status ${xhr.status}`));
@@ -213,10 +215,11 @@ export default function CarPage() {
             url: imageData.url,
             filename: imageData.filename,
             metadata: {
-              angle: "",
-              description: "",
-              movement: "",
-              tod: "",
+              ...imageData.metadata,
+              angle: imageData.metadata?.aiAnalysis?.angle || "",
+              description: imageData.metadata?.aiAnalysis?.description || "",
+              movement: imageData.metadata?.aiAnalysis?.shotType || "",
+              tod: imageData.metadata?.aiAnalysis?.timeOfDay || "",
               view: "",
               side: "",
             },
