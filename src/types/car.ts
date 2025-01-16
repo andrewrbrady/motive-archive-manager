@@ -7,7 +7,26 @@ interface Engine {
   features: string[];
 }
 
-interface Car {
+interface CarImage {
+  id: string;
+  url: string;
+  filename: string;
+  metadata: {
+    angle?: string;
+    description?: string;
+    movement?: string;
+    tod?: string;
+    view?: string;
+    side?: string;
+  };
+  variants?: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Car {
   _id: string;
   brand: string;
   model: string;
@@ -17,17 +36,23 @@ interface Car {
   color: string | number;
   engine: Engine;
   horsepower: number | null;
-  condition: 'New' | 'Used' | '';
+  condition: "New" | "Used" | "";
   location: string;
   description: string;
-  images: string[];
+  images: CarImage[];
   history_report: string;
   owner_id: string;
   documents: string[];
   client: string;
+  type?: string;
+  clientInfo?: {
+    _id: string;
+    name: string;
+    [key: string]: string | undefined;
+  };
 }
 
-interface Client {
+export interface Client {
   _id: string;
   name: string;
   email: string;

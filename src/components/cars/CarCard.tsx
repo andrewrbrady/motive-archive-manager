@@ -2,36 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-
-interface Car {
-  _id: string;
-  brand: string;
-  model: string;
-  year: string;
-  price: string;
-  mileage: string | number;
-  color: string | number;
-  images?: {
-    id: string;
-    url: string;
-    filename: string;
-    metadata: {
-      angle?: string;
-      description?: string;
-      movement?: string;
-      tod?: string;
-      view?: string;
-    };
-    variants?: {
-      [key: string]: string;
-    };
-    createdAt: string;
-    updatedAt: string;
-  }[];
-  clientInfo?: {
-    name: string;
-  };
-}
+import { Car } from "@/types/car";
 
 interface CarCardProps {
   car: Car;
@@ -61,9 +32,14 @@ const CarCard: React.FC<CarCardProps> = ({ car }) => {
           )}
         </div>
         <div className="p-4 h-[160px] flex flex-col justify-between">
-          <h2 className="text-lg font-semibold">
-            {car.brand} {car.model} ({car.year})
-          </h2>
+          <h3 className="text-lg font-semibold">
+            {car.year} {car.brand} {car.model}
+            {car.type && (
+              <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                {car.type}
+              </span>
+            )}
+          </h3>
           <div className="space-y-1.5">
             <p className="text-sm text-gray-600">{car.price}</p>
             {typeof car.mileage === "number" && !isNaN(car.mileage) && (

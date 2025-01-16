@@ -29,6 +29,7 @@ interface Car {
   description: string;
   images: string[];
   history_report: string;
+  type: string;
 }
 
 export default function CarPage() {
@@ -191,6 +192,11 @@ export default function CarPage() {
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">
                 {car.year} {car.brand} {car.model}
+                {car.type && (
+                  <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                    {car.type}
+                  </span>
+                )}
               </h1>
               <button
                 onClick={() =>

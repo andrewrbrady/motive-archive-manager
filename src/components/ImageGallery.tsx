@@ -14,6 +14,7 @@ import {
   Move,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ImageFilterControls } from "./ImageFilterControls";
 
 interface ImageGalleryProps {
   images: {
@@ -26,6 +27,7 @@ interface ImageGalleryProps {
       movement?: string;
       tod?: string;
       view?: string;
+      side?: string;
     };
     variants?: {
       [key: string]: string;
@@ -42,6 +44,7 @@ interface ImageGalleryProps {
   onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
   showMetadata?: boolean;
+  showFilters?: boolean;
 }
 
 const MetadataSection = ({
@@ -138,6 +141,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onImagesChange,
   uploading = false,
   showMetadata = true,
+  showFilters = true,
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -146,18 +150,103 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [isMainVisible, setIsMainVisible] = useState(true);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
+  const [filters, setFilters] = useState<{
+    angle?: string;
+    movement?: string;
+    tod?: string;
+    view?: string;
+    side?: string;
+  }>({});
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
 
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
-  const totalPages = Math.ceil(images.length / itemsPerPage);
+
+  // Extract available filter values from images
+  const availableFilters = images.reduce(
+    (acc, image) => {
+      if (image.metadata.angle && !acc.angles.includes(image.metadata.angle)) {
+        acc.angles.push(image.metadata.angle);
+      }
+      if (
+        image.metadata.movement &&
+        !acc.movements.includes(image.metadata.movement)
+      ) {
+        acc.movements.push(image.metadata.movement);
+      }
+      if (image.metadata.tod && !acc.tods.includes(image.metadata.tod)) {
+        acc.tods.push(image.metadata.tod);
+      }
+      if (image.metadata.view && !acc.views.includes(image.metadata.view)) {
+        acc.views.push(image.metadata.view);
+      }
+      if (image.metadata.side && !acc.sides.includes(image.metadata.side)) {
+        acc.sides.push(image.metadata.side);
+      }
+      return acc;
+    },
+    {
+      angles: [] as string[],
+      movements: [] as string[],
+      tods: [] as string[],
+      views: [] as string[],
+      sides: [] as string[],
+    }
+  );
+
+  // Sort filter values alphabetically
+  Object.keys(availableFilters).forEach((key) => {
+    availableFilters[key as keyof typeof availableFilters].sort();
+  });
+
+  // Filter images based on selected filters
+  const filteredImages = images.filter((image) => {
+    const result = Object.entries(filters).every(([key, value]) => {
+      if (!value) return true;
+      const imageValue = image.metadata[key as keyof typeof image.metadata];
+      const matches = imageValue === value;
+      console.log(`Filtering image ${image.filename}:`, {
+        filterKey: key,
+        filterValue: value,
+        imageValue,
+        matches,
+      });
+      return matches;
+    });
+    return result;
+  });
+
+  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
+
+  // Log filter state changes
+  useEffect(() => {
+    console.log("Filter state changed:", {
+      activeFilters: filters,
+      totalImages: images.length,
+      filteredCount: filteredImages.length,
+    });
+  }, [filters, images.length, filteredImages.length]);
+
+  // Reset mainIndex and currentPage when filtered results change
+  useEffect(() => {
+    if (filteredImages.length === 0) {
+      setMainIndex(0);
+      setCurrentPage(1);
+    } else if (mainIndex >= filteredImages.length) {
+      setMainIndex(filteredImages.length - 1);
+      const newPage = Math.ceil(filteredImages.length / itemsPerPage);
+      setCurrentPage(Math.min(currentPage, newPage));
+    }
+  }, [filteredImages.length, mainIndex, currentPage, itemsPerPage]);
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
       const firstImageIndexOfNewPage = (newPage - 1) * itemsPerPage;
-      setMainIndex(firstImageIndexOfNewPage);
+      setMainIndex(
+        Math.min(firstImageIndexOfNewPage, filteredImages.length - 1)
+      );
       setMainImageLoaded(true);
     }
   };
@@ -186,19 +275,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   const handleNext = useCallback(() => {
     if (isModalOpen) {
-      setModalIndex((prev) => (prev + 1) % images.length);
+      setModalIndex((prev) => (prev + 1) % filteredImages.length);
     } else {
-      setMainIndex((prev) => (prev + 1) % images.length);
+      setMainIndex((prev) => (prev + 1) % filteredImages.length);
     }
-  }, [isModalOpen, images.length]);
+  }, [isModalOpen, filteredImages.length]);
 
   const handlePrev = useCallback(() => {
     if (isModalOpen) {
-      setModalIndex((prev) => (prev - 1 + images.length) % images.length);
+      setModalIndex(
+        (prev) => (prev - 1 + filteredImages.length) % filteredImages.length
+      );
     } else {
-      setMainIndex((prev) => (prev - 1 + images.length) % images.length);
+      setMainIndex(
+        (prev) => (prev - 1 + filteredImages.length) % filteredImages.length
+      );
     }
-  }, [isModalOpen, images.length]);
+  }, [isModalOpen, filteredImages.length]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -278,16 +371,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  const paginatedImages = images.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  if (!images || images.length === 0) {
+  if (!images || images.length === 0 || filteredImages.length === 0) {
     return (
       <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-gray-400">No images available</span>
+          <span className="text-gray-400">
+            {!images || images.length === 0
+              ? "No images available"
+              : "No images match the selected filters"}
+          </span>
         </div>
       </div>
     );
@@ -295,6 +387,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   return (
     <div className="space-y-4">
+      {showFilters && (
+        <ImageFilterControls
+          filters={filters}
+          onFilterChange={setFilters}
+          availableFilters={availableFilters}
+        />
+      )}
       <div className="flex gap-6">
         <div className="w-2/3 space-y-3">
           <div
@@ -309,19 +408,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               onTouchEnd={handleTouchEnd}
             >
               {!mainImageLoaded && <ImageSkeleton aspectRatio={aspectRatio} />}
-              <img
-                src={`${images[mainIndex].url}/public`}
-                alt={
-                  title
-                    ? `${title} - View ${mainIndex + 1}`
-                    : `View ${mainIndex + 1} of ${images.length}`
-                }
-                className={cn(
-                  "w-full h-full object-cover transition-opacity duration-300",
-                  !mainImageLoaded && "opacity-0"
-                )}
-                onLoad={() => setMainImageLoaded(true)}
-              />
+              {filteredImages[mainIndex] && (
+                <img
+                  src={`${filteredImages[mainIndex].url}/public`}
+                  alt={
+                    title
+                      ? `${title} - View ${mainIndex + 1}`
+                      : `View ${mainIndex + 1} of ${filteredImages.length}`
+                  }
+                  className={cn(
+                    "w-full h-full object-cover transition-opacity duration-300",
+                    !mainImageLoaded && "opacity-0"
+                  )}
+                  onLoad={() => setMainImageLoaded(true)}
+                />
+              )}
               <button
                 onClick={() => {
                   setModalIndex(mainIndex);
@@ -349,9 +450,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
           </div>
 
-          {showMetadata && (
+          {showMetadata && filteredImages[mainIndex] && (
             <div className="mt-4">
-              <MetadataSection metadata={images} currentIndex={mainIndex} />
+              <MetadataSection
+                metadata={filteredImages}
+                currentIndex={mainIndex}
+              />
             </div>
           )}
         </div>
@@ -395,52 +499,59 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
 
           <div className="grid grid-cols-3 gap-2">
-            {paginatedImages.map((image, index) => {
-              const actualIndex = (currentPage - 1) * itemsPerPage + index;
-              const isSelected = selectedImages.includes(actualIndex);
+            {filteredImages
+              .slice(
+                (currentPage - 1) * itemsPerPage,
+                currentPage * itemsPerPage
+              )
+              .map((image, index) => {
+                const actualIndex = (currentPage - 1) * itemsPerPage + index;
+                const isSelected = selectedImages.includes(actualIndex);
 
-              return (
-                <div
-                  key={index}
-                  className="relative group cursor-pointer"
-                  onClick={() => {
-                    if (!isEditMode) {
-                      setMainIndex(actualIndex);
-                      setMainImageLoaded(true);
-                    }
-                  }}
-                  style={{ aspectRatio }}
-                >
-                  <img
-                    src={`${image.url}/public`}
-                    alt={`Image ${actualIndex + 1}`}
-                    className={cn(
-                      "w-full h-full object-cover rounded-lg transition-all duration-300",
-                      isMainVisible && actualIndex === mainIndex
-                        ? ""
-                        : "opacity-75",
-                      isSelected ? "opacity-75" : ""
-                    )}
-                  />
-                  {isEditMode && (
-                    <div
-                      className="absolute top-2 right-2 z-10"
-                      onClick={(e) => handleImageSelect(actualIndex, e)}
-                    >
+                return (
+                  <div
+                    key={index}
+                    className="relative group cursor-pointer"
+                    onClick={() => {
+                      if (!isEditMode) {
+                        setMainIndex(actualIndex);
+                        setMainImageLoaded(true);
+                      }
+                    }}
+                    style={{ aspectRatio }}
+                  >
+                    <img
+                      src={`${image.url}/public`}
+                      alt={`Image ${actualIndex + 1}`}
+                      className={cn(
+                        "w-full h-full object-cover rounded-lg transition-all duration-300",
+                        isMainVisible && actualIndex === mainIndex
+                          ? ""
+                          : "opacity-75",
+                        isSelected ? "opacity-75" : ""
+                      )}
+                    />
+                    {isEditMode && (
                       <div
-                        className={`w-5 h-5 rounded border-2 ${
-                          isSelected
-                            ? "bg-blue-500 border-blue-500"
-                            : "border-white"
-                        } flex items-center justify-center`}
+                        className="absolute top-2 right-2 z-10"
+                        onClick={(e) => handleImageSelect(actualIndex, e)}
                       >
-                        {isSelected && <Check className="w-4 h-4 text-white" />}
+                        <div
+                          className={`w-5 h-5 rounded border-2 ${
+                            isSelected
+                              ? "bg-blue-500 border-blue-500"
+                              : "border-white"
+                          } flex items-center justify-center`}
+                        >
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-white" />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })}
           </div>
 
           {totalPages > 1 && (
@@ -484,8 +595,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <X className="w-6 h-6" />
           </button>
           <img
-            src={`${images[modalIndex].url}/public`}
-            alt={`Full size view ${modalIndex + 1} of ${images.length}`}
+            src={`${filteredImages[modalIndex].url}/public`}
+            alt={`Full size view ${modalIndex + 1} of ${filteredImages.length}`}
             className="max-w-full max-h-[90vh] object-contain"
           />
           <button

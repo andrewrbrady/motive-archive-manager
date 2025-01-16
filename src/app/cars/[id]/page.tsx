@@ -410,8 +410,13 @@ export default function CarPage() {
           {/* Image Gallery */}
           <div className="md:col-span-2">
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold">
-                {car.brand} {car.model} {car.year}
+              <h1 className="text-xl font-bold uppercase tracking-tight">
+                {car.year} {car.brand} {car.model}
+                {car.type && (
+                  <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                    {car.type}
+                  </span>
+                )}
               </h1>
               <div className="flex items-center gap-3">
                 <button
@@ -504,9 +509,14 @@ export default function CarPage() {
           {/* Car Details */}
           <div className="space-y-6">
             <section>
-              <h1 className="text-3xl font-bold">
-                {car.brand} {car.model} {car.year}
-              </h1>
+              <h2 className="text-3xl font-bold">
+                {car.year} {car.brand} {car.model}
+                {car.type && (
+                  <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                    {car.type}
+                  </span>
+                )}
+              </h2>
               <p className="text-2xl font-semibold mt-2">{car.price}</p>
             </section>
 
