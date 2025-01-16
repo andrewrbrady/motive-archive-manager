@@ -1,29 +1,33 @@
 "use client";
 
-import React from "react";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { Edit } from "lucide-react";
 
 interface EditModeToggleProps {
   isEditMode: boolean;
 }
 
 export default function EditModeToggle({ isEditMode }: EditModeToggleProps) {
+  const router = useRouter();
+
   const toggleEditMode = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("edit", (!isEditMode).toString());
-    window.history.pushState({}, "", url.toString());
-    window.location.reload();
+    const searchParams = new URLSearchParams(window.location.search);
+    if (isEditMode) {
+      searchParams.delete("edit");
+    } else {
+      searchParams.set("edit", "true");
+    }
+    router.push(`?${searchParams.toString()}`);
   };
 
   return (
-    <button
+    <Button
+      variant={isEditMode ? "default" : "outline"}
       onClick={toggleEditMode}
-      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-        isEditMode
-          ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-      }`}
+      title={isEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
     >
-      {isEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
-    </button>
+      <Edit className="h-4 w-4" />
+    </Button>
   );
 }

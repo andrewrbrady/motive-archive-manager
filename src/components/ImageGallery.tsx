@@ -16,6 +16,7 @@ import {
   extractImageIdFromUrl,
 } from "@/lib/cloudflare";
 import { ImageMetadataEditor } from "./ImageMetadataEditor";
+import { cn } from "@/lib/utils";
 
 interface UploadProgress {
   fileName: string;
@@ -84,6 +85,13 @@ const MetadataSection = ({
   );
 };
 
+const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
+  <div
+    className="animate-pulse bg-gray-200 rounded-lg relative w-full"
+    style={{ aspectRatio }}
+  />
+);
+
 export const ImageGallery: React.FC<ImageGalleryProps> = ({
   images,
   title,
@@ -112,6 +120,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(
     null
   );
+  const [loadedImages, setLoadedImages] = useState<{ [key: string]: boolean }>(
+    {}
+  );
+  const [mainImageLoaded, setMainImageLoaded] = useState(false);
 
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
   const totalPages = Math.ceil(images.length / itemsPerPage);
@@ -335,6 +347,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   }, [images]);
 
+  // Function to handle image load
+  const handleImageLoad = (imageUrl: string) => {
+    setLoadedImages((prev) => ({
+      ...prev,
+      [imageUrl]: true,
+    }));
+  };
+
   if (!images || images.length === 0) {
     return (
       <div className="space-y-4">
@@ -400,6 +420,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
+              {!mainImageLoaded && <ImageSkeleton aspectRatio={aspectRatio} />}
               <img
                 src={images[mainIndex]}
                 alt={
@@ -407,7 +428,11 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     ? `${title} - View ${mainIndex + 1}`
                     : `View ${mainIndex + 1} of ${images.length}`
                 }
-                className="w-full h-full object-cover"
+                className={cn(
+                  "w-full h-full object-cover transition-opacity duration-300",
+                  !mainImageLoaded && "opacity-0"
+                )}
+                onLoad={() => setMainImageLoaded(true)}
               />
               {uploading && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -525,6 +550,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               const actualIndex = (currentPage - 1) * itemsPerPage + index;
               const isSelected = selectedImages.includes(actualIndex);
               const imageId = extractImageIdFromUrl(image);
+              const isLoaded = loadedImages[image];
 
               return (
                 <div
@@ -533,20 +559,26 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   onClick={() => {
                     if (!isEditMode) {
                       setMainIndex(actualIndex);
+                      setMainImageLoaded(!!loadedImages[images[actualIndex]]);
                     }
                   }}
                   style={{ aspectRatio }}
                 >
+                  {!isLoaded && <ImageSkeleton aspectRatio={aspectRatio} />}
                   <Image
                     src={image}
                     alt={`Image ${actualIndex + 1}`}
                     fill
-                    className={`object-cover transition-opacity duration-200 ${
+                    className={cn(
+                      "object-cover transition-all duration-300",
+                      !isLoaded && "opacity-0",
                       isMainVisible && actualIndex === mainIndex
                         ? "opacity-50"
-                        : ""
-                    } ${isSelected ? "opacity-50" : ""}`}
+                        : "",
+                      isSelected ? "opacity-50" : ""
+                    )}
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    onLoadingComplete={() => handleImageLoad(image)}
                   />
                   {isEditMode && (
                     <div

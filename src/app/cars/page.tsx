@@ -176,23 +176,25 @@ export default async function CarsPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   try {
-    const params = await Promise.resolve(searchParams);
+    const resolvedParams = await Promise.resolve(searchParams);
 
-    const page = Number(params.page) || 1;
-    const pageSize = Number(params.pageSize) || 12;
-    const viewMode = (params.view?.toString() || "grid") as "grid" | "list";
-    const isEditMode = params.edit === "true";
+    const page = Number(resolvedParams.page) || 1;
+    const pageSize = Number(resolvedParams.pageSize) || 12;
+    const viewMode = (resolvedParams.view?.toString() || "grid") as
+      | "grid"
+      | "list";
+    const isEditMode = resolvedParams.edit === "true";
 
     const filters: FilterParams = {
-      brand: params.brand?.toString(),
-      minYear: params.minYear?.toString(),
-      maxYear: params.maxYear?.toString(),
-      condition: params.condition?.toString(),
-      clientId: params.clientId?.toString(),
-      engineFeatures: params.engineFeatures?.toString(),
-      minPrice: params.minPrice?.toString(),
-      maxPrice: params.maxPrice?.toString(),
-      status: params.status?.toString(),
+      brand: resolvedParams.brand?.toString(),
+      minYear: resolvedParams.minYear?.toString(),
+      maxYear: resolvedParams.maxYear?.toString(),
+      condition: resolvedParams.condition?.toString(),
+      clientId: resolvedParams.clientId?.toString(),
+      engineFeatures: resolvedParams.engineFeatures?.toString(),
+      minPrice: resolvedParams.minPrice?.toString(),
+      maxPrice: resolvedParams.maxPrice?.toString(),
+      status: resolvedParams.status?.toString(),
     };
 
     // Clean up undefined values
@@ -271,7 +273,9 @@ export default async function CarsPage({
               <CarsViewWrapper
                 cars={cars}
                 viewMode={viewMode}
-                searchParams={searchParams}
+                currentSearchParams={new URLSearchParams(
+                  resolvedParams as Record<string, string>
+                ).toString()}
               />
             )}
 

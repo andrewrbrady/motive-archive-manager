@@ -1,4 +1,4 @@
-import { env } from "./env";
+import { getCache, setCache } from "./cache";
 
 interface CloudflareImageResponse {
   result: {
@@ -17,6 +17,13 @@ export async function getCloudflareImageMetadata(
   imageId: string
 ): Promise<Record<string, any> | null> {
   try {
+    // Check cache first
+    const cachedMetadata = getCache<Record<string, any>>(imageId);
+    if (cachedMetadata) {
+      return cachedMetadata;
+    }
+
+    // If not in cache, fetch from API
     const response = await fetch(`/api/cloudflare/metadata/${imageId}`);
 
     if (!response.ok) {
@@ -34,6 +41,8 @@ export async function getCloudflareImageMetadata(
       return null;
     }
 
+    // Cache the metadata before returning
+    setCache(imageId, data.result.meta);
     return data.result.meta;
   } catch (error) {
     console.error("Error fetching Cloudflare image metadata:", error);
@@ -63,6 +72,10 @@ export async function updateCloudflareImageMetadata(
     }
 
     const data = await response.json();
+    if (data.success) {
+      // Update cache with new metadata
+      setCache(imageId, metadata);
+    }
     return data.success;
   } catch (error) {
     console.error("Error updating Cloudflare image metadata:", error);
@@ -81,7 +94,15 @@ export async function deleteCloudflareImageMetadata(
     const updatedMetadata = { ...currentMetadata };
     delete updatedMetadata[key];
 
-    return updateCloudflareImageMetadata(imageId, updatedMetadata);
+    const success = await updateCloudflareImageMetadata(
+      imageId,
+      updatedMetadata
+    );
+    if (success) {
+      // Update cache with new metadata
+      setCache(imageId, updatedMetadata);
+    }
+    return success;
   } catch (error) {
     console.error("Error deleting Cloudflare image metadata:", error);
     return false;
