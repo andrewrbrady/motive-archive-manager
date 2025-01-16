@@ -8,8 +8,14 @@ import {
   ZoomIn,
   Loader2,
   Check,
+  Edit,
 } from "lucide-react";
 import Image from "next/image";
+import {
+  getCloudflareImageMetadata,
+  extractImageIdFromUrl,
+} from "@/lib/cloudflare";
+import { ImageMetadataEditor } from "./ImageMetadataEditor";
 
 interface UploadProgress {
   fileName: string;
@@ -30,6 +36,53 @@ interface ImageGalleryProps {
   uploading?: boolean;
   uploadProgress: UploadProgress[];
 }
+
+const MetadataSection = ({
+  metadata,
+  currentIndex,
+}: {
+  metadata: Record<string, any>[];
+  currentIndex: number;
+}) => {
+  if (!metadata.length || !metadata[currentIndex]) return null;
+
+  const currentMetadata = metadata[currentIndex];
+
+  return (
+    <div className="mb-4 bg-white rounded-lg shadow p-4">
+      <h3 className="text-lg font-semibold mb-3">Image Metadata</h3>
+      <div className="space-y-2">
+        {currentMetadata.angle && (
+          <div>
+            <span className="font-medium">Angle:</span> {currentMetadata.angle}
+          </div>
+        )}
+        {currentMetadata.view && (
+          <div>
+            <span className="font-medium">View:</span> {currentMetadata.view}
+          </div>
+        )}
+        {currentMetadata.tod && (
+          <div>
+            <span className="font-medium">Time of Day:</span>{" "}
+            {currentMetadata.tod}
+          </div>
+        )}
+        {currentMetadata.movement && (
+          <div>
+            <span className="font-medium">Movement:</span>{" "}
+            {currentMetadata.movement}
+          </div>
+        )}
+        {currentMetadata.description && (
+          <div className="mt-2 text-sm text-gray-600">
+            {currentMetadata.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const ImageGallery: React.FC<ImageGalleryProps> = ({
   images,
@@ -52,6 +105,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cloudflareMetadata, setCloudflareMetadata] = useState<
+    Record<string, any>[]
+  >([]);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(
+    null
+  );
 
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
   const totalPages = Math.ceil(images.length / itemsPerPage);
@@ -248,6 +308,33 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   };
 
+  // Fetch Cloudflare metadata for images
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      setIsLoadingMetadata(true);
+      try {
+        const metadataPromises = images.map(async (imageUrl) => {
+          const imageId = extractImageIdFromUrl(imageUrl);
+          if (!imageId) return null;
+          return getCloudflareImageMetadata(imageId);
+        });
+
+        const results = await Promise.all(metadataPromises);
+        setCloudflareMetadata(
+          results.filter((meta): meta is Record<string, any> => meta !== null)
+        );
+      } catch (error) {
+        console.error("Error fetching image metadata:", error);
+      } finally {
+        setIsLoadingMetadata(false);
+      }
+    };
+
+    if (images.length > 0) {
+      fetchMetadata();
+    }
+  }, [images]);
+
   if (!images || images.length === 0) {
     return (
       <div className="space-y-4">
@@ -428,61 +515,95 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
           )}
 
+          <MetadataSection
+            metadata={cloudflareMetadata}
+            currentIndex={mainIndex}
+          />
+
           <div className="grid grid-cols-4 gap-2">
             {paginatedImages.map((image, index) => {
               const actualIndex = (currentPage - 1) * itemsPerPage + index;
               const isSelected = selectedImages.includes(actualIndex);
+              const imageId = extractImageIdFromUrl(image);
+
               return (
-                <div key={actualIndex} className="relative group">
-                  <button
-                    onClick={() => {
-                      if (!isEditMode) {
-                        setMainIndex(actualIndex);
-                      }
-                    }}
-                    onContextMenu={(e) => handleImageSelect(actualIndex, e)}
-                    className={`aspect-square relative w-full transition-opacity duration-200 ${
-                      actualIndex === mainIndex && !isEditMode
-                        ? "ring-2 ring-blue-500"
-                        : isSelected
-                        ? "ring-2 ring-green-500"
-                        : "opacity-75 hover:opacity-100"
-                    }`}
-                    aria-label={`View image ${actualIndex + 1}`}
-                    aria-current={actualIndex === mainIndex ? "true" : "false"}
-                  >
-                    <img
-                      src={image}
-                      alt={`Thumbnail ${actualIndex + 1}`}
-                      className="w-full h-full object-cover rounded-md"
-                    />
-                    {isEditMode && (
+                <div
+                  key={index}
+                  className="relative group cursor-pointer"
+                  onClick={() => {
+                    if (!isEditMode) {
+                      setMainIndex(actualIndex);
+                    }
+                  }}
+                  style={{ aspectRatio }}
+                >
+                  <Image
+                    src={image}
+                    alt={`Image ${actualIndex + 1}`}
+                    fill
+                    className={`object-cover transition-opacity duration-200 ${
+                      isMainVisible && actualIndex === mainIndex
+                        ? "opacity-50"
+                        : ""
+                    } ${isSelected ? "opacity-50" : ""}`}
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  />
+                  {isEditMode && (
+                    <div
+                      className="absolute top-2 right-2 z-10"
+                      onClick={(e) => handleImageSelect(actualIndex, e)}
+                    >
                       <div
-                        onClick={(e) => handleImageSelect(actualIndex, e)}
-                        className={`absolute top-2 left-2 w-5 h-5 rounded border-2 ${
+                        className={`w-5 h-5 rounded border-2 ${
                           isSelected
-                            ? "bg-green-500 border-green-500"
-                            : "border-white bg-black/20"
-                        } cursor-pointer transition-colors duration-200`}
+                            ? "bg-blue-500 border-blue-500"
+                            : "border-white"
+                        } flex items-center justify-center`}
                       >
-                        {isSelected && (
-                          <svg
-                            className="w-full h-full text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
+                        {isSelected && <Check className="w-4 h-4 text-white" />}
                       </div>
-                    )}
-                  </button>
+                    </div>
+                  )}
+                  {isEditMode && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingImageIndex(actualIndex);
+                      }}
+                      className="absolute bottom-2 right-2 p-1 bg-black/50 rounded text-white hover:bg-black/70"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  )}
+                  {editingImageIndex === actualIndex && imageId && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                      <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-lg font-semibold">
+                            Edit Metadata
+                          </h3>
+                          <button
+                            onClick={() => setEditingImageIndex(null)}
+                            className="p-1 hover:bg-gray-100 rounded"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <ImageMetadataEditor
+                          imageId={imageId}
+                          metadata={cloudflareMetadata[actualIndex] || {}}
+                          onMetadataChange={(newMetadata) => {
+                            setCloudflareMetadata((prev) => {
+                              const updated = [...prev];
+                              updated[actualIndex] = newMetadata;
+                              return updated;
+                            });
+                            setEditingImageIndex(null);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
