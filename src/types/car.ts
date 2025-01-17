@@ -49,24 +49,8 @@ export interface Car {
   location: string;
   description: string;
   type?: string;
-  images: {
-    id: string;
-    url: string;
-    filename: string;
-    metadata: {
-      angle?: string;
-      description?: string;
-      movement?: string;
-      tod?: string;
-      view?: string;
-      side?: string;
-    };
-    variants?: {
-      [key: string]: string;
-    };
-    createdAt: string;
-    updatedAt: string;
-  }[];
+  vin?: string;
+  images: CarImage[];
   owner_id?: string;
   engine?: Engine;
   clientInfo?: {

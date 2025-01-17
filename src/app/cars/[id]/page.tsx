@@ -10,10 +10,34 @@ import { DeleteImageDialog } from "@/components/DeleteImageDialog";
 
 interface Engine {
   type: string;
-  displacement?: number;
-  features?: string[];
-  transmission?: string;
-  fuelType?: string;
+  displacement?: string;
+  power?: string;
+  torque?: string;
+}
+
+interface Dimensions {
+  length: string;
+  width: string;
+  height: string;
+  wheelbase: string;
+}
+
+interface InteriorFeatures {
+  seats: number;
+  upholstery?: string;
+}
+
+interface Performance {
+  "0_to_60_mph": string;
+  top_speed: string;
+}
+
+interface Transmission {
+  type: string;
+}
+
+interface Weight {
+  curb_weight: string;
 }
 
 interface Car {
@@ -21,13 +45,13 @@ interface Car {
   make: string;
   model: string;
   year: number;
-  price: number;
+  price: number | null;
   mileage: number;
-  color: string;
-  horsepower: number;
-  condition: string;
+  color: string | null;
+  horsepower: string;
+  condition: string | null;
   location: string;
-  description: string;
+  description: string | null;
   type?: string;
   vin?: string;
   images: {
@@ -63,6 +87,13 @@ interface Car {
   createdAt: string;
   updatedAt: string;
   status?: "available" | "sold" | "pending";
+  dimensions?: Dimensions;
+  fuel_capacity?: string;
+  interior_features?: InteriorFeatures;
+  interior_color?: string;
+  performance?: Performance;
+  transmission?: Transmission;
+  weight?: Weight;
 }
 
 interface UploadProgress {
@@ -79,12 +110,48 @@ interface DeleteStatus {
   error?: string;
 }
 
+interface EditableSpecs
+  extends Partial<
+    Omit<
+      Car,
+      | "dimensions"
+      | "performance"
+      | "weight"
+      | "transmission"
+      | "interior_features"
+    >
+  > {
+  dimensions?: Partial<Dimensions>;
+  performance?: Partial<Performance>;
+  weight?: Partial<Weight>;
+  transmission?: Partial<Transmission>;
+  interior_features?: Partial<InteriorFeatures>;
+}
+
+// Helper function to handle input values
+const getInputValue = (value: any): string => {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "string") return value;
+  return "";
+};
+
+// Helper function to handle number input values
+const getNumberInputValue = (value: any): string => {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "string" && !isNaN(Number(value))) return value;
+  return "";
+};
+
 export default function CarPage() {
   const { id } = useParams() as { id: string };
   const [car, setCar] = useState<Car | null>(null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isSpecsEditMode, setIsSpecsEditMode] = useState(false);
+  const [editedSpecs, setEditedSpecs] = useState<EditableSpecs>({});
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -96,6 +163,7 @@ export default function CarPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   // Add escape key handler
   useEffect(() => {
@@ -509,6 +577,133 @@ export default function CarPage() {
     }
   };
 
+  const handleEnrichData = async () => {
+    if (!car) return;
+
+    setIsEnriching(true);
+    try {
+      const response = await fetch(`/api/cars/${car._id}/enrich`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to enrich car data");
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.updatedCar) {
+        // Update the car state with the enriched data
+        setCar(data.updatedCar);
+
+        // Show success toast or notification
+        // TODO: Add toast notification system
+        console.log("Successfully enriched car data:", data.enrichedData);
+      } else {
+        console.error("Failed to enrich car data:", data.error);
+        // Show error toast or notification
+      }
+    } catch (error) {
+      console.error("Error enriching car data:", error);
+      // Show error toast or notification
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
+  const handleSpecsEdit = async () => {
+    if (!car || !isSpecsEditMode) return;
+
+    try {
+      const response = await fetch(`/api/cars/${car._id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editedSpecs),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update specifications");
+      }
+
+      // Fetch the updated car data to ensure we have the complete and correct state
+      const updatedCarResponse = await fetch(`/api/cars/${car._id}`);
+      if (!updatedCarResponse.ok) {
+        throw new Error("Failed to fetch updated car data");
+      }
+      const updatedCar = await updatedCarResponse.json();
+      setCar(updatedCar);
+
+      // Reset edit mode and clear edited specs
+      setIsSpecsEditMode(false);
+      setEditedSpecs({});
+    } catch (error) {
+      console.error("Error updating specifications:", error);
+      // You might want to show an error notification here
+    }
+  };
+
+  type NestedFields =
+    | "engine"
+    | "dimensions"
+    | "interior_features"
+    | "performance"
+    | "transmission"
+    | "weight";
+
+  const handleInputChange = (
+    field: keyof EditableSpecs,
+    value: string,
+    nestedField?: string
+  ) => {
+    let newValue: any = value;
+
+    // Handle number fields
+    if (
+      field === "year" ||
+      field === "mileage" ||
+      field === "price" ||
+      (field === "interior_features" && nestedField === "seats")
+    ) {
+      newValue = value ? parseInt(value) : field === "price" ? null : 0;
+    }
+
+    // Update the editedSpecs state
+    setEditedSpecs((prev) => {
+      // Handle nested fields
+      if (nestedField && isNestedField(field)) {
+        return {
+          ...prev,
+          [field]: {
+            ...prev[field],
+            [nestedField]: newValue,
+          },
+        };
+      }
+
+      // Handle top-level fields
+      return {
+        ...prev,
+        [field]: newValue,
+      };
+    });
+  };
+
+  // Type guard for nested fields
+  const isNestedField = (field: keyof EditableSpecs): field is NestedFields => {
+    return [
+      "engine",
+      "dimensions",
+      "interior_features",
+      "performance",
+      "transmission",
+      "weight",
+    ].includes(field as string);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -547,6 +742,30 @@ export default function CarPage() {
             )}
           </h1>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleEnrichData}
+              disabled={isEnriching}
+              className="px-4 py-2 text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {isEnriching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                  />
+                </svg>
+              )}
+              {isEnriching ? "Enriching..." : "Enrich Data"}
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingImages}
@@ -657,9 +876,78 @@ export default function CarPage() {
 
         {/* Vehicle Information */}
         <div className="mb-8">
-          <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600 mb-4">
-            Specifications
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600">
+              Specifications
+            </h2>
+            <div className="flex items-center gap-2">
+              {isSpecsEditMode ? (
+                <>
+                  <button
+                    onClick={handleSpecsEdit}
+                    className="px-3 py-1 text-sm text-green-600 hover:text-green-700 border border-green-200 hover:border-green-300 rounded-md transition-colors flex items-center gap-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsSpecsEditMode(false);
+                      setEditedSpecs({});
+                    }}
+                    className="px-3 py-1 text-sm text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-md transition-colors flex items-center gap-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsSpecsEditMode(true)}
+                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
+                  aria-label="Edit specifications"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
           <div className="bg-gray-50/50 border rounded-lg">
             <div className="divide-y">
               <div className="grid grid-cols-12 divide-x text-sm">
@@ -667,19 +955,52 @@ export default function CarPage() {
                   Year
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.year}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="number"
+                      value={getNumberInputValue(editedSpecs.year ?? car.year)}
+                      onChange={(e) =>
+                        handleInputChange("year", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.year
+                  )}
                 </div>
                 <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Make
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.make}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="text"
+                      value={getInputValue(editedSpecs.make ?? car.make)}
+                      onChange={(e) =>
+                        handleInputChange("make", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.make
+                  )}
                 </div>
                 <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Model
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.model}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="text"
+                      value={getInputValue(editedSpecs.model ?? car.model)}
+                      onChange={(e) =>
+                        handleInputChange("model", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.model
+                  )}
                 </div>
               </div>
 
@@ -688,19 +1009,56 @@ export default function CarPage() {
                   Type
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.type || "N/A"}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="text"
+                      value={getInputValue(editedSpecs.type ?? car.type)}
+                      onChange={(e) =>
+                        handleInputChange("type", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.type || "N/A"
+                  )}
                 </div>
                 <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Color
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.color || "N/A"}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="text"
+                      value={getInputValue(editedSpecs.color ?? car.color)}
+                      onChange={(e) =>
+                        handleInputChange("color", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.color || "N/A"
+                  )}
                 </div>
                 <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Mileage
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.mileage.toLocaleString()}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="number"
+                      value={getNumberInputValue(
+                        editedSpecs.mileage ?? car.mileage
+                      )}
+                      onChange={(e) =>
+                        handleInputChange("mileage", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : car.mileage ? (
+                    car.mileage.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                  ) : (
+                    "0"
+                  )}
                 </div>
               </div>
 
@@ -709,7 +1067,16 @@ export default function CarPage() {
                   VIN
                 </div>
                 <div className="col-span-11 text-gray-600 font-medium font-mono text-sm p-2 flex items-center uppercase">
-                  {car.vin || "N/A"}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="text"
+                      value={getInputValue(editedSpecs.vin ?? car.vin)}
+                      onChange={(e) => handleInputChange("vin", e.target.value)}
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.vin || "N/A"
+                  )}
                 </div>
               </div>
 
@@ -718,13 +1085,45 @@ export default function CarPage() {
                   Location
                 </div>
                 <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  {car.location || "N/A"}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="text"
+                      value={getInputValue(
+                        editedSpecs.location ?? car.location
+                      )}
+                      onChange={(e) =>
+                        handleInputChange("location", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : (
+                    car.location || "N/A"
+                  )}
                 </div>
                 <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Price
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                  ${car.price.toLocaleString()}
+                  {isSpecsEditMode ? (
+                    <input
+                      type="number"
+                      value={getNumberInputValue(
+                        editedSpecs.price ?? car.price
+                      )}
+                      onChange={(e) =>
+                        handleInputChange("price", e.target.value)
+                      }
+                      className="w-full bg-white border rounded px-2 py-1"
+                    />
+                  ) : car.price ? (
+                    `$${car.price
+                      .toString()
+                      .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
+                  ) : car.price === 0 ? (
+                    "$0"
+                  ) : (
+                    ""
+                  )}
                 </div>
               </div>
 
@@ -734,13 +1133,323 @@ export default function CarPage() {
                     Engine
                   </div>
                   <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
-                    {car.engine.type}
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.engine?.type ?? car.engine.type
+                        )}
+                        onChange={(e) =>
+                          handleInputChange("engine", e.target.value, "type")
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.engine.type
+                    )}
                   </div>
                   <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
-                    Disp.
+                    Power
                   </div>
                   <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                    {car.engine.displacement || "N/A"}
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.horsepower ?? car.horsepower
+                        )}
+                        onChange={(e) =>
+                          handleInputChange("horsepower", e.target.value)
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.horsepower || "N/A"
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {car.dimensions && (
+                <>
+                  <div className="grid grid-cols-12 divide-x text-sm">
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Length
+                    </div>
+                    <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <input
+                          type="text"
+                          value={getInputValue(
+                            editedSpecs.dimensions?.length ??
+                              car.dimensions.length
+                          )}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "dimensions",
+                              e.target.value,
+                              "length"
+                            )
+                          }
+                          className="w-full bg-white border rounded px-2 py-1"
+                        />
+                      ) : (
+                        car.dimensions.length || "N/A"
+                      )}
+                    </div>
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Width
+                    </div>
+                    <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <input
+                          type="text"
+                          value={getInputValue(
+                            editedSpecs.dimensions?.width ??
+                              car.dimensions.width
+                          )}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "dimensions",
+                              e.target.value,
+                              "width"
+                            )
+                          }
+                          className="w-full bg-white border rounded px-2 py-1"
+                        />
+                      ) : (
+                        car.dimensions.width || "N/A"
+                      )}
+                    </div>
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Height
+                    </div>
+                    <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <input
+                          type="text"
+                          value={getInputValue(
+                            editedSpecs.dimensions?.height ??
+                              car.dimensions.height
+                          )}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "dimensions",
+                              e.target.value,
+                              "height"
+                            )
+                          }
+                          className="w-full bg-white border rounded px-2 py-1"
+                        />
+                      ) : (
+                        car.dimensions.height || "N/A"
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-12 divide-x text-sm">
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Wheelbase
+                    </div>
+                    <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <input
+                          type="text"
+                          value={getInputValue(
+                            editedSpecs.dimensions?.wheelbase ??
+                              car.dimensions.wheelbase
+                          )}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "dimensions",
+                              e.target.value,
+                              "wheelbase"
+                            )
+                          }
+                          className="w-full bg-white border rounded px-2 py-1"
+                        />
+                      ) : (
+                        car.dimensions.wheelbase || "N/A"
+                      )}
+                    </div>
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Fuel Cap.
+                    </div>
+                    <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <input
+                          type="text"
+                          value={getInputValue(
+                            editedSpecs.fuel_capacity ?? car.fuel_capacity
+                          )}
+                          onChange={(e) =>
+                            handleInputChange("fuel_capacity", e.target.value)
+                          }
+                          className="w-full bg-white border rounded px-2 py-1"
+                        />
+                      ) : (
+                        car.fuel_capacity || "N/A"
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {car.interior_features && (
+                <div className="grid grid-cols-12 divide-x text-sm">
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    Interior
+                  </div>
+                  <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.interior_color ?? car.interior_color
+                        )}
+                        onChange={(e) =>
+                          handleInputChange("interior_color", e.target.value)
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.interior_color || "N/A"
+                    )}
+                  </div>
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    Seats
+                  </div>
+                  <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                    {isSpecsEditMode ? (
+                      <input
+                        type="number"
+                        value={getNumberInputValue(
+                          editedSpecs.interior_features?.seats ??
+                            car.interior_features?.seats
+                        )}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "interior_features",
+                            e.target.value,
+                            "seats"
+                          )
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.interior_features.seats || "N/A"
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {car.performance && (
+                <div className="grid grid-cols-12 divide-x text-sm">
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    0-60 mph
+                  </div>
+                  <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.performance?.["0_to_60_mph"] ??
+                            car.performance["0_to_60_mph"]
+                        )}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "performance",
+                            e.target.value,
+                            "0_to_60_mph"
+                          )
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.performance["0_to_60_mph"] || "N/A"
+                    )}
+                  </div>
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    Top Speed
+                  </div>
+                  <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.performance?.top_speed ??
+                            car.performance.top_speed
+                        )}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "performance",
+                            e.target.value,
+                            "top_speed"
+                          )
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.performance.top_speed || "N/A"
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {car.transmission && (
+                <div className="grid grid-cols-12 divide-x text-sm">
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    Trans.
+                  </div>
+                  <div className="col-span-11 text-gray-600 font-medium p-2 flex items-center uppercase">
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.transmission?.type ??
+                            car.transmission.type
+                        )}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "transmission",
+                            e.target.value,
+                            "type"
+                          )
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.transmission.type || "N/A"
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {car.weight && (
+                <div className="grid grid-cols-12 divide-x text-sm">
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    Weight
+                  </div>
+                  <div className="col-span-11 text-gray-600 font-medium p-2 flex items-center uppercase">
+                    {isSpecsEditMode ? (
+                      <input
+                        type="text"
+                        value={getInputValue(
+                          editedSpecs.weight?.curb_weight ??
+                            car.weight.curb_weight
+                        )}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "weight",
+                            e.target.value,
+                            "curb_weight"
+                          )
+                        }
+                        className="w-full bg-white border rounded px-2 py-1"
+                      />
+                    ) : (
+                      car.weight.curb_weight || "N/A"
+                    )}
                   </div>
                 </div>
               )}
