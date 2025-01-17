@@ -19,7 +19,7 @@ const ListView: React.FC<ListViewProps> = ({ cars }) => {
         <thead>
           <tr className="bg-gray-50 border-y">
             <th className="py-2 px-3 text-left font-medium border">Year</th>
-            <th className="py-2 px-3 text-left font-medium border">Brand</th>
+            <th className="py-2 px-3 text-left font-medium border">Make</th>
             <th className="py-2 px-3 text-left font-medium border">Model</th>
             <th className="py-2 px-3 text-right font-medium border">Price</th>
             <th className="py-2 px-3 text-right font-medium border">Mileage</th>
@@ -35,7 +35,7 @@ const ListView: React.FC<ListViewProps> = ({ cars }) => {
           {cars.map((car) => (
             <tr key={getCarId(car)} className="hover:bg-gray-50">
               <td className="py-2 px-3 border">{car.year}</td>
-              <td className="py-2 px-3 border">{car.brand}</td>
+              <td className="py-2 px-3 border">{car.make}</td>
               <td className="py-2 px-3 border">
                 <Link
                   href={`/cars/${getCarId(car)}`}
@@ -43,7 +43,7 @@ const ListView: React.FC<ListViewProps> = ({ cars }) => {
                 >
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold truncate">
-                      {car.year} {car.brand} {car.model}
+                      {car.year} {car.make} {car.model}
                       {car.type && (
                         <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
                           {car.type}

@@ -16,7 +16,7 @@ interface Engine {
 
 interface Car {
   _id: string;
-  brand: string;
+  make: string;
   model: string;
   year: string;
   price: string;
@@ -191,7 +191,7 @@ export default function CarPage() {
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-3xl font-bold">
-                {car.year} {car.brand} {car.model}
+                {car.year} {car.make} {car.model}
                 {car.type && (
                   <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
                     {car.type}
@@ -214,7 +214,7 @@ export default function CarPage() {
 
             <ImageGallery
               images={car.images}
-              title={`${car.year} ${car.brand} ${car.model}`}
+              title={`${car.year} ${car.make} ${car.model}`}
               isEditMode={isEditMode}
               onRemoveImage={handleRemoveImage}
               onImagesChange={handleImageUpload}
