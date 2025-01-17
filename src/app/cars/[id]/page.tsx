@@ -7,6 +7,8 @@ import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
 import { Loader2 } from "lucide-react";
 import { DeleteImageDialog } from "@/components/DeleteImageDialog";
+import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
+import { getUnitsForType } from "@/constants/units";
 
 interface MeasurementValue {
   value: number | null;
@@ -166,50 +168,6 @@ interface EditableSpecs
   interior_features?: Partial<InteriorFeatures>;
 }
 
-// Helper function to handle input values
-const getInputValue = (
-  value: string | number | MeasurementValue | null | undefined
-): string => {
-  if (value === null || value === undefined || value === "") return "";
-  if (typeof value === "number") return value.toString();
-  if (typeof value === "string") return value;
-  if (value.value === null) return "";
-  return value.value.toString();
-};
-
-// Helper function to handle number input values
-const getNumberInputValue = (
-  value: string | number | MeasurementValue | null | undefined
-): string => {
-  if (value === null || value === undefined || value === "") return "";
-  if (typeof value === "number") return value.toString();
-  if (typeof value === "string" && !isNaN(Number(value))) return value;
-  if (typeof value === "object" && value.value !== null)
-    return value.value.toString();
-  return "";
-};
-
-// Helper function to format structured measurement values
-const formatMeasurement = (
-  measurement: MeasurementValue | string | undefined
-): string => {
-  if (!measurement) return "N/A";
-  if (typeof measurement === "string") return measurement;
-  if (measurement.value === null) return "N/A";
-  return `${measurement.value} ${measurement.unit}`;
-};
-
-// Helper function to display mileage
-const formatMileage = (mileage: MeasurementValue | undefined): string => {
-  if (!mileage || mileage.value === null || mileage.value === undefined)
-    return "0";
-  return (
-    mileage.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
-    " " +
-    (mileage.unit || "")
-  );
-};
-
 export default function CarPage() {
   const { id } = useParams() as { id: string };
   const [car, setCar] = useState<Car | null>(null);
@@ -229,6 +187,143 @@ export default function CarPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
+
+  type NestedFields =
+    | "engine"
+    | "dimensions"
+    | "interior_features"
+    | "performance"
+    | "transmission"
+    | "weight";
+
+  // Helper function to handle input values
+  const getInputValue = (
+    value: string | number | MeasurementValue | null | undefined
+  ): string => {
+    if (value === null || value === undefined || value === "") return "";
+    if (typeof value === "number") return value.toString();
+    if (typeof value === "string") return value;
+    if (value.value === null) return "";
+    return value.value.toString();
+  };
+
+  // Helper function to handle number input values
+  const getNumberInputValue = (
+    value: string | number | MeasurementValue | null | undefined
+  ): string => {
+    if (value === null || value === undefined || value === "") return "";
+    if (typeof value === "number") return value.toString();
+    if (typeof value === "string" && !isNaN(Number(value))) return value;
+    if (typeof value === "object" && value.value !== null)
+      return value.value.toString();
+    return "";
+  };
+
+  // Helper function to format structured measurement values
+  const formatMeasurement = (
+    measurement: MeasurementValue | string | undefined
+  ): string => {
+    if (!measurement) return "N/A";
+    if (typeof measurement === "string") return measurement;
+    if (measurement.value === null) return "N/A";
+    return `${measurement.value} ${measurement.unit}`;
+  };
+
+  // Helper function to display mileage
+  const formatMileage = (mileage: MeasurementValue | undefined): string => {
+    if (!mileage || mileage.value === null || mileage.value === undefined)
+      return "0";
+    return (
+      mileage.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
+      " " +
+      (mileage.unit || "")
+    );
+  };
+
+  // Type guard for nested fields
+  const isNestedField = (field: keyof EditableSpecs): field is NestedFields => {
+    return [
+      "engine",
+      "dimensions",
+      "interior_features",
+      "performance",
+      "transmission",
+      "weight",
+    ].includes(field as string);
+  };
+
+  // Helper function to handle input changes
+  const handleInputChange = (
+    field: keyof EditableSpecs,
+    value: string | number | { [key: string]: number | string | null },
+    nestedField?: string
+  ): void => {
+    let newValue:
+      | string
+      | number
+      | { [key: string]: number | string | null }
+      | null = value;
+
+    // Handle number fields
+    if (
+      field === "year" ||
+      field === "mileage" ||
+      field === "price" ||
+      (field === "interior_features" && nestedField === "seats")
+    ) {
+      newValue = value
+        ? parseInt(value.toString())
+        : field === "price"
+        ? null
+        : 0;
+    }
+
+    // Update the editedSpecs state
+    setEditedSpecs((prev: EditableSpecs) => {
+      // Handle nested fields
+      if (nestedField && isNestedField(field)) {
+        return {
+          ...prev,
+          [field]: {
+            ...(prev[field] as Record<string, unknown>),
+            [nestedField]: newValue,
+          },
+        };
+      }
+
+      // Handle top-level fields
+      return {
+        ...prev,
+        [field]: newValue,
+      };
+    });
+  };
+
+  // Helper function to handle measurement input changes
+  const handleMeasurementChange = (
+    field: keyof EditableSpecs,
+    value: MeasurementValue,
+    nestedField?: string
+  ): void => {
+    setEditedSpecs((prev: EditableSpecs) => {
+      // Handle nested fields
+      if (nestedField && isNestedField(field)) {
+        return {
+          ...prev,
+          [field]: {
+            ...(prev[field] as Record<string, unknown>),
+            [nestedField]: value,
+          },
+        };
+      }
+
+      // Handle top-level fields
+      return {
+        ...prev,
+        [field]: value,
+      };
+    });
+  };
 
   // Add escape key handler
   useEffect(() => {
@@ -702,62 +797,16 @@ export default function CarPage() {
     }
   };
 
-  type NestedFields =
-    | "engine"
-    | "dimensions"
-    | "interior_features"
-    | "performance"
-    | "transmission"
-    | "weight";
-
-  const handleInputChange = (
-    field: keyof EditableSpecs,
-    value: string,
-    nestedField?: string
-  ): void => {
-    let newValue: string | number | null = value;
-
-    // Handle number fields
-    if (
-      field === "year" ||
-      field === "mileage" ||
-      field === "price" ||
-      (field === "interior_features" && nestedField === "seats")
-    ) {
-      newValue = value ? parseInt(value) : field === "price" ? null : 0;
-    }
-
-    // Update the editedSpecs state
-    setEditedSpecs((prev: EditableSpecs) => {
-      // Handle nested fields
-      if (nestedField && isNestedField(field)) {
-        return {
-          ...prev,
-          [field]: {
-            ...prev[field],
-            [nestedField]: newValue,
-          },
-        };
-      }
-
-      // Handle top-level fields
-      return {
-        ...prev,
-        [field]: newValue,
-      };
-    });
+  // Add helper function to format power values
+  const formatPower = (power?: Power): string => {
+    if (!power) return "N/A";
+    return `${power.hp} hp / ${power.kW} kW / ${power.ps} ps`;
   };
 
-  // Type guard for nested fields
-  const isNestedField = (field: keyof EditableSpecs): field is NestedFields => {
-    return [
-      "engine",
-      "dimensions",
-      "interior_features",
-      "performance",
-      "transmission",
-      "weight",
-    ].includes(field as string);
+  // Add helper function to format torque values
+  const formatTorque = (torque?: Torque): string => {
+    if (!torque) return "N/A";
+    return `${torque["lb-ft"]} lb-ft / ${torque.Nm} Nm`;
   };
 
   if (loading) {
@@ -1102,15 +1151,19 @@ export default function CarPage() {
                 </div>
                 <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {isSpecsEditMode ? (
-                    <input
-                      type="number"
-                      value={getNumberInputValue(
-                        editedSpecs.mileage ?? car?.mileage
-                      )}
-                      onChange={(e) =>
-                        handleInputChange("mileage", e.target.value)
+                    <MeasurementInputWithUnit
+                      value={
+                        editedSpecs.mileage ?? {
+                          value: car.mileage?.value ?? null,
+                          unit:
+                            car.mileage?.unit ?? getUnitsForType("MILEAGE")[0],
+                        }
                       }
-                      className="w-full bg-white border rounded px-2 py-1"
+                      onChange={(value) =>
+                        handleMeasurementChange("mileage", value)
+                      }
+                      availableUnits={getUnitsForType("MILEAGE")}
+                      className="w-full"
                     />
                   ) : car ? (
                     formatMileage(car.mileage)
@@ -1186,46 +1239,155 @@ export default function CarPage() {
               </div>
 
               {car.engine && (
-                <div className="grid grid-cols-12 divide-x text-sm">
-                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
-                    Engine
+                <>
+                  <div className="grid grid-cols-12 divide-x text-sm">
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Engine
+                    </div>
+                    <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <input
+                          type="text"
+                          value={getInputValue(
+                            editedSpecs.engine?.type ?? car.engine.type
+                          )}
+                          onChange={(e) =>
+                            handleInputChange("engine", e.target.value, "type")
+                          }
+                          className="w-full bg-white border rounded px-2 py-1"
+                        />
+                      ) : (
+                        car.engine.type
+                      )}
+                    </div>
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Power
+                    </div>
+                    <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={
+                                editedSpecs.engine?.power?.hp ??
+                                car.engine?.power?.hp ??
+                                ""
+                              }
+                              onChange={(e) =>
+                                handleInputChange(
+                                  "engine",
+                                  {
+                                    ...car.engine?.power,
+                                    hp: parseInt(e.target.value) || 0,
+                                  },
+                                  "power"
+                                )
+                              }
+                              placeholder="HP"
+                              className="w-full bg-white border rounded px-2 py-1"
+                            />
+                            <input
+                              type="number"
+                              value={
+                                editedSpecs.engine?.power?.kW ??
+                                car.engine?.power?.kW ??
+                                ""
+                              }
+                              onChange={(e) =>
+                                handleInputChange(
+                                  "engine",
+                                  {
+                                    ...car.engine?.power,
+                                    kW: parseInt(e.target.value) || 0,
+                                  },
+                                  "power"
+                                )
+                              }
+                              placeholder="kW"
+                              className="w-full bg-white border rounded px-2 py-1"
+                            />
+                            <input
+                              type="number"
+                              value={
+                                editedSpecs.engine?.power?.ps ??
+                                car.engine?.power?.ps ??
+                                ""
+                              }
+                              onChange={(e) =>
+                                handleInputChange(
+                                  "engine",
+                                  {
+                                    ...car.engine?.power,
+                                    ps: parseInt(e.target.value) || 0,
+                                  },
+                                  "power"
+                                )
+                              }
+                              placeholder="PS"
+                              className="w-full bg-white border rounded px-2 py-1"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        formatPower(car.engine?.power)
+                      )}
+                    </div>
                   </div>
-                  <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
-                    {isSpecsEditMode ? (
-                      <input
-                        type="text"
-                        value={getInputValue(
-                          editedSpecs.engine?.type ?? car.engine.type
-                        )}
-                        onChange={(e) =>
-                          handleInputChange("engine", e.target.value, "type")
-                        }
-                        className="w-full bg-white border rounded px-2 py-1"
-                      />
-                    ) : (
-                      car.engine.type
-                    )}
+                  <div className="grid grid-cols-12 divide-x text-sm">
+                    <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                      Torque
+                    </div>
+                    <div className="col-span-11 text-gray-600 font-medium p-2 flex items-center uppercase">
+                      {isSpecsEditMode ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={
+                              editedSpecs.engine?.torque?.["lb-ft"] ??
+                              car.engine?.torque?.["lb-ft"] ??
+                              ""
+                            }
+                            onChange={(e) =>
+                              handleInputChange(
+                                "engine",
+                                {
+                                  ...car.engine?.torque,
+                                  "lb-ft": parseInt(e.target.value) || 0,
+                                },
+                                "torque"
+                              )
+                            }
+                            placeholder="lb-ft"
+                            className="w-full bg-white border rounded px-2 py-1"
+                          />
+                          <input
+                            type="number"
+                            value={
+                              editedSpecs.engine?.torque?.Nm ??
+                              car.engine?.torque?.Nm ??
+                              ""
+                            }
+                            onChange={(e) =>
+                              handleInputChange(
+                                "engine",
+                                {
+                                  ...car.engine?.torque,
+                                  Nm: parseInt(e.target.value) || 0,
+                                },
+                                "torque"
+                              )
+                            }
+                            placeholder="Nm"
+                            className="w-full bg-white border rounded px-2 py-1"
+                          />
+                        </div>
+                      ) : (
+                        formatTorque(car.engine?.torque)
+                      )}
+                    </div>
                   </div>
-                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
-                    Power
-                  </div>
-                  <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
-                    {isSpecsEditMode ? (
-                      <input
-                        type="text"
-                        value={getInputValue(
-                          editedSpecs.horsepower ?? car.horsepower
-                        )}
-                        onChange={(e) =>
-                          handleInputChange("horsepower", e.target.value)
-                        }
-                        className="w-full bg-white border rounded px-2 py-1"
-                      />
-                    ) : (
-                      car.horsepower || "N/A"
-                    )}
-                  </div>
-                </div>
+                </>
               )}
 
               {car.dimensions && (
@@ -1236,23 +1398,27 @@ export default function CarPage() {
                     </div>
                     <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                       {isSpecsEditMode ? (
-                        <input
-                          type="text"
-                          value={getInputValue(
-                            editedSpecs.dimensions?.length ??
-                              car.dimensions.length
-                          )}
-                          onChange={(e) =>
-                            handleInputChange(
+                        <MeasurementInputWithUnit
+                          value={
+                            editedSpecs.dimensions?.length ?? {
+                              value: car.dimensions?.length?.value ?? null,
+                              unit:
+                                car.dimensions?.length?.unit ??
+                                getUnitsForType("LENGTH")[0],
+                            }
+                          }
+                          onChange={(value) =>
+                            handleMeasurementChange(
                               "dimensions",
-                              e.target.value,
+                              value,
                               "length"
                             )
                           }
-                          className="w-full bg-white border rounded px-2 py-1"
+                          availableUnits={getUnitsForType("LENGTH")}
+                          className="w-full"
                         />
                       ) : (
-                        <span>{formatMeasurement(car.dimensions.length)}</span>
+                        <span>{formatMeasurement(car.dimensions?.length)}</span>
                       )}
                     </div>
                     <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
@@ -1260,23 +1426,27 @@ export default function CarPage() {
                     </div>
                     <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                       {isSpecsEditMode ? (
-                        <input
-                          type="text"
-                          value={getInputValue(
-                            editedSpecs.dimensions?.width ??
-                              car.dimensions.width
-                          )}
-                          onChange={(e) =>
-                            handleInputChange(
+                        <MeasurementInputWithUnit
+                          value={
+                            editedSpecs.dimensions?.width ?? {
+                              value: car.dimensions?.width?.value ?? null,
+                              unit:
+                                car.dimensions?.width?.unit ??
+                                getUnitsForType("LENGTH")[0],
+                            }
+                          }
+                          onChange={(value) =>
+                            handleMeasurementChange(
                               "dimensions",
-                              e.target.value,
+                              value,
                               "width"
                             )
                           }
-                          className="w-full bg-white border rounded px-2 py-1"
+                          availableUnits={getUnitsForType("LENGTH")}
+                          className="w-full"
                         />
                       ) : (
-                        <span>{formatMeasurement(car.dimensions.width)}</span>
+                        <span>{formatMeasurement(car.dimensions?.width)}</span>
                       )}
                     </div>
                     <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
@@ -1284,23 +1454,27 @@ export default function CarPage() {
                     </div>
                     <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                       {isSpecsEditMode ? (
-                        <input
-                          type="text"
-                          value={getInputValue(
-                            editedSpecs.dimensions?.height ??
-                              car.dimensions.height
-                          )}
-                          onChange={(e) =>
-                            handleInputChange(
+                        <MeasurementInputWithUnit
+                          value={
+                            editedSpecs.dimensions?.height ?? {
+                              value: car.dimensions?.height?.value ?? null,
+                              unit:
+                                car.dimensions?.height?.unit ??
+                                getUnitsForType("LENGTH")[0],
+                            }
+                          }
+                          onChange={(value) =>
+                            handleMeasurementChange(
                               "dimensions",
-                              e.target.value,
+                              value,
                               "height"
                             )
                           }
-                          className="w-full bg-white border rounded px-2 py-1"
+                          availableUnits={getUnitsForType("LENGTH")}
+                          className="w-full"
                         />
                       ) : (
-                        <span>{formatMeasurement(car.dimensions.height)}</span>
+                        <span>{formatMeasurement(car.dimensions?.height)}</span>
                       )}
                     </div>
                   </div>
@@ -1311,24 +1485,28 @@ export default function CarPage() {
                     </div>
                     <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
                       {isSpecsEditMode ? (
-                        <input
-                          type="text"
-                          value={getInputValue(
-                            editedSpecs.dimensions?.wheelbase ??
-                              car.dimensions.wheelbase
-                          )}
-                          onChange={(e) =>
-                            handleInputChange(
+                        <MeasurementInputWithUnit
+                          value={
+                            editedSpecs.dimensions?.wheelbase ?? {
+                              value: car.dimensions?.wheelbase?.value ?? null,
+                              unit:
+                                car.dimensions?.wheelbase?.unit ??
+                                getUnitsForType("LENGTH")[0],
+                            }
+                          }
+                          onChange={(value) =>
+                            handleMeasurementChange(
                               "dimensions",
-                              e.target.value,
+                              value,
                               "wheelbase"
                             )
                           }
-                          className="w-full bg-white border rounded px-2 py-1"
+                          availableUnits={getUnitsForType("LENGTH")}
+                          className="w-full"
                         />
                       ) : (
                         <span>
-                          {formatMeasurement(car.dimensions.wheelbase)}
+                          {formatMeasurement(car.dimensions?.wheelbase)}
                         </span>
                       )}
                     </div>
@@ -1337,15 +1515,20 @@ export default function CarPage() {
                     </div>
                     <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                       {isSpecsEditMode ? (
-                        <input
-                          type="text"
-                          value={getInputValue(
-                            editedSpecs.fuel_capacity ?? car.fuel_capacity
-                          )}
-                          onChange={(e) =>
-                            handleInputChange("fuel_capacity", e.target.value)
+                        <MeasurementInputWithUnit
+                          value={
+                            editedSpecs.fuel_capacity ?? {
+                              value: car.fuel_capacity?.value ?? null,
+                              unit:
+                                car.fuel_capacity?.unit ??
+                                getUnitsForType("VOLUME")[0],
+                            }
                           }
-                          className="w-full bg-white border rounded px-2 py-1"
+                          onChange={(value) =>
+                            handleMeasurementChange("fuel_capacity", value)
+                          }
+                          availableUnits={getUnitsForType("VOLUME")}
+                          className="w-full"
                         />
                       ) : (
                         <span>{formatMeasurement(car.fuel_capacity)}</span>
@@ -1410,24 +1593,29 @@ export default function CarPage() {
                   </div>
                   <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
                     {isSpecsEditMode ? (
-                      <input
-                        type="text"
-                        value={getInputValue(
-                          editedSpecs.performance?.["0_to_60_mph"] ??
-                            car.performance["0_to_60_mph"]
-                        )}
-                        onChange={(e) =>
-                          handleInputChange(
+                      <MeasurementInputWithUnit
+                        value={
+                          editedSpecs.performance?.["0_to_60_mph"] ?? {
+                            value:
+                              car.performance?.["0_to_60_mph"]?.value ?? null,
+                            unit:
+                              car.performance?.["0_to_60_mph"]?.unit ??
+                              getUnitsForType("TIME")[0],
+                          }
+                        }
+                        onChange={(value) =>
+                          handleMeasurementChange(
                             "performance",
-                            e.target.value,
+                            value,
                             "0_to_60_mph"
                           )
                         }
-                        className="w-full bg-white border rounded px-2 py-1"
+                        availableUnits={getUnitsForType("TIME")}
+                        className="w-full"
                       />
                     ) : (
                       <span>
-                        {formatMeasurement(car.performance["0_to_60_mph"])}
+                        {formatMeasurement(car.performance?.["0_to_60_mph"])}
                       </span>
                     )}
                   </div>
@@ -1436,24 +1624,28 @@ export default function CarPage() {
                   </div>
                   <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                     {isSpecsEditMode ? (
-                      <input
-                        type="text"
-                        value={getInputValue(
-                          editedSpecs.performance?.top_speed ??
-                            car.performance.top_speed
-                        )}
-                        onChange={(e) =>
-                          handleInputChange(
+                      <MeasurementInputWithUnit
+                        value={
+                          editedSpecs.performance?.top_speed ?? {
+                            value: car.performance?.top_speed?.value ?? null,
+                            unit:
+                              car.performance?.top_speed?.unit ??
+                              getUnitsForType("SPEED")[0],
+                          }
+                        }
+                        onChange={(value) =>
+                          handleMeasurementChange(
                             "performance",
-                            e.target.value,
+                            value,
                             "top_speed"
                           )
                         }
-                        className="w-full bg-white border rounded px-2 py-1"
+                        availableUnits={getUnitsForType("SPEED")}
+                        className="w-full"
                       />
                     ) : (
                       <span>
-                        {formatMeasurement(car.performance.top_speed)}
+                        {formatMeasurement(car.performance?.top_speed)}
                       </span>
                     )}
                   </div>
@@ -1496,23 +1688,27 @@ export default function CarPage() {
                   </div>
                   <div className="col-span-11 text-gray-600 font-medium p-2 flex items-center uppercase">
                     {isSpecsEditMode ? (
-                      <input
-                        type="text"
-                        value={getInputValue(
-                          editedSpecs.weight?.curb_weight ??
-                            car.weight.curb_weight
-                        )}
-                        onChange={(e) =>
-                          handleInputChange(
+                      <MeasurementInputWithUnit
+                        value={
+                          editedSpecs.weight?.curb_weight ?? {
+                            value: car.weight?.curb_weight?.value ?? null,
+                            unit:
+                              car.weight?.curb_weight?.unit ??
+                              getUnitsForType("WEIGHT")[0],
+                          }
+                        }
+                        onChange={(value) =>
+                          handleMeasurementChange(
                             "weight",
-                            e.target.value,
+                            value,
                             "curb_weight"
                           )
                         }
-                        className="w-full bg-white border rounded px-2 py-1"
+                        availableUnits={getUnitsForType("WEIGHT")}
+                        className="w-full"
                       />
                     ) : (
-                      <span>{formatMeasurement(car.weight.curb_weight)}</span>
+                      <span>{formatMeasurement(car.weight?.curb_weight)}</span>
                     )}
                   </div>
                 </div>
