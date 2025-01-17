@@ -106,6 +106,23 @@ export default function CarPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isEditMode]);
 
+  // Add effect to refresh car data when entering edit mode
+  useEffect(() => {
+    if (isEditMode && id) {
+      const refreshCarData = async () => {
+        try {
+          const response = await fetch(`/api/cars/${id}`);
+          if (!response.ok) throw new Error("Failed to fetch car data");
+          const carData = await response.json();
+          setCar(carData);
+        } catch (error) {
+          console.error("Error refreshing car data:", error);
+        }
+      };
+      refreshCarData();
+    }
+  }, [isEditMode, id]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -156,9 +173,8 @@ export default function CarPage() {
       );
       setUploadingImages(true);
 
-      // Upload each file sequentially to ensure progress is tracked properly
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
+      // Create upload promises for all files
+      const uploadPromises = fileArray.map((file, i) => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append(
@@ -184,15 +200,25 @@ export default function CarPage() {
           )
         );
 
-        try {
-          // Create XHR for upload progress
+        return new Promise<{
+          index: number;
+          imageData: {
+            id: string;
+            url: string;
+            filename: string;
+            metadata: any;
+            variants: {};
+            createdAt: string;
+            updatedAt: string;
+          };
+        }>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.upload.addEventListener("progress", (event) => {
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded * 100) / event.total);
               setUploadProgress((prev) =>
-                prev.map((p, index) =>
-                  index === i
+                prev.map((p, idx) =>
+                  idx === i
                     ? {
                         ...p,
                         progress,
@@ -204,124 +230,146 @@ export default function CarPage() {
             }
           });
 
-          const uploadPromise = new Promise<{
-            imageId: string;
-            imageUrl: string;
-            metadata?: {
-              aiAnalysis?: {
-                angle?: string;
-                description?: string;
-                movement?: string;
-                tod?: string;
-                view?: string;
-                side?: string;
-              };
-            };
-          }>((resolve, reject) => {
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(JSON.parse(xhr.responseText));
-              } else {
-                reject(new Error(`Upload failed with status ${xhr.status}`));
+          xhr.onload = async () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                // Update status to analyzing
+                setUploadProgress((prev) =>
+                  prev.map((p, idx) =>
+                    idx === i
+                      ? {
+                          ...p,
+                          progress: 100,
+                          status: "analyzing",
+                          currentStep: "Analyzing image with AI...",
+                        }
+                      : p
+                  )
+                );
+
+                const uploadResponse = JSON.parse(xhr.responseText);
+                const imageData = {
+                  id: uploadResponse.imageId,
+                  url: uploadResponse.imageUrl,
+                  filename: file.name,
+                  metadata: {
+                    ...uploadResponse.metadata,
+                    angle: uploadResponse.metadata?.aiAnalysis?.angle || "",
+                    description:
+                      uploadResponse.metadata?.aiAnalysis?.description || "",
+                    movement:
+                      uploadResponse.metadata?.aiAnalysis?.movement || "",
+                    tod: uploadResponse.metadata?.aiAnalysis?.tod || "",
+                    view: uploadResponse.metadata?.aiAnalysis?.view || "",
+                    side: uploadResponse.metadata?.aiAnalysis?.side || "",
+                  },
+                  variants: {},
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+
+                // Update UI immediately after successful upload
+                setCar((prevCar) => ({
+                  ...prevCar!,
+                  images: [...prevCar!.images, imageData],
+                }));
+
+                // Update status to complete for this image
+                setUploadProgress((prev) =>
+                  prev.map((p, idx) =>
+                    idx === i
+                      ? {
+                          ...p,
+                          status: "complete",
+                          currentStep: "Upload complete!",
+                        }
+                      : p
+                  )
+                );
+
+                resolve({ index: i, imageData });
+              } catch (error) {
+                reject(error);
               }
-            };
-            xhr.onerror = () => reject(new Error("Upload failed"));
-            xhr.open("POST", "/api/cloudflare/images");
-            xhr.send(formData);
-          });
-
-          // Update status to analyzing
-          setUploadProgress((prev) =>
-            prev.map((p, index) =>
-              index === i
-                ? {
-                    ...p,
-                    progress: 100,
-                    status: "analyzing",
-                    currentStep: "Analyzing image with AI...",
-                  }
-                : p
-            )
-          );
-
-          const uploadResponse = await uploadPromise;
-          const imageData = {
-            id: uploadResponse.imageId,
-            url: uploadResponse.imageUrl,
-            filename: file.name,
-            metadata: {
-              ...uploadResponse.metadata,
-              angle: uploadResponse.metadata?.aiAnalysis?.angle || "",
-              description:
-                uploadResponse.metadata?.aiAnalysis?.description || "",
-              movement: uploadResponse.metadata?.aiAnalysis?.movement || "",
-              tod: uploadResponse.metadata?.aiAnalysis?.tod || "",
-              view: uploadResponse.metadata?.aiAnalysis?.view || "",
-              side: uploadResponse.metadata?.aiAnalysis?.side || "",
-            },
-            variants: {},
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
           };
+          xhr.onerror = () => reject(new Error("Upload failed"));
+          xhr.open("POST", "/api/cloudflare/images");
+          xhr.send(formData);
+        });
+      });
 
-          // Fetch the latest car data from the database
-          const carResponse = await fetch(`/api/cars/${id}`);
-          if (!carResponse.ok) {
-            throw new Error("Failed to fetch latest car data");
-          }
-          const latestCarData = await carResponse.json();
+      // Process uploads in parallel with a maximum of 3 concurrent uploads
+      const batchSize = 3;
+      const results = [];
+      for (let i = 0; i < uploadPromises.length; i += batchSize) {
+        const batch = uploadPromises.slice(i, i + batchSize);
+        const batchResults = await Promise.allSettled(batch);
+        results.push(...batchResults);
+      }
 
-          // Update car state with the new image
-          const updatedImages = [...latestCarData.images, imageData];
-          setCar((prevCar) => ({
-            ...prevCar!,
+      // Collect successful uploads
+      const successfulUploads = results
+        .filter(
+          (
+            result
+          ): result is PromiseFulfilledResult<{
+            index: number;
+            imageData: any;
+          }> => result.status === "fulfilled"
+        )
+        .map((result) => result.value.imageData);
+
+      if (successfulUploads.length > 0) {
+        // Fetch latest car data once for the batch
+        const carResponse = await fetch(`/api/cars/${id}`);
+        if (!carResponse.ok) {
+          throw new Error("Failed to fetch latest car data");
+        }
+        const latestCarData = await carResponse.json();
+
+        // Update the backend with all new images
+        const updatedImages = [...latestCarData.images, ...successfulUploads];
+        const dbResponse = await fetch(`/api/cars/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
             images: updatedImages,
-          }));
+          }),
+        });
 
-          // Update the backend with the latest images
-          const dbResponse = await fetch(`/api/cars/${id}`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              images: updatedImages,
-            }),
-          });
+        if (!dbResponse.ok) {
+          throw new Error("Failed to update car images in database");
+        }
 
-          if (!dbResponse.ok) {
-            throw new Error("Failed to update car images in database");
-          }
+        // Sync UI with database state to ensure consistency
+        setCar((prevCar) => ({
+          ...prevCar!,
+          images: updatedImages,
+        }));
+      }
 
-          // Update status to complete
+      // Update error status for failed uploads
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
           setUploadProgress((prev) =>
-            prev.map((p, index) =>
-              index === i
-                ? {
-                    ...p,
-                    status: "complete",
-                    currentStep: "Upload complete!",
-                  }
-                : p
-            )
-          );
-        } catch (error) {
-          // Update status to error
-          setUploadProgress((prev) =>
-            prev.map((p, index) =>
-              index === i
+            prev.map((p, i) =>
+              i === index
                 ? {
                     ...p,
                     status: "error",
-                    error: "Failed to upload image",
                     currentStep: "Upload failed",
+                    error: result.reason.message,
                   }
                 : p
             )
           );
-          console.error("Error uploading image:", error);
         }
-      }
+      });
     } catch (error) {
       console.error("Error uploading images:", error);
     } finally {
@@ -515,7 +563,10 @@ export default function CarPage() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => setIsEditMode(!isEditMode)}
+                  onClick={async () => {
+                    const newEditMode = !isEditMode;
+                    setIsEditMode(newEditMode);
+                  }}
                   className={`p-2 transition-colors rounded-full hover:bg-gray-100 border ${
                     isEditMode
                       ? "text-blue-500 hover:text-blue-600 border-blue-200"
