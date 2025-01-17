@@ -2,6 +2,57 @@ import { NextResponse } from "next/server";
 import { MongoClient, ObjectId } from "mongodb";
 import { Car } from "@/types/car";
 
+interface SerperResult {
+  organic: Array<{
+    title: string;
+    link: string;
+    snippet: string;
+    position: number;
+  }>;
+  searchParameters: {
+    q: string;
+    num: number;
+  };
+}
+
+interface EnrichedCarData {
+  model?: string;
+  year?: number;
+  mileage?: { value: number | null; unit: string };
+  color?: string;
+  type?: string;
+  engine?: {
+    type: string;
+    displacement?: { value: number | null; unit: string };
+    power?: { hp: number; kW: number; ps: number };
+    torque?: { "lb-ft": number; Nm: number };
+  };
+  horsepower?: number;
+  condition?: string;
+  description?: string;
+  interior_color?: string;
+  vin?: string;
+  dimensions?: {
+    length: { value: number | null; unit: string };
+    width: { value: number | null; unit: string };
+    height: { value: number | null; unit: string };
+    wheelbase: { value: number | null; unit: string };
+  };
+  fuel_capacity?: { value: number | null; unit: string };
+  interior_features?: {
+    seats: number;
+    upholstery?: string;
+  };
+  performance?: {
+    "0_to_60_mph": { value: number | null; unit: string };
+    top_speed: { value: number | null; unit: string };
+  };
+  transmission?: { type: string };
+  weight?: {
+    curb_weight: { value: number | null; unit: string };
+  };
+}
+
 // Helper function to get MongoDB client
 async function getMongoClient() {
   console.log("🔄 Connecting to MongoDB...");
@@ -37,7 +88,10 @@ async function searchVehicleInfo(query: string) {
   return results;
 }
 
-async function cleanAndStructureData(searchResults: any, existingCarData: Car) {
+async function cleanAndStructureData(
+  searchResults: SerperResult,
+  existingCarData: Car
+): Promise<EnrichedCarData> {
   console.log("\n🧹 Cleaning and structuring initial search data...");
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -79,7 +133,10 @@ async function cleanAndStructureData(searchResults: any, existingCarData: Car) {
   return cleanedData;
 }
 
-async function generateNewSearchTerms(initialData: any, existingCarData: Car) {
+async function generateNewSearchTerms(
+  initialData: EnrichedCarData,
+  existingCarData: Car
+): Promise<string[]> {
   console.log(
     "\n🎯 Generating targeted search terms based on initial findings..."
   );
@@ -124,10 +181,10 @@ async function generateNewSearchTerms(initialData: any, existingCarData: Car) {
 }
 
 async function validateAndCrossReference(
-  allSearchResults: any[],
-  initialData: any,
+  allSearchResults: SerperResult[],
+  initialData: EnrichedCarData,
   existingCarData: Car
-) {
+): Promise<EnrichedCarData> {
   console.log("\n🔄 Cross-referencing and validating all collected data...");
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -140,8 +197,48 @@ async function validateAndCrossReference(
       messages: [
         {
           role: "system",
-          content:
-            "Cross-reference and validate all collected vehicle information. Only include fields where multiple sources agree or confidence is high. DO NOT include price or location. Return a final JSON object with validated data that matches the following structure: { model, year, mileage, color, engine: { type, displacement, power, torque }, horsepower, condition, description, interior_color, vin, dimensions: { length, width, height, wheelbase }, fuel_capacity, interior_features: { seats, upholstery }, performance: { 0_to_60_mph, top_speed }, transmission: { type }, weight: { curb_weight } }",
+          content: `Cross-reference and validate all collected vehicle information. Only include fields where multiple sources agree or confidence is high. DO NOT include price or location. 
+Return a final JSON object with validated data that matches the following structure:
+{
+  model: string,
+  year: number,
+  mileage: { value: number, unit: "mi" | "km" },
+  color: string,
+  engine: {
+    type: string,
+    displacement: { value: number, unit: "L" | "cc" },
+    power: { hp: number, kW: number, ps: number },
+    torque: { "lb-ft": number, Nm: number }
+  },
+  horsepower: number,
+  condition: string,
+  description: string,
+  interior_color: string,
+  vin: string,
+  dimensions: {
+    length: { value: number, unit: "inches" | "mm" },
+    width: { value: number, unit: "inches" | "mm" },
+    height: { value: number, unit: "inches" | "mm" },
+    wheelbase: { value: number, unit: "inches" | "mm" }
+  },
+  fuel_capacity: { value: number, unit: "gallons" | "L" },
+  interior_features: {
+    seats: number,
+    upholstery: string
+  },
+  performance: {
+    "0_to_60_mph": { value: number, unit: "seconds" },
+    top_speed: { value: number, unit: "mph" | "km/h" }
+  },
+  transmission: { type: string },
+  weight: {
+    curb_weight: { value: number, unit: "lbs" | "kg" }
+  }
+}
+
+For measurements, always include both value and unit. Convert units if necessary to match the structure above.
+For power and torque, calculate and include all unit variations (hp/kW/ps and lb-ft/Nm).
+If a value cannot be determined with high confidence, set it to null but include the appropriate unit.`,
         },
         {
           role: "user",
@@ -167,6 +264,36 @@ async function validateAndCrossReference(
   const validatedData = JSON.parse(content.match(/\{[\s\S]*\}/)[0]);
   console.log("✅ Data validation complete:", validatedData);
   return validatedData;
+}
+
+// Helper function to convert units if needed
+function convertUnits(data: EnrichedCarData): EnrichedCarData {
+  if (!data) return data;
+
+  // Deep clone the data
+  const converted = JSON.parse(JSON.stringify(data));
+
+  // Convert power if only one unit is provided
+  if (converted.engine?.power) {
+    const power = converted.engine.power;
+    if (power.hp && !power.kW) power.kW = Math.round(power.hp * 0.7457);
+    if (power.hp && !power.ps) power.ps = Math.round(power.hp * 1.014);
+    if (power.kW && !power.hp) power.hp = Math.round(power.kW / 0.7457);
+    if (power.kW && !power.ps) power.ps = Math.round(power.kW * 1.359);
+    if (power.ps && !power.hp) power.hp = Math.round(power.ps / 1.014);
+    if (power.ps && !power.kW) power.kW = Math.round(power.ps * 0.7355);
+  }
+
+  // Convert torque if only one unit is provided
+  if (converted.engine?.torque) {
+    const torque = converted.engine.torque;
+    if (torque["lb-ft"] && !torque.Nm)
+      torque.Nm = Math.round(torque["lb-ft"] * 1.356);
+    if (torque.Nm && !torque["lb-ft"])
+      torque["lb-ft"] = Math.round(torque.Nm / 1.356);
+  }
+
+  return converted;
 }
 
 export async function POST(
@@ -234,11 +361,14 @@ export async function POST(
 
     // Step 5: Validate and cross-reference all data
     console.log("\n📍 Step 5: Final Validation");
-    const validatedData = await validateAndCrossReference(
+    let validatedData = await validateAndCrossReference(
       additionalSearchResults,
       initialCleanedData,
       car
     );
+
+    // Convert units and ensure all measurement pairs are present
+    validatedData = convertUnits(validatedData);
 
     // Step 6: Update the database with validated data
     console.log("\n📍 Step 6: Updating Database");
@@ -246,15 +376,26 @@ export async function POST(
       { _id: new ObjectId(id) },
       {
         $set: {
-          ...validatedData,
-          // Preserve existing fields if they exist and are not empty
+          // Only update fields from validatedData if they don't exist in car
+          ...(car.color ? {} : { color: validatedData.color }),
+          ...(car.mileage ? {} : { mileage: validatedData.mileage }),
+          ...(car.interior_color
+            ? {}
+            : { interior_color: validatedData.interior_color }),
+          // Always preserve these fields
           make: car.make,
           model: car.model,
           year: car.year || validatedData.year,
-          mileage: car.mileage || validatedData.mileage,
-          color: car.color || validatedData.color,
           type: car.type || validatedData.type,
           vin: car.vin || validatedData.vin,
+          // Update other enriched data
+          engine: validatedData.engine,
+          dimensions: validatedData.dimensions,
+          fuel_capacity: validatedData.fuel_capacity,
+          interior_features: validatedData.interior_features,
+          performance: validatedData.performance,
+          transmission: validatedData.transmission,
+          weight: validatedData.weight,
         },
       }
     );
