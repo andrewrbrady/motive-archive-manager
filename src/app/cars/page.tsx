@@ -12,6 +12,7 @@ import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import ViewModeSelector from "@/components/cars/ViewModeSelector";
 import CarImageEditor from "@/components/cars/CarImageEditor";
 import EditModeToggle from "@/components/cars/EditModeToggle";
+import PageSizeSelector from "@/components/PageSizeSelector";
 
 export const metadata: Metadata = {
   title: "Cars Collection | Premium Vehicles",
@@ -100,7 +101,7 @@ function serializeMongoData(data: any): any {
   return data;
 }
 
-async function getCars(page = 1, pageSize = 12, filters: FilterParams = {}) {
+async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
   try {
     const client = await clientPromise;
     const db = client.db("motive_archive");
@@ -179,7 +180,7 @@ export default async function CarsPage({
     const resolvedParams = await Promise.resolve(searchParams);
 
     const page = Number(resolvedParams.page) || 1;
-    const pageSize = Number(resolvedParams.pageSize) || 12;
+    const pageSize = Number(resolvedParams.pageSize) || 48;
     const viewMode = (resolvedParams.view?.toString() || "grid") as
       | "grid"
       | "list";
@@ -242,14 +243,18 @@ export default async function CarsPage({
               clients={clients}
             />
 
-            {total > pageSize && (
-              <div className="my-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 my-6">
+              <PageSizeSelector
+                currentPageSize={pageSize}
+                options={[12, 24, 36, 48]}
+              />
+              {total > pageSize && (
                 <Pagination
                   currentPage={page}
                   totalPages={Math.ceil(total / pageSize)}
                 />
-              </div>
-            )}
+              )}
+            </div>
 
             {isEditMode ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
