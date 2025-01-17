@@ -244,41 +244,54 @@ export default function CarPage() {
             )
           );
 
-          const response = await uploadPromise;
+          const uploadResponse = await uploadPromise;
           const imageData = {
-            id: response.imageId,
-            url: response.imageUrl,
+            id: uploadResponse.imageId,
+            url: uploadResponse.imageUrl,
             filename: file.name,
             metadata: {
-              ...response.metadata,
-              angle: response.metadata?.aiAnalysis?.angle || "",
-              description: response.metadata?.aiAnalysis?.description || "",
-              movement: response.metadata?.aiAnalysis?.movement || "",
-              tod: response.metadata?.aiAnalysis?.tod || "",
-              view: response.metadata?.aiAnalysis?.view || "",
-              side: response.metadata?.aiAnalysis?.side || "",
+              ...uploadResponse.metadata,
+              angle: uploadResponse.metadata?.aiAnalysis?.angle || "",
+              description:
+                uploadResponse.metadata?.aiAnalysis?.description || "",
+              movement: uploadResponse.metadata?.aiAnalysis?.movement || "",
+              tod: uploadResponse.metadata?.aiAnalysis?.tod || "",
+              view: uploadResponse.metadata?.aiAnalysis?.view || "",
+              side: uploadResponse.metadata?.aiAnalysis?.side || "",
             },
             variants: {},
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
 
-          // Update car state immediately with the new image
+          // Fetch the latest car data from the database
+          const carResponse = await fetch(`/api/cars/${id}`);
+          if (!carResponse.ok) {
+            throw new Error("Failed to fetch latest car data");
+          }
+          const latestCarData = await carResponse.json();
+
+          // Update car state with the new image
+          const updatedImages = [...latestCarData.images, imageData];
           setCar((prevCar) => ({
             ...prevCar!,
-            images: [...prevCar!.images, imageData],
+            images: updatedImages,
           }));
 
-          // Update the backend
-          await fetch(`/api/cars/${id}`, {
+          // Update the backend with the latest images
+          const dbResponse = await fetch(`/api/cars/${id}`, {
             method: "PATCH",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              images: [...car.images, imageData],
+              images: updatedImages,
             }),
           });
+
+          if (!dbResponse.ok) {
+            throw new Error("Failed to update car images in database");
+          }
 
           // Update status to complete
           setUploadProgress((prev) =>
