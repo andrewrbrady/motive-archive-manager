@@ -28,7 +28,7 @@ interface Engine {
 
 interface Car {
   _id: string;
-  brand: string;
+  make: string;
   model: string;
   year: number;
   price: number;
@@ -52,7 +52,7 @@ interface Car {
 }
 
 interface FilterParams {
-  brand?: string;
+  make?: string;
   minYear?: string;
   maxYear?: string;
   condition?: string;
@@ -109,8 +109,8 @@ async function getCars(page = 1, pageSize = 12, filters: FilterParams = {}) {
     const skip = (page - 1) * pageSize;
     const query: any = {};
 
-    if (filters.brand) {
-      query.brand = { $regex: filters.brand, $options: "i" };
+    if (filters.make) {
+      query.make = { $regex: filters.make, $options: "i" };
     }
 
     if (filters.minYear || filters.maxYear) {
@@ -186,7 +186,7 @@ export default async function CarsPage({
     const isEditMode = resolvedParams.edit === "true";
 
     const filters: FilterParams = {
-      brand: resolvedParams.brand?.toString(),
+      make: resolvedParams.make?.toString(),
       minYear: resolvedParams.minYear?.toString(),
       maxYear: resolvedParams.maxYear?.toString(),
       condition: resolvedParams.condition?.toString(),
@@ -228,7 +228,7 @@ export default async function CarsPage({
 
             <CarFiltersSection
               currentFilters={{
-                brand: filters.brand || "",
+                make: filters.make || "",
                 minYear: filters.minYear || "",
                 maxYear: filters.maxYear || "",
                 condition: filters.condition || "",
@@ -238,7 +238,7 @@ export default async function CarsPage({
                 maxPrice: filters.maxPrice || "",
                 status: filters.status || "",
               }}
-              brands={makes.map((make) => make.name)}
+              makes={makes.map((make) => make.name)}
               clients={clients}
             />
 
@@ -259,7 +259,7 @@ export default async function CarsPage({
                     className="bg-white rounded-lg shadow-md p-4"
                   >
                     <h3 className="text-lg font-semibold mb-4">
-                      {car.year} {car.brand} {car.model}
+                      {car.year} {car.make} {car.model}
                     </h3>
                     <CarImageEditor
                       carId={car._id}

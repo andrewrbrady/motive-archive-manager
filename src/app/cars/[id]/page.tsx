@@ -18,7 +18,7 @@ interface Engine {
 
 interface Car {
   _id: string;
-  brand: string;
+  make: string;
   model: string;
   year: number;
   price: number;
@@ -181,7 +181,7 @@ export default function CarPage() {
           "vehicleInfo",
           JSON.stringify({
             year: car.year,
-            brand: car.brand,
+            make: car.make,
             model: car.model,
             type: car.type,
             color: car.color,
@@ -539,7 +539,7 @@ export default function CarPage() {
           <div className="md:col-span-2">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-xl font-bold uppercase tracking-tight">
-                {car.year} {car.brand} {car.model}
+                {car.year} {car.make} {car.model}
                 {car.type && (
                   <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
                     {car.type}
@@ -635,7 +635,7 @@ export default function CarPage() {
               showMetadata={true}
               vehicleInfo={{
                 year: car.year,
-                brand: car.brand,
+                make: car.make,
                 model: car.model,
                 type: car.type,
               }}
@@ -659,7 +659,7 @@ export default function CarPage() {
           <div className="space-y-6">
             <section>
               <h2 className="text-3xl font-bold">
-                {car.year} {car.brand} {car.model}
+                {car.year} {car.make} {car.model}
                 {car.type && (
                   <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
                     {car.type}
@@ -672,8 +672,8 @@ export default function CarPage() {
             <section className="space-y-4">
               <h2 className="text-xl font-semibold">Vehicle Details</h2>
               <div className="grid grid-cols-2 gap-4">
-                <div className="font-medium">Brand:</div>
-                <div>{car.brand}</div>
+                <div className="font-medium">Make:</div>
+                <div>{car.make}</div>
                 <div className="font-medium">Model:</div>
                 <div>{car.model}</div>
                 <div className="font-medium">Year:</div>

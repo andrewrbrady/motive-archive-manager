@@ -19,7 +19,7 @@ const CarCard: React.FC<CarCardProps> = ({ car }) => {
           {thumbnail ? (
             <Image
               src={thumbnail}
-              alt={`${car.brand} ${car.model}`}
+              alt={`${car.make} ${car.model}`}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -33,7 +33,7 @@ const CarCard: React.FC<CarCardProps> = ({ car }) => {
         </div>
         <div className="p-4 h-[160px] flex flex-col justify-between">
           <h3 className="text-lg font-semibold">
-            {car.year} {car.brand} {car.model}
+            {car.year} {car.make} {car.model}
             {car.type && (
               <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
                 {car.type}

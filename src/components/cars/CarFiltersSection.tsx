@@ -4,26 +4,30 @@
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+interface FilterProps {
+  make: string;
+  minYear: string;
+  maxYear: string;
+  minPrice: string;
+  maxPrice: string;
+  status: string;
+  condition: string;
+  engineFeatures: string;
+  clientId: string;
+}
+
 interface CarFiltersSectionProps {
-  currentFilters: {
-    brand: string;
-    minYear: string;
-    maxYear: string;
-    condition: string;
-    engineFeatures: string;
-    clientId: string;
-    minPrice: string;
-    maxPrice: string;
-    status: string;
-  };
-  brands: string[];
-  clients: { _id: string; name: string }[];
+  currentFilters: FilterProps;
+  makes: string[];
+  clients?: any[];
+  onFilterChange?: (filters: FilterProps) => void;
 }
 
 export default function CarFiltersSection({
   currentFilters,
-  brands,
+  makes,
   clients,
+  onFilterChange,
 }: CarFiltersSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,20 +38,13 @@ export default function CarFiltersSection({
     (currentYear - i).toString()
   );
 
-  const handleFilterChange = (key: string, value: string) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
+  const handleFilterChange = (field: keyof FilterProps, value: string) => {
+    if (onFilterChange) {
+      onFilterChange({
+        ...currentFilters,
+        [field]: value,
+      });
     }
-
-    params.set("page", "1");
-    router.push(`/cars?${params.toString()}`);
   };
 
   const clearFilters = () => {
@@ -59,20 +56,20 @@ export default function CarFiltersSection({
   return (
     <div className="bg-white p-4 rounded-lg shadow">
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {/* Brand filter */}
+        {/* Make filter */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Brand
+            Make
           </label>
           <select
-            value={filters.brand}
-            onChange={(e) => handleFilterChange("brand", e.target.value)}
+            value={filters.make}
+            onChange={(e) => handleFilterChange("make", e.target.value)}
             className="w-full border rounded-md px-3 py-2"
           >
-            <option value="">All Brands</option>
-            {brands.map((brand) => (
-              <option key={brand} value={brand}>
-                {brand}
+            <option value="">All Makes</option>
+            {makes.map((make) => (
+              <option key={make} value={make}>
+                {make}
               </option>
             ))}
           </select>

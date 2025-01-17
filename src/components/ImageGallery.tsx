@@ -58,7 +58,7 @@ interface ImageGalleryProps {
   showFilters?: boolean;
   vehicleInfo?: {
     year: number;
-    brand: string;
+    make: string;
     model: string;
     type?: string;
   };
@@ -782,7 +782,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       {vehicleInfo && (
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h3 className="text-lg font-semibold">
-            {vehicleInfo.year} {vehicleInfo.brand} {vehicleInfo.model}
+            {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
             {vehicleInfo.type && (
               <span className="text-sm text-gray-500 ml-2">
                 {vehicleInfo.type}

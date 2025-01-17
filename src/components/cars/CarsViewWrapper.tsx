@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 
 interface Car {
   _id: string;
-  brand: string;
+  make: string;
   model: string;
   year: string;
   price: string;
@@ -39,7 +39,7 @@ export const ListView = ({ cars }: { cars: Car[] }) => {
         <thead>
           <tr className="bg-gray-50 border-y">
             <th className="py-2 px-3 text-left font-medium border">Year</th>
-            <th className="py-2 px-3 text-left font-medium border">Brand</th>
+            <th className="py-2 px-3 text-left font-medium border">Make</th>
             <th className="py-2 px-3 text-left font-medium border">Model</th>
             <th className="py-2 px-3 text-right font-medium border">Price</th>
             <th className="py-2 px-3 text-right font-medium border">Mileage</th>
@@ -51,9 +51,9 @@ export const ListView = ({ cars }: { cars: Car[] }) => {
           {cars.map((car) => (
             <tr key={car._id} className="border-b hover:bg-gray-50">
               <td className="py-2 px-3 border">{car.year}</td>
-              <td className="py-2 px-3 border">{car.brand}</td>
+              <td className="py-2 px-3 border">{car.make}</td>
               <td className="py-2 px-3 border">
-                {car.year} {car.brand} {car.model}
+                {car.year} {car.make} {car.model}
                 {car.type && (
                   <span className="text-xs uppercase text-gray-500 ml-1">
                     {car.type}

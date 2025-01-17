@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     console.log("Successfully converted image to base64");
 
     const vehicleContext = vehicleInfo
-      ? `This is a ${vehicleInfo.year} ${vehicleInfo.brand} ${
+      ? `This is a ${vehicleInfo.year} ${vehicleInfo.make} ${
           vehicleInfo.model
         }${
           vehicleInfo.type ? ` ${vehicleInfo.type}` : ""
