@@ -180,6 +180,43 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
+  const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
+  const prevImagesLengthRef = useRef(images.length);
+  const prevMainIndexRef = useRef(mainIndex);
+
+  // Handle initial image load and updates
+  useEffect(() => {
+    // Only update main index once when transitioning from no images to having images
+    if (
+      prevImagesLengthRef.current === 0 &&
+      images.length > 0 &&
+      !hasSetInitialImage
+    ) {
+      setMainIndex(0); // Always show the first uploaded image
+      setMainImageLoaded(false);
+      setHasSetInitialImage(true);
+      const timer = setTimeout(() => {
+        setMainImageLoaded(true);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    // Reset states when there are no images
+    else if (images.length === 0) {
+      setMainIndex(0);
+      setMainImageLoaded(false);
+      setHasSetInitialImage(false);
+    }
+    prevImagesLengthRef.current = images.length;
+  }, [images.length]);
+
+  // Only force reload when entering/exiting edit mode
+  useEffect(() => {
+    if (isEditMode) {
+      setCurrentPage(1);
+      setSelectedImages([]);
+      setFilters({});
+    }
+  }, [isEditMode]);
 
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
 
@@ -398,16 +435,52 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   };
 
+  // Remove the mainImageLoaded state changes from thumbnail clicks
+  const handleThumbnailClick = (index: number) => {
+    if (!isEditMode) {
+      setMainIndex(index);
+    }
+  };
+
   if (!images || images.length === 0 || filteredImages.length === 0) {
     return (
       <>
-        <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-gray-400">
-              {!images || images.length === 0
-                ? "No images available"
-                : "No images match the selected filters"}
-            </span>
+        <div className="flex gap-6">
+          <div className="w-2/3 space-y-3">
+            <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-gray-400">
+                  {!images || images.length === 0
+                    ? "No images available"
+                    : "No images match the selected filters"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-1/3">
+            {isEditMode && (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 w-full justify-center"
+                  >
+                    {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {uploading ? "Uploading..." : "Add Images"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -442,21 +515,31 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              {!mainImageLoaded && <ImageSkeleton aspectRatio={aspectRatio} />}
               {filteredImages[mainIndex] && (
-                <img
-                  src={`${filteredImages[mainIndex].url}/public`}
-                  alt={
-                    title
-                      ? `${title} - View ${mainIndex + 1}`
-                      : `View ${mainIndex + 1} of ${filteredImages.length}`
-                  }
-                  className={cn(
-                    "w-full h-full object-cover transition-opacity duration-300",
-                    !mainImageLoaded && "opacity-0"
+                <>
+                  {!mainImageLoaded && (
+                    <ImageSkeleton aspectRatio={aspectRatio} />
                   )}
-                  onLoad={() => setMainImageLoaded(true)}
-                />
+                  <img
+                    key={`${filteredImages[mainIndex].id}-${isEditMode}`}
+                    src={`${filteredImages[mainIndex].url}/public`}
+                    alt={
+                      title
+                        ? `${title} - View ${mainIndex + 1}`
+                        : `View ${mainIndex + 1} of ${filteredImages.length}`
+                    }
+                    className={cn(
+                      "w-full h-full object-cover transition-opacity duration-300",
+                      !mainImageLoaded && "opacity-0"
+                    )}
+                    onLoad={() => {
+                      // Only set loaded state on first load
+                      if (!mainImageLoaded) {
+                        setMainImageLoaded(true);
+                      }
+                    }}
+                  />
+                </>
               )}
               <button
                 onClick={() => {
@@ -588,8 +671,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     className="relative group cursor-pointer"
                     onClick={() => {
                       if (!isEditMode) {
-                        setMainIndex(actualIndex);
-                        setMainImageLoaded(true);
+                        handleThumbnailClick(actualIndex);
                       }
                     }}
                     style={{ aspectRatio }}

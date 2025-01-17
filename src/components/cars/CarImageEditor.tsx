@@ -71,7 +71,7 @@ export default function CarImageEditor({
     }
   };
 
-  const handleImageProgress = (progress: ImageProgress) => {
+  const handleImageProgress = async (progress: ImageProgress) => {
     setUploadProgress((prev) => {
       const existing = prev.findIndex((p) => p.fileName === progress.fileName);
       if (existing !== -1) {
@@ -82,7 +82,47 @@ export default function CarImageEditor({
       return [...prev, progress];
     });
 
-    // When an image is complete, update the car's images immediately
+    // When an image is uploaded to Cloudflare, immediately update the database
+    if (progress.status === "uploading" && progress.imageUrl) {
+      try {
+        console.log("Attempting to save image to database:", {
+          imageUrl: progress.imageUrl,
+          imageId: progress.imageUrl.split("/").pop() || progress.fileName,
+        });
+
+        // Create the image data to send to the database
+        const formData = new FormData();
+        formData.append(
+          "imageData",
+          JSON.stringify({
+            imageUrl: progress.imageUrl,
+            imageId: progress.imageUrl.split("/").pop() || progress.fileName,
+          })
+        );
+
+        // Update the database immediately
+        const response = await fetch(`/api/cars/${carId}/images`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const responseData = await response.json();
+        console.log("Database update response:", responseData);
+
+        if (!response.ok) {
+          console.error(
+            "Failed to update database with new image:",
+            responseData
+          );
+        } else {
+          console.log("Successfully saved image to database");
+        }
+      } catch (error) {
+        console.error("Error updating database:", error);
+      }
+    }
+
+    // When an image is complete with analysis, update the metadata
     if (
       progress.status === "complete" &&
       progress.imageUrl &&
@@ -97,10 +137,10 @@ export default function CarImageEditor({
         updatedAt: new Date().toISOString(),
       };
 
-      // Update the car's images immediately with the new image
+      // Update the car's images with the new metadata
       const updatedImages = [...currentImages, newImage];
 
-      // Update the backend
+      // Update the backend with metadata
       fetch(`/api/cars/${carId}`, {
         method: "PATCH",
         headers: {
@@ -114,7 +154,7 @@ export default function CarImageEditor({
           }
         })
         .catch((error) => {
-          console.error("Error updating car images:", error);
+          console.error("Error updating car images metadata:", error);
         });
     }
   };
