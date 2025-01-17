@@ -29,6 +29,7 @@ interface Car {
   location: string;
   description: string;
   type?: string;
+  vin?: string;
   images: {
     id: string;
     url: string;
@@ -678,6 +679,12 @@ export default function CarPage() {
                 <div>{car.model}</div>
                 <div className="font-medium">Year:</div>
                 <div>{car.year}</div>
+                {car.vin && (
+                  <>
+                    <div className="font-medium">VIN:</div>
+                    <div>{car.vin}</div>
+                  </>
+                )}
                 <div className="font-medium">Mileage:</div>
                 <div>{car.mileage || "N/A"}</div>
                 <div className="font-medium">Color:</div>
