@@ -184,6 +184,11 @@ export default function CarPage() {
             brand: car.brand,
             model: car.model,
             type: car.type,
+            color: car.color,
+            description: car.description,
+            condition: car.condition,
+            mileage: car.mileage,
+            engine: car.engine,
           })
         );
 
