@@ -159,7 +159,7 @@ export async function PATCH(
     }
     const objectId = new ObjectId(id);
     const body = await request.json();
-    const { documentId, images } = body;
+    const { documentId, images, ...updates } = body;
     const db = client.db(DB_NAME);
 
     // Handle document removal
@@ -201,6 +201,24 @@ export async function PATCH(
       const updateResult = await db
         .collection("cars")
         .updateOne({ _id: objectId }, { $set: { images } });
+
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json({ error: "Car not found" }, { status: 404 });
+      }
+
+      // Fetch the updated car to return the new state
+      const updatedCar = await db.collection("cars").findOne({
+        _id: objectId,
+      });
+
+      return NextResponse.json(updatedCar);
+    }
+
+    // Handle general car data updates
+    if (Object.keys(updates).length > 0) {
+      const updateResult = await db
+        .collection("cars")
+        .updateOne({ _id: objectId }, { $set: updates });
 
       if (updateResult.matchedCount === 0) {
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
