@@ -157,7 +157,6 @@ export default function CarPage() {
       setUploadingImages(true);
 
       // Upload each file sequentially to ensure progress is tracked properly
-      const uploadedImages = [];
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
         const formData = new FormData();
@@ -264,7 +263,22 @@ export default function CarPage() {
             updatedAt: new Date().toISOString(),
           };
 
-          uploadedImages.push(imageData);
+          // Update car state immediately with the new image
+          setCar((prevCar) => ({
+            ...prevCar!,
+            images: [...prevCar!.images, imageData],
+          }));
+
+          // Update the backend
+          await fetch(`/api/cars/${id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              images: [...car.images, imageData],
+            }),
+          });
 
           // Update status to complete
           setUploadProgress((prev) =>
@@ -292,25 +306,9 @@ export default function CarPage() {
                 : p
             )
           );
-          throw error;
+          console.error("Error uploading image:", error);
         }
       }
-
-      // Update car with new images
-      const response = await fetch(`/api/cars/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          images: [...(car.images || []), ...uploadedImages],
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to update car images");
-
-      const data = await response.json();
-      setCar(data);
     } catch (error) {
       console.error("Error uploading images:", error);
     } finally {
@@ -533,10 +531,11 @@ export default function CarPage() {
               type="file"
               ref={fileInputRef}
               onChange={(e) => {
-                if (e.target.files) {
-                  const files = Array.from(e.target.files);
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  const filesArray = Array.from(files);
                   setUploadProgress(
-                    files.map((file) => ({
+                    filesArray.map((file) => ({
                       fileName: file.name,
                       progress: 0,
                       status: "pending" as const,
@@ -545,7 +544,7 @@ export default function CarPage() {
                   );
                   setUploadingImages(true);
                   // Call handleImageUpload after state is set
-                  setTimeout(() => handleImageUpload(e.target.files), 0);
+                  setTimeout(() => handleImageUpload(files), 0);
                 }
               }}
               className="hidden"
