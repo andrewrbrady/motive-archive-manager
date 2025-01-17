@@ -11,7 +11,6 @@ interface FilterProps {
   minPrice: string;
   maxPrice: string;
   status: string;
-  condition: string;
   engineFeatures: string;
   clientId: string;
 }
@@ -33,31 +32,62 @@ export default function CarFiltersSection({
   const searchParams = useSearchParams();
   const [filters, setFilters] = React.useState(currentFilters);
 
-  const currentYear = new Date().getFullYear() + 1;
-  const years = Array.from({ length: currentYear - 1960 + 1 }, (_, i) =>
-    (currentYear - i).toString()
-  );
-
   const handleFilterChange = (field: keyof FilterProps, value: string) => {
-    if (onFilterChange) {
-      onFilterChange({
-        ...currentFilters,
-        [field]: value,
-      });
-    }
+    const newFilters = {
+      ...filters,
+      [field]: value,
+    };
+    setFilters(newFilters);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Update the URL parameters
+    Object.entries(newFilters).forEach(([key, val]) => {
+      if (val && val.trim() !== "") {
+        params.set(key, val);
+      } else {
+        params.delete(key);
+      }
+    });
+
+    // Preserve view mode and page size
+    const view = searchParams.get("view");
+    const pageSize = searchParams.get("pageSize");
+    if (view) params.set("view", view);
+    if (pageSize) params.set("pageSize", pageSize);
+    params.set("page", "1"); // Reset to first page
+
+    router.push(`/cars?${params.toString()}`);
   };
 
   const clearFilters = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    Object.keys(filters).forEach((key) => params.delete(key));
+    const emptyFilters = {
+      make: "",
+      minYear: "",
+      maxYear: "",
+      minPrice: "",
+      maxPrice: "",
+      status: "",
+      engineFeatures: "",
+      clientId: "",
+    };
+    setFilters(emptyFilters);
+
+    const params = new URLSearchParams();
+    const view = searchParams.get("view");
+    const pageSize = searchParams.get("pageSize");
+    if (view) params.set("view", view);
+    if (pageSize) params.set("pageSize", pageSize);
+    params.set("page", "1");
+
     router.push(`/cars?${params.toString()}`);
   };
 
   return (
     <div className="bg-white p-4 rounded-lg shadow">
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="flex flex-wrap gap-4 items-end">
         {/* Make filter */}
-        <div>
+        <div className="flex-1 min-w-[150px]">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Make
           </label>
@@ -76,60 +106,59 @@ export default function CarFiltersSection({
         </div>
 
         {/* Year range */}
-        <div>
+        <div className="flex-1 min-w-[120px]">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Year
+            Year Range
           </label>
-          <select
-            value={filters.minYear}
-            onChange={(e) => handleFilterChange("minYear", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Any Year</option>
-            {years.map((year) => (
-              <option key={`min-${year}`} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="1900"
+              max={new Date().getFullYear() + 1}
+              placeholder="Min"
+              value={filters.minYear}
+              onChange={(e) => handleFilterChange("minYear", e.target.value)}
+              className="w-full border rounded-md px-3 py-2"
+            />
+            <input
+              type="number"
+              min="1900"
+              max={new Date().getFullYear() + 1}
+              placeholder="Max"
+              value={filters.maxYear}
+              onChange={(e) => handleFilterChange("maxYear", e.target.value)}
+              className="w-full border rounded-md px-3 py-2"
+            />
+          </div>
         </div>
 
-        <div>
+        {/* Price range */}
+        <div className="flex-1 min-w-[120px]">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Year
+            Price Range
           </label>
-          <select
-            value={filters.maxYear}
-            onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Any Year</option>
-            {years.map((year) => (
-              <option key={`max-${year}`} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Condition */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Condition
-          </label>
-          <select
-            value={filters.condition}
-            onChange={(e) => handleFilterChange("condition", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Any Condition</option>
-            <option value="New">New</option>
-            <option value="Used">Used</option>
-          </select>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              placeholder="Min"
+              value={filters.minPrice}
+              onChange={(e) => handleFilterChange("minPrice", e.target.value)}
+              className="w-full border rounded-md px-3 py-2"
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Max"
+              value={filters.maxPrice}
+              onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
+              className="w-full border rounded-md px-3 py-2"
+            />
+          </div>
         </div>
 
         {/* Engine Features */}
-        <div>
+        <div className="flex-1 min-w-[150px]">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Engine Type
           </label>
@@ -146,7 +175,7 @@ export default function CarFiltersSection({
         </div>
 
         {/* Client/Dealer */}
-        <div>
+        <div className="flex-1 min-w-[150px]">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Dealer
           </label>
@@ -156,22 +185,20 @@ export default function CarFiltersSection({
             className="w-full border rounded-md px-3 py-2"
           >
             <option value="">All Dealers</option>
-            {clients.map((client) => (
+            {clients?.map((client) => (
               <option key={client._id} value={client._id}>
                 {client.name}
               </option>
             ))}
           </select>
         </div>
-      </div>
 
-      {/* Clear Filters */}
-      <div className="mt-4 flex justify-end">
+        {/* Clear Filters */}
         <button
           onClick={clearFilters}
-          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
         >
-          Clear Filters
+          Clear
         </button>
       </div>
     </div>

@@ -777,20 +777,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         isOpen={uploadProgress.length > 0}
         uploadProgress={uploadProgress}
       />
-
-      {/* Vehicle Info */}
-      {vehicleInfo && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4">
-          <h3 className="text-lg font-semibold">
-            {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
-            {vehicleInfo.type && (
-              <span className="text-sm text-gray-500 ml-2">
-                {vehicleInfo.type}
-              </span>
-            )}
-          </h3>
-        </div>
-      )}
     </div>
   );
 };
