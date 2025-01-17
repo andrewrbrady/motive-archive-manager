@@ -663,83 +663,83 @@ export default function CarPage() {
           <div className="bg-gray-50/50 border rounded-lg">
             <div className="divide-y">
               <div className="grid grid-cols-12 divide-x text-sm">
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Year
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.year}
                 </div>
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Make
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.make}
                 </div>
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Model
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.model}
                 </div>
               </div>
 
               <div className="grid grid-cols-12 divide-x text-sm">
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Type
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.type || "N/A"}
                 </div>
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Color
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.color || "N/A"}
                 </div>
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Mileage
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.mileage.toLocaleString()}
                 </div>
               </div>
 
               <div className="grid grid-cols-12 divide-x text-sm">
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   VIN
                 </div>
-                <div className="col-span-10 font-medium font-mono text-sm p-2 flex items-center uppercase">
+                <div className="col-span-11 text-gray-600 font-medium font-mono text-sm p-2 flex items-center uppercase">
                   {car.vin || "N/A"}
                 </div>
               </div>
 
               <div className="grid grid-cols-12 divide-x text-sm">
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Location
                 </div>
-                <div className="col-span-6 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
                   {car.location || "N/A"}
                 </div>
-                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Price
                 </div>
-                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                   ${car.price.toLocaleString()}
                 </div>
               </div>
 
               {car.engine && (
                 <div className="grid grid-cols-12 divide-x text-sm">
-                  <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                     Engine
                   </div>
-                  <div className="col-span-6 font-medium p-2 flex items-center uppercase">
+                  <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
                     {car.engine.type}
                   </div>
-                  <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
-                    Displacement
+                  <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    Disp.
                   </div>
-                  <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  <div className="col-span-3 text-gray-600 font-medium p-2 flex items-center uppercase">
                     {car.engine.displacement || "N/A"}
                   </div>
                 </div>
@@ -760,37 +760,37 @@ export default function CarPage() {
               </section>
             )}
           </div>
+        </div>
 
-          {/* Additional Details */}
-          <div className="space-y-6">
-            <section>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600">
-                  Service History
-                </h2>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
-                  aria-label="Add document"
+        {/* Service History - Full Width */}
+        <div className="mt-8">
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600">
+                Service History
+              </h2>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
+                aria-label="Add document"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <DocumentsClient carId={id} initialDocuments={documents} />
-            </section>
-          </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              </button>
+            </div>
+            <DocumentsClient carId={id} initialDocuments={documents} />
+          </section>
         </div>
       </div>
     </>
