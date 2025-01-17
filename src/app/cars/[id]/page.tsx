@@ -8,18 +8,34 @@ import DocumentsClient from "@/app/documents/DocumentsClient";
 import { Loader2 } from "lucide-react";
 import { DeleteImageDialog } from "@/components/DeleteImageDialog";
 
+interface MeasurementValue {
+  value: number | null;
+  unit: string;
+}
+
+interface Power {
+  hp: number;
+  kW: number;
+  ps: number;
+}
+
+interface Torque {
+  "lb-ft": number;
+  Nm: number;
+}
+
 interface Engine {
   type: string;
-  displacement?: string;
-  power?: string;
-  torque?: string;
+  displacement?: MeasurementValue;
+  power?: Power;
+  torque?: Torque;
 }
 
 interface Dimensions {
-  length: string;
-  width: string;
-  height: string;
-  wheelbase: string;
+  length: MeasurementValue;
+  width: MeasurementValue;
+  height: MeasurementValue;
+  wheelbase: MeasurementValue;
 }
 
 interface InteriorFeatures {
@@ -28,8 +44,8 @@ interface InteriorFeatures {
 }
 
 interface Performance {
-  "0_to_60_mph": string;
-  top_speed: string;
+  "0_to_60_mph": MeasurementValue;
+  top_speed: MeasurementValue;
 }
 
 interface Transmission {
@@ -37,7 +53,28 @@ interface Transmission {
 }
 
 interface Weight {
-  curb_weight: string;
+  curb_weight: MeasurementValue;
+}
+
+interface ImageMetadata {
+  angle?: string;
+  description?: string;
+  movement?: string;
+  tod?: string;
+  view?: string;
+  side?: string;
+  aiAnalysis?: {
+    angle?: string;
+    description?: string;
+    movement?: string;
+    tod?: string;
+    view?: string;
+    side?: string;
+  };
+}
+
+interface ImageVariants {
+  [key: string]: string;
 }
 
 interface Car {
@@ -45,10 +82,10 @@ interface Car {
   make: string;
   model: string;
   year: number;
-  price: number | null;
-  mileage: number;
+  price: number | string | null;
+  mileage: MeasurementValue;
   color: string | null;
-  horsepower: string;
+  horsepower: number;
   condition: string | null;
   location: string;
   description: string | null;
@@ -58,17 +95,8 @@ interface Car {
     id: string;
     url: string;
     filename: string;
-    metadata: {
-      angle?: string;
-      description?: string;
-      movement?: string;
-      tod?: string;
-      view?: string;
-      side?: string;
-    };
-    variants?: {
-      [key: string]: string;
-    };
+    metadata: ImageMetadata;
+    variants: ImageVariants;
     createdAt: string;
     updatedAt: string;
   }[];
@@ -88,12 +116,22 @@ interface Car {
   updatedAt: string;
   status?: "available" | "sold" | "pending";
   dimensions?: Dimensions;
-  fuel_capacity?: string;
+  fuel_capacity?: MeasurementValue;
   interior_features?: InteriorFeatures;
   interior_color?: string;
   performance?: Performance;
   transmission?: Transmission;
   weight?: Weight;
+}
+
+interface UploadedImageData {
+  id: string;
+  url: string;
+  filename: string;
+  metadata: ImageMetadata;
+  variants: ImageVariants;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface UploadProgress {
@@ -129,19 +167,46 @@ interface EditableSpecs
 }
 
 // Helper function to handle input values
-const getInputValue = (value: any): string => {
+const getInputValue = (
+  value: string | number | MeasurementValue | null | undefined
+): string => {
   if (value === null || value === undefined || value === "") return "";
   if (typeof value === "number") return value.toString();
   if (typeof value === "string") return value;
-  return "";
+  if (value.value === null) return "";
+  return value.value.toString();
 };
 
 // Helper function to handle number input values
-const getNumberInputValue = (value: any): string => {
+const getNumberInputValue = (
+  value: string | number | MeasurementValue | null | undefined
+): string => {
   if (value === null || value === undefined || value === "") return "";
   if (typeof value === "number") return value.toString();
   if (typeof value === "string" && !isNaN(Number(value))) return value;
+  if (typeof value === "object" && value.value !== null)
+    return value.value.toString();
   return "";
+};
+
+// Helper function to format structured measurement values
+const formatMeasurement = (
+  measurement: MeasurementValue | string | undefined
+): string => {
+  if (!measurement) return "N/A";
+  if (typeof measurement === "string") return measurement;
+  if (measurement.value === null) return "N/A";
+  return `${measurement.value} ${measurement.unit}`;
+};
+
+// Helper function to display mileage
+const formatMileage = (mileage: MeasurementValue): string => {
+  if (mileage.value === null) return "0";
+  return (
+    mileage.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
+    " " +
+    mileage.unit
+  );
 };
 
 export default function CarPage() {
@@ -162,7 +227,6 @@ export default function CarPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
 
   // Add escape key handler
@@ -278,15 +342,7 @@ export default function CarPage() {
 
         return new Promise<{
           index: number;
-          imageData: {
-            id: string;
-            url: string;
-            filename: string;
-            metadata: any;
-            variants: {};
-            createdAt: string;
-            updatedAt: string;
-          };
+          imageData: UploadedImageData;
         }>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.upload.addEventListener("progress", (event) => {
@@ -393,7 +449,7 @@ export default function CarPage() {
             result
           ): result is PromiseFulfilledResult<{
             index: number;
-            imageData: any;
+            imageData: UploadedImageData;
           }> => result.status === "fulfilled"
         )
         .map((result) => result.value.imageData);
@@ -658,8 +714,8 @@ export default function CarPage() {
     field: keyof EditableSpecs,
     value: string,
     nestedField?: string
-  ) => {
-    let newValue: any = value;
+  ): void => {
+    let newValue: string | number | null = value;
 
     // Handle number fields
     if (
@@ -672,7 +728,7 @@ export default function CarPage() {
     }
 
     // Update the editedSpecs state
-    setEditedSpecs((prev) => {
+    setEditedSpecs((prev: EditableSpecs) => {
       // Handle nested fields
       if (nestedField && isNestedField(field)) {
         return {
@@ -742,30 +798,6 @@ export default function CarPage() {
             )}
           </h1>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleEnrichData}
-              disabled={isEnriching}
-              className="px-4 py-2 text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              {isEnriching ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                  />
-                </svg>
-              )}
-              {isEnriching ? "Enriching..." : "Enrich Data"}
-            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingImages}
@@ -926,25 +958,51 @@ export default function CarPage() {
                   </button>
                 </>
               ) : (
-                <button
-                  onClick={() => setIsSpecsEditMode(true)}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
-                  aria-label="Edit specifications"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <>
+                  <button
+                    onClick={() => setIsSpecsEditMode(true)}
+                    className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
+                    aria-label="Edit specifications"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleEnrichData}
+                    disabled={isEnriching}
+                    className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200 disabled:opacity-50"
+                    aria-label="Enrich data"
+                  >
+                    {isEnriching ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -1054,10 +1112,8 @@ export default function CarPage() {
                       }
                       className="w-full bg-white border rounded px-2 py-1"
                     />
-                  ) : car.mileage ? (
-                    car.mileage.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                   ) : (
-                    "0"
+                    formatMileage(car.mileage)
                   )}
                 </div>
               </div>
@@ -1194,7 +1250,7 @@ export default function CarPage() {
                           className="w-full bg-white border rounded px-2 py-1"
                         />
                       ) : (
-                        car.dimensions.length || "N/A"
+                        <span>{formatMeasurement(car.dimensions.length)}</span>
                       )}
                     </div>
                     <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
@@ -1218,7 +1274,7 @@ export default function CarPage() {
                           className="w-full bg-white border rounded px-2 py-1"
                         />
                       ) : (
-                        car.dimensions.width || "N/A"
+                        <span>{formatMeasurement(car.dimensions.width)}</span>
                       )}
                     </div>
                     <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
@@ -1242,7 +1298,7 @@ export default function CarPage() {
                           className="w-full bg-white border rounded px-2 py-1"
                         />
                       ) : (
-                        car.dimensions.height || "N/A"
+                        <span>{formatMeasurement(car.dimensions.height)}</span>
                       )}
                     </div>
                   </div>
@@ -1269,7 +1325,9 @@ export default function CarPage() {
                           className="w-full bg-white border rounded px-2 py-1"
                         />
                       ) : (
-                        car.dimensions.wheelbase || "N/A"
+                        <span>
+                          {formatMeasurement(car.dimensions.wheelbase)}
+                        </span>
                       )}
                     </div>
                     <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
@@ -1288,7 +1346,7 @@ export default function CarPage() {
                           className="w-full bg-white border rounded px-2 py-1"
                         />
                       ) : (
-                        car.fuel_capacity || "N/A"
+                        <span>{formatMeasurement(car.fuel_capacity)}</span>
                       )}
                     </div>
                   </div>
@@ -1366,7 +1424,9 @@ export default function CarPage() {
                         className="w-full bg-white border rounded px-2 py-1"
                       />
                     ) : (
-                      car.performance["0_to_60_mph"] || "N/A"
+                      <span>
+                        {formatMeasurement(car.performance["0_to_60_mph"])}
+                      </span>
                     )}
                   </div>
                   <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
@@ -1390,7 +1450,9 @@ export default function CarPage() {
                         className="w-full bg-white border rounded px-2 py-1"
                       />
                     ) : (
-                      car.performance.top_speed || "N/A"
+                      <span>
+                        {formatMeasurement(car.performance.top_speed)}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1448,7 +1510,7 @@ export default function CarPage() {
                         className="w-full bg-white border rounded px-2 py-1"
                       />
                     ) : (
-                      car.weight.curb_weight || "N/A"
+                      <span>{formatMeasurement(car.weight.curb_weight)}</span>
                     )}
                   </div>
                 </div>
@@ -1479,7 +1541,6 @@ export default function CarPage() {
                 Service History
               </h2>
               <button
-                onClick={() => setIsAddModalOpen(true)}
                 className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
                 aria-label="Add document"
               >
