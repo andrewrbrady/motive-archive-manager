@@ -131,18 +131,7 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Service History</h2>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center space-x-2 text-blue-600 hover:text-blue-800"
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>Add Document</span>
-        </button>
-      </div>
-
+    <div>
       <div className="overflow-x-auto shadow-md rounded-lg">
         <table className="w-full text-sm text-left">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50">

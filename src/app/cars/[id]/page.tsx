@@ -94,6 +94,8 @@ export default function CarPage() {
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Add escape key handler
   useEffect(() => {
@@ -535,24 +537,241 @@ export default function CarPage() {
     <>
       <Navbar />
       <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-xl uppercase font-medium tracking-wide">
+            {car.year} {car.make} {car.model}
+            {car.type && (
+              <span className="text-xs uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                {car.type}
+              </span>
+            )}
+          </h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImages}
+              className="p-2 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:bg-gray-100 border border-gray-200"
+              aria-label="Add images"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={async () => {
+                const newEditMode = !isEditMode;
+                setIsEditMode(newEditMode);
+              }}
+              className={`p-2 transition-colors rounded-full hover:bg-gray-100 border ${
+                isEditMode
+                  ? "text-blue-500 hover:text-blue-600 border-blue-200"
+                  : "text-gray-500 hover:text-gray-700 border-gray-200"
+              }`}
+              aria-label="Edit images"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 transition-colors rounded-full hover:bg-gray-100 border ${
+                showFilters
+                  ? "text-blue-500 hover:text-blue-600 border-blue-200"
+                  : "text-gray-500 hover:text-gray-700 border-gray-200"
+              }`}
+              aria-label="Toggle filters"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Image Gallery */}
+        <div className="mb-8">
+          <ImageGallery
+            images={car.images}
+            isEditMode={isEditMode}
+            onRemoveImage={handleRemoveImage}
+            onImagesChange={(files) => {
+              handleImageUpload(files);
+            }}
+            uploading={uploadingImages}
+            uploadProgress={uploadProgress}
+            setUploadProgress={setUploadProgress}
+            showMetadata={true}
+            showFilters={showFilters}
+            vehicleInfo={{
+              year: car.year,
+              make: car.make,
+              model: car.model,
+              type: car.type,
+            }}
+          />
+
+          <DeleteImageDialog
+            isOpen={deleteDialogOpen}
+            onClose={() => {
+              setDeleteDialogOpen(false);
+              setImagesToDelete([]);
+              setDeleteStatus([]);
+            }}
+            onConfirm={handleDeleteConfirm}
+            imageCount={imagesToDelete.length}
+            deleteStatus={deleteStatus}
+            isDeleting={isDeleting}
+          />
+        </div>
+
+        {/* Vehicle Information */}
+        <div className="mb-8">
+          <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600 mb-4">
+            Specifications
+          </h2>
+          <div className="bg-gray-50/50 border rounded-lg">
+            <div className="divide-y">
+              <div className="grid grid-cols-12 divide-x text-sm">
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Year
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  {car.year}
+                </div>
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Make
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  {car.make}
+                </div>
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Model
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  {car.model}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 divide-x text-sm">
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Type
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  {car.type || "N/A"}
+                </div>
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Color
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  {car.color || "N/A"}
+                </div>
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Mileage
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  {car.mileage.toLocaleString()}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 divide-x text-sm">
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  VIN
+                </div>
+                <div className="col-span-10 font-medium font-mono text-sm p-2 flex items-center uppercase">
+                  {car.vin || "N/A"}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 divide-x text-sm">
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Location
+                </div>
+                <div className="col-span-6 font-medium p-2 flex items-center uppercase">
+                  {car.location || "N/A"}
+                </div>
+                <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                  Price
+                </div>
+                <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                  ${car.price.toLocaleString()}
+                </div>
+              </div>
+
+              {car.engine && (
+                <div className="grid grid-cols-12 divide-x text-sm">
+                  <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                    Engine
+                  </div>
+                  <div className="col-span-6 font-medium p-2 flex items-center uppercase">
+                    {car.engine.type}
+                  </div>
+                  <div className="col-span-2 text-gray-600 uppercase text-xs font-medium p-2 flex items-center">
+                    Displacement
+                  </div>
+                  <div className="col-span-2 font-medium p-2 flex items-center uppercase">
+                    {car.engine.displacement || "N/A"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Image Gallery */}
-          <div className="md:col-span-2">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-xl font-bold uppercase tracking-tight">
-                {car.year} {car.make} {car.model}
-                {car.type && (
-                  <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
-                    {car.type}
-                  </span>
-                )}
-              </h1>
-              <div className="flex items-center gap-3">
+          {/* Car Details */}
+          <div className="space-y-6">
+            {car.description && (
+              <section className="space-y-4">
+                <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600">
+                  Description
+                </h2>
+                <p className="whitespace-pre-wrap">{car.description}</p>
+              </section>
+            )}
+          </div>
+
+          {/* Additional Details */}
+          <div className="space-y-6">
+            <section>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600">
+                  Service History
+                </h2>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImages}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-full hover:bg-gray-100 border border-gray-200"
-                  aria-label="Add images"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors rounded-full hover:bg-gray-100 border border-gray-200"
+                  aria-label="Add document"
                 >
                   <svg
                     className="w-5 h-5"
@@ -568,151 +787,7 @@ export default function CarPage() {
                     />
                   </svg>
                 </button>
-                <button
-                  onClick={async () => {
-                    const newEditMode = !isEditMode;
-                    setIsEditMode(newEditMode);
-                  }}
-                  className={`p-2 transition-colors rounded-full hover:bg-gray-100 border ${
-                    isEditMode
-                      ? "text-blue-500 hover:text-blue-600 border-blue-200"
-                      : "text-gray-500 hover:text-gray-700 border-gray-200"
-                  }`}
-                  aria-label="Edit images"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                    />
-                  </svg>
-                </button>
               </div>
-            </div>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={(e) => {
-                const files = e.target.files;
-                if (files && files.length > 0) {
-                  const filesArray = Array.from(files);
-                  setUploadProgress(
-                    filesArray.map((file) => ({
-                      fileName: file.name,
-                      progress: 0,
-                      status: "pending" as const,
-                      currentStep: "Preparing upload...",
-                    }))
-                  );
-                  setUploadingImages(true);
-                  // Call handleImageUpload after state is set
-                  setTimeout(() => handleImageUpload(files), 0);
-                }
-              }}
-              className="hidden"
-              multiple
-              accept="image/*"
-            />
-
-            <ImageGallery
-              images={car.images}
-              isEditMode={isEditMode}
-              onRemoveImage={handleRemoveImage}
-              onImagesChange={(files) => {
-                // Remove duplicate initialization here since it's handled in the input onChange
-                handleImageUpload(files);
-              }}
-              uploading={uploadingImages}
-              uploadProgress={uploadProgress}
-              setUploadProgress={setUploadProgress}
-              showMetadata={true}
-              vehicleInfo={{
-                year: car.year,
-                make: car.make,
-                model: car.model,
-                type: car.type,
-              }}
-            />
-
-            <DeleteImageDialog
-              isOpen={deleteDialogOpen}
-              onClose={() => {
-                setDeleteDialogOpen(false);
-                setImagesToDelete([]);
-                setDeleteStatus([]);
-              }}
-              onConfirm={handleDeleteConfirm}
-              imageCount={imagesToDelete.length}
-              deleteStatus={deleteStatus}
-              isDeleting={isDeleting}
-            />
-          </div>
-
-          {/* Car Details */}
-          <div className="space-y-6">
-            <section className="space-y-4">
-              <h2 className="text-xl font-semibold">Vehicle Details</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="font-medium">Make:</div>
-                <div>{car.make}</div>
-                <div className="font-medium">Model:</div>
-                <div>{car.model}</div>
-                <div className="font-medium">Year:</div>
-                <div>{car.year}</div>
-                <div className="font-medium">Price:</div>
-                <div>{car.price}</div>
-                {car.vin && (
-                  <>
-                    <div className="font-medium">VIN:</div>
-                    <div>{car.vin}</div>
-                  </>
-                )}
-                <div className="font-medium">Mileage:</div>
-                <div>{car.mileage || "N/A"}</div>
-                <div className="font-medium">Color:</div>
-                <div>{car.color || "N/A"}</div>
-                <div className="font-medium">Location:</div>
-                <div>{car.location || "N/A"}</div>
-              </div>
-            </section>
-
-            {car.engine && (
-              <section className="space-y-4">
-                <h2 className="text-xl font-semibold">Engine Specifications</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="font-medium">Type:</div>
-                  <div>{car.engine.type}</div>
-                  <div className="font-medium">Displacement:</div>
-                  <div>{car.engine.displacement}</div>
-                  {car.engine.features && car.engine.features.length > 0 && (
-                    <>
-                      <div className="font-medium">Features:</div>
-                      <div>{car.engine.features.join(", ")}</div>
-                    </>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {car.description && (
-              <section className="space-y-4">
-                <h2 className="text-xl font-semibold">Description</h2>
-                <p className="whitespace-pre-wrap">{car.description}</p>
-              </section>
-            )}
-          </div>
-
-          {/* Additional Details */}
-          <div className="space-y-6">
-            <section className="space-y-4">
               <DocumentsClient carId={id} initialDocuments={documents} />
             </section>
           </div>
