@@ -36,6 +36,23 @@ export async function GET(
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
+    // If the car has a client field, populate the client information
+    if (car.client && ObjectId.isValid(car.client)) {
+      const client = await db.collection("clients").findOne({
+        _id: new ObjectId(car.client),
+      });
+
+      if (client) {
+        car.clientInfo = {
+          _id: client._id.toString(),
+          name: client.name,
+          email: client.email,
+          phone: client.phone,
+          address: client.address,
+        };
+      }
+    }
+
     return NextResponse.json(car);
   } catch (error) {
     console.error("Error fetching car:", error);

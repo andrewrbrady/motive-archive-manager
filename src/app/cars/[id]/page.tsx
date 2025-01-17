@@ -1193,6 +1193,15 @@ export default function CarPage() {
 
               <div className="grid grid-cols-12 divide-x text-sm">
                 <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                  Client
+                </div>
+                <div className="col-span-11 text-gray-600 font-medium p-2 flex items-center uppercase">
+                  {car.clientInfo?.name || "N/A"}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 divide-x text-sm">
+                <div className="col-span-1 text-gray-600 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Location
                 </div>
                 <div className="col-span-7 text-gray-600 font-medium p-2 flex items-center uppercase">
