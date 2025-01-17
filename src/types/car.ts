@@ -53,6 +53,7 @@ export interface Car {
   images: CarImage[];
   owner_id?: string;
   engine?: Engine;
+  interior_color?: string;
   clientInfo?: {
     _id: string;
     name: string;

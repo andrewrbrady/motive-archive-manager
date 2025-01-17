@@ -200,12 +200,13 @@ const formatMeasurement = (
 };
 
 // Helper function to display mileage
-const formatMileage = (mileage: MeasurementValue): string => {
-  if (mileage.value === null) return "0";
+const formatMileage = (mileage: MeasurementValue | undefined): string => {
+  if (!mileage || mileage.value === null || mileage.value === undefined)
+    return "0";
   return (
     mileage.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
     " " +
-    mileage.unit
+    (mileage.unit || "")
   );
 };
 
@@ -698,7 +699,6 @@ export default function CarPage() {
       setEditedSpecs({});
     } catch (error) {
       console.error("Error updating specifications:", error);
-      // You might want to show an error notification here
     }
   };
 
@@ -1105,15 +1105,17 @@ export default function CarPage() {
                     <input
                       type="number"
                       value={getNumberInputValue(
-                        editedSpecs.mileage ?? car.mileage
+                        editedSpecs.mileage ?? car?.mileage
                       )}
                       onChange={(e) =>
                         handleInputChange("mileage", e.target.value)
                       }
                       className="w-full bg-white border rounded px-2 py-1"
                     />
-                  ) : (
+                  ) : car ? (
                     formatMileage(car.mileage)
+                  ) : (
+                    "0"
                   )}
                 </div>
               </div>
