@@ -5,12 +5,22 @@ import { ImageUploader } from "./ImageUploader";
 import { Loader2, Trash2, ZoomIn } from "lucide-react";
 import Image from "next/image";
 
+interface ImageProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  imageUrl?: string;
+  metadata?: any;
+  error?: string;
+}
+
 interface ImageManagerProps {
   onSelect?: (imageUrl: string) => void;
   selectedImages?: string[];
   maxSelection?: number;
   showUploader?: boolean;
   className?: string;
+  onImageProgress?: (progress: ImageProgress) => void;
 }
 
 export const ImageManager: React.FC<ImageManagerProps> = ({
@@ -19,11 +29,13 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   maxSelection = 1,
   showUploader = true,
   className = "",
+  onImageProgress,
 }) => {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalImage, setModalImage] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
 
   useEffect(() => {
     fetchImages();
@@ -46,7 +58,34 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   };
 
   const handleImageUpload = async (uploadedUrls: string[]) => {
-    setImages((prev) => [...uploadedUrls, ...prev]);
+    // Clear upload progress when all uploads are complete
+    setUploadProgress([]);
+  };
+
+  const handleImageProgress = (progress: ImageProgress) => {
+    setUploadProgress((prev) => {
+      const existing = prev.findIndex((p) => p.fileName === progress.fileName);
+      if (existing !== -1) {
+        const newProgress = [...prev];
+        newProgress[existing] = progress;
+        return newProgress;
+      }
+      return [...prev, progress];
+    });
+
+    // Forward the progress to the parent component
+    onImageProgress?.(progress);
+
+    // When an image is uploaded (analyzing or complete), add it to the list immediately
+    if (
+      progress.imageUrl &&
+      (progress.status === "analyzing" || progress.status === "complete")
+    ) {
+      setImages((prev) => {
+        if (prev.includes(progress.imageUrl!)) return prev;
+        return [progress.imageUrl!, ...prev];
+      });
+    }
   };
 
   const handleImageDelete = async (imageUrl: string) => {
@@ -108,71 +147,108 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     <div className={className}>
       {showUploader && (
         <div className="mb-8">
-          <ImageUploader onUploadComplete={handleImageUpload} />
+          <ImageUploader
+            onUploadComplete={handleImageUpload}
+            onImageProgress={handleImageProgress}
+          />
+          {uploadProgress.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {uploadProgress.map((progress) => (
+                <div
+                  key={progress.fileName}
+                  className="bg-gray-50 p-3 rounded-lg space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {progress.fileName}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {progress.status === "error"
+                        ? "Error"
+                        : `${progress.progress}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full ${
+                        progress.status === "error"
+                          ? "bg-red-500"
+                          : progress.status === "complete"
+                          ? "bg-green-500"
+                          : "bg-blue-500"
+                      }`}
+                      style={{ width: `${progress.progress}%` }}
+                    />
+                  </div>
+                  {progress.status === "error" && (
+                    <p className="text-xs text-red-500">{progress.error}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {images.map((imageUrl, index) => (
-          <div
-            key={index}
-            className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden"
-          >
-            <Image
-              src={imageUrl}
-              alt={`Uploaded image ${index + 1}`}
-              fill
-              className={`object-cover transition-transform group-hover:scale-105 ${
-                selectedImages.includes(imageUrl) ? "ring-2 ring-blue-500" : ""
+      {images.length > 0 ? (
+        <div className="grid grid-cols-4 gap-4">
+          {images.map((imageUrl, index) => (
+            <div
+              key={imageUrl}
+              className={`relative aspect-square rounded-lg overflow-hidden group cursor-pointer border-2 ${
+                selectedImages.includes(imageUrl)
+                  ? "border-blue-500"
+                  : "border-transparent"
               }`}
-              onClick={() => handleImageClick(imageUrl)}
-            />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
-            <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => setModalImage(imageUrl)}
-                className="p-2 bg-white/90 rounded-full hover:bg-white"
-                aria-label="View full size"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleImageDelete(imageUrl)}
-                className="p-2 bg-white/90 rounded-full hover:bg-white text-red-500"
-                aria-label="Delete image"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+            >
+              <Image
+                src={`${imageUrl}/public`}
+                alt={`Image ${index + 1}`}
+                fill
+                className="object-cover"
+                onClick={() => handleImageClick(imageUrl)}
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity" />
+              <div className="absolute inset-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setModalImage(imageUrl)}
+                  className="p-1.5 bg-white rounded-full text-gray-700 hover:text-blue-500"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleImageDelete(imageUrl)}
+                  className="p-1.5 bg-white rounded-full text-gray-700 hover:text-red-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+          ))}
+        </div>
+      ) : (
+        !showUploader && (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            No images available
           </div>
-        ))}
-      </div>
+        )
+      )}
 
       {modalImage && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
           onClick={() => setModalImage(null)}
         >
-          <div className="relative max-w-4xl max-h-[90vh]">
+          <div className="relative max-w-4xl w-full h-full">
             <Image
-              src={modalImage}
+              src={`${modalImage}/public`}
               alt="Full size preview"
-              width={1200}
-              height={800}
+              fill
               className="object-contain"
-              onClick={(e) => e.stopPropagation()}
             />
-            <button
-              onClick={() => setModalImage(null)}
-              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white"
-            >
-              ×
-            </button>
           </div>
         </div>
       )}
     </div>
   );
 };
-
-export default ImageManager;
