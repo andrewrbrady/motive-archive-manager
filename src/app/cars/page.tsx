@@ -56,7 +56,6 @@ interface FilterParams {
   make?: string;
   minYear?: string;
   maxYear?: string;
-  condition?: string;
   clientId?: string;
   engineFeatures?: string;
   minPrice?: string;
@@ -114,20 +113,26 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       query.make = { $regex: filters.make, $options: "i" };
     }
 
+    // Handle year filter
     if (filters.minYear || filters.maxYear) {
       query.year = {};
-      if (filters.minYear) query.year.$gte = parseInt(filters.minYear);
-      if (filters.maxYear) query.year.$lte = parseInt(filters.maxYear);
+      if (filters.minYear) {
+        query.year.$gte = Number(filters.minYear);
+      }
+      if (filters.maxYear) {
+        query.year.$lte = Number(filters.maxYear);
+      }
     }
 
+    // Handle price filter
     if (filters.minPrice || filters.maxPrice) {
       query.price = {};
-      if (filters.minPrice) query.price.$gte = parseInt(filters.minPrice);
-      if (filters.maxPrice) query.price.$lte = parseInt(filters.maxPrice);
-    }
-
-    if (filters.condition) {
-      query.condition = filters.condition;
+      if (filters.minPrice) {
+        query.price.$gte = Number(filters.minPrice);
+      }
+      if (filters.maxPrice) {
+        query.price.$lte = Number(filters.maxPrice);
+      }
     }
 
     if (filters.clientId) {
@@ -142,6 +147,9 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       query.status = filters.status;
     }
 
+    console.log("Filters:", filters);
+    console.log("MongoDB query:", JSON.stringify(query, null, 2));
+
     const pipeline = [
       { $match: query },
       {
@@ -153,9 +161,9 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
         },
       },
       { $unwind: { path: "$clientInfo", preserveNullAndEmptyArrays: true } },
+      { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: pageSize },
-      { $sort: { createdAt: -1 } },
     ];
 
     const cars = await collection.aggregate(pipeline).toArray();
@@ -190,7 +198,6 @@ export default async function CarsPage({
       make: resolvedParams.make?.toString(),
       minYear: resolvedParams.minYear?.toString(),
       maxYear: resolvedParams.maxYear?.toString(),
-      condition: resolvedParams.condition?.toString(),
       clientId: resolvedParams.clientId?.toString(),
       engineFeatures: resolvedParams.engineFeatures?.toString(),
       minPrice: resolvedParams.minPrice?.toString(),
@@ -232,7 +239,6 @@ export default async function CarsPage({
                 make: filters.make || "",
                 minYear: filters.minYear || "",
                 maxYear: filters.maxYear || "",
-                condition: filters.condition || "",
                 clientId: filters.clientId || "",
                 engineFeatures: filters.engineFeatures || "",
                 minPrice: filters.minPrice || "",

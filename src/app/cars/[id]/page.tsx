@@ -658,18 +658,6 @@ export default function CarPage() {
 
           {/* Car Details */}
           <div className="space-y-6">
-            <section>
-              <h2 className="text-3xl font-bold">
-                {car.year} {car.make} {car.model}
-                {car.type && (
-                  <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
-                    {car.type}
-                  </span>
-                )}
-              </h2>
-              <p className="text-2xl font-semibold mt-2">{car.price}</p>
-            </section>
-
             <section className="space-y-4">
               <h2 className="text-xl font-semibold">Vehicle Details</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -679,6 +667,8 @@ export default function CarPage() {
                 <div>{car.model}</div>
                 <div className="font-medium">Year:</div>
                 <div>{car.year}</div>
+                <div className="font-medium">Price:</div>
+                <div>{car.price}</div>
                 {car.vin && (
                   <>
                     <div className="font-medium">VIN:</div>
