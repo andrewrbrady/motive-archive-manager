@@ -3,14 +3,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { logos } from "@/data/site-content";
 
-export default function Navbar() {
+interface NavbarProps {
+  className?: string;
+}
+
+export default function Navbar({ className }: NavbarProps) {
   return (
     <>
       {/* Spacer div to prevent content from going under navbar */}
       <div className="h-20" />
 
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a1f3c] shadow-lg">
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 bg-[#1a1f3c] shadow-lg ${
+          className || ""
+        }`}
+      >
         <div className="max-w-7xl mx-auto flex justify-between items-center h-20 px-4">
           <div className="flex items-center space-x-12">
             <Link href="/" className="shrink-0">

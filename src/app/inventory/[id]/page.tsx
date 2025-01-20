@@ -58,7 +58,15 @@ export default function InventoryItemPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <ImageGallery
-            images={item.images}
+            images={(item.images || []).map((url) => ({
+              id: url,
+              url,
+              filename: url.split("/").pop() || "",
+              metadata: {},
+              variants: {},
+              createdAt: item.timestamp || new Date().toISOString(),
+              updatedAt: item.timestamp || new Date().toISOString(),
+            }))}
             title={`${item.year} ${item.make} ${item.model}`}
             aspectRatio="16/9"
           />

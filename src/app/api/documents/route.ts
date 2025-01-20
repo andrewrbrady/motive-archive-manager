@@ -1,7 +1,12 @@
 // app/api/documents/[id]/route.ts
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { ObjectId, UpdateFilter } from "mongodb";
+
+interface CarDocument {
+  _id: ObjectId;
+  documents: ObjectId[];
+}
 
 // Helper function to safely get ID
 const getDocumentId = async (params: { id: string }) => {
@@ -125,12 +130,15 @@ export async function DELETE(
     }
 
     // Update car
+    const updateDoc: UpdateFilter<CarDocument> = {
+      $pull: {
+        documents: documentId,
+      },
+    };
+
     await db
-      .collection("cars")
-      .updateOne(
-        { _id: new ObjectId(body.carId) },
-        { $pull: { documents: new ObjectId(documentId) } }
-      );
+      .collection<CarDocument>("cars")
+      .updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
 
     // Delete document
     const result = await db

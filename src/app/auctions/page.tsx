@@ -4,7 +4,6 @@ import { fetchMakes } from "@/lib/fetchMakes";
 import { fetchPlatforms } from "@/lib/fetchPlatforms";
 import Pagination from "@/components/Pagination";
 import Navbar from "@/components/layout/navbar";
-import { AuctionCard } from "@/components/auctions/AuctionCard";
 import Footer from "@/components/layout/footer";
 import { FiltersSection } from "@/components/auctions/FiltersSection";
 import { ViewModeSelector } from "@/components/ViewModeSelector";

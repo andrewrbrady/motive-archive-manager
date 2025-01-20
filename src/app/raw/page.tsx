@@ -1,11 +1,11 @@
 "use client";
-import React from "react";
+import React, { useCallback, useEffect } from "react";
 import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import AssetRow from "@/components/raw/AssetRow";
 import Pagination from "@/components/Pagination";
 import { FuzzySearchBar } from "@/components/SearchBar";
-import { PencilIcon, ArrowDown, ArrowUp } from "lucide-react";
+import { PencilIcon } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import _ from "lodash";
 
@@ -51,323 +51,222 @@ const RawPage: React.FC = () => {
   );
   const [pagination, setPagination] = React.useState<PaginationData>({
     total: 0,
-    page: 1,
-    limit: parseInt(searchParams.get("limit") || "10"),
-    totalPages: 1,
+    page: Number(searchParams.get("page")) || 1,
+    limit: Number(searchParams.get("limit")) || 10,
+    totalPages: 0,
   });
 
-  const createQueryString = (params: {
-    [key: string]: string | number | null;
-  }) => {
-    const current = new URLSearchParams(Array.from(searchParams.entries()));
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value === null) {
-        current.delete(key);
-      } else {
-        current.set(key, String(value));
-      }
-    });
-
-    return current.toString();
-  };
-
-  const fetchAssets = async (
-    page: number = 1,
-    search: string = searchTerm,
-    field: SortField = sortField,
-    direction: SortDirection = sortDirection,
-    limit: number = pagination.limit
-  ) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const queryString = createQueryString({
-        page,
-        search: search || null,
-        sortField: field,
-        sortDirection: direction,
-        limit,
+  const createQueryString = useCallback(
+    (params: { [key: string]: string | number | null }) => {
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === null) {
+          newSearchParams.delete(key);
+        } else {
+          newSearchParams.set(key, String(value));
+        }
       });
-      router.push(`${pathname}?${queryString}`);
-
-      const response = await fetch(
-        `/api/assets?page=${page}&limit=${limit}&search=${encodeURIComponent(
-          search
-        )}&sortField=${field}&sortDirection=${direction}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch assets");
-      }
-      const data = await response.json();
-      setAssets(data.assets);
-      setPagination({ ...data.pagination, limit });
-
-      // Update search suggestions based on all asset names
-      const uniqueNames = _.uniq(data.assets.map((asset: Asset) => asset.name));
-      setSearchSuggestions(uniqueNames);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const debouncedFetch = React.useCallback(
-    _.debounce((searchValue: string) => {
-      fetchAssets(1, searchValue, sortField, sortDirection, pagination.limit);
-    }, 300),
-    [sortField, sortDirection, pagination.limit]
+      return newSearchParams.toString();
+    },
+    [searchParams]
   );
 
-  const handleSort = () => {
-    if (sortField === "name") {
-      setSortField("createdAt");
-      setSortDirection("desc");
-      fetchAssets(
-        pagination.page,
-        searchTerm,
-        "createdAt",
-        "desc",
-        pagination.limit
-      );
-      return;
-    }
+  const fetchAssets = useCallback(
+    async (
+      page: number = 1,
+      search: string = searchTerm,
+      field: SortField = sortField,
+      direction: SortDirection = sortDirection,
+      limit: number = pagination.limit
+    ) => {
+      setLoading(true);
+      setError(null);
 
-    let newDirection: SortDirection;
-    if (sortDirection === "asc") {
-      newDirection = "desc";
-    } else if (sortDirection === "desc") {
-      setSortField("name");
-      setSortDirection("desc");
-      fetchAssets(
-        pagination.page,
-        searchTerm,
-        "name",
-        "desc",
-        pagination.limit
-      );
-      return;
-    } else {
-      newDirection = "asc";
-    }
+      try {
+        const queryString = createQueryString({
+          page,
+          search: search || null,
+          sortField: field,
+          sortDirection: direction,
+          limit,
+        });
 
-    setSortDirection(newDirection);
-    fetchAssets(
-      pagination.page,
-      searchTerm,
-      "createdAt",
-      newDirection,
-      pagination.limit
-    );
-  };
+        const response = await fetch(`/api/assets?${queryString}`);
+        if (!response.ok) throw new Error("Failed to fetch assets");
+
+        const data = await response.json();
+        setAssets(data.assets);
+        setPagination({
+          total: data.total,
+          page: data.page,
+          limit: data.limit,
+          totalPages: data.totalPages,
+        });
+
+        // Update search suggestions based on all asset names
+        const uniqueNames = _.uniq(
+          data.assets.map((asset: Asset) => asset.name)
+        ) as string[];
+        setSearchSuggestions(uniqueNames);
+      } catch (err) {
+        setError("Failed to fetch assets");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [searchTerm, sortField, sortDirection, pagination.limit, createQueryString]
+  );
+
+  useEffect(() => {
+    fetchAssets(pagination.page);
+  }, [fetchAssets, pagination.page, searchParams]);
 
   const handleSearch = () => {
-    fetchAssets(1, searchTerm, sortField, sortDirection, pagination.limit);
+    router.push(
+      `${pathname}?${createQueryString({ page: 1, search: searchTerm })}`
+    );
   };
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
-    if (value.length >= 2) {
-      debouncedFetch(value);
+    if (!value) {
+      router.push(
+        `${pathname}?${createQueryString({ search: null, page: 1 })}`
+      );
     }
   };
 
   const handlePageChange = (page: number) => {
-    fetchAssets(page, searchTerm, sortField, sortDirection, pagination.limit);
+    router.push(`${pathname}?${createQueryString({ page })}`);
   };
 
   const handleLimitChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLimit = parseInt(event.target.value);
-    fetchAssets(1, searchTerm, sortField, sortDirection, newLimit);
+    const newLimit = Number(event.target.value);
+    router.push(
+      `${pathname}?${createQueryString({ limit: newLimit, page: 1 })}`
+    );
   };
 
   const deleteAsset = async (id: string) => {
-    if (confirm("Are you sure you want to delete this asset?")) {
-      try {
-        const response = await fetch(`/api/assets/${id}`, {
-          method: "DELETE",
-        });
-        if (!response.ok) {
-          throw new Error("Failed to delete asset");
-        }
-        fetchAssets(
-          pagination.page,
-          searchTerm,
-          sortField,
-          sortDirection,
-          pagination.limit
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
+    try {
+      const response = await fetch(`/api/assets/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete asset");
       }
-    }
-  };
 
-  React.useEffect(() => {
-    const initialPage = parseInt(searchParams.get("page") || "1");
-    const initialSearch = searchParams.get("search") || "";
-    const initialLimit = parseInt(searchParams.get("limit") || "10");
-    const initialSortField =
-      (searchParams.get("sortField") as SortField) || "name";
-    const initialSortDirection =
-      (searchParams.get("sortDirection") as SortDirection) || "desc";
-
-    setSearchTerm(initialSearch);
-    setSortField(initialSortField);
-    setSortDirection(initialSortDirection);
-    fetchAssets(
-      initialPage,
-      initialSearch,
-      initialSortField,
-      initialSortDirection,
-      initialLimit
-    );
-  }, []);
-
-  const getSortIndicator = () => {
-    if (sortField === "name") {
-      return null;
+      // Refetch assets after successful deletion
+      fetchAssets(pagination.page);
+    } catch (err) {
+      setError("Failed to delete asset");
     }
-    if (sortDirection === "asc") {
-      return <ArrowUp className="w-4 h-4 inline-block ml-1" />;
-    }
-    return <ArrowDown className="w-4 h-4 inline-block ml-1" />;
   };
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <div className="h-screen overflow-y-auto">
-        <div className="container mx-auto px-4 py-24">
-          <div className="flex flex-col space-y-4 mb-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-6">
-                <div className="text-sm text-gray-600">
-                  Total Assets: {pagination.total}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <label htmlFor="limit" className="text-sm text-gray-600">
-                    Show:
-                  </label>
-                  <select
-                    id="limit"
-                    value={pagination.limit}
-                    onChange={handleLimitChange}
-                    className="border rounded px-2 py-1 text-sm"
-                  >
-                    {LIMIT_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <label htmlFor="sort" className="text-sm text-gray-600">
-                    Sort by:
-                  </label>
-                  <select
-                    id="sort"
-                    value={`${sortField}-${sortDirection}`}
-                    onChange={(e) => {
-                      const [field, direction] = e.target.value.split("-") as [
-                        SortField,
-                        SortDirection
-                      ];
-                      setSortField(field);
-                      setSortDirection(direction);
-                      fetchAssets(
-                        1,
-                        searchTerm,
-                        field,
-                        direction,
-                        pagination.limit
-                      );
-                    }}
-                    className="border rounded px-2 py-1 text-sm"
-                  >
-                    <option value="name-desc">Name (Z-A)</option>
-                    <option value="name-asc">Name (A-Z)</option>
-                    <option value="createdAt-desc">Newest First</option>
-                    <option value="createdAt-asc">Oldest First</option>
-                  </select>
-                </div>
-              </div>
-              <Link
-                href="/add-asset"
-                className="bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-all duration-200"
-                aria-label="Add New Asset"
-              >
-                <PencilIcon className="w-5 h-5" />
-              </Link>
-            </div>
-            <FuzzySearchBar
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onSearch={handleSearch}
-              suggestions={searchSuggestions}
-              maxSuggestions={5}
-            />
+      <main className="flex-1 container mx-auto px-4 py-8">
+        <div className="flex flex-col space-y-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold">Raw Assets</h1>
+            <Link
+              href="/add-asset"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              <PencilIcon className="w-4 h-4" />
+              Add Asset
+            </Link>
           </div>
 
-          {error && <div className="text-red-500 mb-4">Error: {error}</div>}
-
-          {loading ? (
-            <div className="text-gray-600 mb-4">Loading assets...</div>
-          ) : assets.length === 0 ? (
-            <div className="text-gray-600 mb-4">
-              {searchTerm
-                ? `No assets found matching "${searchTerm}"`
-                : "No assets found."}
+          <div className="flex justify-between items-center gap-4">
+            <div className="flex-1">
+              <FuzzySearchBar
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onSearch={handleSearch}
+                suggestions={searchSuggestions}
+                placeholder="Search assets..."
+              />
             </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto shadow-md rounded-lg mb-8">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3">
-                        Name
-                      </th>
-                      <th scope="col" className="px-6 py-3">
-                        Description
-                      </th>
-                      <th scope="col" className="px-6 py-3">
-                        Location
-                      </th>
-                      <th scope="col" className="px-6 py-3">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assets.map((asset) => (
-                      <AssetRow
-                        key={asset._id}
-                        asset={asset}
-                        deleteAsset={deleteAsset}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <select
+              value={pagination.limit}
+              onChange={handleLimitChange}
+              className="px-3 py-2 border rounded"
+            >
+              {LIMIT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option} per page
+                </option>
+              ))}
+            </select>
+          </div>
 
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-4">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : assets.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-4">
+                      No assets found
+                    </td>
+                  </tr>
+                ) : (
+                  assets.map((asset) => (
+                    <AssetRow
+                      key={asset._id}
+                      asset={asset}
+                      onDelete={() => deleteAsset(asset._id)}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="mt-4">
               <Pagination
                 currentPage={pagination.page}
                 totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
+                pageSize={pagination.limit}
+                onChange={handlePageChange}
+                useUrlPagination={false}
               />
-
-              <div className="text-sm text-gray-600 text-center mt-2">
-                Showing page {pagination.page} of {pagination.totalPages}
-              </div>
-            </>
+            </div>
           )}
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 };
 

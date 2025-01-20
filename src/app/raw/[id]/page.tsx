@@ -8,10 +8,10 @@ import { Loader2 } from "lucide-react";
 
 interface Engine {
   type: string;
-  displacement: string;
-  power_output: string;
-  torque: string;
-  features: string[];
+  displacement?: string;
+  power_output?: string;
+  torque?: string;
+  features?: string[];
 }
 
 interface Car {
@@ -73,11 +73,12 @@ export default function CarPage() {
     fetchCar();
   }, [params.id]);
 
-  const handleImageUpload = async (files: File[]) => {
-    if (!car || !files.length) return;
+  const handleImageUpload = async (fileList: FileList) => {
+    if (!car || !fileList.length) return;
 
     setUploadingImages(true);
     try {
+      const files = Array.from(fileList);
       const formData = new FormData();
       files.forEach((file) => {
         formData.append("images", file);
@@ -104,29 +105,25 @@ export default function CarPage() {
     }
   };
 
-  const handleRemoveImage = async (index: number) => {
-    if (!car) return;
-
+  const handleRemoveImage = async (indices: number[]) => {
     try {
-      const imageToRemove = car.images[index];
+      const index = indices[0]; // We'll handle one image at a time for now
+      const imageUrl = car.images[index];
       const response = await fetch(`/api/cars/${params.id}/images`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ imageUrl: imageToRemove }),
+        body: JSON.stringify({ imageUrl }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to remove image");
+      if (response.ok) {
+        const newImages = [...car.images];
+        newImages.splice(index, 1);
+        setCar({ ...car, images: newImages });
       }
-
-      setCar((prevCar) => ({
-        ...prevCar!,
-        images: prevCar!.images.filter((_, i) => i !== index),
-      }));
-    } catch (err) {
-      console.error("Error removing image:", err);
+    } catch (error) {
+      console.error("Error removing image:", error);
     }
   };
 
@@ -213,7 +210,14 @@ export default function CarPage() {
             </div>
 
             <ImageGallery
-              images={car.images}
+              images={car.images.map((url) => ({
+                id: url,
+                url,
+                filename: url.split("/").pop() || "",
+                metadata: {},
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }))}
               title={`${car.year} ${car.make} ${car.model}`}
               isEditMode={isEditMode}
               onRemoveImage={handleRemoveImage}
@@ -319,6 +323,7 @@ export default function CarPage() {
                             setCar({
                               ...car,
                               engine: {
+                                type: car.engine?.type || "",
                                 ...(car.engine || {}),
                                 displacement: e.target.value,
                               },

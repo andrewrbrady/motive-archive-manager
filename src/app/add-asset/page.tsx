@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
-import { PlusIcon, TrashIcon, UploadIcon } from "lucide-react";
+import { PlusIcon, TrashIcon } from "lucide-react";
 import Papa from "papaparse";
 
 interface LocationPair {
@@ -17,6 +17,12 @@ interface Asset {
   location: { [key: string]: string };
 }
 
+interface CSVRow {
+  date: string;
+  description: string;
+  [key: string]: string;
+}
+
 const AddAssetPage: React.FC = () => {
   const router = useRouter();
   const [name, setName] = useState<string>("");
@@ -27,7 +33,7 @@ const AddAssetPage: React.FC = () => {
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadProgress, _setUploadProgress] = useState<number>(0);
 
   const handleLocationChange = (
     index: number,
@@ -58,62 +64,75 @@ const AddAssetPage: React.FC = () => {
     setSuccess("");
     setLoading(true);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const assets: Asset[] = [];
-        const errors: string[] = [];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const csv = e.target?.result;
+      if (typeof csv !== "string") {
+        setError("Failed to read CSV file");
+        setLoading(false);
+        return;
+      }
 
-        results.data.forEach((row: any, index: number) => {
-          if (!row.date || !row.description) {
-            errors.push(`Row ${index + 1}: Missing required fields`);
+      Papa.parse<CSVRow>(csv, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          const assets: Asset[] = [];
+          const errors: string[] = [];
+
+          results.data.forEach((row, index) => {
+            if (!row.date || !row.description) {
+              errors.push(`Row ${index + 1}: Missing required fields`);
+              return;
+            }
+
+            const asset: Asset = {
+              name: row.date,
+              description: row.description,
+              location: {},
+            };
+
+            // Extract location fields
+            Object.entries(row).forEach(([key, value]) => {
+              if (key !== "date" && key !== "description") {
+                asset.location[key] = value;
+              }
+            });
+
+            assets.push(asset);
+          });
+
+          if (errors.length > 0) {
+            setError(errors.join("\n"));
+            setLoading(false);
             return;
           }
 
-          const locationObj: { [key: string]: string } = {};
-          Object.entries(row).forEach(([key, value]) => {
-            if (key.startsWith("location") && value) {
-              locationObj[`Location ${key.split(" ")[1]}`] = value as string;
+          // Process assets
+          try {
+            for (const asset of assets) {
+              await handleAssetSubmit(asset);
             }
-          });
-
-          assets.push({
-            name: row.date,
-            description: row.description,
-            location: locationObj,
-          });
-        });
-
-        if (errors.length > 0) {
-          setError(`CSV parsing errors:\n${errors.join("\n")}`);
-          setLoading(false);
-          return;
-        }
-
-        try {
-          let successCount = 0;
-          for (const asset of assets) {
-            await handleAssetSubmit(asset);
-            successCount++;
-            setUploadProgress((successCount / assets.length) * 100);
+            setSuccess(`Successfully imported ${assets.length} assets`);
+          } catch {
+            setError("Failed to import assets");
+          } finally {
+            setLoading(false);
           }
-          setSuccess(`Successfully imported ${successCount} assets`);
-          setTimeout(() => router.push("/raw"), 2000);
-        } catch (err) {
-          setError(
-            err instanceof Error ? err.message : "Failed to import assets"
-          );
-        } finally {
+        },
+        error: (error: { message: string }) => {
+          setError(`Failed to parse CSV: ${error.message}`);
           setLoading(false);
-          setUploadProgress(0);
-        }
-      },
-      error: (error: Papa.ParseError) => {
-        setError(`Failed to parse CSV: ${error.message}`);
-        setLoading(false);
-      },
-    });
+        },
+      });
+    };
+
+    reader.onerror = () => {
+      setError("Failed to read CSV file");
+      setLoading(false);
+    };
+
+    reader.readAsText(file);
   };
 
   const handleAssetSubmit = async (asset: Asset) => {
@@ -154,10 +173,8 @@ const AddAssetPage: React.FC = () => {
     try {
       await handleAssetSubmit(asset);
       router.push("/raw");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred"
-      );
+    } catch {
+      setError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }

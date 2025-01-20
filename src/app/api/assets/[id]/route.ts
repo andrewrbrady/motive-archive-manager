@@ -10,14 +10,17 @@ async function getClient() {
   return client;
 }
 
+type RouteContext = {
+  params: {
+    id: string;
+  };
+};
+
 // GET single asset
-export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   let client;
   try {
-    const id = context.params.id;
+    const id = params.id;
     client = await getClient();
     const db = client.db(dbName);
 
@@ -44,13 +47,10 @@ export async function GET(
 }
 
 // PATCH single asset
-export async function PATCH(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   let client;
   try {
-    const id = context.params.id;
+    const id = params.id;
     const data = await request.json();
     const { field, value } = data;
 
@@ -94,13 +94,10 @@ export async function PATCH(
 }
 
 // DELETE single asset
-export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   let client;
   try {
-    const id = context.params.id;
+    const id = params.id;
     client = await getClient();
     const db = client.db(dbName);
 

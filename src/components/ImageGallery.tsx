@@ -53,10 +53,10 @@ interface ImageGalleryProps {
   onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
   uploadProgress?: UploadProgress[];
-  setUploadProgress?: (progress: UploadProgress[]) => void;
+  _setUploadProgress?: (progress: UploadProgress[]) => void;
   showMetadata?: boolean;
   showFilters?: boolean;
-  vehicleInfo?: {
+  _vehicleInfo?: {
     year: number;
     make: string;
     model: string;
@@ -158,10 +158,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onImagesChange,
   uploading = false,
   uploadProgress = [],
-  setUploadProgress,
+  _setUploadProgress,
   showMetadata = true,
   showFilters = true,
-  vehicleInfo,
+  _vehicleInfo,
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -182,21 +182,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
   const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
   const prevImagesLengthRef = useRef(images.length);
-  const prevMainIndexRef = useRef(mainIndex);
+  const _prevMainIndexRef = useRef(mainIndex);
 
   // Handle initial image load and updates
   useEffect(() => {
-    // Only update main index once when transitioning from no images to having images
-    if (
-      prevImagesLengthRef.current === 0 &&
-      images.length > 0 &&
-      !hasSetInitialImage
-    ) {
-      setMainIndex(0); // Always show the first uploaded image
-      setMainImageLoaded(false);
-      setHasSetInitialImage(true);
+    if (images.length > 0 && !hasSetInitialImage) {
       const timer = setTimeout(() => {
-        setMainImageLoaded(true);
+        setMainIndex(0);
+        setMainImageLoaded(false);
+        setHasSetInitialImage(true);
       }, 50);
       return () => clearTimeout(timer);
     }
@@ -207,7 +201,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setHasSetInitialImage(false);
     }
     prevImagesLengthRef.current = images.length;
-  }, [images.length]);
+  }, [images.length, hasSetInitialImage]);
 
   // Only force reload when entering/exiting edit mode
   useEffect(() => {
@@ -350,6 +344,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   }, [isModalOpen, filteredImages.length]);
 
+  const handleDeleteSelected = useCallback(() => {
+    if (onRemoveImage) {
+      onRemoveImage(selectedImages);
+      setSelectedImages([]);
+    }
+  }, [onRemoveImage, selectedImages]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Handle Shift + Arrow combinations first
@@ -392,6 +393,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     currentPage,
     totalPages,
     handlePageChange,
+    isEditMode,
+    selectedImages.length,
+    handleDeleteSelected,
   ]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -426,13 +430,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         return [...prev, index];
       }
     });
-  };
-
-  const handleDeleteSelected = () => {
-    if (onRemoveImage && selectedImages.length > 0) {
-      onRemoveImage(selectedImages);
-      setSelectedImages([]);
-    }
   };
 
   // Remove the mainImageLoaded state changes from thumbnail clicks

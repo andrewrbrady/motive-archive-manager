@@ -6,7 +6,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const query: any = {};
+    interface QueryFilter {
+      make?: { $regex: string; $options: string };
+      year?: { $gte: string; $ne: string };
+      // Add other filter types as needed
+    }
+
+    const query: QueryFilter = {};
 
     // Build query based on search parameters
     const make = searchParams.get("make");

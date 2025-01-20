@@ -930,10 +930,10 @@ export default function CarPage() {
             }}
             uploading={uploadingImages}
             uploadProgress={uploadProgress}
-            setUploadProgress={setUploadProgress}
+            _setUploadProgress={setUploadProgress}
             showMetadata={true}
             showFilters={showFilters}
-            vehicleInfo={{
+            _vehicleInfo={{
               year: car.year,
               make: car.make,
               model: car.model,
