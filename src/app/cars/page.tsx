@@ -349,6 +349,7 @@ export default async function CarsPage({
                 <Pagination
                   currentPage={page}
                   totalPages={Math.ceil(total / pageSize)}
+                  pageSize={pageSize}
                 />
               )}
             </div>
@@ -386,6 +387,7 @@ export default async function CarsPage({
                 <Pagination
                   currentPage={page}
                   totalPages={Math.ceil(total / pageSize)}
+                  pageSize={pageSize}
                 />
               </div>
             )}

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { ObjectId, Document, WithId, UpdateFilter } from "mongodb";
+
+interface CarDocument {
+  _id: ObjectId;
+  documents: ObjectId[];
+}
+
+type Car = WithId<CarDocument>;
 
 export async function GET(
   request: Request,
@@ -64,12 +71,15 @@ export async function DELETE(
     }
 
     // Update the car to remove the document reference
+    const updateDoc: UpdateFilter<CarDocument> = {
+      $pull: {
+        documents: documentId,
+      },
+    };
+
     await db
-      .collection("cars")
-      .updateOne(
-        { _id: new ObjectId(body.carId) },
-        { $pull: { documents: documentId } }
-      );
+      .collection<CarDocument>("cars")
+      .updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
 
     // Delete the document
     const result = await db

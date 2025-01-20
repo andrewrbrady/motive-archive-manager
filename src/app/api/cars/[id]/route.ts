@@ -4,6 +4,29 @@ import { NextResponse } from "next/server";
 const MONGODB_URI = "mongodb://localhost:27017";
 const DB_NAME = "motive_archive";
 
+interface Car {
+  _id: ObjectId;
+  documents: string[];
+  images?: CarImage[];
+  client?: string;
+  clientInfo?: {
+    _id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+  };
+}
+
+interface CarImage {
+  id: string;
+  url: string;
+  filename: string;
+  metadata: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Helper function to get MongoDB client
 async function getMongoClient() {
   const client = new MongoClient(MONGODB_URI);
@@ -28,7 +51,7 @@ export async function GET(
     const objectId = new ObjectId(id);
 
     const db = client.db(DB_NAME);
-    const car = await db.collection("cars").findOne({
+    const car = await db.collection<Car>("cars").findOne({
       _id: objectId,
     });
 
@@ -84,7 +107,7 @@ export async function PUT(
 
     const db = client.db(DB_NAME);
     const result = await db
-      .collection("cars")
+      .collection<Car>("cars")
       .updateOne({ _id: objectId }, { $set: updates });
 
     if (result.matchedCount === 0) {
@@ -92,7 +115,7 @@ export async function PUT(
     }
 
     // Fetch and return the updated car
-    const updatedCar = await db.collection("cars").findOne({
+    const updatedCar = await db.collection<Car>("cars").findOne({
       _id: objectId,
     });
 
@@ -126,7 +149,7 @@ export async function DELETE(
     const db = client.db(DB_NAME);
 
     // First, get the car to check if it exists and get associated documents
-    const car = await db.collection("cars").findOne({
+    const car = await db.collection<Car>("cars").findOne({
       _id: objectId,
     });
 
@@ -142,7 +165,7 @@ export async function DELETE(
     }
 
     // Delete the car
-    await db.collection("cars").deleteOne({
+    await db.collection<Car>("cars").deleteOne({
       _id: objectId,
     });
 
@@ -191,7 +214,7 @@ export async function PATCH(
 
       // Remove document reference from car
       const updateResult = await db
-        .collection("cars")
+        .collection<Car>("cars")
         .updateOne({ _id: objectId }, { $pull: { documents: documentId } });
 
       if (updateResult.matchedCount === 0) {
@@ -216,7 +239,7 @@ export async function PATCH(
       }
 
       const updateResult = await db
-        .collection("cars")
+        .collection<Car>("cars")
         .updateOne({ _id: objectId }, { $set: { images } });
 
       if (updateResult.matchedCount === 0) {
@@ -224,7 +247,7 @@ export async function PATCH(
       }
 
       // Fetch the updated car to return the new state
-      const updatedCar = await db.collection("cars").findOne({
+      const updatedCar = await db.collection<Car>("cars").findOne({
         _id: objectId,
       });
 
@@ -234,7 +257,7 @@ export async function PATCH(
     // Handle general car data updates
     if (Object.keys(updates).length > 0) {
       const updateResult = await db
-        .collection("cars")
+        .collection<Car>("cars")
         .updateOne({ _id: objectId }, { $set: updates });
 
       if (updateResult.matchedCount === 0) {
@@ -242,7 +265,7 @@ export async function PATCH(
       }
 
       // Fetch the updated car to return the new state
-      const updatedCar = await db.collection("cars").findOne({
+      const updatedCar = await db.collection<Car>("cars").findOne({
         _id: objectId,
       });
 

@@ -128,11 +128,11 @@ export async function DELETE(
 
     await client.connect();
     const database = client.db("motive_archive");
-    const collection = database.collection("cars");
+    const collection = database.collection<CarDocument>("cars");
 
     const result = await collection.updateOne(
       { _id: new ObjectId(id) },
-      { $pull: { images: imageUrl } }
+      { $pull: { images: { url: imageUrl } } }
     );
 
     if (result.matchedCount === 0) {

@@ -52,7 +52,7 @@ export function FiltersSection({
   >({
     ...currentFilters,
     platformId: currentFilters.platformId,
-    noReserveOnly: currentFilters.noReserve,
+    noReserve: currentFilters.noReserve,
     endDate: currentFilters.endDate || "",
   });
 
@@ -94,7 +94,7 @@ export function FiltersSection({
     setOrDeleteParam("platformId", newFilters.platformId);
     setOrDeleteParam("minYear", newFilters.minYear);
     setOrDeleteParam("maxYear", newFilters.maxYear);
-    setOrDeleteParam("noReserve", newFilters.noReserveOnly);
+    setOrDeleteParam("noReserve", newFilters.noReserve);
 
     // Preserve the search parameter if it exists
     const search = searchParams.get("search");
@@ -223,10 +223,8 @@ export function FiltersSection({
           <input
             type="checkbox"
             id="noReserve"
-            checked={filters.noReserveOnly}
-            onChange={(e) =>
-              handleFilterChange("noReserveOnly", e.target.checked)
-            }
+            checked={filters.noReserve}
+            onChange={(e) => handleFilterChange("noReserve", e.target.checked)}
             className="h-4 w-4 text-blue-600 border-gray-300 rounded"
           />
           <label

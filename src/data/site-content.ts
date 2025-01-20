@@ -1,3 +1,14 @@
+export interface Project {
+  id: string;
+  title: string;
+  client: string;
+  description: string;
+  thumbnailUrl: string;
+  slug: string;
+  createdAt: string;
+  category: string;
+}
+
 export const logos = {
   primary:
     "https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/af203ac4-b939-4cd0-6e36-72aaad147d00/public",

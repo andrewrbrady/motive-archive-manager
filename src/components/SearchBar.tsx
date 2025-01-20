@@ -11,6 +11,7 @@ interface SearchBarProps {
   onSearch: () => void;
   suggestions?: string[];
   maxSuggestions?: number;
+  placeholder?: string;
 }
 
 export const FuzzySearchBar: React.FC<SearchBarProps> = ({
@@ -19,6 +20,7 @@ export const FuzzySearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   suggestions = [],
   maxSuggestions = 5,
+  placeholder = "Search...",
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
@@ -127,7 +129,7 @@ export const FuzzySearchBar: React.FC<SearchBarProps> = ({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => value && setShowSuggestions(true)}
-        placeholder="Search assets..."
+        placeholder={placeholder}
         className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-red-500"
       />
       <button

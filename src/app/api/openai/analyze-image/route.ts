@@ -23,12 +23,15 @@ const allowedValues = {
   side: ["driver", "passenger", "rear", "overhead"],
 } as const;
 
+type AllowedField = keyof typeof allowedValues;
+type AllowedValues = (typeof allowedValues)[AllowedField][number];
+
 function cleanMarkdownJSON(text: string | null | undefined): string {
   if (!text) return "{}";
   return text.replace(/```(json)?\n?|\n```$/g, "").trim();
 }
 
-function normalizeValue(field: string, value: string): string {
+function normalizeValue(field: AllowedField, value: string): string {
   if (!value) return "";
 
   const normalizedValue = value.toLowerCase().trim();
@@ -64,11 +67,7 @@ function normalizeValue(field: string, value: string): string {
       break;
   }
 
-  // Return the value if it's in the allowed values, otherwise return empty string
-  const allowedForField = allowedValues[field as keyof typeof allowedValues];
-  return allowedForField?.includes(
-    normalizedValue as (typeof allowedForField)[number]
-  )
+  return (allowedValues[field] as readonly string[]).includes(normalizedValue)
     ? normalizedValue
     : "";
 }

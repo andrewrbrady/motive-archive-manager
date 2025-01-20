@@ -26,7 +26,11 @@ export interface Auction {
 }
 
 export const fetchAuctions = cache(
-  async (page: number, pageSize: number, filters: any = {}) => {
+  async (
+    page: number,
+    pageSize: number,
+    filters: Record<string, unknown> = {}
+  ) => {
     try {
       const baseUrl =
         typeof window !== "undefined"
@@ -41,11 +45,10 @@ export const fetchAuctions = cache(
       // Handle filters
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== "") {
-          if (key === "endDate") {
-            // Pass endDate directly as a string value
+          if (key === "endDate" && typeof value === "string") {
             params.set("endDate", value);
           } else {
-            params.set(key, value.toString());
+            params.set(key, String(value));
           }
         }
       });
