@@ -85,12 +85,16 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
 
     // Handle year filter
     if (filters.minYear || filters.maxYear) {
-      query.year = {};
-      if (filters.minYear) {
-        (query.year as Record<string, number>).$gte = Number(filters.minYear);
+      query.year = {
+        $type: "number", // Only match numeric years
+      };
+      if (filters.minYear && filters.minYear.trim() !== "") {
+        (query.year as Record<string, number>).$gte =
+          Number(filters.minYear) || 1900;
       }
-      if (filters.maxYear) {
-        (query.year as Record<string, number>).$lte = Number(filters.maxYear);
+      if (filters.maxYear && filters.maxYear.trim() !== "") {
+        (query.year as Record<string, number>).$lte =
+          Number(filters.maxYear) || new Date().getFullYear() + 1;
       }
     }
 
@@ -99,15 +103,13 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       query.price = {
         $type: "number", // Only match numeric prices
       };
-      if (filters.minPrice) {
-        (query.price as Record<string, unknown>).$gte = Number(
-          filters.minPrice
-        );
+      if (filters.minPrice && filters.minPrice.trim() !== "") {
+        (query.price as Record<string, unknown>).$gte =
+          Number(filters.minPrice) || 0;
       }
-      if (filters.maxPrice) {
-        (query.price as Record<string, unknown>).$lte = Number(
-          filters.maxPrice
-        );
+      if (filters.maxPrice && filters.maxPrice.trim() !== "") {
+        (query.price as Record<string, unknown>).$lte =
+          Number(filters.maxPrice) || Number.MAX_SAFE_INTEGER;
       }
     }
 
@@ -182,7 +184,9 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
                 ],
               },
               { $toInt: "$year" },
-              "$year",
+              {
+                $cond: [{ $eq: [{ $type: "$year" }, "number"] }, "$year", null],
+              },
             ],
           },
           price: {
@@ -195,7 +199,13 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
                 ],
               },
               { $toDouble: "$price" },
-              "$price",
+              {
+                $cond: [
+                  { $eq: [{ $type: "$price" }, "number"] },
+                  "$price",
+                  null,
+                ],
+              },
             ],
           },
           mileage: {
@@ -210,7 +220,13 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
                 ],
               },
               { $toDouble: "$mileage" },
-              "$mileage",
+              {
+                $cond: [
+                  { $eq: [{ $type: "$mileage" }, "number"] },
+                  "$mileage",
+                  null,
+                ],
+              },
             ],
           },
           horsepower: {
@@ -223,7 +239,13 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
                 ],
               },
               { $toInt: "$horsepower" },
-              "$horsepower",
+              {
+                $cond: [
+                  { $eq: [{ $type: "$horsepower" }, "number"] },
+                  "$horsepower",
+                  null,
+                ],
+              },
             ],
           },
         },
