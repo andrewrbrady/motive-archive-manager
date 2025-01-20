@@ -9,9 +9,9 @@ const Car =
       {
         make: String,
         model: String,
-        year: String,
-        price: String,
-        mileage: String,
+        year: Number,
+        price: Number,
+        mileage: Number,
         color: String,
         engine: {
           type: String,
@@ -30,9 +30,22 @@ const Car =
         description: String,
         history_report: String,
         images: [String],
+        type: String,
+        vin: String,
+        interior_color: String,
+        client: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Client",
+        },
+        status: {
+          type: String,
+          enum: ["available", "sold", "pending"],
+          default: "available",
+        },
       },
       {
         collection: "cars",
+        timestamps: true,
       }
     )
   );

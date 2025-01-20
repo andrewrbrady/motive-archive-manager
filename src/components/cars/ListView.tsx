@@ -1,18 +1,13 @@
 import React from "react";
-import Link from "next/link";
 import { Car } from "@/types/car";
+import Link from "next/link";
 
 interface ListViewProps {
   cars: Car[];
+  currentSearchParams: string;
 }
 
-const ListView: React.FC<ListViewProps> = ({ cars }) => {
-  // Helper function to safely get the ID
-  const getCarId = (car: Car) => {
-    if (typeof car._id === "string") return car._id;
-    return car._id?.$oid || car._id?.toString();
-  };
-
+export default function ListView({ cars, currentSearchParams }: ListViewProps) {
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -33,39 +28,40 @@ const ListView: React.FC<ListViewProps> = ({ cars }) => {
         </thead>
         <tbody>
           {cars.map((car) => (
-            <tr key={getCarId(car)} className="hover:bg-gray-50">
-              <td className="py-2 px-3 border">{car.year}</td>
-              <td className="py-2 px-3 border">{car.make}</td>
+            <tr key={car._id} className="border-b hover:bg-gray-50">
               <td className="py-2 px-3 border">
                 <Link
-                  href={`/cars/${getCarId(car)}`}
-                  className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  href={`/cars/${car._id}?${currentSearchParams}`}
+                  className="text-blue-600 hover:text-blue-800"
                 >
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold truncate">
-                      {car.year} {car.make} {car.model}
-                      {car.type && (
-                        <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
-                          {car.type}
-                        </span>
-                      )}
-                    </h3>
-                    <div className="mt-2 space-y-1.5">
-                  </div>
+                  {car.year}
                 </Link>
               </td>
-              <td className="py-2 px-3 text-right border">
-                {car.price === "P.O.A."
-                  ? "P.O.A."
-                  : `$${Number(car.price).toLocaleString()}`}
+              <td className="py-2 px-3 border">{car.make}</td>
+              <td className="py-2 px-3 border">
+                {car.model}
+                {car.type && (
+                  <span className="text-xs uppercase text-gray-500 ml-1">
+                    {car.type}
+                  </span>
+                )}
               </td>
               <td className="py-2 px-3 text-right border">
-                {Number(car.mileage).toLocaleString()}
+                {typeof car.price === "number"
+                  ? `$${car.price.toLocaleString()}`
+                  : car.price}
               </td>
               <td className="py-2 px-3 text-right border">
-                {car.horsepower || "-"}
+                {typeof car.mileage === "number"
+                  ? `${car.mileage.toLocaleString()}`
+                  : car.mileage || "-"}
               </td>
-              <td className="py-2 px-3 border">{car.color || "-"}</td>
+              <td className="py-2 px-3 text-right border">
+                {typeof car.horsepower === "number"
+                  ? car.horsepower.toLocaleString()
+                  : car.horsepower || "-"}
+              </td>
+              <td className="py-2 px-3 border">{car.color}</td>
               <td className="py-2 px-3 border">{car.condition || "-"}</td>
               <td className="py-2 px-3 border">{car.location || "-"}</td>
             </tr>
@@ -74,6 +70,4 @@ const ListView: React.FC<ListViewProps> = ({ cars }) => {
       </table>
     </div>
   );
-};
-
-export default ListView;
+}
