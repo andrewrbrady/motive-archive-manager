@@ -4,6 +4,8 @@ import { MongoClient } from "mongodb";
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const dbName = "motive_archive";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const client = new MongoClient(uri);
   try {

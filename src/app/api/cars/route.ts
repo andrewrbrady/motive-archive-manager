@@ -2,6 +2,8 @@ import { MongoClient } from "mongodb";
 import { NextResponse } from "next/server";
 
 // app/api/cars/route.ts
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
