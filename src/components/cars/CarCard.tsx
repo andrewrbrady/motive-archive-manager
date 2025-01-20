@@ -6,15 +6,20 @@ import { Car } from "@/types/car";
 
 interface CarCardProps {
   car: Car;
+  currentSearchParams?: string;
 }
 
-const CarCard: React.FC<CarCardProps> = ({ car }) => {
+const CarCard: React.FC<CarCardProps> = ({ car, currentSearchParams }) => {
   const thumbnail =
     car.images && car.images.length > 0 ? `${car.images[0].url}/public` : null;
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-      <Link href={`/cars/${car._id}`}>
+      <Link
+        href={`/cars/${car._id}${
+          currentSearchParams ? `?${currentSearchParams}` : ""
+        }`}
+      >
         <div className="relative w-full h-48">
           {thumbnail ? (
             <Image
@@ -41,7 +46,11 @@ const CarCard: React.FC<CarCardProps> = ({ car }) => {
             )}
           </h3>
           <div className="space-y-1.5">
-            <p className="text-sm text-gray-600">{car.price}</p>
+            <p className="text-sm text-gray-600">
+              {typeof car.price === "number"
+                ? `$${car.price.toLocaleString()}`
+                : car.price}
+            </p>
             {typeof car.mileage === "number" && !isNaN(car.mileage) && (
               <p className="text-sm text-gray-600">
                 {car.mileage.toLocaleString()} miles

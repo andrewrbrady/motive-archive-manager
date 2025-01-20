@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ImageUploader } from "./ImageUploader";
 import { Loader2, Trash2, ZoomIn } from "lucide-react";
 import Image from "next/image";
+import { ImageMetadataEditor } from "./ImageMetadataEditor";
+import { CarImage } from "@/types/car";
 
 interface ImageProgress {
   fileName: string;
   progress: number;
   status: "pending" | "uploading" | "analyzing" | "complete" | "error";
   imageUrl?: string;
-  metadata?: any;
+  metadata?: CarImage["metadata"];
   error?: string;
 }
 
@@ -26,8 +28,8 @@ interface ImageManagerProps {
 export const ImageManager: React.FC<ImageManagerProps> = ({
   onSelect,
   selectedImages = [],
-  maxSelection = 1,
-  showUploader = true,
+  maxSelection = 10,
+  showUploader = false,
   className = "",
   onImageProgress,
 }) => {
@@ -36,6 +38,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchImages();
@@ -150,6 +153,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           <ImageUploader
             onUploadComplete={handleImageUpload}
             onImageProgress={handleImageProgress}
+            maxSelection={maxSelection}
           />
           {uploadProgress.length > 0 && (
             <div className="mt-4 space-y-2">

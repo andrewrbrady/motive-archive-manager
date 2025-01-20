@@ -3,26 +3,11 @@
 import React, { useState } from "react";
 import { ImageManager } from "@/components/ImageManager";
 import { Loader2 } from "lucide-react";
+import { CarImage } from "@/types/car";
 
 interface CarImageEditorProps {
   carId: string;
-  currentImages: {
-    id: string;
-    url: string;
-    filename: string;
-    metadata: {
-      angle?: string;
-      description?: string;
-      movement?: string;
-      tod?: string;
-      view?: string;
-    };
-    variants?: {
-      [key: string]: string;
-    };
-    createdAt: string;
-    updatedAt: string;
-  }[];
+  currentImages: CarImage[];
   onImagesUpdate?: () => void;
 }
 
@@ -31,7 +16,7 @@ interface ImageProgress {
   progress: number;
   status: "pending" | "uploading" | "analyzing" | "complete" | "error";
   imageUrl?: string;
-  metadata?: any;
+  metadata?: CarImage["metadata"];
   error?: string;
 }
 
@@ -128,7 +113,7 @@ export default function CarImageEditor({
       progress.imageUrl &&
       progress.metadata
     ) {
-      const newImage = {
+      const newImage: CarImage = {
         id: progress.imageUrl,
         url: progress.imageUrl,
         filename: progress.fileName,

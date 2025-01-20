@@ -13,44 +13,12 @@ import ViewModeSelector from "@/components/cars/ViewModeSelector";
 import CarImageEditor from "@/components/cars/CarImageEditor";
 import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
+import { Car } from "@/types/car";
 
 export const metadata: Metadata = {
   title: "Cars Collection | Premium Vehicles",
   description: "Browse our exclusive collection of premium and luxury vehicles",
 };
-
-interface Engine {
-  type: string;
-  displacement?: number;
-  features?: string[];
-  transmission?: string;
-  fuelType?: string;
-}
-
-interface Car {
-  _id: string;
-  make: string;
-  model: string;
-  year: number;
-  price: number;
-  mileage: number;
-  color: string;
-  horsepower: number;
-  condition: string;
-  location: string;
-  description: string;
-  images: string[];
-  owner_id?: string;
-  engine?: Engine;
-  clientInfo?: {
-    _id: string;
-    name: string;
-    [key: string]: any;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-  status?: "available" | "sold" | "pending";
-}
 
 interface FilterParams {
   make?: string;
@@ -63,7 +31,7 @@ interface FilterParams {
   status?: string;
 }
 
-function serializeMongoData(data: any): any {
+function serializeMongoData(data: unknown): unknown {
   if (data === null || data === undefined) {
     return data;
   }
@@ -84,14 +52,16 @@ function serializeMongoData(data: any): any {
   }
 
   // Handle ObjectId instances
-  if (data._bsontype === "ObjectID" || data._bsontype === "ObjectId") {
+  if (data && typeof data === "object" && "_bsontype" in data) {
     return data.toString();
   }
 
   // Handle plain objects
   if (typeof data === "object") {
-    const serialized: { [key: string]: any } = {};
-    for (const [key, value] of Object.entries(data)) {
+    const serialized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(
+      data as Record<string, unknown>
+    )) {
       serialized[key] = serializeMongoData(value);
     }
     return serialized;
@@ -107,7 +77,7 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     const collection = db.collection("cars");
 
     const skip = (page - 1) * pageSize;
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
     if (filters.make) {
       query.make = { $regex: filters.make, $options: "i" };
@@ -117,21 +87,27 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     if (filters.minYear || filters.maxYear) {
       query.year = {};
       if (filters.minYear) {
-        query.year.$gte = Number(filters.minYear);
+        (query.year as Record<string, number>).$gte = Number(filters.minYear);
       }
       if (filters.maxYear) {
-        query.year.$lte = Number(filters.maxYear);
+        (query.year as Record<string, number>).$lte = Number(filters.maxYear);
       }
     }
 
     // Handle price filter
     if (filters.minPrice || filters.maxPrice) {
-      query.price = {};
+      query.price = {
+        $type: "number", // Only match numeric prices
+      };
       if (filters.minPrice) {
-        query.price.$gte = Number(filters.minPrice);
+        (query.price as Record<string, unknown>).$gte = Number(
+          filters.minPrice
+        );
       }
       if (filters.maxPrice) {
-        query.price.$lte = Number(filters.maxPrice);
+        (query.price as Record<string, unknown>).$lte = Number(
+          filters.maxPrice
+        );
       }
     }
 
@@ -161,6 +137,97 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
         },
       },
       { $unwind: { path: "$clientInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          images: {
+            $map: {
+              input: {
+                $cond: [
+                  { $isArray: "$images" },
+                  "$images",
+                  { $ifNull: ["$images", []] },
+                ],
+              },
+              as: "img",
+              in: {
+                $cond: [
+                  { $eq: [{ $type: "$$img" }, "string"] },
+                  {
+                    id: "$$img",
+                    url: "$$img",
+                    filename: {
+                      $arrayElemAt: [{ $split: ["$$img", "/"] }, -1],
+                    },
+                    metadata: {},
+                    createdAt: "$createdAt",
+                    updatedAt: "$updatedAt",
+                  },
+                  "$$img",
+                ],
+              },
+            },
+          },
+        },
+      },
+      // Convert any remaining string numbers to actual numbers
+      {
+        $addFields: {
+          year: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: [{ $type: "$year" }, "string"] },
+                  { $ne: ["$year", ""] },
+                  { $regexMatch: { input: "$year", regex: /^\d+$/ } },
+                ],
+              },
+              { $toInt: "$year" },
+              "$year",
+            ],
+          },
+          price: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: [{ $type: "$price" }, "string"] },
+                  { $ne: ["$price", ""] },
+                  { $regexMatch: { input: "$price", regex: /^\d+(\.\d+)?$/ } },
+                ],
+              },
+              { $toDouble: "$price" },
+              "$price",
+            ],
+          },
+          mileage: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: [{ $type: "$mileage" }, "string"] },
+                  { $ne: ["$mileage", ""] },
+                  {
+                    $regexMatch: { input: "$mileage", regex: /^\d+(\.\d+)?$/ },
+                  },
+                ],
+              },
+              { $toDouble: "$mileage" },
+              "$mileage",
+            ],
+          },
+          horsepower: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: [{ $type: "$horsepower" }, "string"] },
+                  { $ne: ["$horsepower", ""] },
+                  { $regexMatch: { input: "$horsepower", regex: /^\d+$/ } },
+                ],
+              },
+              { $toInt: "$horsepower" },
+              "$horsepower",
+            ],
+          },
+        },
+      },
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: pageSize },
@@ -169,8 +236,10 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     const cars = await collection.aggregate(pipeline).toArray();
     const total = await collection.countDocuments(query);
 
+    const serializedCars = serializeMongoData(cars) as unknown as Car[];
+
     return {
-      cars: serializeMongoData(cars),
+      cars: serializedCars,
       total,
     };
   } catch (error) {

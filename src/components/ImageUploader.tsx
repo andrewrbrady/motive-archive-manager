@@ -1,21 +1,24 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
+import { CarImage } from "@/types/car";
+
+interface ImageProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  imageUrl?: string;
+  metadata?: CarImage["metadata"];
+  error?: string;
+}
 
 interface ImageUploaderProps {
-  onUploadComplete?: (imageUrls: string[]) => void;
-  onImageProgress?: (progress: {
-    fileName: string;
-    progress: number;
-    status: "pending" | "uploading" | "analyzing" | "complete" | "error";
-    imageUrl?: string;
-    metadata?: any;
-    error?: string;
-  }) => void;
+  onUploadComplete?: (uploadedUrls: string[]) => void;
+  onImageProgress?: (progress: ImageProgress) => void;
   metadata?: Record<string, string>;
-  maxFiles?: number;
+  maxSelection?: number;
   className?: string;
 }
 
@@ -23,20 +26,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onUploadComplete,
   onImageProgress,
   metadata = {},
-  maxFiles = 10,
+  maxSelection = 10,
   className = "",
 }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       setSelectedFiles((prev) => {
         const newFiles = [...prev, ...acceptedFiles];
-        return newFiles.slice(0, maxFiles);
+        return newFiles.slice(0, maxSelection);
       });
     },
-    [maxFiles]
+    [maxSelection]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -44,7 +48,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     accept: {
       "image/*": [".png", ".jpg", ".jpeg", ".webp"],
     },
-    maxFiles,
+    maxFiles: maxSelection,
   });
 
   const removeFile = (index: number) => {
@@ -75,6 +79,72 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     const data = await response.json();
     return { imageUrl: data.imageUrl, metadata: data.metadata };
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const files = Array.from(e.target.files);
+    if (files.length > maxSelection) {
+      alert(`You can only upload up to ${maxSelection} images at a time.`);
+      return;
+    }
+
+    const uploadPromises = files.map(async (file) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      onImageProgress?.({
+        fileName: file.name,
+        progress: 0,
+        status: "uploading",
+      });
+
+      try {
+        const response = await fetch("/api/cloudflare/images", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to upload image");
+        }
+
+        const data = await response.json();
+        onImageProgress?.({
+          fileName: file.name,
+          progress: 100,
+          status: "complete",
+          imageUrl: data.imageUrl,
+          metadata: data.metadata,
+        });
+
+        return data.imageUrl;
+      } catch (error) {
+        console.error("Error uploading image:", error);
+        onImageProgress?.({
+          fileName: file.name,
+          progress: 0,
+          status: "error",
+          error:
+            error instanceof Error ? error.message : "Failed to upload image",
+        });
+        return null;
+      }
+    });
+
+    const uploadedUrls = (await Promise.all(uploadPromises)).filter(
+      (url): url is string => url !== null
+    );
+
+    if (uploadedUrls.length > 0 && onUploadComplete) {
+      onUploadComplete(uploadedUrls);
+    }
+
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleUpload = async () => {
@@ -184,7 +254,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             Drag and drop images here, or click to browse
           </p>
           <p className="text-xs text-gray-400">
-            Supports: PNG, JPG, JPEG, WebP (max {maxFiles} files)
+            Supports: PNG, JPG, JPEG, WebP (max {maxSelection} files)
           </p>
         </div>
       </div>
@@ -226,6 +296,26 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           </button>
         </div>
       )}
+
+      <div className="relative">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <div className="flex items-center justify-center gap-2">
+            <Upload className="w-4 h-4" />
+            <span>Upload Images</span>
+          </div>
+        </button>
+      </div>
     </div>
   );
 };
