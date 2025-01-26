@@ -45,11 +45,13 @@ export function getApiUrl(path: string): string {
     let baseUrl: string;
 
     if (process.env.VERCEL_URL) {
-      // Using Vercel's deployment URL
+      // Using Vercel's deployment URL - ensure HTTPS
       baseUrl = `https://${process.env.VERCEL_URL}`;
     } else if (process.env.NEXT_PUBLIC_BASE_URL) {
-      // Using configured base URL
-      baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      // Using configured base URL - ensure HTTPS if not localhost
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL.startsWith("http://localhost")
+        ? process.env.NEXT_PUBLIC_BASE_URL
+        : process.env.NEXT_PUBLIC_BASE_URL.replace(/^http:/, "https:");
     } else {
       // Fallback URL
       baseUrl = "https://motive-archive-manager.vercel.app";
