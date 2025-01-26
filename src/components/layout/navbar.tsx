@@ -20,11 +20,11 @@ export default function Navbar({ className }: NavbarProps) {
 
       {/* Navbar */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 bg-[#1a1f3c] dark:bg-gray-900 shadow-lg transition-colors ${
+        className={`fixed top-0 left-0 right-0 z-50 bg-white dark:bg-[#111111] border-b border-gray-200 dark:border-gray-800 ${
           className || ""
         }`}
       >
-        <div className="max-w-7xl mx-auto flex justify-between items-center h-20 px-4">
+        <div className="container mx-auto flex justify-between items-center h-20 px-4">
           <div className="flex items-center space-x-12">
             <Link href="/" className="shrink-0">
               <Image
@@ -38,31 +38,31 @@ export default function Navbar({ className }: NavbarProps) {
             <div className="space-x-8">
               <Link
                 href="/"
-                className="text-sm uppercase tracking-wider text-white hover:text-gray-300 transition-colors"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Home
               </Link>
               <Link
                 href="/cars"
-                className="text-sm uppercase tracking-wider text-white hover:text-gray-300 transition-colors"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Cars
               </Link>
               <Link
                 href="/inventory"
-                className="text-sm uppercase tracking-wider text-white hover:text-gray-300 transition-colors"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Inventory
               </Link>
               <Link
                 href="/auctions"
-                className="text-sm uppercase tracking-wider text-white hover:text-gray-300 transition-colors"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Auctions
               </Link>
               <Link
                 href="/raw"
-                className="text-sm uppercase tracking-wider text-white hover:text-gray-300 transition-colors"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Raw
               </Link>
@@ -71,7 +71,7 @@ export default function Navbar({ className }: NavbarProps) {
           <div className="flex items-center space-x-6">
             <button
               onClick={toggleTheme}
-              className="text-white hover:text-gray-300 transition-colors"
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (
@@ -82,14 +82,14 @@ export default function Navbar({ className }: NavbarProps) {
             </button>
             <a
               href="#"
-              className="hover:text-gray-300 transition-colors text-white"
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               aria-label="Instagram"
             >
               <Instagram className="w-5 h-5" />
             </a>
             <a
               href="#"
-              className="hover:text-gray-300 transition-colors text-white"
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               aria-label="Email"
             >
               <Mail className="w-5 h-5" />

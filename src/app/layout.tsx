@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -30,12 +30,8 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.className} h-full`}>
-        <ThemeProvider>
-          <div className="min-h-screen overflow-x-hidden bg-white dark:bg-gray-900 transition-colors">
-            {children}
-          </div>
-        </ThemeProvider>
+      <body className="bg-white dark:bg-[#111111]">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
