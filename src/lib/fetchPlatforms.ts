@@ -1,4 +1,4 @@
-import { getApiUrl } from "./utils";
+import clientPromise from "@/lib/mongodb";
 
 export interface Platform {
   _id: string;
@@ -9,11 +9,20 @@ export interface Platform {
 
 export async function fetchPlatforms() {
   try {
-    const response = await fetch(getApiUrl("platforms"));
-    if (!response.ok) throw new Error("Failed to fetch platforms");
+    const client = await clientPromise;
+    const db = client.db("motive_archive");
 
-    const platforms = await response.json();
-    return platforms as Platform[];
+    console.log("Fetching platforms from MongoDB...");
+    const platforms = await db.collection("platforms").find({}).toArray();
+
+    console.log(`Successfully fetched ${platforms.length} platforms`);
+
+    return platforms.map((platform) => ({
+      _id: platform._id.toString(),
+      name: platform.name,
+      platformId: platform.platformId,
+      color: "text-gray-600", // Hardcode this for now until we add to DB
+    }));
   } catch (error) {
     console.error("Error fetching platforms:", error);
     throw error;
