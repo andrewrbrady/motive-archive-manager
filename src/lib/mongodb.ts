@@ -1,5 +1,6 @@
 import { MongoClient, ServerApiVersion } from "mongodb";
 
+// Vercel deployment configuration - triggers rebuild
 if (!process.env.MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
