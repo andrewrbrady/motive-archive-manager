@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
+// Force dynamic to prevent caching
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+// Disable Vercel's authentication
+export const config = {
+  api: {
+    auth: false,
+  },
+};
 
 export async function GET() {
   try {
@@ -35,17 +43,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
-
-export async function OPTIONS() {
-  return NextResponse.json(
-    {},
-    {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    }
-  );
 }
