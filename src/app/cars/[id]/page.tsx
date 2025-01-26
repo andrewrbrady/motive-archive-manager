@@ -1452,7 +1452,7 @@ export default function CarPage() {
                 <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600 dark:text-gray-400">
                   Description
                 </h2>
-                <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
                   {car.description}
                 </p>
               </section>

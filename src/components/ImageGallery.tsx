@@ -8,15 +8,14 @@ import {
   ZoomIn,
   Loader2,
   Check,
-  Compass,
-  Eye,
-  Sun,
-  Move,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
 import { UploadProgressDialog } from "./UploadProgressDialog";
 import { ImageMetadata } from "./ImageMetadata";
+import { Button } from "./ui/button";
 
 interface UploadProgress {
   fileName: string;
@@ -117,7 +116,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
-  const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
   const prevImagesLengthRef = useRef(images.length);
   const _prevMainIndexRef = useRef(mainIndex);
 
@@ -126,11 +124,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (images.length > 0) {
       setMainIndex(0);
       setMainImageLoaded(true);
-      setHasSetInitialImage(true);
     } else {
       setMainIndex(0);
       setMainImageLoaded(false);
-      setHasSetInitialImage(false);
     }
     prevImagesLengthRef.current = images.length;
   }, [images.length]);
