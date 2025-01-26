@@ -87,18 +87,10 @@ export function VehicleCard({
     ? `${car.images[0].url}/public`
     : null;
 
-  console.log("Final imageUrl:", imageUrl);
-
   return (
-    <div
-      className={`bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden ${
-        !isGridView ? "flex" : ""
-      }`}
-    >
+    <div className="bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
       <Link {...linkProps}>
-        <div
-          className={`relative ${isGridView ? "aspect-[16/9]" : "w-48 h-48"}`}
-        >
+        <div className="relative aspect-[16/9]">
           {imageUrl ? (
             variant === "car" ? (
               <Image
@@ -124,102 +116,120 @@ export function VehicleCard({
         </div>
       </Link>
 
-      <div className={`p-4 ${!isGridView ? "flex-1" : ""}`}>
-        <Link
-          {...linkProps}
-          className="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-        >
-          {isAuction && auction.title
-            ? auction.title
-            : [vehicle.year, vehicle.make, vehicle.model]
-                .filter(Boolean)
-                .join(" ")}
-          {variant === "car" && car.type && (
-            <span className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-2 font-medium">
-              {car.type}
-            </span>
-          )}
-        </Link>
+      <div className="divide-y divide-gray-200 dark:divide-gray-800">
+        {/* Combined Year Make Model */}
+        <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+            Vehicle
+          </span>
+          <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+            {vehicle.year} {vehicle.make} {vehicle.model}
+          </span>
+        </div>
 
-        {isAuction && auction.excerpt && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {auction.excerpt}
-          </p>
-        )}
-
-        <div className="mt-2 space-y-1">
-          {/* Price/Bid Information */}
-          {isAuction ? (
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Current Bid
-                </div>
-                <div className="font-semibold text-gray-900 dark:text-gray-100">
-                  ${auction.current_bid?.toLocaleString() || "No Bids"}
-                </div>
+        {/* Additional Info */}
+        <div className="grid grid-cols-3 divide-x divide-gray-200 dark:divide-gray-800">
+          {variant === "car" ? (
+            <>
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Type
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                  {car.type || "N/A"}
+                </span>
               </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Time Left
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Color
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                  {car.color || "N/A"}
+                </span>
+              </div>
+              {vehicle.mileage && (
+                <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                    Mileage
+                  </span>
+                  <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                    {vehicle.mileage.toLocaleString()} MILES
+                  </span>
                 </div>
-                <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
+              )}
+            </>
+          ) : variant === "inventory" ? (
+            <>
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Transmission
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                  {inventory.transmission || "N/A"}
+                </span>
+              </div>
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Dealer
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                  {inventory.dealer || "N/A"}
+                </span>
+              </div>
+              {vehicle.mileage && (
+                <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                    Mileage
+                  </span>
+                  <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                    {vehicle.mileage.toLocaleString()} MILES
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Current Bid
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                  ${auction.current_bid?.toLocaleString() || "NO BIDS"}
+                </span>
+              </div>
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Time Left
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium flex items-center uppercase p-2">
                   <Clock className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
                   {getTimeRemaining(auction.end_date)}
-                </div>
+                </span>
               </div>
-            </div>
-          ) : (
-            vehicle.price && (
-              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                ${vehicle.price.toLocaleString()}
-              </p>
-            )
-          )}
-
-          {/* Common Vehicle Details */}
-          {vehicle.mileage && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {vehicle.mileage.toLocaleString()} miles
-            </p>
-          )}
-
-          {/* Variant-specific Details */}
-          {variant === "car" && car.color && car.color !== "NaN" && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Color: {car.color}
-            </p>
-          )}
-
-          {variant === "inventory" && inventory.transmission && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {inventory.transmission}
-            </p>
-          )}
-
-          {/* Dealer/Platform Information */}
-          {variant === "car" && car.clientInfo?.name && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Dealer: {car.clientInfo.name}
-            </p>
-          )}
-
-          {variant === "inventory" && inventory.dealer && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {inventory.dealer}
-            </p>
-          )}
-
-          {isAuction && (
-            <div className="mt-4 flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
-              <div className="flex items-center">
-                <MapPin className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
-                {auction.location || "N/A"}
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Location
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium flex items-center uppercase p-2">
+                  <MapPin className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
+                  {auction.location || "N/A"}
+                </span>
               </div>
-              <div>{auction.platform?.name || "Unknown Platform"}</div>
-            </div>
+            </>
           )}
         </div>
+
+        {/* Price Info */}
+        {!isAuction && vehicle.price && (
+          <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+              Price
+            </span>
+            <span className="text-lg text-gray-700 dark:text-gray-200 font-semibold p-2">
+              ${vehicle.price.toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
