@@ -16,7 +16,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
   showExternalLink = false,
 }) => {
   return (
-    <div className="border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
       <Link href={`/inventory/${item.id}`}>
         <div className="relative aspect-[16/10] w-full mb-6">
           <ImageWithFallback

@@ -56,7 +56,7 @@ export default async function InventoryPage({
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h1 className="text-3xl font-bold">
+              <h1 className="text-lg uppercase tracking-wide font-medium text-gray-900 dark:text-gray-100">
                 Vehicle Inventory ({total} vehicles)
               </h1>
             </div>

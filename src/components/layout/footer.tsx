@@ -1,10 +1,12 @@
+"use client";
+
 import { Instagram, Mail } from "lucide-react";
 import Image from "next/image";
 import { logos } from "@/data/site-content";
 
 export default function Footer() {
   return (
-    <footer className="bg-[#1a1f3c] text-white py-12">
+    <footer className="bg-[#1a1f3c] dark:bg-gray-900 text-white py-12 transition-colors">
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
@@ -16,8 +18,12 @@ export default function Footer() {
               className="w-12 h-12"
             />
             <div className="space-y-1">
-              <p className="text-gray-200">CHICAGO / SAN FRANCISCO</p>
-              <p className="text-gray-200">HELLO@MOTIVEARCHIVE.COM</p>
+              <p className="text-gray-200 dark:text-gray-300">
+                CHICAGO / SAN FRANCISCO
+              </p>
+              <p className="text-gray-200 dark:text-gray-300">
+                HELLO@MOTIVEARCHIVE.COM
+              </p>
             </div>
           </div>
           <div className="flex justify-end space-x-6 items-start">

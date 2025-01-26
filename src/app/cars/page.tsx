@@ -313,13 +313,13 @@ export default async function CarsPage({
     ]);
 
     return (
-      <div className="flex flex-col min-h-screen bg-gray-50">
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navbar />
 
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h1 className="text-3xl font-bold">
+              <h1 className="text-lg uppercase tracking-wide font-medium text-gray-900 dark:text-gray-100">
                 Our Collection ({total.toLocaleString()} vehicles)
               </h1>
               <div className="flex items-center gap-4">

@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,8 +17,25 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark')
+              } else {
+                document.documentElement.classList.remove('dark')
+              }
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.className} h-full`}>
-        <div className="min-h-screen overflow-x-hidden">{children}</div>
+        <ThemeProvider>
+          <div className="min-h-screen overflow-x-hidden bg-white dark:bg-gray-900 transition-colors">
+            {children}
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );
