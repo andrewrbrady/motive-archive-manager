@@ -33,6 +33,9 @@ export function getApiUrl(path: string): string {
     return `http://localhost:3000/api/${cleanPath}`;
   }
 
-  // In production, use relative URL
-  return `/api/${cleanPath}`;
+  // In production, use NEXT_PUBLIC_BASE_URL or the deployment URL
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    "https://motive-archive-manager.vercel.app";
+  return `${baseUrl}/api/${cleanPath}`;
 }
