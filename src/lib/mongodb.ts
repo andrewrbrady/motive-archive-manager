@@ -13,11 +13,8 @@ const options = {
     strict: true,
     deprecationErrors: true,
   },
-  ssl: true,
   tls: true,
-  tlsInsecure: false,
-  minTLSVersion: "TLSv1.2",
-  maxTLSVersion: "TLSv1.3",
+  tlsAllowInvalidCertificates: false,
 };
 
 let client: MongoClient;
