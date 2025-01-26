@@ -4,6 +4,13 @@ import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Dealer } from "@/lib/fetchDealers";
 import { Make } from "@/lib/fetchMakes";
+import {
+  FilterSection,
+  FilterItem,
+  FilterLabel,
+  FilterSelect,
+  FilterInput,
+} from "@/components/ui/FilterSection";
 
 // components/inventory/FiltersSection.tsx
 interface FiltersSectionProps {
@@ -43,9 +50,63 @@ export default function FiltersSection({
   );
 
   const handleFilterChange = (key: string, value: string) => {
-    const newFilters = { ...filters, [key]: value };
+    let newFilters = { ...filters };
+    newFilters[key] = value;
     setFilters(newFilters);
-    applyFilters(newFilters);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Helper function to handle filter parameters
+    const setOrDeleteParam = (
+      key: string,
+      value: string,
+      defaultValue?: string
+    ) => {
+      if (key.includes("Year")) {
+        // For year fields, only update when it's a 4-digit number
+        if (value && /^\d{4}$/.test(value)) {
+          params.set(key, value);
+        } else if (!value) {
+          params.delete(key);
+        }
+      } else if (key.includes("Price") || key.includes("Mileage")) {
+        // For price and mileage fields, update even if empty to preserve partial values
+        if (value && value !== defaultValue) {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
+      } else {
+        // For other fields, only set if non-empty and not default
+        if (value && value !== defaultValue) {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
+      }
+    };
+
+    setOrDeleteParam("make", newFilters.make, "All Makes");
+    setOrDeleteParam("model", newFilters.model);
+    setOrDeleteParam("dealer", newFilters.dealer, "All Dealers");
+    setOrDeleteParam("transmission", newFilters.transmission, "All Types");
+    setOrDeleteParam("minPrice", newFilters.minPrice, "0");
+    setOrDeleteParam("maxPrice", newFilters.maxPrice);
+    setOrDeleteParam("minMileage", newFilters.minMileage, "0");
+    setOrDeleteParam("maxMileage", newFilters.maxMileage);
+    setOrDeleteParam("minYear", newFilters.minYear);
+    setOrDeleteParam("maxYear", newFilters.maxYear);
+
+    // Preserve the search parameter if it exists
+    const search = searchParams.get("search");
+    if (search) {
+      params.set("search", search);
+    }
+
+    // Reset to first page when filters change
+    params.set("page", "1");
+
+    router.push(`/inventory?${params.toString()}`);
   };
 
   const applyFilters = (newFilters: typeof filters) => {
@@ -112,178 +173,114 @@ export default function FiltersSection({
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {/* Make Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Make
-          </label>
-          <select
-            value={filters.make || "All Makes"}
-            onChange={(e) => handleFilterChange("make", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="All Makes">All Makes</option>
-            {makes.map((make) => (
-              <option key={make._id} value={make.name}>
-                {make.name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <FilterSection onClearFilters={clearFilters}>
+      <FilterItem>
+        <FilterLabel>Make</FilterLabel>
+        <FilterSelect
+          value={filters.make || "All Makes"}
+          onChange={(e) => handleFilterChange("make", e.target.value)}
+        >
+          <option value="All Makes">All Makes</option>
+          {makes.map((make) => (
+            <option key={make._id} value={make.name}>
+              {make.name}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
 
-        {/* Model Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Model
-          </label>
-          <input
-            type="text"
-            value={filters.model || ""}
-            onChange={(e) => handleFilterChange("model", e.target.value)}
-            placeholder="Enter model"
-            className="w-full border rounded-md px-3 py-2"
+      <FilterItem>
+        <FilterLabel>Model</FilterLabel>
+        <FilterInput
+          type="text"
+          value={filters.model || ""}
+          onChange={(e) => handleFilterChange("model", e.target.value)}
+          placeholder="Enter model"
+        />
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Year Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
+            type="number"
+            value={filters.minYear || ""}
+            onChange={(e) => handleFilterChange("minYear", e.target.value)}
+            placeholder="Min"
+          />
+          <FilterInput
+            type="number"
+            value={filters.maxYear || ""}
+            onChange={(e) => handleFilterChange("maxYear", e.target.value)}
+            placeholder="Max"
           />
         </div>
+      </FilterItem>
 
-        {/* Dealer Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Dealer
-          </label>
-          <select
-            value={filters.dealer || "All Dealers"}
-            onChange={(e) => handleFilterChange("dealer", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="All Dealers">All Dealers</option>
-            {dealers.map((dealer) => (
-              <option key={dealer._id} value={dealer.name}>
-                {dealer.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Transmission Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Transmission
-          </label>
-          <select
-            value={filters.transmission || "All Types"}
-            onChange={(e) => handleFilterChange("transmission", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            {transmissions.map((transmission) => (
-              <option key={transmission} value={transmission}>
-                {transmission}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Price Range */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Price
-          </label>
-          <input
+      <FilterItem>
+        <FilterLabel>Price Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
             type="number"
             value={filters.minPrice || ""}
             onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-            placeholder="Min Price"
-            className="w-full border rounded-md px-3 py-2"
+            placeholder="Min"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Price
-          </label>
-          <input
+          <FilterInput
             type="number"
             value={filters.maxPrice || ""}
             onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
-            placeholder="Max Price"
-            className="w-full border rounded-md px-3 py-2"
+            placeholder="Max"
           />
         </div>
+      </FilterItem>
 
-        {/* Mileage Range */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Mileage
-          </label>
-          <input
+      <FilterItem>
+        <FilterLabel>Mileage Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
             type="number"
             value={filters.minMileage || ""}
             onChange={(e) => handleFilterChange("minMileage", e.target.value)}
-            placeholder="Min Mileage"
-            className="w-full border rounded-md px-3 py-2"
+            placeholder="Min"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Mileage
-          </label>
-          <input
+          <FilterInput
             type="number"
             value={filters.maxMileage || ""}
             onChange={(e) => handleFilterChange("maxMileage", e.target.value)}
-            placeholder="Max Mileage"
-            className="w-full border rounded-md px-3 py-2"
+            placeholder="Max"
           />
         </div>
+      </FilterItem>
 
-        {/* Year Range */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Year
-          </label>
-          <select
-            value={filters.minYear || ""}
-            onChange={(e) => handleFilterChange("minYear", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Select Year</option>
-            {years.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Year
-          </label>
-          <select
-            value={filters.maxYear || ""}
-            onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Select Year</option>
-            {years.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={clearFilters}
-          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+      <FilterItem>
+        <FilterLabel>Dealer</FilterLabel>
+        <FilterSelect
+          value={filters.dealer || "All Dealers"}
+          onChange={(e) => handleFilterChange("dealer", e.target.value)}
         >
-          Clear Filters
-        </button>
-      </div>
-    </div>
+          <option value="All Dealers">All Dealers</option>
+          {dealers.map((dealer) => (
+            <option key={dealer._id} value={dealer.name}>
+              {dealer.name}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Transmission</FilterLabel>
+        <FilterSelect
+          value={filters.transmission || "All Types"}
+          onChange={(e) => handleFilterChange("transmission", e.target.value)}
+        >
+          {transmissions.map((transmission) => (
+            <option key={transmission} value={transmission}>
+              {transmission}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
+    </FilterSection>
   );
 }

@@ -12,6 +12,7 @@ export interface InventoryPageProps {
     minYear?: string;
     maxYear?: string;
     transmission?: string;
+    view?: string;
   };
 }
 

@@ -4,6 +4,13 @@
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Client } from "@/types/car";
+import {
+  FilterSection,
+  FilterItem,
+  FilterLabel,
+  FilterSelect,
+  FilterInput,
+} from "@/components/ui/FilterSection";
 
 interface CarFiltersSectionProps {
   currentFilters: {
@@ -34,16 +41,33 @@ export default function CarFiltersSection({
       ...filters,
       [field]: value,
     };
+
     setFilters(newFilters);
 
     const params = new URLSearchParams(searchParams.toString());
 
     // Update the URL parameters
     Object.entries(newFilters).forEach(([key, val]) => {
-      if (val && val.trim() !== "") {
+      if (key.includes("Year")) {
+        // For year fields, only update when it's a 4-digit number
+        if (val && /^\d{4}$/.test(val)) {
+          params.set(key, val);
+        } else if (!val) {
+          params.delete(key);
+        }
+      } else if (key.includes("Price")) {
+        // For price fields, update even if empty to preserve partial values
         params.set(key, val);
+        if (!val) {
+          params.delete(key);
+        }
       } else {
-        params.delete(key);
+        // For other fields, only set if non-empty
+        if (val && val.trim() !== "") {
+          params.set(key, val);
+        } else {
+          params.delete(key);
+        }
       }
     });
 
@@ -80,17 +104,19 @@ export default function CarFiltersSection({
     router.push(`/cars?${params.toString()}`);
   };
 
+  const hasActiveFilters = Object.values(filters).some((value) => value !== "");
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Make
-        </label>
-        <select
+    <FilterSection
+      hasActiveFilters={hasActiveFilters}
+      onClearFilters={clearFilters}
+    >
+      <FilterItem>
+        <FilterLabel>Make</FilterLabel>
+        <FilterSelect
           name="make"
-          defaultValue={currentFilters.make}
+          value={filters.make}
           onChange={(e) => handleFilterChange("make", e.target.value)}
-          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="">Any Make</option>
           {makes.map((make) => (
@@ -98,66 +124,55 @@ export default function CarFiltersSection({
               {make}
             </option>
           ))}
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterItem>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Year Range
-        </label>
+      <FilterItem>
+        <FilterLabel>Year Range</FilterLabel>
         <div className="grid grid-cols-2 gap-2">
-          <input
+          <FilterInput
             type="number"
             name="minYear"
             placeholder="Min"
-            defaultValue={currentFilters.minYear}
+            value={filters.minYear}
             onChange={(e) => handleFilterChange("minYear", e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
-          <input
+          <FilterInput
             type="number"
             name="maxYear"
             placeholder="Max"
-            defaultValue={currentFilters.maxYear}
+            value={filters.maxYear}
             onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
         </div>
-      </div>
+      </FilterItem>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Price Range
-        </label>
+      <FilterItem>
+        <FilterLabel>Price Range</FilterLabel>
         <div className="grid grid-cols-2 gap-2">
-          <input
+          <FilterInput
             type="number"
             name="minPrice"
             placeholder="Min"
-            defaultValue={currentFilters.minPrice}
+            value={filters.minPrice}
             onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
-          <input
+          <FilterInput
             type="number"
             name="maxPrice"
             placeholder="Max"
-            defaultValue={currentFilters.maxPrice}
+            value={filters.maxPrice}
             onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
         </div>
-      </div>
+      </FilterItem>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Client
-        </label>
-        <select
+      <FilterItem>
+        <FilterLabel>Client</FilterLabel>
+        <FilterSelect
           name="clientId"
-          defaultValue={currentFilters.clientId}
+          value={filters.clientId}
           onChange={(e) => handleFilterChange("clientId", e.target.value)}
-          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="">Any Client</option>
           {clients.map((client) => (
@@ -165,52 +180,37 @@ export default function CarFiltersSection({
               {client.name}
             </option>
           ))}
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterItem>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Engine Features
-        </label>
-        <select
+      <FilterItem>
+        <FilterLabel>Engine Features</FilterLabel>
+        <FilterSelect
           name="engineFeatures"
-          defaultValue={currentFilters.engineFeatures}
+          value={filters.engineFeatures}
           onChange={(e) => handleFilterChange("engineFeatures", e.target.value)}
-          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="">Any Type</option>
           <option value="turbo">Turbo</option>
           <option value="supercharged">Supercharged</option>
           <option value="hybrid">Hybrid</option>
           <option value="electric">Electric</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterItem>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Status
-        </label>
-        <select
+      <FilterItem>
+        <FilterLabel>Status</FilterLabel>
+        <FilterSelect
           name="status"
-          defaultValue={currentFilters.status}
+          value={filters.status}
           onChange={(e) => handleFilterChange("status", e.target.value)}
-          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
         >
           <option value="">Any Status</option>
           <option value="available">Available</option>
           <option value="sold">Sold</option>
           <option value="pending">Pending</option>
-        </select>
-      </div>
-
-      <div>
-        <button
-          onClick={clearFilters}
-          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
-        >
-          Clear
-        </button>
-      </div>
-    </div>
+        </FilterSelect>
+      </FilterItem>
+    </FilterSection>
   );
 }
