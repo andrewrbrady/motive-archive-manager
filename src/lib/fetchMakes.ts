@@ -15,8 +15,28 @@ export interface Make {
 
 export async function fetchMakes() {
   try {
-    const response = await fetch(getApiUrl("makes"));
-    if (!response.ok) throw new Error("Failed to fetch makes");
+    const url = getApiUrl("makes");
+    console.log("Fetching makes from:", url);
+
+    const response = await fetch(url, {
+      // Add cache control headers
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to fetch makes:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+      });
+      throw new Error(
+        `Failed to fetch makes: ${response.status} ${response.statusText}`
+      );
+    }
 
     const makes = await response.json();
     return makes as Make[];

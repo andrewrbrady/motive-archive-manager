@@ -38,14 +38,25 @@ export function getApiUrl(path: string): string {
 
   // In production
   if (isBrowser) {
-    // Client-side: use window.location
+    // Client-side: use relative URL
     return `/api/${cleanPath}`;
   } else {
-    // Server-side: use process.env.NEXT_PUBLIC_BASE_URL or construct from request headers
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL ||
-        "https://motive-archive-manager.vercel.app";
+    // Server-side: construct absolute URL
+    let baseUrl: string;
+
+    if (process.env.VERCEL_URL) {
+      // Using Vercel's deployment URL
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (process.env.NEXT_PUBLIC_BASE_URL) {
+      // Using configured base URL
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    } else {
+      // Fallback URL
+      baseUrl = "https://motive-archive-manager.vercel.app";
+    }
+
+    // Ensure baseUrl doesn't end with a slash
+    baseUrl = baseUrl.replace(/\/$/, "");
 
     return `${baseUrl}/api/${cleanPath}`;
   }
