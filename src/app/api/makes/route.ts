@@ -1,37 +1,11 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
   try {
-    // Get request headers
-    const headersList = headers();
-    const host = headersList.get("host") || "";
-    const referer = headersList.get("referer") || "";
-
-    // Allow requests from Vercel deployment URLs and localhost
-    const isVercelDeployment = host.endsWith(".vercel.app");
-    const isLocalhost = host.includes("localhost");
-    const isAllowedReferer = referer.includes(host) || referer === "";
-
-    if (!isVercelDeployment && !isLocalhost && !isAllowedReferer) {
-      console.error("Unauthorized request:", { host, referer });
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        {
-          status: 401,
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-          },
-        }
-      );
-    }
-
     const client = await clientPromise;
     const db = client.db("motive_archive");
 
@@ -53,25 +27,12 @@ export async function GET() {
       active: make.active,
     }));
 
-    return NextResponse.json(formattedMakes, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    return NextResponse.json(formattedMakes);
   } catch (error) {
     console.error("Error fetching makes:", error);
     return NextResponse.json(
       { error: "Failed to fetch makes" },
-      {
-        status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        },
-      }
+      { status: 500 }
     );
   }
 }
