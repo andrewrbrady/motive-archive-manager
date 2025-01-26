@@ -11,7 +11,7 @@ export function GridView({ cars, currentSearchParams }: GridViewProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {cars.map((car) => (
-        <InventoryCard key={car.id} item={car} />
+        <InventoryCard key={car.id} item={car} view="grid" />
       ))}
 
       {cars.length === 0 && (
