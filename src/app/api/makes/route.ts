@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
-// Force dynamic to prevent caching
+// Force dynamic to prevent caching and disable authentication
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-// Disable Vercel's authentication
-export const config = {
-  api: {
-    auth: false,
-  },
-};
+export const runtime = "nodejs";
 
 export async function GET() {
   try {
