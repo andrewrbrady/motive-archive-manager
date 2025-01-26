@@ -133,8 +133,8 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
   return (
     <div>
       <div className="overflow-x-auto shadow-md rounded-lg">
-        <table className="w-full text-sm text-left">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+          <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-[#111111]">
             <tr>
               <th className="px-6 py-3">Date</th>
               <th className="px-6 py-3">Merchant</th>
