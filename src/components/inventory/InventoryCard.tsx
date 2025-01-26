@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { InventoryItem } from "./types";
+import { InventoryItem } from "@/types/inventory";
 import { VehicleCard } from "@/components/ui/VehicleCard";
 
 interface InventoryCardProps {
