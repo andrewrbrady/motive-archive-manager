@@ -1,3 +1,4 @@
+// MongoDB configuration v1.0.1
 import { MongoClient, ServerApiVersion } from "mongodb";
 
 // Vercel deployment configuration - triggers rebuild
@@ -13,8 +14,13 @@ const options = {
     strict: true,
     deprecationErrors: true,
   },
-  tls: true,
-  tlsAllowInvalidCertificates: false,
+  // Only use TLS in production
+  ...(process.env.NODE_ENV === "production"
+    ? {
+        tls: true,
+        tlsAllowInvalidCertificates: false,
+      }
+    : {}),
   connectTimeoutMS: 10000,
   socketTimeoutMS: 45000,
   maxPoolSize: 50,
