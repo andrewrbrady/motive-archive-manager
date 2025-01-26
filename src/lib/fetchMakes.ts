@@ -1,5 +1,5 @@
 // lib/fetchMakes.ts
-import { getApiUrl } from "./utils";
+import clientPromise from "@/lib/mongodb";
 
 export interface Make {
   _id: string;
@@ -15,33 +15,29 @@ export interface Make {
 
 export async function fetchMakes() {
   try {
-    const url = getApiUrl("makes");
-    console.log("Fetching makes from:", url);
+    const client = await clientPromise;
+    const db = client.db("motive_archive");
 
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
-      credentials: "include", // Include credentials in the request
-      next: {
-        revalidate: 3600, // Cache for 1 hour
-      },
-    });
+    console.log("Fetching makes from MongoDB...");
+    const makes = await db
+      .collection("makes")
+      .find({ active: true })
+      .sort({ name: 1 })
+      .toArray();
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Failed to fetch makes:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorText,
-      });
-      throw new Error(
-        `Failed to fetch makes: ${response.status} ${response.statusText}`
-      );
-    }
+    console.log(`Successfully fetched ${makes.length} makes`);
 
-    const makes = await response.json();
-    return makes as Make[];
+    return makes.map((make) => ({
+      _id: make._id.toString(),
+      name: make.name,
+      country_of_origin: make.country_of_origin,
+      founded: make.founded,
+      type: make.type,
+      parent_company: make.parent_company,
+      created_at: make.created_at,
+      updated_at: make.updated_at,
+      active: make.active,
+    }));
   } catch (error) {
     console.error("Error fetching makes:", error);
     throw error;
