@@ -14,8 +14,8 @@ type BaseVehicle = {
 
 type Car = BaseVehicle & {
   _id: string;
-  type?: string;
   color?: string;
+  vin?: string;
   clientInfo?: {
     name: string;
   };
@@ -133,30 +133,30 @@ export function VehicleCard({
             <>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Type
+                  Client
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {car.type || "N/A"}
+                  {car.clientInfo?.name || "N/A"}
                 </span>
               </div>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Color
+                  VIN
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {car.color || "N/A"}
+                  {car.vin || "N/A"}
                 </span>
               </div>
-              {vehicle.mileage && (
-                <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                    Mileage
-                  </span>
-                  <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                    {vehicle.mileage.toLocaleString()} MILES
-                  </span>
-                </div>
-              )}
+              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
+                  Mileage
+                </span>
+                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                  {vehicle.mileage
+                    ? `${vehicle.mileage.toLocaleString()} MILES`
+                    : "N/A"}
+                </span>
+              </div>
             </>
           ) : variant === "inventory" ? (
             <>
