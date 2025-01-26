@@ -123,22 +123,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   // Handle initial image load and updates
   useEffect(() => {
-    if (images.length > 0 && !hasSetInitialImage) {
-      const timer = setTimeout(() => {
-        setMainIndex(0);
-        setMainImageLoaded(false);
-        setHasSetInitialImage(true);
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-    // Reset states when there are no images
-    else if (images.length === 0) {
+    if (images.length > 0) {
+      setMainIndex(0);
+      setMainImageLoaded(true);
+      setHasSetInitialImage(true);
+    } else {
       setMainIndex(0);
       setMainImageLoaded(false);
       setHasSetInitialImage(false);
     }
     prevImagesLengthRef.current = images.length;
-  }, [images.length, hasSetInitialImage]);
+  }, [images.length]);
 
   // Only force reload when entering/exiting edit mode
   useEffect(() => {
