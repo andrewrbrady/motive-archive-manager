@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
-// Configure route segment config
-export const config = {
-  runtime: "edge", // Use edge runtime to bypass middleware
-};
+// Use the new runtime export format
+export const runtime = "edge";
 
 export async function GET() {
   let client;
