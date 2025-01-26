@@ -114,22 +114,20 @@ export const fetchAuctions = cache(async function fetchAuctions(
     }
 
     // Handle noReserve filter
-    if (filters.noReserve === true) {
-      query.no_reserve = true;
+    if (filters.noReserve) {
+      query.no_reserve =
+        filters.noReserve === true || filters.noReserve === "true";
     }
 
     // Handle search filter
     if (filters.$or) {
-      const searchConditions = filters.$or.map((condition: any) => {
+      query.$or = filters.$or.map((condition: any) => {
         const field = Object.keys(condition)[0];
+        const value = condition[field].$regex;
         return {
-          [field]: {
-            $regex: String(condition[field].$regex),
-            $options: "i",
-          },
+          [field]: { $regex: String(value), $options: "i" },
         };
       });
-      query.$or = searchConditions;
     }
 
     console.log("MongoDB Query:", JSON.stringify(query, null, 2));

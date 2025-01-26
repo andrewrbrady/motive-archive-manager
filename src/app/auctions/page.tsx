@@ -51,20 +51,26 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
   }
 
   if (params.endDate) {
-    filters.endDate = params.endDate; // Ensure endDate is a string like "24h"
+    filters.endDate = params.endDate;
   }
 
   // Handle noReserve filter
   if (params.noReserve === "true") {
-    filters.no_reserve = true;
+    filters.noReserve = true;
   }
 
   if (params.make && params.make !== "All Makes") {
-    filters.make = { $regex: params.make, $options: "i" };
+    filters.make = params.make;
   }
 
   if (params.model) {
-    filters.model = { $regex: params.model, $options: "i" };
+    filters.model = params.model;
+  }
+
+  // Handle year range filters
+  if (params.minYear || params.maxYear) {
+    filters.minYear = params.minYear;
+    filters.maxYear = params.maxYear;
   }
 
   console.log("Page - Filters:", filters);
