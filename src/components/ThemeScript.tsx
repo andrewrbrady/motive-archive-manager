@@ -9,7 +9,7 @@ export function ThemeScript() {
               if (storedTheme) {
                 return storedTheme;
               }
-              return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+              return 'dark'; // Default to dark instead of checking system preference
             }
 
             const theme = getTheme();
