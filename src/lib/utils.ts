@@ -23,3 +23,16 @@ export function getTimeRemaining(endDate?: string): string {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
 }
+
+export function getApiUrl(path: string): string {
+  // Remove leading slash if present
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
+  // In development, use localhost
+  if (process.env.NODE_ENV === "development") {
+    return `http://localhost:3000/api/${cleanPath}`;
+  }
+
+  // In production, use relative URL
+  return `/api/${cleanPath}`;
+}
