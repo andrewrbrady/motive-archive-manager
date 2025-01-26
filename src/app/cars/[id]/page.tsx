@@ -12,6 +12,7 @@ import { getUnitsForType } from "@/constants/units";
 import { Pencil, Plus } from "lucide-react";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Footer from "@/components/layout/footer";
+import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
 
 interface MeasurementValue {
   value: number | null;
@@ -814,14 +815,7 @@ export default function CarPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen">
-        <Navbar />
-        <div className="flex justify-center items-center h-[calc(100vh-64px)]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-        </div>
-      </div>
-    );
+    return <CarPageSkeleton />;
   }
 
   if (!car) {
