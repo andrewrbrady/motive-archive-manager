@@ -69,13 +69,8 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   // Handle year range filters
   if (params.minYear || params.maxYear) {
-    filters.year = {};
-    if (params.minYear) {
-      filters.year.$gte = Number(params.minYear);
-    }
-    if (params.maxYear) {
-      filters.year.$lte = Number(params.maxYear);
-    }
+    filters.minYear = params.minYear;
+    filters.maxYear = params.maxYear;
   }
 
   console.log("Page - Filters:", filters);

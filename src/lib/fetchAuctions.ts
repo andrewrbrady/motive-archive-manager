@@ -70,11 +70,16 @@ export const fetchAuctions = cache(async function fetchAuctions(
     // Handle year range filters
     if (filters.minYear || filters.maxYear) {
       query.year = {};
-      if (filters.minYear) {
-        query.year.$gte = Number(filters.minYear);
+      if (filters.minYear && !isNaN(parseInt(filters.minYear))) {
+        query.year.$gte = parseInt(filters.minYear);
       }
-      if (filters.maxYear) {
-        query.year.$lte = Number(filters.maxYear);
+      if (filters.maxYear && !isNaN(parseInt(filters.maxYear))) {
+        query.year.$lte = parseInt(filters.maxYear);
+      }
+      // Only delete if we successfully used them
+      if (query.year.$gte || query.year.$lte) {
+        delete filters.minYear;
+        delete filters.maxYear;
       }
     }
 
