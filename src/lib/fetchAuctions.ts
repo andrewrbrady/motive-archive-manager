@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { getApiUrl } from "./utils";
 
 export interface Auction {
   _id: string;
@@ -25,51 +26,33 @@ export interface Auction {
   };
 }
 
-export const fetchAuctions = cache(
-  async (
-    page: number,
-    pageSize: number,
-    filters: Record<string, unknown> = {}
-  ) => {
-    try {
-      const baseUrl =
-        typeof window !== "undefined"
-          ? `${window.location.protocol}//${window.location.host}`
-          : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+export interface AuctionsResponse {
+  auctions: Auction[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
 
-      const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: pageSize.toString(),
-      });
+export const fetchAuctions = cache(async function fetchAuctions(
+  page: number = 1,
+  filters: Record<string, any> = {},
+  pageSize: number = 24
+): Promise<AuctionsResponse> {
+  try {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+      ...filters,
+    });
 
-      // Handle filters
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
-          if (key === "endDate" && typeof value === "string") {
-            params.set("endDate", value);
-          } else {
-            params.set(key, String(value));
-          }
-        }
-      });
+    const response = await fetch(getApiUrl(`auctions?${queryParams}`));
+    if (!response.ok) throw new Error("Failed to fetch auctions");
 
-      const url = `${baseUrl}/api/auctions?${params}`;
-      console.log("Fetching auctions from:", url);
-
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch auctions");
-
-      const data = await response.json();
-      return {
-        results: data.results,
-        total: data.total,
-      };
-    } catch (error) {
-      console.error("Error fetching auctions:", error);
-      return {
-        results: [],
-        total: 0,
-      };
-    }
+    const data = await response.json();
+    return data as AuctionsResponse;
+  } catch (error) {
+    console.error("Error fetching auctions:", error);
+    throw error;
   }
-);
+});

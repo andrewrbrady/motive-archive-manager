@@ -1,5 +1,5 @@
 // lib/fetchMakes.ts
-import clientPromise from "@/lib/mongodb";
+import { getApiUrl } from "./utils";
 
 export interface Make {
   _id: string;
@@ -15,18 +15,13 @@ export interface Make {
 
 export async function fetchMakes() {
   try {
-    const baseUrl =
-      typeof window !== "undefined"
-        ? `${window.location.protocol}//${window.location.host}`
-        : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
-    const response = await fetch(`${baseUrl}/api/makes`);
+    const response = await fetch(getApiUrl("makes"));
     if (!response.ok) throw new Error("Failed to fetch makes");
 
     const makes = await response.json();
     return makes as Make[];
   } catch (error) {
     console.error("Error fetching makes:", error);
-    return [];
+    throw error;
   }
 }
