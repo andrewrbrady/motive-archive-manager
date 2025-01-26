@@ -22,6 +22,7 @@ export async function fetchMakes() {
       headers: {
         Accept: "application/json",
       },
+      credentials: "include", // Include credentials in the request
       next: {
         revalidate: 3600, // Cache for 1 hour
       },
