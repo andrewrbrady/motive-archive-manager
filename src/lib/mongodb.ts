@@ -1,20 +1,11 @@
-import { MongoClient, ServerApiVersion, MongoClientOptions } from "mongodb";
+import { MongoClient, ServerApiVersion } from "mongodb";
 
 if (!process.env.MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
 
 const uri = process.env.MONGODB_URI;
-const options: MongoClientOptions = {
-  ssl: true,
-  tls: true,
-  tlsAllowInvalidCertificates: false,
-  minPoolSize: 1,
-  maxPoolSize: 10,
-  retryWrites: true,
-  writeConcern: {
-    w: "majority",
-  },
+const options = {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
