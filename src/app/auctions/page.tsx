@@ -69,12 +69,13 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   console.log("Page - Filters:", filters);
 
-  const [{ results: auctions, total }, makes, platforms] = await Promise.all([
-    fetchAuctions(page, pageSize, filters),
+  const [auctionsResponse, makes, platforms] = await Promise.all([
+    fetchAuctions(page, filters, pageSize),
     fetchMakes(),
     fetchPlatforms(),
   ]);
 
+  const { auctions, total } = auctionsResponse;
   console.log("Page - Received auctions:", auctions?.length, "Total:", total);
 
   const totalPages = Math.ceil(total / pageSize);
