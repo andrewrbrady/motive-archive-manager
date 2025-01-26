@@ -28,14 +28,25 @@ export function getApiUrl(path: string): string {
   // Remove leading slash if present
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
-  // In development, use localhost
+  // Check if we're in a browser environment
+  const isBrowser = typeof window !== "undefined";
+
+  // In development
   if (process.env.NODE_ENV === "development") {
     return `http://localhost:3000/api/${cleanPath}`;
   }
 
-  // In production, use NEXT_PUBLIC_BASE_URL or the deployment URL
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    "https://motive-archive-manager.vercel.app";
-  return `${baseUrl}/api/${cleanPath}`;
+  // In production
+  if (isBrowser) {
+    // Client-side: use window.location
+    return `/api/${cleanPath}`;
+  } else {
+    // Server-side: use process.env.NEXT_PUBLIC_BASE_URL or construct from request headers
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL ||
+        "https://motive-archive-manager.vercel.app";
+
+    return `${baseUrl}/api/${cleanPath}`;
+  }
 }
