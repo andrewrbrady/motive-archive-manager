@@ -781,7 +781,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     style={{ aspectRatio }}
                   >
                     <img
-                      src={`${image.url}/public`}
+                      src={`${image.url.replace("/public", "")}/width=200`}
                       alt={`Image ${actualIndex + 1}`}
                       className={cn(
                         "w-full h-full object-cover rounded-lg transition-all duration-300",
