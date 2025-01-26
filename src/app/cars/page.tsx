@@ -9,11 +9,12 @@ import { fetchClients } from "@/lib/fetchClients";
 import CarFiltersSection from "@/components/cars/CarFiltersSection";
 import Footer from "@/components/layout/footer";
 import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
-import ViewModeSelector from "@/components/cars/ViewModeSelector";
+import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import CarImageEditor from "@/components/cars/CarImageEditor";
 import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
 import { Car } from "@/types/car";
+import { PageTitle } from "@/components/ui/PageTitle";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -181,15 +182,26 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
             $cond: [
               {
                 $and: [
-                  { $eq: [{ $type: "$year" }, "string"] },
+                  { $ne: [{ $type: "$year" }, "missing"] },
+                  { $ne: ["$year", null] },
                   { $ne: ["$year", ""] },
-                  { $regexMatch: { input: "$year", regex: /^\d+$/ } },
+                  {
+                    $cond: [
+                      { $eq: [{ $type: "$year" }, "string"] },
+                      { $regexMatch: { input: "$year", regex: /^\d+$/ } },
+                      true,
+                    ],
+                  },
                 ],
               },
-              { $toInt: "$year" },
               {
-                $cond: [{ $eq: [{ $type: "$year" }, "number"] }, "$year", null],
+                $cond: [
+                  { $eq: [{ $type: "$year" }, "string"] },
+                  { $toInt: "$year" },
+                  "$year",
+                ],
               },
+              null,
             ],
           },
           price: {
@@ -283,9 +295,7 @@ export default async function CarsPage({
 
     const page = Number(resolvedParams.page) || 1;
     const pageSize = Number(resolvedParams.pageSize) || 48;
-    const viewMode = (resolvedParams.view?.toString() || "grid") as
-      | "grid"
-      | "list";
+    const view = (resolvedParams.view?.toString() || "grid") as "grid" | "list";
     const isEditMode = resolvedParams.edit === "true";
 
     const filters: FilterParams = {
@@ -313,20 +323,21 @@ export default async function CarsPage({
     ]);
 
     return (
-      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[#111111]">
         <Navbar />
 
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h1 className="text-lg uppercase tracking-wide font-medium text-gray-900 dark:text-gray-100">
-                Our Collection ({total.toLocaleString()} vehicles)
-              </h1>
-              <div className="flex items-center gap-4">
-                <ViewModeSelector viewMode={viewMode} />
+            <PageTitle title="Cars Collection" count={total}>
+              <div className="flex items-center gap-4 ml-auto">
+                <PageSizeSelector
+                  currentPageSize={pageSize}
+                  options={[12, 24, 48, 96]}
+                />
                 <EditModeToggle isEditMode={isEditMode} />
+                <ViewModeSelector currentView={view} />
               </div>
-            </div>
+            </PageTitle>
 
             <CarFiltersSection
               currentFilters={{
@@ -343,28 +354,14 @@ export default async function CarsPage({
               clients={clients}
             />
 
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 my-6">
-              <PageSizeSelector
-                currentPageSize={pageSize}
-                options={[12, 24, 36, 48]}
-              />
-              {total > pageSize && (
-                <Pagination
-                  currentPage={page}
-                  totalPages={Math.ceil(total / pageSize)}
-                  pageSize={pageSize}
-                />
-              )}
-            </div>
-
             {isEditMode ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {cars.map((car: Car) => (
                   <div
                     key={car._id}
-                    className="bg-white rounded-lg shadow-md p-4"
+                    className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
                   >
-                    <h3 className="text-lg font-semibold mb-4">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
                       {car.year} {car.make} {car.model}
                     </h3>
                     <CarImageEditor
@@ -378,7 +375,7 @@ export default async function CarsPage({
             ) : (
               <CarsViewWrapper
                 cars={cars}
-                viewMode={viewMode}
+                viewMode={view}
                 currentSearchParams={new URLSearchParams(
                   resolvedParams as Record<string, string>
                 ).toString()}

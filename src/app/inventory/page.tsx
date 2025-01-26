@@ -13,11 +13,14 @@ import {
 } from "@/components/inventory/types";
 import Footer from "@/components/layout/footer";
 import FiltersSection from "@/components/inventory/FiltersSection";
+import { PageTitle } from "@/components/ui/PageTitle";
+import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 
 export default async function InventoryPage({
   searchParams,
 }: InventoryPageProps) {
   const page = Number(searchParams.page) || 1;
+  const view = (searchParams.view || "grid") as "grid" | "list";
   const filters = {
     make: searchParams.make,
     model: searchParams.model,
@@ -47,7 +50,7 @@ export default async function InventoryPage({
   const results = rawResults.map((item: any) => transformInventoryItem(item));
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[#111111]">
       <nav className="fixed top-0 w-full z-50 bg-[#1a1f3c] shadow-md">
         <Navbar />
       </nav>
@@ -55,11 +58,9 @@ export default async function InventoryPage({
       <main className="flex-1 w-full pt-20">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h1 className="text-lg uppercase tracking-wide font-medium text-gray-900 dark:text-gray-100">
-                Vehicle Inventory ({total} vehicles)
-              </h1>
-            </div>
+            <PageTitle title="Vehicle Inventory" count={total}>
+              <ViewModeSelector currentView={view} />
+            </PageTitle>
 
             <FiltersSection
               currentFilters={{
@@ -81,9 +82,15 @@ export default async function InventoryPage({
             />
 
             {results.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div
+                className={`${
+                  view === "grid"
+                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                    : "flex flex-col space-y-4"
+                }`}
+              >
                 {results.map((item: InventoryItem) => (
-                  <InventoryCard key={item.id} item={item} />
+                  <InventoryCard key={item.id} item={item} view={view} />
                 ))}
               </div>
             ) : (

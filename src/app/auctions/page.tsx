@@ -6,8 +6,9 @@ import Pagination from "@/components/Pagination";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { FiltersSection } from "@/components/auctions/FiltersSection";
-import { ViewModeSelector } from "@/components/ViewModeSelector";
+import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import { AuctionsViewWrapper } from "@/components/auctions/AuctionsViewWrapper";
+import { PageTitle } from "@/components/ui/PageTitle";
 
 interface PageProps {
   searchParams: {
@@ -33,7 +34,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   const page = Number(params.page) || 1;
   const pageSize = Number(params.pageSize) || 24;
-  const view = params.view || "grid";
+  const view = (params.view || "grid") as "grid" | "list";
 
   // Build filters object based on search params
   const filters: any = {};
@@ -87,7 +88,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[#111111]">
       <nav className="fixed top-0 w-full z-50 bg-[#1a1f3c] shadow-md">
         <Navbar />
       </nav>
@@ -95,12 +96,9 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
       <main className="flex-1 w-full pt-20">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h1 className="text-lg uppercase tracking-wide font-medium text-gray-900 dark:text-gray-100">
-                Auctions ({total.toLocaleString()} listings)
-              </h1>
+            <PageTitle title="Auctions" count={total}>
               <ViewModeSelector currentView={view} />
-            </div>
+            </PageTitle>
 
             <FiltersSection
               currentFilters={{

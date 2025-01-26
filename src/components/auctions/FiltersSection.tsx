@@ -2,6 +2,13 @@
 
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  FilterSection,
+  FilterItem,
+  FilterLabel,
+  FilterSelect,
+  FilterInput,
+} from "@/components/ui/FilterSection";
 
 const END_DATE_OPTIONS = [
   { value: "", label: "Any Time" },
@@ -62,18 +69,13 @@ export function FiltersSection({
   );
 
   const handleFilterChange = (key: string, value: string | boolean) => {
-    const newFilters = { ...filters, [key]: value };
-
-    // Special handling for make filter
-    if (key === "make" && value === "All Makes") {
-      delete newFilters.make;
-    }
-
+    let newFilters = { ...filters };
+    newFilters = {
+      ...newFilters,
+      [key]: value,
+    };
     setFilters(newFilters);
-    applyFilters(newFilters);
-  };
 
-  const applyFilters = (newFilters: typeof filters) => {
     const params = new URLSearchParams(searchParams.toString());
 
     const setOrDeleteParam = (
@@ -81,10 +83,36 @@ export function FiltersSection({
       value: string | boolean,
       defaultValue?: string
     ) => {
-      if (value && value !== defaultValue) {
-        params.set(key, String(value));
+      if (typeof value === "string") {
+        if (key.includes("Year")) {
+          // For year fields, only update when it's a 4-digit number
+          if (value && /^\d{4}$/.test(value)) {
+            params.set(key, value);
+          } else if (!value) {
+            params.delete(key);
+          }
+        } else if (key.includes("Price")) {
+          // For price fields, update even if empty to preserve partial values
+          if (value && value !== defaultValue) {
+            params.set(key, value);
+          } else {
+            params.delete(key);
+          }
+        } else {
+          // For other fields, only set if non-empty and not default
+          if (value && value !== defaultValue) {
+            params.set(key, value);
+          } else {
+            params.delete(key);
+          }
+        }
       } else {
-        params.delete(key);
+        // Handle boolean values (like noReserve)
+        if (value) {
+          params.set(key, String(value));
+        } else {
+          params.delete(key);
+        }
       }
     };
 
@@ -128,122 +156,86 @@ export function FiltersSection({
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Source
-          </label>
-          <select
-            value={currentFilters.platformId || ""}
-            onChange={(e) => handleFilterChange("platformId", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">All Sources</option>
-            {platforms.map((platform) => (
-              <option key={platform._id} value={platform._id}>
-                {platform.name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <FilterSection onClearFilters={clearFilters}>
+      <FilterItem>
+        <FilterLabel>Source</FilterLabel>
+        <FilterSelect
+          value={currentFilters.platformId || ""}
+          onChange={(e) => handleFilterChange("platformId", e.target.value)}
+        >
+          <option value="">All Sources</option>
+          {platforms.map((platform) => (
+            <option key={platform._id} value={platform._id}>
+              {platform.name}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Make
-          </label>
-          <select
-            value={filters.make || "All Makes"}
-            onChange={(e) => handleFilterChange("make", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="All Makes">All Makes</option>
-            {makes.map((make) => (
-              <option key={`make-${make._id}`} value={make.name}>
-                {make.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <FilterItem>
+        <FilterLabel>Make</FilterLabel>
+        <FilterSelect
+          value={filters.make || "All Makes"}
+          onChange={(e) => handleFilterChange("make", e.target.value)}
+        >
+          <option value="All Makes">All Makes</option>
+          {makes.map((make) => (
+            <option key={`make-${make._id}`} value={make.name}>
+              {make.name}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Min Year
-          </label>
-          <select
+      <FilterItem>
+        <FilterLabel>Year Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
+            type="number"
             value={filters.minYear || ""}
             onChange={(e) => handleFilterChange("minYear", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Select Year</option>
-            {years.map((year) => (
-              <option key={`min-year-${year}`} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Max Year
-          </label>
-          <select
+            placeholder="Min"
+          />
+          <FilterInput
+            type="number"
             value={filters.maxYear || ""}
             onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            <option value="">Select Year</option>
-            {years.map((year) => (
-              <option key={`max-year-${year}`} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
+            placeholder="Max"
+          />
         </div>
+      </FilterItem>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ending
-          </label>
-          <select
-            value={filters.endDate || ""}
-            onChange={(e) => handleFilterChange("endDate", e.target.value)}
-            className="w-full border rounded-md px-3 py-2"
-          >
-            {END_DATE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <FilterItem>
+        <FilterLabel>Ending</FilterLabel>
+        <FilterSelect
+          value={filters.endDate || ""}
+          onChange={(e) => handleFilterChange("endDate", e.target.value)}
+        >
+          {END_DATE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
 
-        <div className="flex items-center">
+      <FilterItem>
+        <div className="flex items-center space-y-0">
           <input
             type="checkbox"
             id="noReserve"
             checked={filters.noReserve}
             onChange={(e) => handleFilterChange("noReserve", e.target.checked)}
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400"
           />
           <label
             htmlFor="noReserve"
-            className="ml-2 block text-sm text-gray-700"
+            className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
           >
             No Reserve Only
           </label>
         </div>
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={clearFilters}
-          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
-        >
-          Clear Filters
-        </button>
-      </div>
-    </div>
+      </FilterItem>
+    </FilterSection>
   );
 }
