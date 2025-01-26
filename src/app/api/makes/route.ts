@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 
-// Force dynamic to prevent caching and disable authentication
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const runtime = "nodejs";
+// Configure route segment config
+export const config = {
+  runtime: "edge", // Use edge runtime to bypass middleware
+};
 
 export async function GET() {
   let client;
@@ -33,16 +33,29 @@ export async function GET() {
       active: make.active,
     }));
 
-    return NextResponse.json(formattedMakes);
+    // Set CORS headers
+    return new NextResponse(JSON.stringify(formattedMakes), {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Content-Type": "application/json",
+      },
+    });
   } catch (error) {
     console.error("Error fetching makes:", error);
-    // Return a more detailed error response
-    return NextResponse.json(
-      {
+    return new NextResponse(
+      JSON.stringify({
         error: "Failed to fetch makes",
         details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
+      }),
+      {
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Content-Type": "application/json",
+        },
+      }
     );
   }
 }
