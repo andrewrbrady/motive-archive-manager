@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 interface ViewModeSelectorProps {
-  viewMode: 'grid' | 'list';
+  viewMode: "grid" | "list";
 }
 
 export default function ViewModeSelector({ viewMode }: ViewModeSelectorProps) {
   const handleViewModeChange = (mode: string) => {
     const url = new URL(window.location.href);
-    url.searchParams.set('view', mode);
-    window.history.pushState({}, '', url);
+    url.searchParams.set("view", mode);
+    window.history.pushState({}, "", url);
     // Optionally force a refresh to reflect the new view
     window.location.reload();
   };

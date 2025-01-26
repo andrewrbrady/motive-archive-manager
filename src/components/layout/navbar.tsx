@@ -1,13 +1,18 @@
-import { Instagram, Mail } from "lucide-react";
+"use client";
+
+import { Instagram, Mail, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { logos } from "@/data/site-content";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface NavbarProps {
   className?: string;
 }
 
 export default function Navbar({ className }: NavbarProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <>
       {/* Spacer div to prevent content from going under navbar */}
@@ -15,7 +20,7 @@ export default function Navbar({ className }: NavbarProps) {
 
       {/* Navbar */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 bg-[#1a1f3c] shadow-lg ${
+        className={`fixed top-0 left-0 right-0 z-50 bg-[#1a1f3c] dark:bg-gray-900 shadow-lg transition-colors ${
           className || ""
         }`}
       >
@@ -64,6 +69,17 @@ export default function Navbar({ className }: NavbarProps) {
             </div>
           </div>
           <div className="flex items-center space-x-6">
+            <button
+              onClick={toggleTheme}
+              className="text-white hover:text-gray-300 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-5 h-5" />
+              ) : (
+                <Moon className="w-5 h-5" />
+              )}
+            </button>
             <a
               href="#"
               className="hover:text-gray-300 transition-colors text-white"
