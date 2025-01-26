@@ -1,37 +1,19 @@
 import { NextResponse } from "next/server";
+import clientPromise from "@/lib/mongodb";
 
-// Use the new runtime export format
-export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const response = await fetch(
-      `${process.env.MONGODB_DATA_API_URL}/action/find`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Request-Headers": "*",
-          "api-key": process.env.MONGODB_DATA_API_KEY || "",
-        },
-        body: JSON.stringify({
-          dataSource: "Cluster0",
-          database: "motive_archive",
-          collection: "makes",
-          filter: { active: true },
-          sort: { name: 1 },
-        }),
-      }
-    );
+    const client = await clientPromise;
+    const db = client.db("motive_archive");
 
-    if (!response.ok) {
-      throw new Error(
-        `MongoDB Data API error: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const result = await response.json();
-    const makes = result.documents;
+    console.log("Fetching makes from MongoDB...");
+    const makes = await db
+      .collection("makes")
+      .find({ active: true })
+      .sort({ name: 1 })
+      .toArray();
 
     console.log(`Successfully fetched ${makes.length} makes`);
 
@@ -47,29 +29,15 @@ export async function GET() {
       active: make.active,
     }));
 
-    // Set CORS headers
-    return new NextResponse(JSON.stringify(formattedMakes), {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Content-Type": "application/json",
-      },
-    });
+    return NextResponse.json(formattedMakes);
   } catch (error) {
     console.error("Error fetching makes:", error);
-    return new NextResponse(
-      JSON.stringify({
+    return NextResponse.json(
+      {
         error: "Failed to fetch makes",
         details: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Content-Type": "application/json",
-        },
-      }
+      },
+      { status: 500 }
     );
   }
 }
