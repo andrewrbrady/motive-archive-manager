@@ -15,6 +15,11 @@ const options = {
   },
   tls: true,
   tlsAllowInvalidCertificates: false,
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+  maxPoolSize: 50,
+  minPoolSize: 5,
+  maxIdleTimeMS: 120000,
 };
 
 let client: MongoClient;
