@@ -3,10 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  Squares2X2Icon as ViewGridIcon,
-  ListBulletIcon as ViewListIcon,
-} from "@heroicons/react/24/outline";
+import { Squares2X2Icon, ListBulletIcon } from "@heroicons/react/24/outline";
 
 interface ViewToggleProps {
   currentView: string;
@@ -31,7 +28,7 @@ export function ViewToggle({ currentView }: ViewToggleProps) {
             : "text-gray-500 hover:text-gray-900"
         }`}
       >
-        <ViewGridIcon className="h-5 w-5" />
+        <Squares2X2Icon className="h-5 w-5" />
       </Link>
       <Link
         href={getViewUrl("list")}
@@ -41,7 +38,7 @@ export function ViewToggle({ currentView }: ViewToggleProps) {
             : "text-gray-500 hover:text-gray-900"
         }`}
       >
-        <ViewListIcon className="h-5 w-5" />
+        <ListBulletIcon className="h-5 w-5" />
       </Link>
     </div>
   );
