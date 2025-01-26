@@ -67,6 +67,17 @@ export const fetchAuctions = cache(async function fetchAuctions(
       query.model = { $regex: String(filters.model), $options: "i" };
     }
 
+    // Handle year range filters
+    if (filters.minYear || filters.maxYear) {
+      query.year = {};
+      if (filters.minYear) {
+        query.year.$gte = parseInt(filters.minYear);
+      }
+      if (filters.maxYear) {
+        query.year.$lte = parseInt(filters.maxYear);
+      }
+    }
+
     // Handle end date filter
     if (filters.endDate) {
       const now = new Date();
@@ -109,11 +120,16 @@ export const fetchAuctions = cache(async function fetchAuctions(
 
     // Handle search filter
     if (filters.$or) {
-      query.$or = filters.$or.map((condition: any) => ({
-        ...condition,
-        $regex: String(condition.$regex),
-        $options: condition.$options,
-      }));
+      const searchConditions = filters.$or.map((condition: any) => {
+        const field = Object.keys(condition)[0];
+        return {
+          [field]: {
+            $regex: String(condition[field].$regex),
+            $options: "i",
+          },
+        };
+      });
+      query.$or = searchConditions;
     }
 
     console.log("MongoDB Query:", JSON.stringify(query, null, 2));
