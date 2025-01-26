@@ -1,158 +1,286 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
-import { InventoryPageProps } from "@/components/inventory/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Dealer } from "@/lib/fetchDealers";
+import { Make } from "@/lib/fetchMakes";
+import {
+  FilterSection,
+  FilterItem,
+  FilterLabel,
+  FilterSelect,
+  FilterInput,
+} from "@/components/ui/FilterSection";
 
+// components/inventory/FiltersSection.tsx
 interface FiltersSectionProps {
-  searchParams: InventoryPageProps["searchParams"];
-  total: number;
-  view: string;
+  currentFilters: {
+    make: string;
+    model: string;
+    dealer: string;
+    minPrice: string;
+    maxPrice: string;
+    minMileage: string;
+    maxMileage: string;
+    minYear: string;
+    maxYear: string;
+    transmission: string;
+    color: string;
+    interior_color: string;
+  };
+  dealers: Dealer[];
+  makes: Make[];
 }
 
 export default function FiltersSection({
-  searchParams,
-  total,
-  view,
+  currentFilters,
+  dealers,
+  makes,
 }: FiltersSectionProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [filters, setFilters] = React.useState(currentFilters);
+
+  const transmissions = ["All Types", "Automatic", "Manual", "DCT"];
+
+  // Generate year options (from 1960 to current year + 1)
+  const currentYear = new Date().getFullYear() + 1;
+  const years = Array.from({ length: currentYear - 1960 + 1 }, (_, i) =>
+    (currentYear - i).toString()
+  );
 
   const handleFilterChange = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams);
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
+    let newFilters = { ...filters };
+    newFilters[key] = value;
+    setFilters(newFilters);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Helper function to handle filter parameters
+    const setOrDeleteParam = (
+      key: string,
+      value: string,
+      defaultValue?: string
+    ) => {
+      if (key.includes("Year")) {
+        // For year fields, only update when it's a 4-digit number
+        if (value && /^\d{4}$/.test(value)) {
+          params.set(key, value);
+        } else if (!value) {
+          params.delete(key);
+        }
+      } else if (key.includes("Price") || key.includes("Mileage")) {
+        // For price and mileage fields, update even if empty to preserve partial values
+        if (value && value !== defaultValue) {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
+      } else {
+        // For other fields, only set if non-empty and not default
+        if (value && value !== defaultValue) {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
+      }
+    };
+
+    setOrDeleteParam("make", newFilters.make, "All Makes");
+    setOrDeleteParam("model", newFilters.model);
+    setOrDeleteParam("dealer", newFilters.dealer, "All Dealers");
+    setOrDeleteParam("transmission", newFilters.transmission, "All Types");
+    setOrDeleteParam("minPrice", newFilters.minPrice, "0");
+    setOrDeleteParam("maxPrice", newFilters.maxPrice);
+    setOrDeleteParam("minMileage", newFilters.minMileage, "0");
+    setOrDeleteParam("maxMileage", newFilters.maxMileage);
+    setOrDeleteParam("minYear", newFilters.minYear);
+    setOrDeleteParam("maxYear", newFilters.maxYear);
+
+    // Preserve the search parameter if it exists
+    const search = searchParams.get("search");
+    if (search) {
+      params.set("search", search);
     }
-    params.set("page", "1"); // Reset to first page on filter change
+
+    // Reset to first page when filters change
+    params.set("page", "1");
+
+    router.push(`/inventory?${params.toString()}`);
+  };
+
+  const applyFilters = (newFilters: typeof filters) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Helper function to handle filter parameters
+    const setOrDeleteParam = (
+      key: string,
+      value: string,
+      defaultValue?: string
+    ) => {
+      if (value && value !== defaultValue) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    };
+
+    setOrDeleteParam("make", newFilters.make, "All Makes");
+    setOrDeleteParam("model", newFilters.model);
+    setOrDeleteParam("dealer", newFilters.dealer, "All Dealers");
+    setOrDeleteParam("transmission", newFilters.transmission, "All Types");
+    setOrDeleteParam("minPrice", newFilters.minPrice, "0");
+    setOrDeleteParam("maxPrice", newFilters.maxPrice);
+    setOrDeleteParam("minMileage", newFilters.minMileage, "0");
+    setOrDeleteParam("maxMileage", newFilters.maxMileage);
+    setOrDeleteParam("minYear", newFilters.minYear);
+    setOrDeleteParam("maxYear", newFilters.maxYear);
+
+    // Preserve the search parameter if it exists
+    const search = searchParams.get("search");
+    if (search) {
+      params.set("search", search);
+    }
+
+    // Reset to first page when filters change
+    params.set("page", "1");
+
+    router.push(`/inventory?${params.toString()}`);
+  };
+
+  const clearFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    [
+      "make",
+      "model",
+      "dealer",
+      "minPrice",
+      "maxPrice",
+      "minMileage",
+      "maxMileage",
+      "minYear",
+      "maxYear",
+      "transmission",
+    ].forEach((key) => params.delete(key));
+
+    // Preserve the search parameter if it exists
+    const search = searchParams.get("search");
+    if (search) {
+      params.set("search", search);
+    }
+
     router.push(`/inventory?${params.toString()}`);
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Filters
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {total} vehicles found
-          </p>
+    <FilterSection onClearFilters={clearFilters}>
+      <FilterItem>
+        <FilterLabel>Make</FilterLabel>
+        <FilterSelect
+          value={filters.make || "All Makes"}
+          onChange={(e) => handleFilterChange("make", e.target.value)}
+        >
+          <option value="All Makes">All Makes</option>
+          {makes.map((make) => (
+            <option key={make._id} value={make.name}>
+              {make.name}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Model</FilterLabel>
+        <FilterInput
+          type="text"
+          value={filters.model || ""}
+          onChange={(e) => handleFilterChange("model", e.target.value)}
+          placeholder="Enter model"
+        />
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Year Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
+            type="number"
+            value={filters.minYear || ""}
+            onChange={(e) => handleFilterChange("minYear", e.target.value)}
+            placeholder="Min"
+          />
+          <FilterInput
+            type="number"
+            value={filters.maxYear || ""}
+            onChange={(e) => handleFilterChange("maxYear", e.target.value)}
+            placeholder="Max"
+          />
         </div>
+      </FilterItem>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Make
-            </label>
-            <input
-              type="text"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-              value={searchParams.make || ""}
-              onChange={(e) => handleFilterChange("make", e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Model
-            </label>
-            <input
-              type="text"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-              value={searchParams.model || ""}
-              onChange={(e) => handleFilterChange("model", e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Price Range
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                value={searchParams.minPrice || ""}
-                onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                value={searchParams.maxPrice || ""}
-                onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Year Range
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                value={searchParams.minYear || ""}
-                onChange={(e) => handleFilterChange("minYear", e.target.value)}
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                value={searchParams.maxYear || ""}
-                onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Mileage Range
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                value={searchParams.minMileage || ""}
-                onChange={(e) =>
-                  handleFilterChange("minMileage", e.target.value)
-                }
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-                value={searchParams.maxMileage || ""}
-                onChange={(e) =>
-                  handleFilterChange("maxMileage", e.target.value)
-                }
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Transmission
-            </label>
-            <select
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:text-sm"
-              value={searchParams.transmission || ""}
-              onChange={(e) =>
-                handleFilterChange("transmission", e.target.value)
-              }
-            >
-              <option value="">Any</option>
-              <option value="automatic">Automatic</option>
-              <option value="manual">Manual</option>
-            </select>
-          </div>
+      <FilterItem>
+        <FilterLabel>Price Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
+            type="number"
+            value={filters.minPrice || ""}
+            onChange={(e) => handleFilterChange("minPrice", e.target.value)}
+            placeholder="Min"
+          />
+          <FilterInput
+            type="number"
+            value={filters.maxPrice || ""}
+            onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
+            placeholder="Max"
+          />
         </div>
-      </div>
-    </div>
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Mileage Range</FilterLabel>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterInput
+            type="number"
+            value={filters.minMileage || ""}
+            onChange={(e) => handleFilterChange("minMileage", e.target.value)}
+            placeholder="Min"
+          />
+          <FilterInput
+            type="number"
+            value={filters.maxMileage || ""}
+            onChange={(e) => handleFilterChange("maxMileage", e.target.value)}
+            placeholder="Max"
+          />
+        </div>
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Dealer</FilterLabel>
+        <FilterSelect
+          value={filters.dealer || "All Dealers"}
+          onChange={(e) => handleFilterChange("dealer", e.target.value)}
+        >
+          <option value="All Dealers">All Dealers</option>
+          {dealers.map((dealer) => (
+            <option key={dealer._id} value={dealer.name}>
+              {dealer.name}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
+
+      <FilterItem>
+        <FilterLabel>Transmission</FilterLabel>
+        <FilterSelect
+          value={filters.transmission || "All Types"}
+          onChange={(e) => handleFilterChange("transmission", e.target.value)}
+        >
+          {transmissions.map((transmission) => (
+            <option key={transmission} value={transmission}>
+              {transmission}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterItem>
+    </FilterSection>
   );
 }

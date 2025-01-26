@@ -10,6 +10,7 @@ import { DeleteImageDialog } from "@/components/DeleteImageDialog";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
 import { Pencil, Plus } from "lucide-react";
+import { PageTitle } from "@/components/ui/PageTitle";
 
 interface MeasurementValue {
   value: number | null;
@@ -840,15 +841,7 @@ export default function CarPage() {
       <Navbar />
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {car.year} {car.make} {car.model}
-            </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">
-              {formatMileage(car.mileage)} · {car.color} · {car.dealer}
-            </p>
-          </div>
+        <PageTitle title={`${car.year} ${car.make} ${car.model}`}>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsEditMode(!isEditMode)}
@@ -857,7 +850,7 @@ export default function CarPage() {
               <Pencil className="w-5 h-5" />
             </button>
           </div>
-        </div>
+        </PageTitle>
 
         {/* Image Gallery */}
         <div className="mb-8">
@@ -945,11 +938,11 @@ export default function CarPage() {
               )}
             </div>
           </div>
-          <div className="bg-gray-50/50 dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg">
+          <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg">
             <div className="divide-y divide-gray-200 dark:divide-gray-800">
               {/* Basic Info */}
-              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Year
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -966,7 +959,7 @@ export default function CarPage() {
                     car.year
                   )}
                 </div>
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Make
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -983,7 +976,7 @@ export default function CarPage() {
                     car.make
                   )}
                 </div>
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Model
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1003,8 +996,8 @@ export default function CarPage() {
               </div>
 
               {/* Additional Info */}
-              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Type
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1021,7 +1014,7 @@ export default function CarPage() {
                     car.type || "N/A"
                   )}
                 </div>
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Color
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1038,7 +1031,7 @@ export default function CarPage() {
                     car.color || "N/A"
                   )}
                 </div>
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Mileage
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1066,8 +1059,8 @@ export default function CarPage() {
               </div>
 
               {/* VIN */}
-              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   VIN
                 </div>
                 <div className="col-span-11 text-gray-600 dark:text-gray-300 font-medium font-mono text-sm p-2 flex items-center uppercase">
@@ -1085,8 +1078,8 @@ export default function CarPage() {
               </div>
 
               {/* Client Info */}
-              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Client
                 </div>
                 <div className="col-span-11 text-gray-600 dark:text-gray-300 p-2 flex items-center uppercase">
@@ -1095,8 +1088,8 @@ export default function CarPage() {
               </div>
 
               {/* Location and Price */}
-              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+              <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Location
                 </div>
                 <div className="col-span-7 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1115,7 +1108,7 @@ export default function CarPage() {
                     car.location || "N/A"
                   )}
                 </div>
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                   Price
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1145,8 +1138,8 @@ export default function CarPage() {
               {/* Engine Info */}
               {car.engine && (
                 <>
-                  <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                    <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                  <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                    <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                       Engine
                     </div>
                     <div className="col-span-7 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1165,15 +1158,15 @@ export default function CarPage() {
                         car.engine.type
                       )}
                     </div>
-                    <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                    <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                       Power
                     </div>
                     <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
                       {formatPower(car.engine?.power)}
                     </div>
                   </div>
-                  <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                    <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                  <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                    <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                       Torque
                     </div>
                     <div className="col-span-11 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1185,14 +1178,14 @@ export default function CarPage() {
 
               {/* Performance Info */}
               {car.performance && (
-                <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm">
-                  <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-black/25">
+                  <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                     0-60 mph
                   </div>
                   <div className="col-span-7 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
                     {formatMeasurement(car.performance?.["0_to_60_mph"])}
                   </div>
-                  <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
+                  <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px] bg-gray-50/80 dark:bg-black/40">
                     Top Speed
                   </div>
                   <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1452,9 +1445,11 @@ export default function CarPage() {
                 <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600 dark:text-gray-400">
                   Description
                 </h2>
-                <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-                  {car.description}
-                </p>
+                <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+                  <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                    {car.description}
+                  </p>
+                </div>
               </section>
             )}
           </div>
@@ -1474,7 +1469,9 @@ export default function CarPage() {
                 <Plus className="w-5 h-5" />
               </button>
             </div>
-            <DocumentsClient carId={id} initialDocuments={documents} />
+            <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg">
+              <DocumentsClient carId={id} initialDocuments={documents} />
+            </div>
           </section>
         </div>
       </main>
