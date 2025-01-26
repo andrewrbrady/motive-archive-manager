@@ -2,11 +2,18 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
-const dbName = process.env.MONGODB_DB || "arb_assets";
+const uri = process.env.MONGODB_URI;
+const dbName = process.env.MONGODB_DB || "motive_archive";
+
+if (!uri) {
+  throw new Error("Please add your Mongo URI to .env.local");
+}
 
 async function getClient() {
-  const client = await MongoClient.connect(uri);
+  const client = await MongoClient.connect(uri, {
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  });
   return client;
 }
 
@@ -21,6 +28,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   let client;
   try {
     const id = params.id;
+    console.log(`Fetching asset with ID: ${id}`);
+
     client = await getClient();
     const db = client.db(dbName);
 
@@ -29,6 +38,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     });
 
     if (!asset) {
+      console.log(`Asset not found with ID: ${id}`);
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
@@ -42,7 +52,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       { status: 500 }
     );
   } finally {
-    if (client) await client.close();
+    if (client) {
+      console.log(`Closing MongoDB connection for asset ${params.id}`);
+      await client.close();
+    }
   }
 }
 
