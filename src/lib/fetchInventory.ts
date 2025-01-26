@@ -14,12 +14,34 @@ export async function fetchInventory(
     // Calculate skip value for pagination
     const skip = (page - 1) * limit;
 
+    // Build MongoDB query
+    const query: any = {};
+
+    // Handle year range filters
+    if (filters.minYear || filters.maxYear) {
+      query.year = {};
+      if (filters.minYear && !isNaN(parseInt(filters.minYear))) {
+        query.year.$gte = parseInt(filters.minYear);
+      }
+      if (filters.maxYear && !isNaN(parseInt(filters.maxYear))) {
+        query.year.$lte = parseInt(filters.maxYear);
+      }
+      // Only delete if we successfully used them
+      if (query.year.$gte || query.year.$lte) {
+        delete filters.minYear;
+        delete filters.maxYear;
+      }
+    }
+
+    // Handle other filters
+    Object.assign(query, filters);
+
     // Get total count with filters
-    const total = await collection.countDocuments(filters);
+    const total = await collection.countDocuments(query);
 
     // Get paginated results with filters
     const results = await collection
-      .find(filters)
+      .find(query)
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit)
