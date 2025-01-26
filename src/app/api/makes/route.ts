@@ -1,21 +1,37 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
 
 // Use the new runtime export format
 export const runtime = "edge";
 
 export async function GET() {
-  let client;
   try {
-    client = await clientPromise;
-    const db = client.db("motive_archive");
+    const response = await fetch(
+      `${process.env.MONGODB_DATA_API_URL}/action/find`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Request-Headers": "*",
+          "api-key": process.env.MONGODB_DATA_API_KEY || "",
+        },
+        body: JSON.stringify({
+          dataSource: "Cluster0",
+          database: "motive_archive",
+          collection: "makes",
+          filter: { active: true },
+          sort: { name: 1 },
+        }),
+      }
+    );
 
-    console.log("Fetching makes from MongoDB...");
-    const makes = await db
-      .collection("makes")
-      .find({ active: true })
-      .sort({ name: 1 })
-      .toArray();
+    if (!response.ok) {
+      throw new Error(
+        `MongoDB Data API error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+    const makes = result.documents;
 
     console.log(`Successfully fetched ${makes.length} makes`);
 
