@@ -1,8 +1,12 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
-const MONGODB_URI = "mongodb://localhost:27017";
-const DB_NAME = "motive_archive";
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+
+if (!MONGODB_URI) {
+  throw new Error("Please add your Mongo URI to .env.local");
+}
 
 interface Car {
   _id: ObjectId;
@@ -29,7 +33,10 @@ interface CarImage {
 
 // Helper function to get MongoDB client
 async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI, {
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  });
   await client.connect();
   return client;
 }
@@ -39,7 +46,7 @@ export async function GET(
   request: Request,
   context: { params: { id: string } }
 ) {
-  const client = await getMongoClient();
+  let client;
   try {
     const { id } = await Promise.resolve(context.params);
     if (!ObjectId.isValid(id)) {
@@ -50,28 +57,33 @@ export async function GET(
     }
     const objectId = new ObjectId(id);
 
+    client = await getMongoClient();
     const db = client.db(DB_NAME);
-    const car = await db.collection<Car>("cars").findOne({
+
+    console.log(`Fetching car with ID: ${id}`);
+    const car = (await db.collection("cars").findOne({
       _id: objectId,
-    });
+    })) as Car | null;
 
     if (!car) {
+      console.log(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
     // If the car has a client field, populate the client information
     if (car.client && ObjectId.isValid(car.client)) {
-      const client = await db.collection("clients").findOne({
+      console.log(`Fetching client info for car ${id}`);
+      const clientDoc = await db.collection("clients").findOne({
         _id: new ObjectId(car.client),
       });
 
-      if (client) {
+      if (clientDoc) {
         car.clientInfo = {
-          _id: client._id.toString(),
-          name: client.name,
-          email: client.email,
-          phone: client.phone,
-          address: client.address,
+          _id: clientDoc._id.toString(),
+          name: clientDoc.name,
+          email: clientDoc.email,
+          phone: clientDoc.phone,
+          address: clientDoc.address,
         };
       }
     }
@@ -81,7 +93,10 @@ export async function GET(
     console.error("Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });
   } finally {
-    await client.close();
+    if (client) {
+      console.log(`Closing MongoDB connection for car ${context.params.id}`);
+      await client.close();
+    }
   }
 }
 
