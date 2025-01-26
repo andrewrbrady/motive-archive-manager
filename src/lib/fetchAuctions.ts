@@ -59,12 +59,12 @@ export const fetchAuctions = cache(async function fetchAuctions(
 
     // Handle make filter
     if (filters.make && filters.make !== "All Makes") {
-      query.make = { $regex: filters.make, $options: "i" };
+      query.make = { $regex: String(filters.make), $options: "i" };
     }
 
     // Handle model filter
     if (filters.model) {
-      query.model = { $regex: filters.model, $options: "i" };
+      query.model = { $regex: String(filters.model), $options: "i" };
     }
 
     // Handle end date filter
@@ -109,7 +109,11 @@ export const fetchAuctions = cache(async function fetchAuctions(
 
     // Handle search filter
     if (filters.$or) {
-      query.$or = filters.$or;
+      query.$or = filters.$or.map((condition: any) => ({
+        ...condition,
+        $regex: String(condition.$regex),
+        $options: condition.$options,
+      }));
     }
 
     console.log("MongoDB Query:", JSON.stringify(query, null, 2));
