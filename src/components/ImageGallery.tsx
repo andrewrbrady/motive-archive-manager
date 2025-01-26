@@ -8,14 +8,14 @@ import {
   ZoomIn,
   Loader2,
   Check,
-  Trash2,
-  Plus,
+  Compass,
+  Eye,
+  Sun,
+  Move,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
 import { UploadProgressDialog } from "./UploadProgressDialog";
-import { ImageMetadata } from "./ImageMetadata";
-import { Button } from "./ui/button";
 
 interface UploadProgress {
   fileName: string;
@@ -73,7 +73,71 @@ const MetadataSection = ({
 }) => {
   if (!metadata.length || !metadata[currentIndex]) return null;
 
-  return <ImageMetadata metadata={metadata[currentIndex].metadata} />;
+  const currentMetadata = metadata[currentIndex].metadata;
+
+  return (
+    <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm p-3">
+      <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
+        {currentMetadata.angle && (
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                Angle
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+              {currentMetadata.angle}
+            </span>
+          </div>
+        )}
+        {currentMetadata.view && (
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                View
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+              {currentMetadata.view}
+            </span>
+          </div>
+        )}
+        {currentMetadata.tod && (
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Sun className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                Time of Day
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+              {currentMetadata.tod}
+            </span>
+          </div>
+        )}
+        {currentMetadata.movement && (
+          <div className="flex items-center px-4 first:pl-0 last:pr-0">
+            <div className="flex items-center gap-1.5">
+              <Move className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                Movement
+              </span>
+            </div>
+            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+              {currentMetadata.movement}
+            </span>
+          </div>
+        )}
+      </div>
+      {currentMetadata.description && (
+        <div className="mt-2 text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-800 pt-2">
+          {currentMetadata.description}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
@@ -116,20 +180,32 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
+  const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
   const prevImagesLengthRef = useRef(images.length);
   const _prevMainIndexRef = useRef(mainIndex);
 
-  // Handle initial image load and updates
+  // Set initial image loaded state to true if we have images
   useEffect(() => {
     if (images.length > 0) {
+      setMainImageLoaded(true);
+    }
+  }, []);
+
+  // Handle initial image load and updates
+  useEffect(() => {
+    if (images.length > 0 && !hasSetInitialImage) {
       setMainIndex(0);
       setMainImageLoaded(true);
-    } else {
+      setHasSetInitialImage(true);
+    }
+    // Reset states when there are no images
+    else if (images.length === 0) {
       setMainIndex(0);
       setMainImageLoaded(false);
+      setHasSetInitialImage(false);
     }
     prevImagesLengthRef.current = images.length;
-  }, [images.length]);
+  }, [images.length, hasSetInitialImage]);
 
   // Only force reload when entering/exiting edit mode
   useEffect(() => {
