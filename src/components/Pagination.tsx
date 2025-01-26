@@ -53,7 +53,7 @@ const Pagination = ({
       <button
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
+        className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800"
         aria-label="Previous page"
       >
         <ChevronLeft className="w-5 h-5" />
@@ -68,14 +68,16 @@ const Pagination = ({
           max={totalPages}
           value={pageInput}
           onChange={handlePageInputChange}
-          className="w-16 px-2 py-1 border rounded text-center"
+          className="w-12 py-1.5 text-sm border border-gray-200 dark:border-gray-800 bg-transparent text-gray-900 dark:text-gray-100 text-center focus:outline-none focus:border-gray-400 dark:focus:border-gray-700 rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="text-sm">of {totalPages}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          / {totalPages}
+        </span>
       </form>
       <button
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
+        className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800"
         aria-label="Next page"
       >
         <ChevronRight className="w-5 h-5" />

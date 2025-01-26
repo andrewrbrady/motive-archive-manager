@@ -334,6 +334,13 @@ export default async function CarsPage({
                   currentPageSize={pageSize}
                   options={[12, 24, 48, 96]}
                 />
+                {total > pageSize && (
+                  <Pagination
+                    currentPage={page}
+                    totalPages={Math.ceil(total / pageSize)}
+                    pageSize={pageSize}
+                  />
+                )}
                 <EditModeToggle isEditMode={isEditMode} />
                 <ViewModeSelector currentView={view} />
               </div>
