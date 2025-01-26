@@ -71,10 +71,10 @@ export const fetchAuctions = cache(async function fetchAuctions(
     if (filters.minYear || filters.maxYear) {
       query.year = {};
       if (filters.minYear) {
-        query.year.$gte = parseInt(filters.minYear);
+        query.year.$gte = Number(filters.minYear);
       }
       if (filters.maxYear) {
-        query.year.$lte = parseInt(filters.maxYear);
+        query.year.$lte = Number(filters.maxYear);
       }
     }
 
