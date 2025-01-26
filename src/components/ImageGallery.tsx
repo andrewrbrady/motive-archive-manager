@@ -12,6 +12,8 @@ import {
   Eye,
   Sun,
   Move,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
@@ -142,7 +144,7 @@ const MetadataSection = ({
 
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
   <div
-    className="animate-pulse bg-gray-200 rounded-lg relative w-full"
+    className="animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg relative w-full"
     style={{ aspectRatio }}
   />
 );
@@ -183,6 +185,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
   const prevImagesLengthRef = useRef(images.length);
   const _prevMainIndexRef = useRef(mainIndex);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   // Set initial image loaded state to true if we have images
   useEffect(() => {
@@ -355,6 +358,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   }, [onRemoveImage, selectedImages]);
 
+  const handleDeleteAll = useCallback(() => {
+    if (onRemoveImage && images.length > 0) {
+      onRemoveImage(images.map((_, index) => index));
+      setShowDeleteAllConfirm(false);
+    }
+  }, [onRemoveImage, images.length]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Handle Shift + Arrow combinations first
@@ -444,22 +454,24 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   };
 
   if (!images || images.length === 0 || filteredImages.length === 0) {
+    const placeholderCount = 15; // 3x5 grid
+
     return (
-      <>
+      <div>
         <div className="flex gap-6">
-          <div className="w-2/3 space-y-3">
-            <div className="w-full aspect-[4/3] relative bg-gray-100 rounded-lg">
+          <div className="w-2/3">
+            <div className="w-full aspect-[4/3] relative bg-neutral-100 dark:bg-neutral-800 rounded-lg">
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-gray-400">
+                <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
                   {!images || images.length === 0
-                    ? "No images available"
-                    : "No images match the selected filters"}
+                    ? "No Images Available"
+                    : "No Images Match The Selected Filters"}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="w-1/3">
+          <div className="w-1/3 space-y-4">
             {isEditMode && (
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
@@ -474,14 +486,40 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 w-full justify-center"
+                    className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
                   >
-                    {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {uploading ? "Uploading..." : "Add Images"}
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Images
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             )}
+
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: placeholderCount }).map((_, index) => (
+                <div
+                  key={index}
+                  className="aspect-[4/3] rounded-lg bg-neutral-100 dark:bg-neutral-800 relative group"
+                >
+                  {isEditMode && index === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <span className="text-gray-400 dark:text-gray-500 text-sm">
+                        Click "Add Images" to begin
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -490,7 +528,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           isOpen={uploadProgress.length > 0}
           uploadProgress={uploadProgress}
         />
-      </>
+      </div>
     );
   }
 
@@ -512,7 +550,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             }`}
           >
             <div
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-gray-100"
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
@@ -547,21 +585,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   setModalIndex(mainIndex);
                   setIsModalOpen(true);
                 }}
-                className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20"
                 aria-label="Open fullscreen view"
               >
                 <ZoomIn className="w-5 h-5" />
               </button>
               <button
                 onClick={handlePrev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20"
                 aria-label="Previous image"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
                 onClick={handleNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20"
                 aria-label="Next image"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -657,29 +695,38 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       ]);
                     }
                   }}
-                  className="px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2"
+                  className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 flex items-center gap-2 text-sm"
                 >
-                  <Check className="w-4 h-4" />
-                  {selectedImages.length === filteredImages.length
-                    ? "Deselect All"
-                    : "Select All on Page"}
+                  <Check className="w-3.5 h-3.5" />
+                  Select All
                 </button>
                 <button
                   onClick={handleDeleteSelected}
                   disabled={selectedImages.length === 0}
-                  className={`px-3 py-1.5 border rounded-md hover:bg-gray-50 flex items-center gap-2 w-full ${
+                  className={`px-3 py-1.5 border rounded-md flex items-center gap-2 text-sm ${
                     selectedImages.length > 0
-                      ? "border-red-200 text-red-600"
-                      : "border-gray-200 text-gray-400"
+                      ? "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-red-600 dark:hover:text-red-400"
+                      : "border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-600"
                   }`}
                 >
-                  <X className="w-4 h-4" />
-                  Delete Selected ({selectedImages.length})
-                  {selectedImages.length > 0 && (
-                    <span className="text-xs text-gray-500 ml-auto">
-                      Shift + Delete
-                    </span>
+                  <X className="w-3.5 h-3.5" />
+                  {selectedImages.length > 0 ? (
+                    <>
+                      Delete ({selectedImages.length})
+                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                        ⇧⌫
+                      </span>
+                    </>
+                  ) : (
+                    "Delete"
                   )}
+                </button>
+                <button
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                  className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 flex items-center gap-2 text-sm group ml-auto"
+                >
+                  <Trash2 className="w-3.5 h-3.5 group-hover:text-red-500 dark:group-hover:text-red-400" />
+                  Delete All
                 </button>
               </div>
               <div className="flex gap-2">
@@ -694,10 +741,19 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 w-full justify-center"
+                  className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
                 >
-                  {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {uploading ? "Uploading..." : "Add Images"}
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Images
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -731,8 +787,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         "w-full h-full object-cover rounded-lg transition-all duration-300",
                         isMainVisible && actualIndex === mainIndex
                           ? ""
-                          : "opacity-75",
-                        isSelected ? "opacity-75" : ""
+                          : "opacity-75 dark:opacity-60",
+                        isSelected ? "opacity-75 dark:opacity-60" : ""
                       )}
                     />
                     {isEditMode && (
@@ -743,8 +799,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         <div
                           className={`w-5 h-5 rounded border-2 ${
                             isSelected
-                              ? "bg-blue-500 border-blue-500"
-                              : "border-white"
+                              ? "bg-blue-500 dark:bg-blue-600 border-blue-500 dark:border-blue-600"
+                              : "border-white dark:border-gray-300"
                           } flex items-center justify-center`}
                         >
                           {isSelected && (
@@ -763,18 +819,18 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
+                className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 disabled:opacity-50"
                 aria-label="Previous page"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <span className="text-sm">
+              <span className="text-sm text-gray-700 dark:text-gray-300">
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 disabled:opacity-50"
+                className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 disabled:opacity-50"
                 aria-label="Next page"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -786,14 +842,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       {isModalOpen && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          className="fixed inset-0 bg-black/90 dark:bg-black/95 z-50 flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-label="Image gallery"
         >
           <button
             onClick={() => setIsModalOpen(false)}
-            className="absolute top-4 right-4 p-2 text-white"
+            className="absolute top-4 right-4 p-2 text-white hover:text-gray-300 dark:hover:text-gray-400"
             aria-label="Close fullscreen view"
           >
             <X className="w-6 h-6" />
@@ -805,18 +861,47 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           />
           <button
             onClick={handlePrev}
-            className="absolute left-4 p-2 text-white"
+            className="absolute left-4 p-2 text-white hover:text-gray-300 dark:hover:text-gray-400"
             aria-label="Previous image"
           >
             <ChevronLeft className="w-8 h-8" />
           </button>
           <button
             onClick={handleNext}
-            className="absolute right-4 p-2 text-white"
+            className="absolute right-4 p-2 text-white hover:text-gray-300 dark:hover:text-gray-400"
             aria-label="Next image"
           >
             <ChevronRight className="w-8 h-8" />
           </button>
+        </div>
+      )}
+
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+              Delete All Images?
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to delete all {images.length} images? This
+              action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowDeleteAllConfirm(false)}
+                className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                className="px-3 py-1.5 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete All
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
