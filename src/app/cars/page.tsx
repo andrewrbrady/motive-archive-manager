@@ -15,6 +15,9 @@ import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
 import { Car } from "@/types/car";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Cars Collection | Premium Vehicles",
   description: "Browse our exclusive collection of premium and luxury vehicles",
