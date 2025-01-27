@@ -120,9 +120,9 @@ export async function POST(request: NextRequest) {
     console.log("Successfully converted image to base64");
 
     const vehicleContext = vehicleInfo
-      ? `This is a ${vehicleInfo.year} ${vehicleInfo.make} ${
-          vehicleInfo.model
-        }${
+      ? `For reference only (DO NOT MODIFY THESE VALUES): This is a ${
+          vehicleInfo.year
+        } ${vehicleInfo.make} ${vehicleInfo.model}${
           vehicleInfo.type ? ` ${vehicleInfo.type}` : ""
         }. The car's color is ${
           vehicleInfo.color || "unknown"
@@ -148,7 +148,11 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: "text",
-              text: `${vehicleContext} Analyze this car image and provide a JSON response with EXACTLY these fields and values:
+              text: `${vehicleContext}
+
+              IMPORTANT: The car specifications provided above are for reference only. DO NOT modify or override these values. Your task is to ONLY analyze the VISUAL ASPECTS of the image.
+
+              Analyze this car image and provide a JSON response with EXACTLY these fields and values:
 
               {
                 "angle": MUST BE ONE OF ["${allowedValues.angle.join('", "')}"],
@@ -158,7 +162,7 @@ export async function POST(request: NextRequest) {
                 )}"],
                 "tod": MUST BE ONE OF ["${allowedValues.tod.join('", "')}"],
                 "side": MUST BE ONE OF ["${allowedValues.side.join('", "')}"],
-                "description": "A brief description of what's shown in the image. Include the color of the car, the make and model of the car, and any other details that are visible–we're aiming to be as SEO-friendly as possible."
+                "description": "A brief description of what's shown in the image. Use the provided car specifications (year, make, model, color) exactly as given, and only add additional visual details that are directly observable in the image."
               }
 
               Choose the CLOSEST matching value for each field. DO NOT use any values not listed above.

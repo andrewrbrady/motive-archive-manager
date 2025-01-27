@@ -13,6 +13,7 @@ import { Pencil, Plus } from "lucide-react";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Footer from "@/components/layout/footer";
 import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
+import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
 
 interface MeasurementValue {
   value: number | null;
@@ -109,6 +110,7 @@ interface Car {
   }[];
   owner_id?: string;
   engine?: Engine;
+  client?: string;
   clientInfo?: {
     _id: string;
     name: string;
@@ -192,6 +194,23 @@ export default function CarPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
+  const [showEnrichProgress, setShowEnrichProgress] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState<{
+    step: number;
+    currentStep: string;
+    status: "pending" | "processing" | "complete" | "error";
+    error?: string;
+    details?: {
+      searchTermsGenerated?: number;
+      additionalSearchesCompleted?: number;
+      fieldsUpdated?: number;
+      protectedFieldsPreserved?: string[];
+    };
+  }>({
+    step: 0,
+    currentStep: "",
+    status: "pending",
+  });
 
   type NestedFields =
     | "engine"
@@ -738,6 +757,22 @@ export default function CarPage() {
     if (!car) return;
 
     setIsEnriching(true);
+    setShowEnrichProgress(true);
+    setEnrichProgress({
+      step: 1,
+      currentStep: "Initial Search",
+      status: "processing",
+    });
+
+    const steps = [
+      "Initial Search",
+      "Initial Data Cleaning",
+      "Generating New Search Terms",
+      "Performing Additional Searches",
+      "Final Validation",
+      "Updating Database",
+    ];
+
     try {
       const response = await fetch(`/api/cars/${car._id}/enrich`, {
         method: "POST",
@@ -750,21 +785,61 @@ export default function CarPage() {
       const data = await response.json();
 
       if (data.success && data.updatedCar) {
-        // Update the car state with the enriched data
-        setCar(data.updatedCar);
+        // Preserve the existing clientInfo when updating the car state
+        const updatedCarWithClient = {
+          ...data.updatedCar,
+          client: car.client,
+          clientInfo: car.clientInfo,
+        };
 
-        // Show success toast or notification
-        // TODO: Add toast notification system
-        console.log("Successfully enriched car data:", data.enrichedData);
+        // Update the car state with the enriched data
+        setCar(updatedCarWithClient);
+
+        // Update progress based on backend response
+        if (data.progress) {
+          setEnrichProgress(data.progress);
+        } else {
+          setEnrichProgress({
+            step: 6,
+            currentStep: "Complete",
+            status: "complete",
+          });
+        }
       } else {
+        // Handle error progress from backend
+        if (data.progress) {
+          setEnrichProgress(data.progress);
+        } else {
+          setEnrichProgress({
+            step: 0,
+            currentStep: "",
+            status: "error",
+            error: data.error || "Failed to enrich car data",
+          });
+        }
         console.error("Failed to enrich car data:", data.error);
-        // Show error toast or notification
       }
     } catch (error) {
+      // Handle error progress
+      setEnrichProgress({
+        step: 0,
+        currentStep: "",
+        status: "error",
+        error:
+          error instanceof Error ? error.message : "Failed to enrich car data",
+      });
       console.error("Error enriching car data:", error);
-      // Show error toast or notification
     } finally {
-      setIsEnriching(false);
+      // Keep isEnriching true for a moment to show completion state
+      setTimeout(() => {
+        setIsEnriching(false);
+        setShowEnrichProgress(false);
+        setEnrichProgress({
+          step: 0,
+          currentStep: "",
+          status: "pending",
+        });
+      }, 2000);
     }
   };
 
@@ -926,11 +1001,25 @@ export default function CarPage() {
                   <button
                     onClick={handleEnrichData}
                     disabled={isEnriching}
-                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 disabled:opacity-50"
+                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 disabled:opacity-50 relative"
                     aria-label="Enrich data"
                   >
                     {isEnriching ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <div className="flex items-center">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {enrichProgress.status === "processing" && (
+                          <div className="absolute left-full ml-2 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 text-xs">
+                            {enrichProgress.currentStep}
+                            <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-white dark:border-r-[#111111]" />
+                          </div>
+                        )}
+                        {enrichProgress.status === "error" && (
+                          <div className="absolute left-full ml-2 whitespace-nowrap bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md px-2 py-1 text-xs text-red-600 dark:text-red-400">
+                            {enrichProgress.error}
+                            <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-red-50 dark:border-r-red-900/20" />
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <Plus className="w-4 h-4" />
                     )}
@@ -999,23 +1088,6 @@ export default function CarPage() {
               {/* Additional Info */}
               <div className="grid grid-cols-12 divide-x divide-gray-200 dark:divide-gray-800 text-sm bg-white dark:bg-[#111111]">
                 <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
-                  Type
-                </div>
-                <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
-                  {isSpecsEditMode ? (
-                    <input
-                      type="text"
-                      value={getInputValue(editedSpecs.type ?? car.type)}
-                      onChange={(e) =>
-                        handleInputChange("type", e.target.value)
-                      }
-                      className="w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1"
-                    />
-                  ) : (
-                    car.type || "N/A"
-                  )}
-                </div>
-                <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Color
                 </div>
                 <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
@@ -1035,7 +1107,7 @@ export default function CarPage() {
                 <div className="col-span-1 text-gray-600 dark:text-gray-400 uppercase text-xs font-medium py-1.5 px-2 flex items-center whitespace-normal min-h-[42px]">
                   Mileage
                 </div>
-                <div className="col-span-3 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
+                <div className="col-span-7 text-gray-600 dark:text-gray-300 font-medium p-2 flex items-center uppercase">
                   {isSpecsEditMode ? (
                     <MeasurementInputWithUnit
                       value={
@@ -1477,6 +1549,19 @@ export default function CarPage() {
         </div>
       </main>
       <Footer />
+      <EnrichmentProgress
+        isVisible={showEnrichProgress}
+        step={enrichProgress.step}
+        currentStep={enrichProgress.currentStep}
+        status={enrichProgress.status}
+        error={enrichProgress.error}
+        details={enrichProgress.details}
+        onClose={() => {
+          if (enrichProgress.status !== "processing") {
+            setShowEnrichProgress(false);
+          }
+        }}
+      />
     </div>
   );
 }

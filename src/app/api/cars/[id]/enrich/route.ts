@@ -197,7 +197,18 @@ async function validateAndCrossReference(
       messages: [
         {
           role: "system",
-          content: `Cross-reference and validate all collected vehicle information. Only include fields where multiple sources agree or confidence is high. DO NOT include price or location. 
+          content: `Cross-reference and validate all collected vehicle information. Only include fields where multiple sources agree or confidence is high. DO NOT include price or location.
+
+IMPORTANT: The following fields from the existing car data MUST NOT be modified or overridden. Use these values exactly as provided:
+- Year
+- Make
+- Model
+- Color
+- Mileage
+- VIN
+- Client
+- Location
+
 Return a final JSON object with validated data that matches the following structure:
 {
   model: string,
@@ -234,11 +245,7 @@ Return a final JSON object with validated data that matches the following struct
   weight: {
     curb_weight: { value: number, unit: "lbs" | "kg" }
   }
-}
-
-For measurements, always include both value and unit. Convert units if necessary to match the structure above.
-For power and torque, calculate and include all unit variations (hp/kW/ps and lb-ft/Nm).
-If a value cannot be determined with high confidence, set it to null but include the appropriate unit.`,
+}`,
         },
         {
           role: "user",
@@ -261,9 +268,28 @@ If a value cannot be determined with high confidence, set it to null but include
 
   const data = await response.json();
   const content = data.choices[0].message.content;
-  const validatedData = JSON.parse(content.match(/\{[\s\S]*\}/)[0]);
-  console.log("✅ Data validation complete:", validatedData);
-  return validatedData;
+  const enrichedData = JSON.parse(content.match(/\{[\s\S]*\}/)[0]);
+
+  // Ensure protected fields are preserved
+  const protectedFields = {
+    year: existingCarData.year,
+    make: existingCarData.make,
+    model: existingCarData.model,
+    color: existingCarData.color,
+    mileage: existingCarData.mileage,
+    vin: existingCarData.vin,
+    location: existingCarData.location,
+    client: existingCarData.client,
+  };
+
+  // Override any changes to protected fields
+  const finalData = {
+    ...enrichedData,
+    ...protectedFields,
+  };
+
+  console.log("✅ Data validated and cross-referenced:", finalData);
+  return finalData;
 }
 
 // Helper function to convert units if needed
@@ -309,7 +335,15 @@ export async function POST(
     if (!ObjectId.isValid(id)) {
       console.error("❌ Invalid car ID format");
       return NextResponse.json(
-        { error: "Invalid car ID format" },
+        {
+          error: "Invalid car ID format",
+          progress: {
+            step: 0,
+            currentStep: "",
+            status: "error",
+            error: "Invalid car ID format",
+          },
+        },
         { status: 400 }
       );
     }
@@ -321,7 +355,18 @@ export async function POST(
 
     if (!carDoc) {
       console.error("❌ Car not found in database");
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Car not found",
+          progress: {
+            step: 0,
+            currentStep: "",
+            status: "error",
+            error: "Car not found",
+          },
+        },
+        { status: 404 }
+      );
     }
 
     // Cast MongoDB document to Car type
@@ -388,6 +433,8 @@ export async function POST(
           year: car.year || validatedData.year,
           type: car.type || validatedData.type,
           vin: car.vin || validatedData.vin,
+          client: car.client,
+          clientInfo: car.clientInfo,
           // Update other enriched data
           engine: validatedData.engine,
           dimensions: validatedData.dimensions,
@@ -417,11 +464,42 @@ export async function POST(
       originalData: car,
       enrichedData: validatedData,
       updatedCar,
+      progress: {
+        step: 6,
+        currentStep: "Complete",
+        status: "complete",
+        details: {
+          searchTermsGenerated: newSearchTerms.length,
+          additionalSearchesCompleted: additionalSearchResults.length,
+          fieldsUpdated: Object.keys(validatedData).length,
+          protectedFieldsPreserved: [
+            "make",
+            "model",
+            "year",
+            "color",
+            "mileage",
+            "vin",
+            "client",
+            "clientInfo",
+          ],
+        },
+      },
     });
   } catch (error) {
     console.error("❌ Error during enrichment process:", error);
     return NextResponse.json(
-      { error: "Failed to enrich car data" },
+      {
+        error: "Failed to enrich car data",
+        progress: {
+          step: 0,
+          currentStep: "",
+          status: "error",
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to enrich car data",
+        },
+      },
       { status: 500 }
     );
   } finally {

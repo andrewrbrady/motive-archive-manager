@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
 import { UploadProgressDialog } from "./UploadProgressDialog";
+import { MotiveLogo } from "@/components/ui/MotiveLogo";
 
 interface UploadProgress {
   fileName: string;
@@ -186,6 +187,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const prevImagesLengthRef = useRef(images.length);
   const _prevMainIndexRef = useRef(mainIndex);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Set initial image loaded state to true if we have images
   useEffect(() => {
@@ -358,10 +360,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   }, [onRemoveImage, selectedImages]);
 
-  const handleDeleteAll = useCallback(() => {
+  const handleDeleteAll = useCallback(async () => {
     if (onRemoveImage && images.length > 0) {
-      onRemoveImage(images.map((_, index) => index));
-      setShowDeleteAllConfirm(false);
+      try {
+        setIsDeleting(true);
+        await onRemoveImage(images.map((_, index) => index));
+      } finally {
+        setIsDeleting(false);
+        setShowDeleteAllConfirm(false);
+      }
     }
   }, [onRemoveImage, images.length]);
 
@@ -393,8 +400,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         handleNext();
-      } else if (e.key === "Escape" && isModalOpen) {
-        setIsModalOpen(false);
+      } else if (e.key === "Escape") {
+        if (isModalOpen) {
+          setIsModalOpen(false);
+        }
+        // Only close delete confirmation if not currently deleting
+        if (showDeleteAllConfirm && !isDeleting) {
+          setShowDeleteAllConfirm(false);
+        }
       }
     };
 
@@ -410,6 +423,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     isEditMode,
     selectedImages.length,
     handleDeleteSelected,
+    showDeleteAllConfirm,
+    isDeleting,
   ]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -461,7 +476,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         <div className="flex gap-6">
           <div className="w-2/3">
             <div className="w-full aspect-[4/3] relative bg-neutral-100 dark:bg-neutral-800 rounded-lg">
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                <MotiveLogo className="w-16 h-16 opacity-50" />
                 <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
                   {!images || images.length === 0
                     ? "No Images Available"
@@ -878,7 +894,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       {showDeleteAllConfirm && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
+          <div className="bg-white dark:bg-[#111111] rounded-lg p-6 max-w-md w-full mx-4 space-y-4 border border-gray-200 dark:border-gray-800">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
               Delete All Images?
             </h3>
