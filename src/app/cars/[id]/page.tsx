@@ -15,6 +15,7 @@ import Footer from "@/components/layout/footer";
 import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
 import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
 import ImageUploadWithContext from "@/components/ImageUploadWithContext";
+import CaptionGenerator from "@/components/CaptionGenerator";
 
 interface MeasurementValue {
   value: number | null;
@@ -966,6 +967,11 @@ export default function CarPage() {
             title={`${car.year} ${car.make} ${car.model}`}
             onContextChange={setAdditionalContext}
           />
+        </div>
+
+        {/* Add CaptionGenerator after the image gallery */}
+        <div className="mb-6">
+          <CaptionGenerator carDetails={car} />
         </div>
 
         {/* Vehicle Information */}
