@@ -188,7 +188,7 @@ export async function POST(
   const client = await getMongoClient();
 
   try {
-    const db = client.db("motive");
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
     const collection = db.collection("cars");
     const carId = new ObjectId(params.id);
 
