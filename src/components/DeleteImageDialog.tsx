@@ -26,9 +26,9 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
   deleteStatus = [],
   isDeleting = false,
 }) => {
-  if (!isOpen) return null;
-
   React.useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !isDeleting) {
         onClose();
@@ -37,7 +37,9 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDeleting, onClose]);
+  }, [isDeleting, onClose, isOpen]);
+
+  if (!isOpen) return null;
 
   const getOverallProgress = () => {
     if (deleteStatus.length === 0) return 0;
