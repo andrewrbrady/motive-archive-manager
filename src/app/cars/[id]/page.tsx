@@ -764,15 +764,6 @@ export default function CarPage() {
       status: "processing",
     });
 
-    const steps = [
-      "Initial Search",
-      "Initial Data Cleaning",
-      "Generating New Search Terms",
-      "Performing Additional Searches",
-      "Final Validation",
-      "Updating Database",
-    ];
-
     try {
       const response = await fetch(`/api/cars/${car._id}/enrich`, {
         method: "POST",
@@ -784,16 +775,9 @@ export default function CarPage() {
 
       const data = await response.json();
 
-      if (data.success && data.updatedCar) {
-        // Preserve the existing clientInfo when updating the car state
-        const updatedCarWithClient = {
-          ...data.updatedCar,
-          client: car.client,
-          clientInfo: car.clientInfo,
-        };
-
+      if (data.success && data.data) {
         // Update the car state with the enriched data
-        setCar(updatedCarWithClient);
+        setCar(data.data);
 
         // Update progress based on backend response
         if (data.progress) {
