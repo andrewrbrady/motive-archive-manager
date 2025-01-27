@@ -74,7 +74,7 @@ async function searchVehicleInfo(query: string) {
     },
     body: JSON.stringify({
       q: query,
-      num: 15,
+      num: 10,
     }),
   });
 
@@ -89,10 +89,10 @@ async function searchVehicleInfo(query: string) {
 }
 
 async function cleanAndStructureData(
-  searchResults: SerperResult,
+  searchResults: SerperResult[],
   existingCarData: Car
 ): Promise<EnrichedCarData> {
-  console.log("\n🧹 Cleaning and structuring initial search data...");
+  console.log("\n🧹 Cleaning and structuring search data...");
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -104,100 +104,7 @@ async function cleanAndStructureData(
       messages: [
         {
           role: "system",
-          content:
-            "You are a vehicle data specialist. Extract and clean vehicle information from search results. Focus on technical specifications, engine details, and factual information. DO NOT include price or location. Return a JSON object with cleaned data and confidence scores (0-1) for each field.",
-        },
-        {
-          role: "user",
-          content: `Extract information for ${existingCarData.year} ${
-            existingCarData.make
-          } ${existingCarData.model}${
-            existingCarData.type ? ` ${existingCarData.type}` : ""
-          }. Search results: ${JSON.stringify(searchResults)}`,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 1000,
-    }),
-  });
-
-  if (!response.ok) {
-    console.error("❌ OpenAI API error:", response.statusText);
-    throw new Error(`OpenAI API error: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices[0].message.content;
-  const cleanedData = JSON.parse(content.match(/\{[\s\S]*\}/)[0]);
-  console.log("✅ Initial data cleaned and structured:", cleanedData);
-  return cleanedData;
-}
-
-async function generateNewSearchTerms(
-  initialData: EnrichedCarData,
-  existingCarData: Car
-): Promise<string[]> {
-  console.log(
-    "\n🎯 Generating targeted search terms based on initial findings..."
-  );
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Based on the initial vehicle data, generate specific search queries to verify and expand the information. Focus on technical details that need verification or areas where information is missing. Return an array of search queries.",
-        },
-        {
-          role: "user",
-          content: `Generate specific search queries for ${
-            existingCarData.year
-          } ${existingCarData.make} ${
-            existingCarData.model
-          }. Initial data: ${JSON.stringify(initialData)}`,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 1000,
-    }),
-  });
-
-  if (!response.ok) {
-    console.error("❌ OpenAI API error:", response.statusText);
-    throw new Error(`OpenAI API error: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices[0].message.content;
-  const searchTerms = JSON.parse(content.match(/\[[\s\S]*\]/)[0]);
-  console.log("✅ Generated search terms:", searchTerms);
-  return searchTerms;
-}
-
-async function validateAndCrossReference(
-  allSearchResults: SerperResult[],
-  initialData: EnrichedCarData,
-  existingCarData: Car
-): Promise<EnrichedCarData> {
-  console.log("\n🔄 Cross-referencing and validating all collected data...");
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Cross-reference and validate all collected vehicle information. Only include fields where multiple sources agree or confidence is high. DO NOT include price or location.
+          content: `Cross-reference and validate vehicle information from search results. Only include fields where confidence is high. DO NOT include price or location.
 
 IMPORTANT: The following fields from the existing car data MUST NOT be modified or overridden. Use these values exactly as provided:
 - Year
@@ -249,15 +156,16 @@ Return a final JSON object with validated data that matches the following struct
         },
         {
           role: "user",
-          content: `Validate information for ${existingCarData.year} ${
-            existingCarData.make
-          } ${existingCarData.model}. Initial data: ${JSON.stringify(
-            initialData
-          )}. Additional search results: ${JSON.stringify(allSearchResults)}`,
+          content: `Extract and validate information for ${
+            existingCarData.year
+          } ${existingCarData.make} ${
+            existingCarData.model
+          }. Search results: ${JSON.stringify(searchResults)}`,
         },
       ],
       temperature: 0.3,
       max_tokens: 1000,
+      response_format: { type: "json_object" },
     }),
   });
 
@@ -267,243 +175,111 @@ Return a final JSON object with validated data that matches the following struct
   }
 
   const data = await response.json();
-  const content = data.choices[0].message.content;
-  const enrichedData = JSON.parse(content.match(/\{[\s\S]*\}/)[0]);
-
-  // Ensure protected fields are preserved
-  const protectedFields = {
-    year: existingCarData.year,
-    make: existingCarData.make,
-    model: existingCarData.model,
-    color: existingCarData.color,
-    mileage: existingCarData.mileage,
-    vin: existingCarData.vin,
-    location: existingCarData.location,
-    client: existingCarData.client,
-  };
-
-  // Override any changes to protected fields
-  const finalData = {
-    ...enrichedData,
-    ...protectedFields,
-  };
-
-  console.log("✅ Data validated and cross-referenced:", finalData);
-  return finalData;
-}
-
-// Helper function to convert units if needed
-function convertUnits(data: EnrichedCarData): EnrichedCarData {
-  if (!data) return data;
-
-  // Deep clone the data
-  const converted = JSON.parse(JSON.stringify(data));
-
-  // Convert power if only one unit is provided
-  if (converted.engine?.power) {
-    const power = converted.engine.power;
-    if (power.hp && !power.kW) power.kW = Math.round(power.hp * 0.7457);
-    if (power.hp && !power.ps) power.ps = Math.round(power.hp * 1.014);
-    if (power.kW && !power.hp) power.hp = Math.round(power.kW / 0.7457);
-    if (power.kW && !power.ps) power.ps = Math.round(power.kW * 1.359);
-    if (power.ps && !power.hp) power.hp = Math.round(power.ps / 1.014);
-    if (power.ps && !power.kW) power.kW = Math.round(power.ps * 0.7355);
-  }
-
-  // Convert torque if only one unit is provided
-  if (converted.engine?.torque) {
-    const torque = converted.engine.torque;
-    if (torque["lb-ft"] && !torque.Nm)
-      torque.Nm = Math.round(torque["lb-ft"] * 1.356);
-    if (torque.Nm && !torque["lb-ft"])
-      torque["lb-ft"] = Math.round(torque.Nm / 1.356);
-  }
-
-  return converted;
+  const cleanedData = JSON.parse(data.choices[0].message.content);
+  console.log("✅ Data cleaned and structured:", cleanedData);
+  return cleanedData;
 }
 
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  console.log("\n🚀 Starting vehicle data enrichment process...");
+  console.log("\n🚀 Starting car data enrichment process...");
   const client = await getMongoClient();
+
   try {
-    const { id } = await Promise.resolve(params);
-    console.log(`📋 Processing vehicle ID: ${id}`);
+    const db = client.db("motive");
+    const collection = db.collection("cars");
+    const carId = new ObjectId(params.id);
 
-    if (!ObjectId.isValid(id)) {
-      console.error("❌ Invalid car ID format");
-      return NextResponse.json(
-        {
-          error: "Invalid car ID format",
-          progress: {
-            step: 0,
-            currentStep: "",
-            status: "error",
-            error: "Invalid car ID format",
-          },
-        },
-        { status: 400 }
-      );
+    // Get existing car data
+    const existingCarData = await collection.findOne<Car>({ _id: carId });
+    if (!existingCarData) {
+      throw new Error("Car not found");
     }
 
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
-    const carDoc = await db.collection("cars").findOne({
-      _id: new ObjectId(id),
-    });
+    // Perform initial search
+    const baseQuery = `${existingCarData.year} ${existingCarData.make} ${existingCarData.model} specs technical details`;
+    const additionalQueries = [
+      `${existingCarData.year} ${existingCarData.make} ${existingCarData.model} engine specifications`,
+      `${existingCarData.year} ${existingCarData.make} ${existingCarData.model} dimensions weight`,
+    ];
 
-    if (!carDoc) {
-      console.error("❌ Car not found in database");
-      return NextResponse.json(
-        {
-          error: "Car not found",
-          progress: {
-            step: 0,
-            currentStep: "",
-            status: "error",
-            error: "Car not found",
-          },
-        },
-        { status: 404 }
-      );
-    }
+    // Perform searches concurrently
+    const searchPromises = [baseQuery, ...additionalQueries].map((query) =>
+      searchVehicleInfo(query)
+    );
+    const searchResults = await Promise.all(searchPromises);
 
-    // Cast MongoDB document to Car type
-    const car = carDoc as unknown as Car;
-    console.log(`📌 Found vehicle: ${car.year} ${car.make} ${car.model}`);
-
-    // Step 1: Initial search
-    console.log("\n📍 Step 1: Initial Search");
-    let searchQuery = `${car.year} ${car.make} ${car.model} specifications`;
-    if (car.type) searchQuery += ` ${car.type}`;
-    if (car.vin) searchQuery += ` VIN: ${car.vin}`;
-    const initialSearchResults = await searchVehicleInfo(searchQuery);
-
-    // Step 2: Clean and structure initial data
-    console.log("\n📍 Step 2: Initial Data Cleaning");
-    const initialCleanedData = await cleanAndStructureData(
-      initialSearchResults,
-      car
+    // Clean and structure the data
+    const enrichedData = await cleanAndStructureData(
+      searchResults,
+      existingCarData
     );
 
-    // Step 3: Generate new search terms based on findings
-    console.log("\n📍 Step 3: Generating New Search Terms");
-    const newSearchTerms = await generateNewSearchTerms(
-      initialCleanedData,
-      car
-    );
+    // Preserve protected fields
+    const updatedCarData = {
+      ...enrichedData,
+      _id: existingCarData._id,
+      year: existingCarData.year,
+      make: existingCarData.make,
+      model: existingCarData.model,
+      color: existingCarData.color,
+      mileage: existingCarData.mileage,
+      vin: existingCarData.vin,
+      client: existingCarData.client,
+      clientInfo: existingCarData.clientInfo,
+      location: existingCarData.location,
+    };
 
-    // Step 4: Perform additional searches
-    console.log("\n📍 Step 4: Performing Additional Searches");
-    console.log(`🔄 Running ${newSearchTerms.length} additional searches...`);
-    const additionalSearchResults = await Promise.all(
-      newSearchTerms.map((term: string) =>
-        searchVehicleInfo(`${car.year} ${car.make} ${car.model} ${term}`)
-      )
-    );
-    console.log(`✅ Completed ${newSearchTerms.length} additional searches`);
+    // Update the car in the database
+    await collection.updateOne({ _id: carId }, { $set: updatedCarData });
 
-    // Step 5: Validate and cross-reference all data
-    console.log("\n📍 Step 5: Final Validation");
-    let validatedData = await validateAndCrossReference(
-      additionalSearchResults,
-      initialCleanedData,
-      car
-    );
-
-    // Convert units and ensure all measurement pairs are present
-    validatedData = convertUnits(validatedData);
-
-    // Step 6: Update the database with validated data
-    console.log("\n📍 Step 6: Updating Database");
-    const updateResult = await db.collection("cars").updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          // Only update fields from validatedData if they don't exist in car
-          ...(car.color ? {} : { color: validatedData.color }),
-          ...(car.mileage ? {} : { mileage: validatedData.mileage }),
-          ...(car.interior_color
-            ? {}
-            : { interior_color: validatedData.interior_color }),
-          // Always preserve these fields
-          make: car.make,
-          model: car.model,
-          year: car.year || validatedData.year,
-          type: car.type || validatedData.type,
-          vin: car.vin || validatedData.vin,
-          client: car.client,
-          clientInfo: car.clientInfo,
-          // Update other enriched data
-          engine: validatedData.engine,
-          dimensions: validatedData.dimensions,
-          fuel_capacity: validatedData.fuel_capacity,
-          interior_features: validatedData.interior_features,
-          performance: validatedData.performance,
-          transmission: validatedData.transmission,
-          weight: validatedData.weight,
-        },
-      }
-    );
-
-    if (!updateResult.modifiedCount) {
-      console.error("❌ Failed to update car with enriched data");
-      throw new Error("Failed to update car with enriched data");
-    }
-    console.log("✅ Database updated successfully");
-
-    // Fetch the updated car data
-    const updatedCar = await db.collection("cars").findOne({
-      _id: new ObjectId(id),
-    });
-
-    console.log("\n🎉 Enrichment process complete!");
     return NextResponse.json({
       success: true,
-      originalData: car,
-      enrichedData: validatedData,
-      updatedCar,
+      message: "Car data enriched successfully",
+      data: updatedCarData,
       progress: {
         step: 6,
         currentStep: "Complete",
         status: "complete",
         details: {
-          searchTermsGenerated: newSearchTerms.length,
-          additionalSearchesCompleted: additionalSearchResults.length,
-          fieldsUpdated: Object.keys(validatedData).length,
+          searchTermsGenerated: additionalQueries.length + 1,
+          additionalSearchesCompleted: additionalQueries.length,
+          fieldsUpdated: Object.keys(enrichedData).length,
           protectedFieldsPreserved: [
+            "year",
             "make",
             "model",
-            "year",
             "color",
             "mileage",
             "vin",
             "client",
             "clientInfo",
+            "location",
           ],
         },
       },
     });
   } catch (error) {
-    console.error("❌ Error during enrichment process:", error);
+    console.error("❌ Error enriching car data:", error);
     return NextResponse.json(
       {
-        error: "Failed to enrich car data",
+        success: false,
+        message: "Failed to enrich car data",
+        error:
+          error instanceof Error ? error.message : "Unknown error occurred",
         progress: {
           step: 0,
           currentStep: "",
           status: "error",
           error:
-            error instanceof Error
-              ? error.message
-              : "Failed to enrich car data",
+            error instanceof Error ? error.message : "Unknown error occurred",
         },
       },
       { status: 500 }
     );
   } finally {
     await client.close();
-    console.log("👋 MongoDB connection closed");
   }
 }
