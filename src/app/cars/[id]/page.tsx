@@ -775,11 +775,14 @@ export default function CarPage() {
 
       const data = await response.json();
 
-      if (data.success && data.data) {
-        // Only update car state if we have valid data
-        if (data.data._id && data.data.images) {
-          setCar(data.data);
+      if (data.success) {
+        // Fetch fresh data after successful enrichment
+        const freshDataResponse = await fetch(`/api/cars/${car._id}`);
+        if (!freshDataResponse.ok) {
+          throw new Error("Failed to fetch updated car data");
         }
+        const freshData = await freshDataResponse.json();
+        setCar(freshData);
 
         // Update progress based on backend response
         if (data.progress) {
