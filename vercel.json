@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/cars/[id]/enrich": {
+    "app/api/cars/[id]/enrich/route": {
       "maxDuration": 60
     }
   }
