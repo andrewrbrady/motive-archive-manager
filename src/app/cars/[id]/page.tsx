@@ -14,6 +14,7 @@ import { PageTitle } from "@/components/ui/PageTitle";
 import Footer from "@/components/layout/footer";
 import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
 import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
+import ImageUploadWithContext from "@/components/ImageUploadWithContext";
 
 interface MeasurementValue {
   value: number | null;
@@ -211,6 +212,7 @@ export default function CarPage() {
     currentStep: "",
     status: "pending",
   });
+  const [additionalContext, setAdditionalContext] = useState("");
 
   type NestedFields =
     | "engine"
@@ -444,6 +446,7 @@ export default function CarPage() {
             condition: car.condition,
             mileage: car.mileage,
             engine: car.engine,
+            additionalContext: additionalContext,
           })
         );
 
@@ -641,12 +644,34 @@ export default function CarPage() {
 
   const handleRemoveImage = async (indices: number[]) => {
     if (!car) return;
-    const imagesToRemove = indices.map((index) => ({
-      index,
-      image: car.images[index],
-    }));
-    setImagesToDelete(imagesToRemove);
-    setDeleteDialogOpen(true);
+
+    try {
+      // First remove from car's state
+      const indicesToRemove = new Set(indices);
+      const newImages = car.images.filter((_, i) => !indicesToRemove.has(i));
+
+      // Update the database
+      const response = await fetch(`/api/cars/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ images: newImages }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update car images");
+      }
+
+      // Update local state
+      setCar((prev) => ({
+        ...prev!,
+        images: newImages,
+      }));
+    } catch (error) {
+      console.error("Error removing images:", error);
+      throw error; // Re-throw to be handled by the ImageUploadWithContext component
+    }
   };
 
   const handleDeleteConfirm = async (deleteFromCloudflare: boolean) => {
@@ -920,43 +945,26 @@ export default function CarPage() {
           </PageTitle>
         </div>
 
-        {/* Image Gallery */}
+        {/* Replace both the context input and image gallery with the new component */}
         <div className="mb-6">
-          <ImageGallery
+          <ImageUploadWithContext
             images={car.images}
             isEditMode={isEditMode}
             onRemoveImage={handleRemoveImage}
-            onImagesChange={(files) => {
-              handleImageUpload(files);
-            }}
+            onImagesChange={handleImageUpload}
             uploading={uploadingImages}
             uploadProgress={uploadProgress}
-            _setUploadProgress={setUploadProgress}
+            setUploadProgress={setUploadProgress}
             showMetadata={true}
             showFilters={showFilters}
-            _vehicleInfo={{
+            vehicleInfo={{
               year: car.year,
               make: car.make,
               model: car.model,
               type: car.type,
             }}
             title={`${car.year} ${car.make} ${car.model}`}
-            aspectRatio="4/3"
-            thumbnailsPerRow={8}
-            rowsPerPage={3}
-          />
-
-          <DeleteImageDialog
-            isOpen={deleteDialogOpen}
-            onClose={() => {
-              setDeleteDialogOpen(false);
-              setImagesToDelete([]);
-              setDeleteStatus([]);
-            }}
-            onConfirm={handleDeleteConfirm}
-            imageCount={imagesToDelete.length}
-            deleteStatus={deleteStatus}
-            isDeleting={isDeleting}
+            onContextChange={setAdditionalContext}
           />
         </div>
 
