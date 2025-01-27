@@ -775,9 +775,11 @@ export default function CarPage() {
 
       const data = await response.json();
 
-      if (data.success) {
-        // Update car state with enriched data
-        setCar(data.data);
+      if (data.success && data.data) {
+        // Only update car state if we have valid data
+        if (data.data._id && data.data.images) {
+          setCar(data.data);
+        }
 
         // Update progress based on backend response
         if (data.progress) {
