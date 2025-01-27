@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "app/api/cars/[id]/enrich/route": {
-      "maxDuration": 60
-    }
-  }
-}
