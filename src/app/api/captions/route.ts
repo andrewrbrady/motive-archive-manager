@@ -8,7 +8,7 @@ interface Car {
   make: string;
   model: string;
   color?: string;
-  captionIds: ObjectId[]; // Array of caption IDs only
+  captionIds: ObjectId[];
 }
 
 interface Caption {
@@ -112,7 +112,7 @@ export async function PATCH(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection("captions");
+    const captions = db.collection<Caption>("captions");
 
     const result = await captions.findOneAndUpdate(
       { _id: new ObjectId(captionId) },
@@ -156,8 +156,8 @@ export async function DELETE(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection("captions");
-    const cars = db.collection("cars");
+    const captions = db.collection<Caption>("captions");
+    const cars = db.collection<Car>("cars");
 
     // Delete the caption
     const result = await captions.deleteOne({ _id: new ObjectId(captionId) });
@@ -166,12 +166,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Caption not found" }, { status: 404 });
     }
 
-    // Remove the caption ID from the car document
+    // Get the car document first
+    const car = await cars.findOne({ _id: new ObjectId(carId) });
+    if (!car) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
+    // Update the car document to remove the caption ID
     await cars.updateOne(
       { _id: new ObjectId(carId) },
       {
-        $pull: {
-          captionIds: new ObjectId(captionId),
+        $set: {
+          captionIds: car.captionIds.filter(
+            (id) => id.toString() !== captionId
+          ),
         },
       }
     );
@@ -200,7 +208,7 @@ export async function GET(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection("captions");
+    const captions = db.collection<Caption>("captions");
 
     const results = await captions
       .find({ carId: new ObjectId(carId) })
@@ -210,7 +218,7 @@ export async function GET(request: NextRequest) {
     // Convert ObjectIds to strings and format dates for frontend
     const formattedResults = results.map((caption) => ({
       ...caption,
-      _id: caption._id.toString(),
+      _id: caption._id!.toString(),
       carId: caption.carId.toString(),
       createdAt: caption.createdAt.toISOString(),
       car: caption.car
