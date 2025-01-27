@@ -776,11 +776,6 @@ export default function CarPage() {
       const data = await response.json();
 
       if (data.success && data.data) {
-        // Only update car state if we have valid data
-        if (data.data._id && data.data.images) {
-          setCar(data.data);
-        }
-
         // Update progress based on backend response
         if (data.progress) {
           setEnrichProgress(data.progress);
@@ -790,6 +785,21 @@ export default function CarPage() {
             currentStep: "Complete",
             status: "complete",
           });
+        }
+
+        // Add a small delay to ensure database write is complete
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Fetch fresh data after the delay
+        const freshDataResponse = await fetch(`/api/cars/${car._id}`);
+        if (!freshDataResponse.ok) {
+          throw new Error("Failed to fetch updated car data");
+        }
+        const freshData = await freshDataResponse.json();
+
+        // Only update if we have valid data
+        if (freshData._id && freshData.images) {
+          setCar(freshData);
         }
       } else {
         // Handle error progress from backend
