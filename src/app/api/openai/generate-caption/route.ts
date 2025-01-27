@@ -9,6 +9,11 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+interface MessageContent {
+  type: "text";
+  text: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -162,7 +167,7 @@ Follow these rules:
 
     // Regular caption generation (including dealer template)
     const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-3-sonnet-20240229",
       max_tokens: 500,
       temperature: temperature || 1.0,
       system: `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
@@ -184,7 +189,9 @@ Style Guideline: ${
 
 The first line of every caption must follow this format:
 [YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
-Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION`,
+Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
+
+Important: End the caption with relevant hashtags on a new line.`,
       messages: [
         {
           role: "user",
@@ -218,13 +225,13 @@ ${
       ],
     });
 
-    const captionContent = response.content[0];
-    if (!captionContent || captionContent.type !== "text") {
+    const content = response.content[0] as MessageContent;
+    if (!content.text) {
       throw new Error("Failed to generate caption");
     }
 
     // Find the last occurrence of hashtags
-    const captionText = captionContent.text.trim();
+    const captionText = content.text.trim();
     const hashtagIndex = captionText.lastIndexOf("\n#");
 
     // Split content and hashtags
