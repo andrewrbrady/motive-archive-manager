@@ -54,6 +54,7 @@ export interface Car {
   owner_id?: string;
   engine?: Engine;
   interior_color?: string;
+  client?: string;
   clientInfo?: {
     _id: string;
     name: string;

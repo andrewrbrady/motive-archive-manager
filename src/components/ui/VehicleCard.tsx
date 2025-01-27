@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Clock, MapPin } from "lucide-react";
 import { getTimeRemaining } from "@/lib/utils";
+import { MotiveLogo } from "./MotiveLogo";
 
 type BaseVehicle = {
   year: number;
@@ -109,8 +110,8 @@ export function VehicleCard({
               />
             )
           ) : (
-            <div className="w-full h-full bg-gray-100 dark:bg-black flex items-center justify-center text-gray-500 dark:text-gray-400">
-              No Image Available
+            <div className="w-full h-full bg-gray-50 dark:bg-black flex items-center justify-center">
+              <MotiveLogo className="w-16 h-16 opacity-50" />
             </div>
           )}
         </div>

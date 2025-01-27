@@ -137,11 +137,6 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
                 <span className="text-gray-900 dark:text-gray-100">
                   {car.model}
                 </span>
-                {car.type && (
-                  <span className="text-xs uppercase text-gray-500 dark:text-gray-400 ml-1">
-                    {car.type}
-                  </span>
-                )}
               </td>
               <td className="w-[12%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
                 {typeof car.price === "number"
