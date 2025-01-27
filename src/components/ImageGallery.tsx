@@ -65,6 +65,7 @@ interface ImageGalleryProps {
     model: string;
     type?: string;
   };
+  contextInput?: React.ReactNode;
 }
 
 const MetadataSection = ({
@@ -165,6 +166,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   showMetadata = true,
   showFilters = true,
   _vehicleInfo,
+  contextInput,
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -517,6 +519,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     )}
                   </button>
                 </div>
+                {contextInput}
               </div>
             )}
 
@@ -771,6 +774,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     </>
                   )}
                 </button>
+                {contextInput}
               </div>
             </div>
           )}
