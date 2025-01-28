@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  BAT_LISTING_EXAMPLES,
+  BAT_LISTING_GUIDELINES,
+  BAT_LISTING_SECTIONS,
+} from "@/constants/bat-listing-examples";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -100,6 +105,21 @@ export async function POST(request: NextRequest) {
         setTimeout(() => reject(new Error("Request timeout")), 55000) // 55 seconds timeout
     );
 
+    // Get a relevant example based on the car type and focus
+    const relevantExample =
+      BAT_LISTING_EXAMPLES.find((example) => {
+        if (
+          focus === "mechanical" &&
+          example.title === "Modern Performance Car"
+        )
+          return true;
+        if (focus === "historical" && example.title === "Vintage Race Car")
+          return true;
+        if (focus === "comprehensive" && example.title === "Classic Sports Car")
+          return true;
+        return false;
+      }) || BAT_LISTING_EXAMPLES[0];
+
     const responsePromise = anthropic.messages.create({
       model: "claude-3-sonnet-20240229",
       max_tokens: 3000,
@@ -111,19 +131,16 @@ Style: ${styleGuidelines[style as keyof typeof styleGuidelines]}
 Tone: ${toneGuidelines[tone as keyof typeof toneGuidelines]}
 Length: ${lengthGuidelines[length as keyof typeof lengthGuidelines]}
 
-Writing Guidelines:
-- Start with a compelling introduction that hooks potential buyers
-- Use proper paragraph breaks for readability
-- Include all relevant technical specifications
-- Highlight unique features and selling points
-- Describe any modifications or restoration work
-- Mention maintenance history if provided
-- Use precise, accurate terminology
-- Avoid subjective terms like "beautiful" or "stunning"
-- Focus on factual descriptions and details
-- Format numbers consistently (use commas for thousands)
-- Include the VIN if provided
-- End with a summary of the vehicle's appeal`,
+BaT Listing Guidelines:
+${BAT_LISTING_GUIDELINES.map((g) => `- ${g}`).join("\n")}
+
+Listing Structure:
+${Object.entries(BAT_LISTING_SECTIONS)
+  .map(([section, desc]) => `${section}: ${desc}`)
+  .join("\n")}
+
+Here's a relevant example of a well-written BaT listing:
+${relevantExample.listing}`,
       messages: [
         {
           role: "user",
@@ -142,7 +159,8 @@ Follow these rules:
 - Maintain the specified tone and style
 - Do not make assumptions about the car's history or modifications
 - Use proper formatting and paragraph breaks
-- Make the listing engaging and informative for potential buyers`,
+- Make the listing engaging and informative for potential buyers
+- Follow the BaT listing structure and guidelines provided`,
         },
       ],
     });
