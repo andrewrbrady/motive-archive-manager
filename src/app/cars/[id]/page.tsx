@@ -16,6 +16,7 @@ import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
 import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
 import ImageUploadWithContext from "@/components/ImageUploadWithContext";
 import CaptionGenerator from "@/components/CaptionGenerator";
+import BaTListingGenerator from "@/components/BaTListingGenerator";
 
 interface MeasurementValue {
   value: number | null;
@@ -970,8 +971,9 @@ export default function CarPage() {
         </div>
 
         {/* Add CaptionGenerator after the image gallery */}
-        <div className="mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <CaptionGenerator carDetails={car} />
+          <BaTListingGenerator carDetails={car} />
         </div>
 
         {/* Vehicle Information */}
