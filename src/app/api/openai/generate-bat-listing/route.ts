@@ -11,7 +11,7 @@ interface MessageContent {
   text: string;
 }
 
-export const maxDuration = 300; // Set max duration to 300 seconds (5 minutes)
+export const maxDuration = 60; // Set max duration to 60 seconds (Vercel hobby plan limit)
 export const dynamic = "force-dynamic"; // Disable static generation
 
 export async function POST(request: NextRequest) {
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     // Set timeout for the API call
     const timeoutPromise = new Promise(
       (_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout")), 240000) // 4 minutes timeout
+        setTimeout(() => reject(new Error("Request timeout")), 55000) // 55 seconds timeout
     );
 
     const responsePromise = anthropic.messages.create({
