@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       }) || BAT_LISTING_EXAMPLES[0];
 
     const responsePromise = anthropic.messages.create({
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 3000,
       temperature: temperature || 0.7,
       system: `You are an expert automotive writer specializing in creating engaging Bring a Trailer (BaT) auction listings. Follow these guidelines:
