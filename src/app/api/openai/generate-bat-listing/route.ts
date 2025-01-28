@@ -3,12 +3,16 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 3, // Add retries for reliability
 });
 
 interface MessageContent {
   type: "text";
   text: string;
 }
+
+export const maxDuration = 300; // Set max duration to 300 seconds (5 minutes)
+export const dynamic = "force-dynamic"; // Disable static generation
 
 export async function POST(request: NextRequest) {
   try {
@@ -90,8 +94,14 @@ export async function POST(request: NextRequest) {
       comprehensive: "Produce an extensive listing of 5+ paragraphs",
     };
 
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+    // Set timeout for the API call
+    const timeoutPromise = new Promise(
+      (_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), 240000) // 4 minutes timeout
+    );
+
+    const responsePromise = anthropic.messages.create({
+      model: "claude-3-sonnet-20240229",
       max_tokens: 3000,
       temperature: temperature || 0.7,
       system: `You are an expert automotive writer specializing in creating engaging Bring a Trailer (BaT) auction listings. Follow these guidelines:
@@ -137,6 +147,12 @@ Follow these rules:
       ],
     });
 
+    // Race between the API call and timeout
+    const response = (await Promise.race([
+      responsePromise,
+      timeoutPromise,
+    ])) as Awaited<typeof responsePromise>;
+
     const content = response.content[0] as MessageContent;
     if (!content.text) {
       throw new Error("Failed to generate listing");
@@ -145,9 +161,9 @@ Follow these rules:
     return NextResponse.json({ listing: content.text.trim() });
   } catch (error) {
     console.error("Error generating BaT listing:", error);
-    return NextResponse.json(
-      { error: "Failed to generate listing" },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate listing";
+    const status = errorMessage === "Request timeout" ? 504 : 500;
+    return NextResponse.json({ error: errorMessage }, { status });
   }
 }
