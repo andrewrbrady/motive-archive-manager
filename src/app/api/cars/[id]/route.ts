@@ -1,5 +1,6 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
+import { ImageMetadata } from "@/lib/cloudflare";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -26,7 +27,7 @@ interface CarImage {
   id: string;
   url: string;
   filename: string;
-  metadata: Record<string, any>;
+  metadata: ImageMetadata;
   createdAt: string;
   updatedAt: string;
 }

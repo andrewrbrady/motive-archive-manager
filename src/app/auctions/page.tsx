@@ -103,10 +103,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
             <FiltersSection
               currentFilters={{
                 make: params.make || "",
-                model: params.model || "",
                 platformId: params.platformId || "",
-                minPrice: params.minPrice || "",
-                maxPrice: params.maxPrice || "",
                 minYear: params.minYear || "",
                 maxYear: params.maxYear || "",
                 noReserve: params.noReserve === "true",

@@ -35,9 +35,25 @@ export interface AuctionsResponse {
   totalPages: number;
 }
 
+interface AuctionFilters {
+  make?: string;
+  model?: string;
+  year?: number;
+  platform?: string;
+  platformId?: string;
+  status?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+  minYear?: number;
+  maxYear?: number;
+  endDate?: string;
+  noReserve?: boolean;
+  $or?: Array<Record<string, unknown>>;
+}
+
 export const fetchAuctions = cache(async function fetchAuctions(
   page: number = 1,
-  filters: Record<string, any> = {},
+  filters: AuctionFilters = {},
   pageSize: number = 24
 ): Promise<AuctionsResponse> {
   try {
@@ -52,7 +68,7 @@ export const fetchAuctions = cache(async function fetchAuctions(
     if (filters.platformId) {
       try {
         query.platformId = new ObjectId(filters.platformId);
-      } catch (err) {
+      } catch (_err) {
         console.error("Invalid platformId ObjectId:", filters.platformId);
       }
     }
@@ -70,11 +86,23 @@ export const fetchAuctions = cache(async function fetchAuctions(
     // Handle year range filters
     if (filters.minYear || filters.maxYear) {
       query.year = {};
-      if (filters.minYear && !isNaN(parseInt(filters.minYear))) {
-        query.year.$gte = parseInt(filters.minYear);
+      if (filters.minYear) {
+        const minYear =
+          typeof filters.minYear === "string"
+            ? parseInt(filters.minYear)
+            : filters.minYear;
+        if (!isNaN(minYear)) {
+          query.year.$gte = minYear;
+        }
       }
-      if (filters.maxYear && !isNaN(parseInt(filters.maxYear))) {
-        query.year.$lte = parseInt(filters.maxYear);
+      if (filters.maxYear) {
+        const maxYear =
+          typeof filters.maxYear === "string"
+            ? parseInt(filters.maxYear)
+            : filters.maxYear;
+        if (!isNaN(maxYear)) {
+          query.year.$lte = maxYear;
+        }
       }
       // Only delete if we successfully used them
       if (query.year.$gte || query.year.$lte) {

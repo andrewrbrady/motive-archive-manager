@@ -6,11 +6,9 @@ import { useState, useEffect } from "react";
 
 const ImageCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(1);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setDirection(1);
       setCurrentIndex(
         (prevIndex) => (prevIndex + 1) % heroContent.images.length
       );

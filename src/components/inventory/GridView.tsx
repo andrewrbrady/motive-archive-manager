@@ -4,10 +4,9 @@ import { InventoryItem } from "@/types/inventory";
 
 interface GridViewProps {
   cars: InventoryItem[];
-  currentSearchParams: string;
 }
 
-export function GridView({ cars, currentSearchParams }: GridViewProps) {
+export function GridView({ cars }: GridViewProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {cars.map((car) => (

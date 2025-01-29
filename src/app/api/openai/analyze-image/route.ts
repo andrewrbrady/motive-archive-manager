@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import sharp from "sharp";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -24,7 +23,6 @@ const allowedValues = {
 } as const;
 
 type AllowedField = keyof typeof allowedValues;
-type AllowedValues = (typeof allowedValues)[AllowedField][number];
 
 function cleanMarkdownJSON(text: string | null | undefined): string {
   if (!text) return "{}";
@@ -85,20 +83,6 @@ function normalizeAnalysis(analysis: any) {
   };
 
   return normalized;
-}
-
-async function resizeImage(imageUrl: string): Promise<Buffer> {
-  const response = await fetch(imageUrl);
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  return sharp(buffer)
-    .resize(150, 150, {
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .jpeg({ quality: 30 })
-    .toBuffer();
 }
 
 async function validateColorWithSerper(color: string, vehicleInfo: any) {

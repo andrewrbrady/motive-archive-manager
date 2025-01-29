@@ -15,6 +15,7 @@ import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
 import ImageUploadWithContext from "@/components/ImageUploadWithContext";
 import CaptionGenerator from "@/components/CaptionGenerator";
 import BaTListingGenerator from "@/components/BaTListingGenerator";
+import { toast } from "react-hot-toast";
 
 interface MeasurementValue {
   value: number | null;
@@ -628,16 +629,42 @@ export default function CarPage() {
     }
   };
 
-  const handleRemoveImage = async (indices: number[]) => {
+  const handleRemoveImage = async (
+    indices: number[],
+    deleteFromStorage: boolean = false
+  ) => {
     if (!car) return;
 
     try {
       // First remove from car's state
       const indicesToRemove = new Set(indices);
+      const imagesToDelete = car.images.filter((_, i) =>
+        indicesToRemove.has(i)
+      );
       const newImages = car.images.filter((_, i) => !indicesToRemove.has(i));
 
-      // Update the database
-      const response = await fetch(`/api/cars/${id}`, {
+      // Delete each image from the API
+      for (const image of imagesToDelete) {
+        const response = await fetch(`/api/cars/${id}/images`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageUrl: image.url,
+            deleteFromStorage,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error("Failed to delete image:", error);
+          throw new Error("Failed to delete image");
+        }
+      }
+
+      // Update the database with the new images array
+      const updateResponse = await fetch(`/api/cars/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -645,18 +672,15 @@ export default function CarPage() {
         body: JSON.stringify({ images: newImages }),
       });
 
-      if (!response.ok) {
+      if (!updateResponse.ok) {
         throw new Error("Failed to update car images");
       }
 
       // Update local state
-      setCar((prev) => ({
-        ...prev!,
-        images: newImages,
-      }));
+      setCar({ ...car, images: newImages });
     } catch (error) {
       console.error("Error removing images:", error);
-      throw error; // Re-throw to be handled by the ImageUploadWithContext component
+      toast.error("Failed to remove images");
     }
   };
 
@@ -838,12 +862,6 @@ export default function CarPage() {
             uploadProgress={uploadProgress}
             setUploadProgress={setUploadProgress}
             showMetadata={true}
-            vehicleInfo={{
-              year: car.year,
-              make: car.make,
-              model: car.model,
-              type: car.type,
-            }}
             title={`${car.year} ${car.make} ${car.model}`}
             onContextChange={setAdditionalContext}
           />

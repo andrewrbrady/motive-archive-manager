@@ -45,7 +45,8 @@ export default async function handler(
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
+  } catch (_error) {
+    console.error("Failed to fetch cars");
     res.status(500).json({ error: "Failed to fetch cars" });
   }
 }

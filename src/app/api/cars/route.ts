@@ -1,7 +1,6 @@
-import { NextRequest } from "next/server";
+// app/api/cars/route.ts
 import clientPromise from "@/lib/mongodb";
 
-// app/api/cars/route.ts
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {

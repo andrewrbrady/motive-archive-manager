@@ -1,6 +1,7 @@
 // Location: app/api/cars/[id]/images/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId } from "mongodb";
+import { ImageMetadata } from "@/lib/cloudflare";
 
 const uri = "mongodb://127.0.0.1:27017";
 const client = new MongoClient(uri);
@@ -14,7 +15,7 @@ interface CarImage {
   id: string;
   url: string;
   filename: string;
-  metadata: Record<string, any>;
+  metadata: ImageMetadata;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,15 +25,10 @@ interface CarDocument {
   images: CarImage[];
 }
 
-let isConnected = false;
-
 async function connectToDatabase() {
   try {
-    if (!isConnected) {
-      await client.connect();
-      isConnected = true;
-      console.log("Connected to MongoDB");
-    }
+    await client.connect();
+    console.log("Connected to MongoDB");
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
     throw error;
@@ -69,7 +65,7 @@ export async function POST(
       id: imageId,
       url: imageUrl,
       filename: imageUrl.split("/").pop() || "",
-      metadata: {},
+      metadata: {} as ImageMetadata,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -117,7 +113,7 @@ export async function DELETE(
 ) {
   try {
     const id = await context.params.id;
-    const { imageUrl } = await request.json();
+    const { imageUrl, deleteFromStorage } = await request.json();
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -130,6 +126,18 @@ export async function DELETE(
     const database = client.db("motive_archive");
     const collection = database.collection<CarDocument>("cars");
 
+    // First, get the image details from the car
+    const car = await collection.findOne({ _id: new ObjectId(id) });
+    if (!car) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
+    const image = car.images.find((img) => img.url === imageUrl);
+    if (!image) {
+      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    }
+
+    // Remove the image from the car document
     const result = await collection.updateOne(
       { _id: new ObjectId(id) },
       { $pull: { images: { url: imageUrl } } }
@@ -137,6 +145,38 @@ export async function DELETE(
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
+    // If deleteFromStorage is true, delete from Cloudflare
+    if (deleteFromStorage && image.id) {
+      try {
+        const response = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.id}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            "Failed to delete image from Cloudflare:",
+            await response.text()
+          );
+          return NextResponse.json(
+            { error: "Failed to delete image from storage" },
+            { status: 500 }
+          );
+        }
+      } catch (error) {
+        console.error("Error deleting from Cloudflare:", error);
+        return NextResponse.json(
+          { error: "Failed to delete image from storage" },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ success: true });

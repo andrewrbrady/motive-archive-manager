@@ -77,7 +77,7 @@ export default async function InventoryPage({
                 color: "",
                 interior_color: "",
               }}
-              dealers={dealers}
+              _dealers={dealers}
               makes={makes}
             />
 

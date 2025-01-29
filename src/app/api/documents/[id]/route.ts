@@ -7,7 +7,7 @@ interface CarDocument {
   documents: ObjectId[];
 }
 
-type Car = WithId<CarDocument>;
+type _Car = WithId<CarDocument>;
 
 export async function GET(
   request: Request,

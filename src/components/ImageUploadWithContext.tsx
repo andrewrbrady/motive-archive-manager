@@ -11,19 +11,13 @@ interface DeleteStatus {
 interface ImageUploadWithContextProps {
   images: any[];
   isEditMode: boolean;
-  onRemoveImage: (indices: number[]) => void;
+  onRemoveImage: (indices: number[], deleteFromStorage: boolean) => void;
   onImagesChange: (files: FileList) => void;
   uploading: boolean;
   uploadProgress: any[];
-  setUploadProgress: (progress: any[]) => void;
+  setUploadProgress?: (progress: any[]) => void;
   showMetadata?: boolean;
   showFilters?: boolean;
-  vehicleInfo?: {
-    year: number;
-    make: string;
-    model: string;
-    type?: string;
-  };
   title: string;
   onContextChange: (context: string) => void;
 }
@@ -35,10 +29,9 @@ export default function ImageUploadWithContext({
   onImagesChange,
   uploading,
   uploadProgress,
-  setUploadProgress,
+  setUploadProgress: _setUploadProgress,
   showMetadata = true,
   showFilters = false,
-  vehicleInfo,
   title,
   onContextChange,
 }: ImageUploadWithContextProps) {
@@ -71,7 +64,7 @@ export default function ImageUploadWithContext({
 
       // Call the parent's onRemoveImage with the indices and deleteFromStorage flag
       const indices = imagesToDelete.map((item) => item.index);
-      await onRemoveImage(indices);
+      await onRemoveImage(indices, deleteFromStorage);
 
       // Update status to complete
       setDeleteStatus((prev) =>
@@ -120,10 +113,8 @@ export default function ImageUploadWithContext({
           onImagesChange={onImagesChange}
           uploading={uploading}
           uploadProgress={uploadProgress}
-          _setUploadProgress={setUploadProgress}
           showMetadata={showMetadata}
           showFilters={showFilters}
-          _vehicleInfo={vehicleInfo}
           title={title}
           aspectRatio="4/3"
           thumbnailsPerRow={8}
