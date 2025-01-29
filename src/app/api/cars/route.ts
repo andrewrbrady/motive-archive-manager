@@ -1,5 +1,5 @@
-import { MongoClient } from "mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import clientPromise from "@/lib/mongodb";
 
 // app/api/cars/route.ts
 export const dynamic = "force-dynamic";
@@ -25,49 +25,14 @@ export async function GET(request: Request) {
       };
     }
 
-    const pipeline = [
-      {
-        $match: {
-          $and: [
-            // Handle empty/null/NaN values appropriately
-            searchParams.get("make")
-              ? {
-                  make: {
-                    $regex: searchParams.get("make"),
-                    $options: "i",
-                  },
-                }
-              : {},
-            searchParams.get("minYear")
-              ? {
-                  year: {
-                    $gte: searchParams.get("minYear"),
-                    $ne: "",
-                  },
-                }
-              : {},
-            // Add more filter conditions
-          ],
-        },
-      },
-      {
-        // Join with clients collection
-        $lookup: {
-          from: "clients",
-          localField: "client",
-          foreignField: "_id",
-          as: "dealerInfo",
-        },
-      },
-      {
-        $unwind: {
-          path: "$dealerInfo",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-    ];
+    // Execute query and return results
+    const client = await clientPromise;
+    const db = client.db();
+    const cars = await db.collection("cars").find(query).toArray();
 
-    // Execute pipeline and return results
+    return new Response(JSON.stringify(cars), {
+      headers: { "content-type": "application/json" },
+    });
   } catch (error) {
     console.error("Error in GET /api/cars:", error);
     return new Response(JSON.stringify({ error: "Internal Server Error" }), {

@@ -49,7 +49,7 @@ type Auction = BaseVehicle & {
 interface VehicleCardProps {
   vehicle: Car | InventoryItem | Auction;
   variant: "car" | "inventory" | "auction";
-  view?: "grid" | "list";
+  _view?: "grid" | "list";
   currentSearchParams?: string;
   showExternalLink?: boolean;
 }
@@ -57,34 +57,32 @@ interface VehicleCardProps {
 export function VehicleCard({
   vehicle,
   variant,
-  view = "grid",
+  _view = "grid",
   currentSearchParams,
   showExternalLink,
 }: VehicleCardProps) {
-  const isGridView = view === "grid";
-  const isAuction = variant === "auction";
-  const auction = vehicle as Auction;
-  const car = vehicle as Car;
-  const inventory = vehicle as InventoryItem;
+  const car = variant === "car" ? (vehicle as Car) : null;
+  const auction = variant === "auction" ? (vehicle as Auction) : null;
+  const inventory = variant === "inventory" ? (vehicle as InventoryItem) : null;
 
   // Determine the link URL and target based on variant
   const linkProps = {
-    href: isAuction
+    href: auction
       ? auction.link
       : variant === "inventory"
-      ? inventory.url
-      : `/cars/${car._id}${
+      ? inventory?.url
+      : `/cars/${car?._id}${
           currentSearchParams ? `?${currentSearchParams}` : ""
         }`,
     target: showExternalLink ? "_blank" : undefined,
   };
 
   // Get the image URL based on variant
-  const imageUrl = isAuction
+  const imageUrl = auction
     ? auction.images?.[0]
     : variant === "inventory"
-    ? inventory.images?.[0] || null
-    : car.images?.[0]?.url
+    ? inventory?.images?.[0] || null
+    : car?.images?.[0]?.url
     ? `${car.images[0].url}/public`
     : null;
 
@@ -137,7 +135,7 @@ export function VehicleCard({
                   Client
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {car.clientInfo?.name || "N/A"}
+                  {car?.clientInfo?.name || "N/A"}
                 </span>
               </div>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -145,7 +143,7 @@ export function VehicleCard({
                   VIN
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {car.vin || "N/A"}
+                  {car?.vin || "N/A"}
                 </span>
               </div>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -166,7 +164,7 @@ export function VehicleCard({
                   Transmission
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {inventory.transmission || "N/A"}
+                  {inventory?.transmission || "N/A"}
                 </span>
               </div>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -174,7 +172,7 @@ export function VehicleCard({
                   Dealer
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {inventory.dealer || "N/A"}
+                  {inventory?.dealer || "N/A"}
                 </span>
               </div>
               {vehicle.mileage && (
@@ -195,7 +193,7 @@ export function VehicleCard({
                   Current Bid
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  ${auction.current_bid?.toLocaleString() || "NO BIDS"}
+                  ${auction?.current_bid?.toLocaleString() || "NO BIDS"}
                 </span>
               </div>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -204,7 +202,7 @@ export function VehicleCard({
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium flex items-center uppercase p-2">
                   <Clock className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
-                  {getTimeRemaining(auction.end_date)}
+                  {getTimeRemaining(auction?.end_date)}
                 </span>
               </div>
               <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -213,7 +211,7 @@ export function VehicleCard({
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium flex items-center uppercase p-2">
                   <MapPin className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
-                  {auction.location || "N/A"}
+                  {auction?.location || "N/A"}
                 </span>
               </div>
             </>
@@ -221,7 +219,7 @@ export function VehicleCard({
         </div>
 
         {/* Price Info */}
-        {!isAuction && vehicle.price && (
+        {!auction && vehicle.price && (
           <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
               Price

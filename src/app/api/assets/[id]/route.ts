@@ -107,7 +107,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 }
 
 // DELETE single asset
-export async function DELETE(request: NextRequest, { params }: RouteContext) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   let client;
   try {
     const id = params.id;

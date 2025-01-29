@@ -59,15 +59,6 @@ interface CaptionGeneratorProps {
   };
 }
 
-interface Caption {
-  _id: string;
-  carId: string;
-  platform: string;
-  context: string;
-  caption: string;
-  createdAt: string;
-}
-
 const generateQuestion = async (
   carDetails: CaptionGeneratorProps["carDetails"]
 ) => {
@@ -120,7 +111,6 @@ export default function CaptionGenerator({
     }>
   >([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [dealerHandle, setDealerHandle] = useState<string | null>(null);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
 
@@ -142,7 +132,7 @@ export default function CaptionGenerator({
     fetchCaptions();
   }, [carDetails._id]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (_captionId?: string) => {
     setIsGenerating(true);
     setError(null);
 
@@ -181,21 +171,18 @@ export default function CaptionGenerator({
       const data = await response.json();
 
       // If we're editing, update the existing caption
-      if (editingCaptionId) {
-        const updateResponse = await fetch(
-          `/api/captions?id=${editingCaptionId}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              platform,
-              context,
-              caption: data.caption,
-            }),
-          }
-        );
+      if (_captionId) {
+        const updateResponse = await fetch(`/api/captions?id=${_captionId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            platform,
+            context,
+            caption: data.caption,
+          }),
+        });
 
         if (!updateResponse.ok) {
           throw new Error("Failed to update caption");
@@ -204,7 +191,7 @@ export default function CaptionGenerator({
         // Update the caption in the local state
         setSavedCaptions((prev) =>
           prev.map((caption) =>
-            caption._id === editingCaptionId
+            caption._id === _captionId
               ? {
                   ...caption,
                   caption: data.caption,
@@ -256,7 +243,6 @@ export default function CaptionGenerator({
       if (carDetails.client) {
         const handle = await fetchClientInstagram(carDetails.client);
         if (handle) {
-          setDealerHandle(handle);
           setContext(`This car is now available from our friends at ${handle}`);
         } else {
           setContext("This car is now available from our friends at [DEALER]");
@@ -268,7 +254,6 @@ export default function CaptionGenerator({
       if (carDetails.client) {
         const handle = await fetchClientInstagram(carDetails.client);
         if (handle) {
-          setDealerHandle(handle);
           setContext(
             `This car is currently live from our friends ${handle} on @bringatrailer. Follow the link in our bio to view the auction.`
           );
@@ -368,7 +353,7 @@ export default function CaptionGenerator({
     }
   };
 
-  const handleTextChange = (text: string, captionId: string) => {
+  const handleTextChange = (text: string, _captionId: string) => {
     setEditingText(text);
   };
 
@@ -606,7 +591,7 @@ export default function CaptionGenerator({
         </div>
 
         <Button
-          onClick={handleGenerate}
+          onClick={() => handleGenerate()}
           disabled={isGenerating}
           variant="outline"
           className="w-full bg-[#111111] hover:bg-black dark:bg-[#111111] dark:hover:bg-black text-white border-gray-800"

@@ -1,7 +1,7 @@
 import React from "react";
 import { Compass, Eye, Sun, Move } from "lucide-react";
 
-interface ImageMetadata {
+interface _ImageMetadata {
   angle?: string;
   description?: string;
   movement?: string;

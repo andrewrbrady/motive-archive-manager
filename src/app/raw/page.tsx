@@ -43,8 +43,8 @@ const RawPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState(
     searchParams.get("search") || ""
   );
-  const [sortField, setSortField] = React.useState<SortField>("name");
-  const [sortDirection, setSortDirection] =
+  const [sortField, _setSortField] = React.useState<SortField>("createdAt");
+  const [sortDirection, _setSortDirection] =
     React.useState<SortDirection>("desc");
   const [searchSuggestions, setSearchSuggestions] = React.useState<string[]>(
     []

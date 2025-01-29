@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { ImageUploader } from "./ImageUploader";
 import { Loader2, Trash2, ZoomIn } from "lucide-react";
 import Image from "next/image";
-import { ImageMetadataEditor } from "./ImageMetadataEditor";
 import { CarImage } from "@/types/car";
 
 interface ImageProgress {
@@ -25,20 +24,19 @@ interface ImageManagerProps {
   onImageProgress?: (progress: ImageProgress) => void;
 }
 
-export const ImageManager: React.FC<ImageManagerProps> = ({
+export default function ImageManager({
   onSelect,
   selectedImages = [],
   maxSelection = 10,
   showUploader = false,
   className = "",
   onImageProgress,
-}) => {
+}: ImageManagerProps) {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchImages();
@@ -60,7 +58,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     }
   };
 
-  const handleImageUpload = async (uploadedUrls: string[]) => {
+  const handleImageUpload = async (_uploadedUrls: string[]) => {
     // Clear upload progress when all uploads are complete
     setUploadProgress([]);
   };
@@ -255,4 +253,4 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       )}
     </div>
   );
-};
+}

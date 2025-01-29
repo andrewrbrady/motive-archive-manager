@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ImageManager } from "@/components/ImageManager";
+import ImageManager from "@/components/ImageManager";
 import { Loader2 } from "lucide-react";
 import { CarImage } from "@/types/car";
 

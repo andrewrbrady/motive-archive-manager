@@ -63,11 +63,6 @@ export function FiltersSection({
     endDate: currentFilters.endDate || "",
   });
 
-  const currentYear = new Date().getFullYear() + 1;
-  const years = Array.from({ length: currentYear - 1960 + 1 }, (_, i) =>
-    (currentYear - i).toString()
-  );
-
   const handleFilterChange = (key: string, value: string | boolean) => {
     let newFilters = { ...filters };
     newFilters = {
