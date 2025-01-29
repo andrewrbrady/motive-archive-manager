@@ -12,12 +12,10 @@ interface UploadProgress {
 }
 
 interface UploadProgressDialogProps {
-  _isOpen: boolean;
   uploadProgress: UploadProgress[];
 }
 
 export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
-  _isOpen,
   uploadProgress = [],
 }) => {
   if (uploadProgress.length === 0) return null;

@@ -34,10 +34,7 @@ interface Platform {
 interface FiltersSectionProps {
   currentFilters: {
     make: string;
-    model: string;
     platformId: string;
-    minPrice: string;
-    maxPrice: string;
     minYear: string;
     maxYear: string;
     noReserve: boolean;
@@ -64,11 +61,8 @@ export function FiltersSection({
   });
 
   const handleFilterChange = (key: string, value: string | boolean) => {
-    let newFilters = { ...filters };
-    newFilters = {
-      ...newFilters,
-      [key]: value,
-    };
+    const newFilters = { ...filters };
+    newFilters[key] = value;
     setFilters(newFilters);
 
     const params = new URLSearchParams(searchParams.toString());

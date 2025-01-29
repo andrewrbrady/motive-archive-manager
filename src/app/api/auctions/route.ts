@@ -25,7 +25,11 @@ export async function GET(request: Request) {
       try {
         query.platformId = new ObjectId(platformId);
       } catch (err) {
-        console.error("Invalid platformId ObjectId:", platformId);
+        console.error("Invalid platformId ObjectId:", platformId, err);
+        return NextResponse.json(
+          { error: "Invalid platform ID format" },
+          { status: 400 }
+        );
       }
     }
 
@@ -87,8 +91,11 @@ export async function GET(request: Request) {
       results: auctions,
       total,
     });
-  } catch (error) {
-    console.error("Error in GET /api/auctions:", error);
-    return NextResponse.error();
+  } catch (err) {
+    console.error("Failed to fetch auctions:", err);
+    return NextResponse.json(
+      { error: "Failed to fetch auctions" },
+      { status: 500 }
+    );
   }
 }

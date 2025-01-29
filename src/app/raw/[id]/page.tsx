@@ -105,7 +105,10 @@ export default function CarPage() {
     }
   };
 
-  const handleRemoveImage = async (indices: number[]) => {
+  const handleRemoveImage = async (
+    indices: number[],
+    deleteFromStorage: boolean = false
+  ) => {
     try {
       const index = indices[0]; // We'll handle one image at a time for now
       const imageUrl = car.images[index];
@@ -114,13 +117,16 @@ export default function CarPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ imageUrl }),
+        body: JSON.stringify({ imageUrl, deleteFromStorage }),
       });
 
       if (response.ok) {
         const newImages = [...car.images];
         newImages.splice(index, 1);
         setCar({ ...car, images: newImages });
+      } else {
+        const error = await response.json();
+        console.error("Error removing image:", error);
       }
     } catch (error) {
       console.error("Error removing image:", error);

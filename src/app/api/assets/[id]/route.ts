@@ -24,7 +24,7 @@ type RouteContext = {
 };
 
 // GET single asset
-export async function GET(request: NextRequest, { params }: RouteContext) {
+export async function GET(_request: NextRequest, { params }: RouteContext) {
   let client;
   try {
     const id = params.id;
@@ -138,7 +138,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 }
 
 // OPTIONS handler for CORS
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS(_request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
     headers: {

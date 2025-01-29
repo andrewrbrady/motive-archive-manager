@@ -52,19 +52,12 @@ interface ImageGalleryProps {
   thumbnailsPerRow?: number;
   rowsPerPage?: number;
   isEditMode?: boolean;
-  onRemoveImage?: (indices: number[]) => void;
+  onRemoveImage?: (indices: number[], deleteFromStorage: boolean) => void;
   onImagesChange?: (files: FileList) => void;
   uploading?: boolean;
   uploadProgress?: UploadProgress[];
-  _setUploadProgress?: (progress: UploadProgress[]) => void;
   showMetadata?: boolean;
   showFilters?: boolean;
-  _vehicleInfo?: {
-    year: number;
-    make: string;
-    model: string;
-    type?: string;
-  };
   contextInput?: React.ReactNode;
 }
 
@@ -86,10 +79,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onImagesChange,
   uploading = false,
   uploadProgress = [],
-  _setUploadProgress,
   showMetadata = true,
   showFilters = true,
-  _vehicleInfo,
   contextInput,
 }) => {
   const [mainIndex, setMainIndex] = useState(0);
@@ -280,7 +271,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   const handleDeleteSelected = useCallback(() => {
     if (onRemoveImage) {
-      onRemoveImage(selectedImages);
+      onRemoveImage(selectedImages, false);
       setSelectedImages([]);
     }
   }, [onRemoveImage, selectedImages]);
@@ -289,7 +280,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (onRemoveImage && images.length > 0) {
       try {
         setIsDeleting(true);
-        await onRemoveImage(images.map((_, index) => index));
+        await onRemoveImage(
+          images.map((_, index) => index),
+          true
+        );
       } finally {
         setIsDeleting(false);
         setShowDeleteAllConfirm(false);
@@ -466,10 +460,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         </div>
 
         {/* Always show upload progress dialog */}
-        <UploadProgressDialog
-          _isOpen={uploadProgress.length > 0}
-          uploadProgress={uploadProgress}
-        />
+        <UploadProgressDialog uploadProgress={uploadProgress} />
       </div>
     );
   }
@@ -849,10 +840,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       )}
 
       {/* Upload Progress */}
-      <UploadProgressDialog
-        _isOpen={uploadProgress.length > 0}
-        uploadProgress={uploadProgress}
-      />
+      <UploadProgressDialog uploadProgress={uploadProgress} />
     </div>
   );
 };

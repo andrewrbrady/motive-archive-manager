@@ -1,10 +1,27 @@
 import { getCache, setCache } from "./cache";
 
+export interface ImageMetadata {
+  angle?: string;
+  description?: string;
+  movement?: string;
+  tod?: string;
+  view?: string;
+  side?: string;
+  aiAnalysis?: {
+    angle?: string;
+    description?: string;
+    movement?: string;
+    tod?: string;
+    view?: string;
+    side?: string;
+  };
+}
+
 interface CloudflareImageResponse {
   result: {
     id: string;
     filename: string;
-    meta: Record<string, any>;
+    meta: ImageMetadata;
     uploaded: string;
     variants: string[];
   };
@@ -15,10 +32,10 @@ interface CloudflareImageResponse {
 
 export async function getCloudflareImageMetadata(
   imageId: string
-): Promise<Record<string, any> | null> {
+): Promise<ImageMetadata | null> {
   try {
     // Check cache first
-    const cachedMetadata = getCache<Record<string, any>>(imageId);
+    const cachedMetadata = getCache<ImageMetadata>(imageId);
     if (cachedMetadata) {
       return cachedMetadata;
     }
@@ -52,7 +69,7 @@ export async function getCloudflareImageMetadata(
 
 export async function updateCloudflareImageMetadata(
   imageId: string,
-  metadata: Record<string, any>
+  metadata: ImageMetadata
 ): Promise<boolean> {
   try {
     const response = await fetch(`/api/cloudflare/metadata/${imageId}`, {

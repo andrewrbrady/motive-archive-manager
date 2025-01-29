@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  CAPTION_EXAMPLES,
-  CAPTION_GUIDELINES,
-} from "@/constants/caption-examples";
+import { CAPTION_GUIDELINES } from "@/constants/caption-examples";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -54,9 +51,7 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    // Get platform-specific examples and guidelines
-    const examples =
-      CAPTION_EXAMPLES[platform as keyof typeof CAPTION_EXAMPLES];
+    // Get platform-specific guidelines
     const guidelines =
       CAPTION_GUIDELINES[platform as keyof typeof CAPTION_GUIDELINES];
 

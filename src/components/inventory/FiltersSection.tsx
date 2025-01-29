@@ -28,13 +28,13 @@ interface FiltersSectionProps {
     color: string;
     interior_color: string;
   };
-  dealers: Dealer[];
+  _dealers: Dealer[];
   makes: Make[];
 }
 
 export default function FiltersSection({
   currentFilters,
-  dealers,
+  _dealers,
   makes,
 }: FiltersSectionProps) {
   const router = useRouter();
@@ -45,12 +45,12 @@ export default function FiltersSection({
 
   // Generate year options (from 1960 to current year + 1)
   const currentYear = new Date().getFullYear() + 1;
-  const years = Array.from({ length: currentYear - 1960 + 1 }, (_, i) =>
+  const _years = Array.from({ length: currentYear - 1960 + 1 }, (_, i) =>
     (currentYear - i).toString()
   );
 
   const handleFilterChange = (key: string, value: string) => {
-    let newFilters = { ...filters };
+    const newFilters = { ...filters };
     newFilters[key] = value;
     setFilters(newFilters);
 
@@ -109,7 +109,7 @@ export default function FiltersSection({
     router.push(`/inventory?${params.toString()}`);
   };
 
-  const applyFilters = (newFilters: typeof filters) => {
+  const _applyFilters = (newFilters: typeof filters) => {
     const params = new URLSearchParams(searchParams.toString());
 
     // Helper function to handle filter parameters
@@ -260,7 +260,7 @@ export default function FiltersSection({
           onChange={(e) => handleFilterChange("dealer", e.target.value)}
         >
           <option value="All Dealers">All Dealers</option>
-          {dealers.map((dealer) => (
+          {_dealers.map((dealer) => (
             <option key={dealer._id} value={dealer.name}>
               {dealer.name}
             </option>

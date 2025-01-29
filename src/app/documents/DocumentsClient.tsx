@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { Pencil, Trash2, Loader2, Plus } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface Document {
   _id: string;
