@@ -142,7 +142,12 @@ async function validateColorWithSerper(
   }
 
   try {
-    const response = await fetch("/api/serper", {
+    // Get the base URL from the environment, defaulting to localhost for development
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
+
+    const response = await fetch(`${baseUrl}/api/serper`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
