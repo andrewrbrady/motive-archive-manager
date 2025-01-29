@@ -18,20 +18,13 @@ interface Caption {
   context: string;
   caption: string;
   createdAt: Date;
-  car: {
-    _id: ObjectId;
-    year: number;
-    make: string;
-    model: string;
-    color?: string;
-  };
 }
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
-    if (!data.platform || !data.carId || !data.caption || !data.car?._id) {
+    if (!data.platform || !data.carId || !data.caption) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -50,13 +43,6 @@ export async function POST(request: NextRequest) {
       context: data.context || "",
       caption: data.caption,
       createdAt: new Date(),
-      car: {
-        _id: new ObjectId(data.car._id),
-        year: data.car.year,
-        make: data.car.make,
-        model: data.car.model,
-        color: data.car.color,
-      },
     };
 
     // Insert the caption
@@ -77,10 +63,6 @@ export async function POST(request: NextRequest) {
       ...captionDoc,
       _id: result.insertedId.toString(),
       createdAt: captionDoc.createdAt.toISOString(),
-      car: {
-        ...captionDoc.car,
-        _id: captionDoc.car._id.toString(),
-      },
     };
 
     return NextResponse.json({
@@ -221,12 +203,6 @@ export async function GET(request: NextRequest) {
       _id: caption._id!.toString(),
       carId: caption.carId.toString(),
       createdAt: caption.createdAt.toISOString(),
-      car: caption.car
-        ? {
-            ...caption.car,
-            _id: caption.car._id.toString(),
-          }
-        : undefined,
     }));
 
     return NextResponse.json(formattedResults);
