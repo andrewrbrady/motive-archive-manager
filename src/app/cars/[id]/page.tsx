@@ -877,7 +877,9 @@ export default function CarPage() {
               model: car.model,
               color: car.color,
               engine: car.engine,
-              mileage: car.mileage?.value || undefined,
+              mileage: car.mileage
+                ? { value: car.mileage.value, unit: car.mileage.unit }
+                : undefined,
               type: car.type,
               client: car.client,
             }}

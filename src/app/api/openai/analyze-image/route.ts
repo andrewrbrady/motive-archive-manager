@@ -185,7 +185,7 @@ async function validateColorWithSerper(
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl, vehicleInfo } = await request.json();
+    const { imageUrl } = await request.json();
     console.log("Analyzing image:", imageUrl);
 
     if (!imageUrl) {
