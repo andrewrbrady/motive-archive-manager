@@ -5,6 +5,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY is not set in environment variables");
+}
+
 interface ImageAnalysis {
   angle?: string;
   view?: string;
@@ -126,7 +130,8 @@ function normalizeAnalysis(analysis: ImageAnalysis): ImageAnalysis {
 
 async function validateColorWithSerper(
   color: string,
-  vehicleInfo: VehicleInfo
+  vehicleInfo: VehicleInfo,
+  request: NextRequest
 ) {
   if (
     !color ||
@@ -138,7 +143,7 @@ async function validateColorWithSerper(
   }
 
   try {
-    const response = await fetch("/api/serper", {
+    const response = await fetch(`${request.nextUrl.origin}/api/serper`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -191,7 +196,7 @@ export async function POST(request: NextRequest) {
 
     // First, get color from OpenAI
     const colorResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4-vision-preview",
       messages: [
         {
           role: "user",
@@ -219,7 +224,7 @@ export async function POST(request: NextRequest) {
     // Validate color with Serper if a color was detected
     const validatedColor =
       detectedColor !== "unknown"
-        ? await validateColorWithSerper(detectedColor, vehicleInfo)
+        ? await validateColorWithSerper(detectedColor, vehicleInfo, request)
         : detectedColor;
 
     // Now proceed with the regular image analysis
