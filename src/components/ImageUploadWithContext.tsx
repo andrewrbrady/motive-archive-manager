@@ -150,7 +150,7 @@ export default function ImageUploadWithContext({
           rowsPerPage={3}
           contextInput={
             isEditMode && (
-              <div className="mb-4 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <div className="w-full">
                 <label
                   htmlFor="uploadContext"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
@@ -159,16 +159,12 @@ export default function ImageUploadWithContext({
                 </label>
                 <textarea
                   id="uploadContext"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-[#111111] dark:text-gray-300"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-gray-950 dark:focus:ring-gray-300 focus:border-gray-950 dark:focus:border-gray-300 dark:bg-[#111111] dark:text-gray-300"
                   rows={3}
                   placeholder="Add any additional details about the vehicle, location, or specific features you'd like the AI to focus on..."
                   value={context}
                   onChange={handleContextChange}
                 />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  This context will help the AI better understand and analyze
-                  the images.
-                </p>
               </div>
             )
           }
