@@ -1,0 +1,5 @@
+DO NOT OVERWRITE MY MODEL CHOICES:
+
+DO NOT USE gpt-4-vision-preview, use gpt-4o-mini instead.
+
+When using Anthropic APIs, use claude-3-5-sonnet-20241022

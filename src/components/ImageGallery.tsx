@@ -103,25 +103,32 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
   const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
   const prevImagesLengthRef = useRef(images.length);
+  const initialLoadRef = useRef(true);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Consolidated image loading effect
+  // Update effect to handle transition from no images to having images
   useEffect(() => {
-    // If this is our first image(s)
-    if (images.length > 0 && prevImagesLengthRef.current === 0) {
+    const hasImages = images.length > 0;
+    const hadNoImages = prevImagesLengthRef.current === 0;
+
+    if (hasImages && hadNoImages && initialLoadRef.current) {
+      // Only set initial state on first load from empty to having images
       setMainIndex(0);
-      setMainImageLoaded(false);
+      setMainImageLoaded(true);
       setHasSetInitialImage(true);
+      setIsMainVisible(true);
+      initialLoadRef.current = false;
     }
-    // If we have no images
-    else if (images.length === 0) {
-      setMainIndex(0);
-      setMainImageLoaded(false);
-      setHasSetInitialImage(false);
-    }
-    // Update the previous images length reference
+
     prevImagesLengthRef.current = images.length;
+  }, [images.length]);
+
+  // Reset initialLoadRef when all images are removed
+  useEffect(() => {
+    if (images.length === 0) {
+      initialLoadRef.current = true;
+    }
   }, [images.length]);
 
   // Only force reload when entering/exiting edit mode
