@@ -194,7 +194,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const publicImageUrl = `${imageUrl}/public`;
+    // Use the direct Cloudflare URL without /public to avoid Vercel auth
+    const publicImageUrl = imageUrl;
 
     // First, get color from OpenAI
     try {
