@@ -4,6 +4,13 @@ import clientPromise from "@/lib/mongodb";
 import { format } from "date-fns";
 import Navbar from "@/components/layout/navbar";
 
+interface ReceiptItem {
+  name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
 async function getReceipt(id: string) {
   const client = await clientPromise;
   const db = client.db("motive_archive");
@@ -97,7 +104,7 @@ export default async function ReceiptPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {receipt.items.map((item: any, index: number) => (
+                    {receipt.items.map((item: ReceiptItem, index: number) => (
                       <tr key={index} className="border-b">
                         <td className="px-4 py-2">{item.name}</td>
                         <td className="px-4 py-2 text-right">

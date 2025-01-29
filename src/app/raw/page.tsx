@@ -108,7 +108,7 @@ const RawPage: React.FC = () => {
           data.assets.map((asset: Asset) => asset.name)
         ) as string[];
         setSearchSuggestions(uniqueNames);
-      } catch (_err) {
+      } catch {
         console.error("Error fetching data");
         setError("Failed to fetch assets");
       } finally {
@@ -160,7 +160,7 @@ const RawPage: React.FC = () => {
 
       // Refetch assets after successful deletion
       fetchAssets(pagination.page);
-    } catch (_err) {
+    } catch {
       console.error("Error fetching data");
       setError("Failed to delete asset");
     }

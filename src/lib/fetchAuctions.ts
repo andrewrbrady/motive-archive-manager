@@ -2,6 +2,23 @@ import { cache } from "react";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+interface MongoQuery {
+  platformId?: ObjectId;
+  make?: { $regex: string; $options: string };
+  model?: { $regex: string; $options: string };
+  year?: {
+    $gte?: number;
+    $lte?: number;
+  };
+  end_date?: {
+    $ne: null;
+    $gte: Date;
+    $lte: Date;
+  };
+  no_reserve?: boolean;
+  $or?: Array<{ [key: string]: { $regex: string; $options: string } }>;
+}
+
 export interface Auction {
   _id: string;
   title: string;
@@ -35,7 +52,7 @@ export interface AuctionsResponse {
   totalPages: number;
 }
 
-interface AuctionFilters {
+export interface AuctionFilters {
   make?: string;
   model?: string;
   year?: number;
@@ -62,7 +79,7 @@ export const fetchAuctions = cache(async function fetchAuctions(
     const skip = (page - 1) * pageSize;
 
     // Build MongoDB query from filters
-    const query: any = {};
+    const query: MongoQuery = {};
 
     // Handle platform filter
     if (filters.platformId) {
@@ -154,11 +171,11 @@ export const fetchAuctions = cache(async function fetchAuctions(
 
     // Handle search filter
     if (filters.$or) {
-      query.$or = filters.$or.map((condition: any) => {
+      query.$or = filters.$or.map((condition) => {
         const field = Object.keys(condition)[0];
-        const value = condition[field].$regex;
+        const value = condition[field] as { $regex: string };
         return {
-          [field]: { $regex: String(value), $options: "i" },
+          [field]: { $regex: String(value.$regex), $options: "i" },
         };
       });
     }
@@ -179,7 +196,7 @@ export const fetchAuctions = cache(async function fetchAuctions(
     console.log(`Successfully fetched ${auctions.length} auctions`);
 
     return {
-      auctions: auctions.map((auction: any) => ({
+      auctions: auctions.map((auction) => ({
         ...auction,
         _id: auction._id.toString(),
         platformId: auction.platformId?.toString() || "",

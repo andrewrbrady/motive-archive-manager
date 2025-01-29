@@ -1,5 +1,5 @@
 import React from "react";
-import { fetchAuctions } from "@/lib/fetchAuctions";
+import { fetchAuctions, type AuctionFilters } from "@/lib/fetchAuctions";
 import { fetchMakes } from "@/lib/fetchMakes";
 import { fetchPlatforms } from "@/lib/fetchPlatforms";
 import Pagination from "@/components/Pagination";
@@ -37,7 +37,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
   const view = (params.view || "grid") as "grid" | "list";
 
   // Build filters object based on search params
-  const filters: any = {};
+  const filters: AuctionFilters = {};
 
   if (params.search) {
     filters.$or = [
@@ -69,9 +69,11 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
   }
 
   // Handle year range filters
-  if (params.minYear || params.maxYear) {
-    filters.minYear = params.minYear;
-    filters.maxYear = params.maxYear;
+  if (params.minYear) {
+    filters.minYear = parseInt(params.minYear);
+  }
+  if (params.maxYear) {
+    filters.maxYear = parseInt(params.maxYear);
   }
 
   console.log("Page - Filters:", filters);

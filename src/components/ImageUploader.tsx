@@ -5,6 +5,11 @@ import { Upload, X, Loader2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { CarImage } from "@/types/car";
 
+interface UploadResponse {
+  imageUrl: string;
+  metadata: CarImage["metadata"];
+}
+
 interface ImageProgress {
   fileName: string;
   progress: number;
@@ -55,9 +60,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const uploadFile = async (
-    file: File
-  ): Promise<{ imageUrl: string; metadata: any }> => {
+  const uploadFile = async (file: File): Promise<UploadResponse> => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("metadata", JSON.stringify(metadata));
