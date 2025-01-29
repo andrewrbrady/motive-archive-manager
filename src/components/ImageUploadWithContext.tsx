@@ -2,6 +2,35 @@ import React, { useState } from "react";
 import { ImageGallery } from "./ImageGallery";
 import { DeleteImageDialog } from "./DeleteImageDialog";
 
+interface ImageMetadata {
+  angle?: string;
+  description?: string;
+  movement?: string;
+  tod?: string;
+  view?: string;
+  side?: string;
+}
+
+interface Image {
+  id: string;
+  url: string;
+  filename: string;
+  metadata: ImageMetadata;
+  variants?: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  error?: string;
+  currentStep?: string;
+}
+
 interface DeleteStatus {
   imageId: string;
   status: "pending" | "deleting" | "complete" | "error";
@@ -9,13 +38,13 @@ interface DeleteStatus {
 }
 
 interface ImageUploadWithContextProps {
-  images: any[];
+  images: Image[];
   isEditMode: boolean;
   onRemoveImage: (indices: number[], deleteFromStorage: boolean) => void;
   onImagesChange: (files: FileList) => void;
   uploading: boolean;
-  uploadProgress: any[];
-  setUploadProgress?: (progress: any[]) => void;
+  uploadProgress: UploadProgress[];
+  setUploadProgress?: (progress: UploadProgress[]) => void;
   showMetadata?: boolean;
   showFilters?: boolean;
   title: string;
@@ -37,7 +66,7 @@ export default function ImageUploadWithContext({
 }: ImageUploadWithContextProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [imagesToDelete, setImagesToDelete] = useState<
-    Array<{ index: number; image: any }>
+    Array<{ index: number; image: Image }>
   >([]);
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
