@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function CuratorSection() {
   return (
     <section className="min-h-screen flex">
@@ -13,19 +15,25 @@ export default function CuratorSection() {
         </div>
       </div>
       <div className="w-1/2 relative hidden md:block">
-        <img
+        <Image
           src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/4dbb830b-9fdf-4682-5d27-6c0f33cc1a00/public"
           alt="Ferrari Detail Shot"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="object-cover"
+          fill
+          sizes="50vw"
+          priority
         />
       </div>
 
       {/* Mobile image - shown below text on smaller screens */}
-      <div className="md:hidden w-full mt-8">
-        <img
+      <div className="md:hidden w-full mt-8 relative aspect-[4/3]">
+        <Image
           src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/4dbb830b-9fdf-4682-5d27-6c0f33cc1a00/public"
           alt="Ferrari Detail Shot"
-          className="w-full"
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
         />
       </div>
     </section>

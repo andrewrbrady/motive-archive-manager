@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 import { transformImageUrl, imagePresets } from "@/lib/imageTransform";
+import Image from "next/image";
 
 interface ImageGalleryProps {
   images: {
@@ -165,13 +166,16 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <img
+          <Image
             src={transformImageUrl(
               `${images[mainIndex].url}/public`,
               imagePresets.mainView
             )}
             alt={`Vehicle view ${mainIndex + 1} of ${images.length}`}
-            className="w-full h-full object-cover"
+            className="object-cover"
+            fill
+            sizes="100vw"
+            priority
           />
           <button
             onClick={() => {
@@ -217,13 +221,15 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 aria-label={`View image ${actualIndex + 1}`}
                 aria-current={actualIndex === mainIndex ? "true" : "false"}
               >
-                <img
+                <Image
                   src={transformImageUrl(
                     `${image.url}/public`,
                     imagePresets.thumbnail
                   )}
                   alt={`Thumbnail ${actualIndex + 1}`}
-                  className="w-full h-full object-cover rounded-md"
+                  className="object-cover rounded-md"
+                  fill
+                  sizes="(max-width: 640px) 25vw, (max-width: 768px) 16.67vw, 12.5vw"
                 />
               </button>
             );
@@ -269,14 +275,19 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
           >
             <X className="w-6 h-6" />
           </button>
-          <img
-            src={transformImageUrl(
-              `${images[modalIndex].url}/public`,
-              imagePresets.fullscreen
-            )}
-            alt={`Full size view ${modalIndex + 1} of ${images.length}`}
-            className="max-w-full max-h-[90vh] object-contain"
-          />
+          <div className="relative w-full h-[90vh]">
+            <Image
+              src={transformImageUrl(
+                `${images[modalIndex].url}/public`,
+                imagePresets.fullscreen
+              )}
+              alt={`Full size view ${modalIndex + 1} of ${images.length}`}
+              className="object-contain"
+              fill
+              sizes="100vw"
+              priority
+            />
+          </div>
           <button
             onClick={handlePrev}
             className="absolute left-4 p-2 text-white"
