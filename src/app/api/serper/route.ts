@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface SerperResult {
+  title: string;
+  snippet: string;
+  link: string;
+}
+
+interface SerperResponse {
+  organic: SerperResult[];
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { make, model, year, color } = await request.json();
@@ -27,11 +37,11 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to fetch from Serper API");
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as SerperResponse;
 
     // Process results to find color matches
     const colorResults = data.organic
-      .map((result: any) => {
+      .map((result: SerperResult) => {
         const title = result.title.toLowerCase();
         const snippet = result.snippet.toLowerCase();
         const colorPattern = new RegExp(`\\b${color.toLowerCase()}\\b`);
