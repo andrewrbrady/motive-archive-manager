@@ -1,7 +1,6 @@
 // lib/fetchInventory.ts
 import clientPromise from "@/lib/mongodb";
 import { InventoryItemRaw } from "@/types/inventory";
-import { Document, WithId } from "mongodb";
 
 interface InventoryFilters extends Partial<Omit<InventoryItemRaw, "_id">> {
   minYear?: string | number;

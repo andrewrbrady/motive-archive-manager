@@ -101,10 +101,12 @@ export function VehicleCard({
                 priority
               />
             ) : (
-              <img
+              <Image
                 src={imageUrl}
                 alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                className="object-cover w-full h-full"
+                className="object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
             )
           ) : (

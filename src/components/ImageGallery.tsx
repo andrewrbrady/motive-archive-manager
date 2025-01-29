@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
 import { UploadProgressDialog } from "./UploadProgressDialog";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
+import Image from "next/image";
 
 interface UploadProgress {
   fileName: string;
@@ -452,7 +453,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   {isEditMode && index === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <span className="text-gray-400 dark:text-gray-500 text-sm">
-                        Click "Add Images" to begin
+                        Click &quot;Add Images&quot; to begin
                       </span>
                     </div>
                   )}
@@ -495,7 +496,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   {!mainImageLoaded && (
                     <ImageSkeleton aspectRatio={aspectRatio} />
                   )}
-                  <img
+                  <Image
                     key={`${filteredImages[mainIndex].id}-${isEditMode}`}
                     src={`${filteredImages[mainIndex].url}/public`}
                     alt={
@@ -504,14 +505,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         : `View ${mainIndex + 1} of ${filteredImages.length}`
                     }
                     className={cn(
-                      "w-full h-full object-cover transition-opacity duration-300",
+                      "object-cover transition-opacity duration-300",
                       !mainImageLoaded && "opacity-0"
                     )}
-                    onLoad={() => {
-                      // Only set loaded state on first load
-                      if (!mainImageLoaded) {
-                        setMainImageLoaded(true);
-                      }
+                    fill
+                    sizes="100vw"
+                    priority
+                    onLoadingComplete={() => {
+                      setMainImageLoaded(true);
                     }}
                   />
                 </>
@@ -717,7 +718,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     }}
                     style={{ aspectRatio }}
                   >
-                    <img
+                    <Image
                       src={`${image.url.replace("/public", "")}/width=200`}
                       alt={`Image ${actualIndex + 1}`}
                       className={cn(
@@ -727,6 +728,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                           : "opacity-75 dark:opacity-60",
                         isSelected ? "opacity-75 dark:opacity-60" : ""
                       )}
+                      fill
+                      sizes="100vw"
+                      priority
                     />
                     {isEditMode && (
                       <div
@@ -791,10 +795,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           >
             <X className="w-6 h-6" />
           </button>
-          <img
+          <Image
             src={`${filteredImages[modalIndex].url}/public`}
             alt={`Full size view ${modalIndex + 1} of ${filteredImages.length}`}
             className="max-w-full max-h-[90vh] object-contain"
+            fill
+            sizes="100vw"
+            priority
           />
           <button
             onClick={handlePrev}

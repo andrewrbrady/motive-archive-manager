@@ -39,7 +39,7 @@ export const fetchAuctions = cache(async function fetchAuctions(
     if (filters.platformId) {
       try {
         query.platformId = new ObjectId(filters.platformId);
-      } catch (_err) {
+      } catch {
         console.error("Invalid platformId ObjectId:", filters.platformId);
       }
     }

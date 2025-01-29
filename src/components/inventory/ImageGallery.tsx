@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
 import React from "react";
+import Image from "next/image";
 
 interface ImageGalleryProps {
   images: string[];
@@ -8,14 +9,17 @@ interface ImageGalleryProps {
 
 export const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
   const [mainImage, setMainImage] = React.useState(images[0]);
-  
+
   return (
     <div className="space-y-2">
       <div className="w-full h-64 relative">
-        <img
+        <Image
           src={mainImage}
           alt="Vehicle"
-          className="w-full h-full object-cover rounded-lg"
+          className="object-cover rounded-lg"
+          fill
+          sizes="100vw"
+          priority
         />
       </div>
       <div className="flex space-x-2 overflow-x-auto pb-2">
@@ -23,12 +27,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
           <button
             key={index}
             onClick={() => setMainImage(image)}
-            className="flex-shrink-0"
+            className="flex-shrink-0 relative w-20 h-20"
           >
-            <img
+            <Image
               src={image}
               alt={`Thumbnail ${index + 1}`}
-              className="w-20 h-20 object-cover rounded-md hover:opacity-75 transition"
+              className="object-cover rounded-md hover:opacity-75 transition"
+              fill
+              sizes="80px"
             />
           </button>
         ))}

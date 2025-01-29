@@ -89,7 +89,7 @@ export default function HeroSection() {
             variants={itemVariants}
             className="text-lg font-medium uppercase tracking-[0.2em] text-gray-500 block mb-8"
           >
-            The Collector's Resource
+            The Collector&apos;s Resource
           </motion.span>
           <motion.div
             variants={itemVariants}
