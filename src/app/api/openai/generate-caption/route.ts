@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Format car specifications
+    // Format car specifications for generation only
     const specs = [
       `${carDetails.year} ${carDetails.make} ${carDetails.model}`,
       carDetails.type && `Type: ${carDetails.type}`,
@@ -162,6 +162,7 @@ Follow these rules:
         .replace(/^["']|["']$/g, "")
         .trim()}${hashtags ? `\n\n${hashtags}` : ""}`;
 
+      // Return only the caption text
       return NextResponse.json({ caption: combinedCaption });
     }
 
@@ -244,19 +245,19 @@ ${
 
     // Handle templates that need a reference line before hashtags
     if (template === "dealer" || template === "bat") {
-      // Remove any "Please include this at the end of the caption:" text from the context
       const cleanedContext = context
         .replace(/Please include this at the end of the caption:.*$/, "")
         .trim();
-
-      const combinedCaption = `${mainContent}\n\n${cleanedContext}${
+      const finalCaption = `${mainContent}\n\n${cleanedContext}${
         hashtags ? `\n\n${hashtags}` : ""
       }`;
-      return NextResponse.json({ caption: combinedCaption });
+      // Return only the caption text
+      return NextResponse.json({ caption: finalCaption });
     }
 
-    // For other templates, return the caption as is
-    return NextResponse.json({ caption: captionText });
+    // Return only the caption text
+    const finalCaption = `${mainContent}${hashtags ? `\n\n${hashtags}` : ""}`;
+    return NextResponse.json({ caption: finalCaption });
   } catch (error) {
     console.error("Error generating caption:", error);
     return NextResponse.json(

@@ -20,6 +20,10 @@ import {
   Youtube,
   X,
 } from "lucide-react";
+import {
+  getRandomQuestion,
+  formatQuestion,
+} from "@/constants/question-examples";
 
 type Platform = "instagram" | "youtube";
 type Template = "none" | "bat" | "dealer" | "question";
@@ -46,34 +50,33 @@ interface CaptionGeneratorProps {
         hp?: number;
       };
     };
+    mileage?: number;
+    type?: string;
     client?: string; // Add client ID field
   };
+}
+
+interface Caption {
+  _id: string;
+  carId: string;
+  platform: string;
+  context: string;
+  caption: string;
+  createdAt: string;
 }
 
 const generateQuestion = async (
   carDetails: CaptionGeneratorProps["carDetails"]
 ) => {
-  try {
-    const response = await fetch("/api/openai/generate-question", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        carDetails,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to generate question");
-    }
-
-    const data = await response.json();
-    return data.question;
-  } catch (error) {
-    console.error("Error generating question:", error);
-    return `What's your favorite detail on this ${carDetails.year} ${carDetails.make} ${carDetails.model}?`;
-  }
+  // Instead of calling the API, directly use our question generator
+  const randomQuestion = getRandomQuestion();
+  return formatQuestion(randomQuestion, {
+    year: carDetails.year,
+    make: carDetails.make,
+    model: carDetails.model,
+    // Optionally add a feature if we want to highlight something specific
+    // feature: carDetails.engine?.type || carDetails.color
+  });
 };
 
 // Function to fetch client's Instagram handle
@@ -150,7 +153,16 @@ export default function CaptionGenerator({
         body: JSON.stringify({
           platform,
           context,
-          carDetails,
+          carDetails: {
+            _id: carDetails._id,
+            year: carDetails.year,
+            make: carDetails.make,
+            model: carDetails.model,
+            color: carDetails.color,
+            engine: carDetails.engine,
+            mileage: carDetails.mileage,
+            type: carDetails.type,
+          },
           temperature,
           tone,
           style,
@@ -213,13 +225,6 @@ export default function CaptionGenerator({
             carId: carDetails._id,
             context,
             caption: data.caption,
-            car: {
-              _id: carDetails._id,
-              year: carDetails.year,
-              make: carDetails.make,
-              model: carDetails.model,
-              color: carDetails.color,
-            },
           }),
         });
 
@@ -620,7 +625,7 @@ export default function CaptionGenerator({
                 Instagram Captions
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Generated caption (only if it's Instagram) */}
               {generatedCaption && platform === "instagram" && (
                 <div className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
@@ -797,7 +802,7 @@ export default function CaptionGenerator({
                 YouTube Captions
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Generated caption (only if it's YouTube) */}
               {generatedCaption && platform === "youtube" && (
                 <div className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
