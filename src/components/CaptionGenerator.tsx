@@ -50,9 +50,12 @@ interface CaptionGeneratorProps {
         hp?: number;
       };
     };
-    mileage?: number;
+    mileage?: {
+      value: number;
+      unit: string;
+    };
     type?: string;
-    client?: string; // Add client ID field
+    client?: string;
   };
 }
 
