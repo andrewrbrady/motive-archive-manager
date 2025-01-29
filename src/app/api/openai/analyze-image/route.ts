@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is not set in environment variables");
 }
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 interface ImageAnalysis {
   angle?: string;
@@ -194,19 +194,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const imageResponse = await fetch(`${imageUrl}/public`);
-    if (!imageResponse.ok) {
-      console.error("Failed to fetch image:", imageResponse.statusText);
-      return NextResponse.json(
-        { error: "Failed to fetch image" },
-        { status: imageResponse.status }
-      );
-    }
-
-    console.log("Image fetch status:", imageResponse.status);
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = Buffer.from(imageBuffer).toString("base64");
-    console.log("Successfully converted image to base64");
+    const publicImageUrl = `${imageUrl}/public`;
 
     // First, get color from OpenAI
     try {
@@ -223,7 +211,7 @@ export async function POST(request: NextRequest) {
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
+                  url: publicImageUrl,
                 },
               },
             ],
@@ -337,7 +325,7 @@ export async function POST(request: NextRequest) {
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:image/jpeg;base64,${base64Image}`,
+                  url: publicImageUrl,
                 },
               },
             ],
@@ -369,15 +357,24 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       console.error("OpenAI API error:", error);
+      console.error("OpenAI API error details:", {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        type: error.type,
+      });
       return NextResponse.json(
-        { error: "Failed to analyze image with OpenAI" },
-        { status: 500 }
+        {
+          error: "Failed to analyze image with OpenAI",
+          details: error.message,
+        },
+        { status: error.status || 500 }
       );
     }
   } catch (error) {
     console.error("Error analyzing image:", error);
     return NextResponse.json(
-      { error: "Failed to analyze image" },
+      { error: "Failed to analyze image", details: error.message },
       { status: 500 }
     );
   }
