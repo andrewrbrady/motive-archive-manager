@@ -60,33 +60,21 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("POST request received");
     const formData = await request.formData();
-    console.log("FormData received:", Array.from(formData.entries()));
-
     const file = formData.get("file") as File;
-    const metadataStr = formData.get("metadata") as string;
-    console.log("File from formData:", file ? "File present" : "No file");
-    console.log("Metadata from formData:", metadataStr);
+    const metadata = formData.get("metadata") as string;
+    const vehicleInfo = formData.get("vehicleInfo") as string;
 
     if (!file) {
-      console.log("No file in request");
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Create a new FormData for the Cloudflare request
-    const cloudflareFormData = new FormData();
-    cloudflareFormData.append("file", file);
-
-    // Add metadata if present
-    if (metadataStr) {
-      try {
-        const metadata = JSON.parse(metadataStr);
-        cloudflareFormData.append("metadata", JSON.stringify(metadata));
-      } catch (error) {
-        console.error("Error parsing metadata:", error);
-      }
+    const uploadFormData = new FormData();
+    uploadFormData.append("file", file);
+    if (metadata) {
+      uploadFormData.append("metadata", metadata);
     }
+    uploadFormData.append("requireSignedURLs", "false");
 
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
@@ -95,36 +83,106 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
         },
-        body: cloudflareFormData,
+        body: uploadFormData,
       }
     );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Cloudflare API error response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText,
+      });
+      return NextResponse.json(
+        { error: `Failed to upload to Cloudflare: ${response.statusText}` },
+        { status: response.status }
+      );
+    }
 
     const result = await response.json();
 
     if (!result.success) {
+      console.error("Cloudflare API error:", result.errors);
       return NextResponse.json(
-        { error: result.errors[0].message },
+        { error: result.errors?.[0]?.message || "Unknown Cloudflare error" },
         { status: 400 }
       );
     }
 
-    // Transform the response to include the image URL and metadata
     const imageUrl = result.result.variants[0].replace(/\/public$/, "");
-    const metadata = {
-      ...(result.result.meta || {}),
-      // Add empty placeholders for OpenAI analysis fields
-      angle: "",
-      view: "",
-      movement: "",
-      tod: "",
-      side: "",
-      description: "",
+
+    // Analyze the image with OpenAI
+    const analysisResponse = await fetch(
+      `${request.nextUrl.origin}/api/openai/analyze-image`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageUrl,
+          vehicleInfo: vehicleInfo ? JSON.parse(vehicleInfo) : undefined,
+        }),
+      }
+    );
+
+    if (!analysisResponse.ok) {
+      const errorText = await analysisResponse.text();
+      console.error("OpenAI analysis error:", {
+        status: analysisResponse.status,
+        statusText: analysisResponse.statusText,
+        body: errorText,
+      });
+      return NextResponse.json({
+        success: true,
+        imageId: result.result.id,
+        imageUrl,
+        metadata: {},
+      });
+    }
+
+    const analysisResult = await analysisResponse.json();
+
+    // Combine the original metadata with the AI analysis
+    const combinedMetadata = {
+      ...JSON.parse(metadata || "{}"),
+      angle: analysisResult.analysis?.angle || "",
+      view: analysisResult.analysis?.view || "",
+      movement: analysisResult.analysis?.movement || "",
+      tod: analysisResult.analysis?.tod || "",
+      side: analysisResult.analysis?.side || "",
+      description: analysisResult.analysis?.description || "",
+      aiAnalysis: analysisResult.analysis,
     };
 
+    // Update the image metadata in Cloudflare
+    const metadataResponse = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${result.result.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ metadata: combinedMetadata }),
+      }
+    );
+
+    if (!metadataResponse.ok) {
+      console.error(
+        "Failed to update Cloudflare metadata:",
+        await metadataResponse.text()
+      );
+    }
+
+    // Return both the image ID, URL, and the analysis
     return NextResponse.json({
-      imageUrl,
-      metadata,
       success: true,
+      imageId: result.result.id,
+      imageUrl,
+      metadata: combinedMetadata,
     });
   } catch (error) {
     console.error("Error uploading to Cloudflare Images:", error);
@@ -156,26 +214,11 @@ export async function DELETE(request: NextRequest) {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Cloudflare API error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: errorText,
-      });
-      return NextResponse.json(
-        { error: `Failed to delete from Cloudflare: ${response.statusText}` },
-        { status: response.status }
-      );
-    }
-
     const result = await response.json();
 
     if (!result.success) {
-      console.error("Cloudflare API error:", result.errors);
       return NextResponse.json(
-        { error: result.errors?.[0]?.message || "Unknown Cloudflare error" },
+        { error: result.errors[0].message },
         { status: 400 }
       );
     }
