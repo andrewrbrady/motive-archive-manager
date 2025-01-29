@@ -869,7 +869,19 @@ export default function CarPage() {
 
         {/* Add CaptionGenerator after the image gallery */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <CaptionGenerator carDetails={car} />
+          <CaptionGenerator
+            carDetails={{
+              _id: car._id,
+              year: car.year,
+              make: car.make,
+              model: car.model,
+              color: car.color,
+              engine: car.engine,
+              mileage: car.mileage?.value || undefined,
+              type: car.type,
+              client: car.client,
+            }}
+          />
           <BaTListingGenerator carDetails={car} />
         </div>
 
