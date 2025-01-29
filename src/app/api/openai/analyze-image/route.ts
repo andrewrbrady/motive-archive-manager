@@ -130,8 +130,7 @@ function normalizeAnalysis(analysis: ImageAnalysis): ImageAnalysis {
 
 async function validateColorWithSerper(
   color: string,
-  vehicleInfo: VehicleInfo,
-  request: NextRequest
+  vehicleInfo: VehicleInfo
 ) {
   if (
     !color ||
@@ -143,7 +142,7 @@ async function validateColorWithSerper(
   }
 
   try {
-    const response = await fetch(`${request.nextUrl.origin}/api/serper`, {
+    const response = await fetch("/api/serper", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -224,7 +223,7 @@ export async function POST(request: NextRequest) {
     // Validate color with Serper if a color was detected
     const validatedColor =
       detectedColor !== "unknown"
-        ? await validateColorWithSerper(detectedColor, vehicleInfo, request)
+        ? await validateColorWithSerper(detectedColor, vehicleInfo)
         : detectedColor;
 
     // Now proceed with the regular image analysis
@@ -315,10 +314,7 @@ export async function POST(request: NextRequest) {
                 Use the provided car specifications (year, make, model, color) exactly as given.
                 Focus ONLY on what is physically observable in the image."
                 If year, make, model, or color are not visible in the image, do not set or describe them as "unknown".
-              }
-
-              Choose the CLOSEST matching value for each field. DO NOT use any values not listed above.
-              DO NOT include any explanations or additional text, ONLY return the JSON object.`,
+              }`,
             },
             {
               type: "image_url",
