@@ -185,8 +185,13 @@ async function validateColorWithSerper(
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl } = await request.json();
-    console.log("Analyzing image:", imageUrl);
+    const { imageUrl, vehicleInfo } = await request.json();
+    console.log(
+      "Analyzing image:",
+      imageUrl,
+      "with vehicle info:",
+      vehicleInfo
+    );
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -198,6 +203,23 @@ export async function POST(request: NextRequest) {
     // Ensure the URL is publicly accessible
     const publicImageUrl = `${imageUrl}/public`;
 
+    // Build context-aware prompt
+    let prompt =
+      "Analyze this car image and provide the following details in JSON format:";
+
+    if (vehicleInfo) {
+      prompt += `\n\nThis is a ${vehicleInfo.make} ${vehicleInfo.model}`;
+      if (vehicleInfo.year) prompt += ` (${vehicleInfo.year})`;
+      if (vehicleInfo.engine?.type)
+        prompt += ` with a ${vehicleInfo.engine.type}`;
+      if (vehicleInfo.condition)
+        prompt += ` in ${vehicleInfo.condition} condition`;
+      prompt += ".\n\n";
+    }
+
+    prompt +=
+      "Provide:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image, focusing on visible features and condition)";
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -206,7 +228,7 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: "text",
-              text: "Analyze this car image and provide the following details in JSON format:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image)",
+              text: prompt,
             },
             {
               type: "image_url",
