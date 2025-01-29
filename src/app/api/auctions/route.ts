@@ -4,6 +4,19 @@ import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
 
+interface AuctionQuery {
+  platformId?: ObjectId;
+  make?: {
+    $regex: string;
+    $options: string;
+  };
+  end_date?: {
+    $ne: null;
+    $gte: Date;
+    $lte: Date;
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -17,7 +30,7 @@ export async function GET(request: Request) {
     const db = client.db("motive_archive");
 
     // Build base query
-    const query: any = {};
+    const query: AuctionQuery = {};
 
     // Handle platform filter
     const platformId = searchParams.get("platformId");
