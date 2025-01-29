@@ -151,11 +151,11 @@ export async function DELETE(
     if (deleteFromStorage && image.id) {
       try {
         const response = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.id}`,
+          `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.id}`,
           {
             method: "DELETE",
             headers: {
-              Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
             },
           }
         );
