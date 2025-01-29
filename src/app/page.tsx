@@ -6,11 +6,14 @@ import RecentProjectsSection from "@/components/sections/recent-projects";
 import ContactSection from "@/components/sections/contact";
 import Footer from "@/components/layout/footer";
 import ScrollIndicator from "@/components/navigation/ScrollIndicator";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 export default function Page() {
   const [activeSection, setActiveSection] = useState(0);
-  const sections = ["hero", "services", "projects", "contact"];
+  const sections = useMemo(
+    () => ["hero", "services", "projects", "contact"],
+    []
+  );
 
   const handleScroll = (index: number) => {
     const element = document.getElementById(sections[index]);
@@ -41,7 +44,7 @@ export default function Page() {
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [sections]);
 
   return (
     <>

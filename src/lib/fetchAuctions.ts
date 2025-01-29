@@ -1,6 +1,9 @@
 import { cache } from "react";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { Auction, AuctionFilters, AuctionsResponse } from "@/types/auction";
+
+export type { AuctionFilters, Auction };
 
 interface MongoQuery {
   platformId?: ObjectId;
@@ -17,55 +20,6 @@ interface MongoQuery {
   };
   no_reserve?: boolean;
   $or?: Array<{ [key: string]: { $regex: string; $options: string } }>;
-}
-
-export interface Auction {
-  _id: string;
-  title: string;
-  make: string;
-  model: string;
-  year: number;
-  trim?: string;
-  images: string[];
-  link: string;
-  excerpt: string;
-  no_reserve?: boolean;
-  date: string;
-  end_date?: string;
-  categories?: string[];
-  comments_count: number;
-  bid_count?: number;
-  current_bid?: number;
-  location?: string;
-  platformId: string;
-  platform: {
-    name: string;
-    shortName: string;
-  };
-}
-
-export interface AuctionsResponse {
-  auctions: Auction[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-export interface AuctionFilters {
-  make?: string;
-  model?: string;
-  year?: number;
-  platform?: string;
-  platformId?: string;
-  status?: string;
-  sort?: string;
-  order?: "asc" | "desc";
-  minYear?: number;
-  maxYear?: number;
-  endDate?: string;
-  noReserve?: boolean;
-  $or?: Array<Record<string, unknown>>;
 }
 
 export const fetchAuctions = cache(async function fetchAuctions(

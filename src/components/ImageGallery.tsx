@@ -110,7 +110,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (images.length > 0) {
       setMainImageLoaded(true);
     }
-  }, []);
+  }, [images.length]);
 
   // Handle initial image load and updates
   useEffect(() => {
@@ -216,16 +216,19 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   }, [filteredImages.length, mainIndex, currentPage, itemsPerPage]);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-      const firstImageIndexOfNewPage = (newPage - 1) * itemsPerPage;
-      setMainIndex(
-        Math.min(firstImageIndexOfNewPage, filteredImages.length - 1)
-      );
-      setMainImageLoaded(true);
-    }
-  };
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      if (newPage >= 1 && newPage <= totalPages) {
+        setCurrentPage(newPage);
+        const firstImageIndexOfNewPage = (newPage - 1) * itemsPerPage;
+        setMainIndex(
+          Math.min(firstImageIndexOfNewPage, filteredImages.length - 1)
+        );
+        setMainImageLoaded(true);
+      }
+    },
+    [totalPages, itemsPerPage, filteredImages.length]
+  );
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -289,7 +292,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         setShowDeleteAllConfirm(false);
       }
     }
-  }, [onRemoveImage, images.length]);
+  }, [onRemoveImage, images]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

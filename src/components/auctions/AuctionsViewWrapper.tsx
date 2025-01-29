@@ -2,9 +2,10 @@
 
 import AuctionCard from "./AuctionCard";
 import { AuctionsList } from "./AuctionsList";
+import { Auction } from "@/types/auction";
 
 interface AuctionsViewWrapperProps {
-  auctions: any[];
+  auctions: Auction[];
   view: "grid" | "list";
 }
 
