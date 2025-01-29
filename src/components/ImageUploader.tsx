@@ -374,17 +374,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         {...getRootProps()}
         className={`
           border-2 border-dashed rounded-lg p-6 cursor-pointer
-          ${isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"}
-          transition-colors duration-200
+          ${
+            isDragActive
+              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+              : "border-gray-300 dark:border-gray-700"
+          }
+          transition-colors duration-200 dark:hover:border-gray-600
         `}
       >
         <input {...getInputProps()} />
         <div className="flex flex-col items-center space-y-2">
-          <Upload className="h-8 w-8 text-gray-400" />
-          <p className="text-sm text-gray-500">
+          <Upload className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Drag and drop images here, or click to browse
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Supports: PNG, JPG, JPEG, WebP (max {maxSelection} files)
           </p>
         </div>
@@ -392,18 +396,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       {selectedFiles.length > 0 && (
         <div className="space-y-2">
-          <div className="text-sm font-medium">Selected files:</div>
+          <div className="text-sm font-medium dark:text-gray-300">
+            Selected files:
+          </div>
           <div className="space-y-2">
             {selectedFiles.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800/50 rounded"
               >
-                <span className="text-sm truncate flex-1">{file.name}</span>
+                <span className="text-sm truncate flex-1 dark:text-gray-300">
+                  {file.name}
+                </span>
                 {!uploading && (
                   <button
                     onClick={() => removeFile(index)}
-                    className="text-gray-500 hover:text-red-500"
+                    className="text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -416,7 +424,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             disabled={uploading}
             className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg
               hover:bg-blue-600 transition-colors disabled:opacity-50
-              disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled:cursor-not-allowed flex items-center justify-center gap-2
+              dark:bg-blue-600 dark:hover:bg-blue-700"
           >
             {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
             {uploading
@@ -439,7 +448,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900"
         >
           <div className="flex items-center justify-center gap-2">
             <Upload className="w-4 h-4" />
