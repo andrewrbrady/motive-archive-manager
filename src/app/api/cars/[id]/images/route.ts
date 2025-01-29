@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId } from "mongodb";
 import { ImageMetadata } from "@/lib/cloudflare";
 
-const uri = "mongodb://127.0.0.1:27017";
+const uri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 const client = new MongoClient(uri);
 
 interface ImageData {
@@ -111,6 +111,7 @@ export async function DELETE(
   request: NextRequest,
   context: { params: { id: Promise<string> } }
 ) {
+  let mongoClient: MongoClient | null = null;
   try {
     const id = await context.params.id;
     const { imageUrl, deleteFromStorage } = await request.json();
@@ -122,8 +123,8 @@ export async function DELETE(
       );
     }
 
-    await client.connect();
-    const database = client.db("motive_archive");
+    mongoClient = await MongoClient.connect(uri);
+    const database = mongoClient.db("motive_archive");
     const collection = database.collection<CarDocument>("cars");
 
     // First, get the image details from the car
@@ -165,17 +166,11 @@ export async function DELETE(
             "Failed to delete image from Cloudflare:",
             await response.text()
           );
-          return NextResponse.json(
-            { error: "Failed to delete image from storage" },
-            { status: 500 }
-          );
+          // Don't return error here, just log it since we already removed from DB
         }
       } catch (error) {
         console.error("Error deleting from Cloudflare:", error);
-        return NextResponse.json(
-          { error: "Failed to delete image from storage" },
-          { status: 500 }
-        );
+        // Don't return error here, just log it since we already removed from DB
       }
     }
 
@@ -187,6 +182,8 @@ export async function DELETE(
       { status: 500 }
     );
   } finally {
-    await client.close();
+    if (mongoClient) {
+      await mongoClient.close();
+    }
   }
 }
