@@ -1,7 +1,7 @@
 // SearchBar.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search } from "lucide-react";
 import _ from "lodash";
 
@@ -28,25 +28,31 @@ export const FuzzySearchBar: React.FC<SearchBarProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  const getFuzzySuggestions = (input: string) => {
-    if (!input) return [];
+  const getFuzzySuggestions = useCallback(
+    (input: string) => {
+      if (!input) return [];
 
-    return suggestions
-      .filter((suggestion) => {
-        const normalizedSuggestion = suggestion.toLowerCase();
-        const normalizedInput = input.toLowerCase();
+      return suggestions
+        .filter((suggestion) => {
+          const normalizedSuggestion = suggestion.toLowerCase();
+          const normalizedInput = input.toLowerCase();
 
-        // Check for consecutive character matches
-        let suggestionIndex = 0;
-        for (const char of normalizedInput) {
-          suggestionIndex = normalizedSuggestion.indexOf(char, suggestionIndex);
-          if (suggestionIndex === -1) return false;
-          suggestionIndex += 1;
-        }
-        return true;
-      })
-      .slice(0, maxSuggestions);
-  };
+          // Check for consecutive character matches
+          let suggestionIndex = 0;
+          for (const char of normalizedInput) {
+            suggestionIndex = normalizedSuggestion.indexOf(
+              char,
+              suggestionIndex
+            );
+            if (suggestionIndex === -1) return false;
+            suggestionIndex += 1;
+          }
+          return true;
+        })
+        .slice(0, maxSuggestions);
+    },
+    [suggestions, maxSuggestions]
+  );
 
   useEffect(() => {
     const debouncedFilter = _.debounce(() => {
@@ -58,7 +64,7 @@ export const FuzzySearchBar: React.FC<SearchBarProps> = ({
 
     debouncedFilter();
     return () => debouncedFilter.cancel();
-  }, [value, suggestions, maxSuggestions]);
+  }, [value, getFuzzySuggestions]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

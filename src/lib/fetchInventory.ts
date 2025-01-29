@@ -1,30 +1,51 @@
 // lib/fetchInventory.ts
 import clientPromise from "@/lib/mongodb";
+import { InventoryItemRaw } from "@/types/inventory";
+import { Document, WithId } from "mongodb";
+
+interface InventoryFilters extends Partial<Omit<InventoryItemRaw, "_id">> {
+  minYear?: string | number;
+  maxYear?: string | number;
+}
+
+interface MongoQuery {
+  year?: {
+    $gte?: number;
+    $lte?: number;
+  };
+  make?: string;
+  model?: string;
+  dealer?: string;
+  price?: number;
+  mileage?: number;
+  transmission?: string;
+  [key: string]: unknown;
+}
 
 export async function fetchInventory(
   page: number,
   limit: number,
-  filters: any = {}
+  filters: InventoryFilters = {}
 ) {
   try {
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const collection = db.collection("inventory");
+    const collection = db.collection<InventoryItemRaw>("inventory");
 
     // Calculate skip value for pagination
     const skip = (page - 1) * limit;
 
     // Build MongoDB query
-    const query: any = {};
+    const query: MongoQuery = {};
 
     // Handle year range filters
     if (filters.minYear || filters.maxYear) {
       query.year = {};
-      if (filters.minYear && !isNaN(parseInt(filters.minYear))) {
-        query.year.$gte = parseInt(filters.minYear);
+      if (filters.minYear && !isNaN(parseInt(String(filters.minYear)))) {
+        query.year.$gte = parseInt(String(filters.minYear));
       }
-      if (filters.maxYear && !isNaN(parseInt(filters.maxYear))) {
-        query.year.$lte = parseInt(filters.maxYear);
+      if (filters.maxYear && !isNaN(parseInt(String(filters.maxYear)))) {
+        query.year.$lte = parseInt(String(filters.maxYear));
       }
       // Only delete if we successfully used them
       if (query.year.$gte || query.year.$lte) {
@@ -50,12 +71,11 @@ export async function fetchInventory(
     return {
       results,
       total,
+      page,
+      limit,
     };
   } catch (error) {
     console.error("Error fetching inventory:", error);
-    return {
-      results: [],
-      total: 0,
-    };
+    throw error;
   }
 }

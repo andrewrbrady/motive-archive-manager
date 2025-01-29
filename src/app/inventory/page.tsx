@@ -10,6 +10,7 @@ import {
   InventoryItem,
   InventoryPageProps,
   transformInventoryItem,
+  InventoryItemRaw,
 } from "@/components/inventory/types";
 import Footer from "@/components/layout/footer";
 import FiltersSection from "@/components/inventory/FiltersSection";
@@ -47,7 +48,9 @@ export default async function InventoryPage({
     fetchMakes(),
   ]);
 
-  const results = rawResults.map((item: any) => transformInventoryItem(item));
+  const results = rawResults.map((item: InventoryItemRaw) =>
+    transformInventoryItem(item)
+  );
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[#111111]">
