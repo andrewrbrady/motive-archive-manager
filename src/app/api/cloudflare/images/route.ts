@@ -108,12 +108,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transform the response to include the image URL
+    // Transform the response to include the image URL and metadata
     const imageUrl = result.result.variants[0].replace(/\/public$/, "");
+    const metadata = {
+      ...(result.result.meta || {}),
+      // Add empty placeholders for OpenAI analysis fields
+      angle: "",
+      view: "",
+      movement: "",
+      tod: "",
+      side: "",
+      description: "",
+    };
+
     return NextResponse.json({
       imageUrl,
-      metadata: result.result.meta || {},
-      ...result,
+      metadata,
+      success: true,
     });
   } catch (error) {
     console.error("Error uploading to Cloudflare Images:", error);
