@@ -4,9 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 export const runtime = "nodejs";
 
-const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-
 interface CloudflareImage {
   id: string;
   filename: string;
