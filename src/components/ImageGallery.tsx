@@ -137,6 +137,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setCurrentPage(1);
       setSelectedImages([]);
       setFilters({});
+    } else {
+      setSelectedImages([]); // Clear selections when exiting edit mode
     }
   }, [isEditMode]);
 
@@ -751,8 +753,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   <div
                     key={index}
                     className="relative group cursor-pointer"
-                    onClick={() => {
-                      if (!isEditMode) {
+                    onClick={(e) => {
+                      if (isEditMode) {
+                        handleImageSelect(actualIndex, e);
+                      } else {
                         handleThumbnailClick(actualIndex);
                       }
                     }}
@@ -766,7 +770,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                         isMainVisible && actualIndex === mainIndex
                           ? ""
                           : "opacity-75 dark:opacity-60",
-                        isSelected ? "opacity-75 dark:opacity-60" : ""
+                        isSelected
+                          ? "ring-2 ring-red-500 dark:ring-red-500"
+                          : ""
                       )}
                       fill
                       sizes="100vw"
@@ -774,21 +780,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     />
                     {isEditMode && (
                       <div
-                        className="absolute top-2 right-2 z-10"
-                        onClick={(e) => handleImageSelect(actualIndex, e)}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded border-2 ${
-                            isSelected
-                              ? "bg-blue-500 dark:bg-blue-600 border-blue-500 dark:border-blue-600"
-                              : "border-white dark:border-gray-300"
-                          } flex items-center justify-center`}
-                        >
-                          {isSelected && (
-                            <Check className="w-4 h-4 text-white" />
-                          )}
-                        </div>
-                      </div>
+                        className={cn(
+                          "absolute inset-0 rounded-lg transition-colors duration-200",
+                          isSelected
+                            ? "bg-red-500/10"
+                            : "hover:bg-gray-950/5 dark:hover:bg-white/5"
+                        )}
+                      />
                     )}
                   </div>
                 );
