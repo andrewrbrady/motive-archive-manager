@@ -60,11 +60,32 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("POST request received");
     const formData = await request.formData();
+    console.log("FormData received:", Array.from(formData.entries()));
+
     const file = formData.get("file") as File;
+    const metadataStr = formData.get("metadata") as string;
+    console.log("File from formData:", file ? "File present" : "No file");
+    console.log("Metadata from formData:", metadataStr);
 
     if (!file) {
+      console.log("No file in request");
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Create a new FormData for the Cloudflare request
+    const cloudflareFormData = new FormData();
+    cloudflareFormData.append("file", file);
+
+    // Add metadata if present
+    if (metadataStr) {
+      try {
+        const metadata = JSON.parse(metadataStr);
+        cloudflareFormData.append("metadata", JSON.stringify(metadata));
+      } catch (error) {
+        console.error("Error parsing metadata:", error);
+      }
     }
 
     const response = await fetch(
@@ -74,7 +95,7 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
         },
-        body: formData,
+        body: cloudflareFormData,
       }
     );
 
@@ -87,7 +108,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(result);
+    // Transform the response to include the image URL
+    const imageUrl = result.result.variants[0].replace(/\/public$/, "");
+    return NextResponse.json({
+      imageUrl,
+      metadata: result.result.meta || {},
+      ...result,
+    });
   } catch (error) {
     console.error("Error uploading to Cloudflare Images:", error);
     return NextResponse.json(
