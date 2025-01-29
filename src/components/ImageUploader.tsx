@@ -25,6 +25,7 @@ interface ImageUploaderProps {
   metadata?: Record<string, string>;
   maxSelection?: number;
   className?: string;
+  contextInput?: React.ReactNode;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -33,6 +34,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   metadata = {},
   maxSelection = 10,
   className = "",
+  contextInput,
 }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -437,24 +439,27 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         </div>
       )}
 
-      <div className="relative">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900"
-        >
-          <div className="flex items-center justify-center gap-2">
-            <Upload className="w-4 h-4" />
-            <span>Upload Images</span>
-          </div>
-        </button>
+      <div className="flex flex-col gap-4">
+        {contextInput}
+        <div className="relative">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111] w-full"
+          >
+            <div className="flex items-center justify-center gap-1.5">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Images</span>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -451,7 +451,36 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     )}
                   </button>
                 </div>
-                {contextInput}
+                <div className="flex flex-col gap-4">
+                  {contextInput}
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      multiple
+                      accept="image/*"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          Add Images
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -677,7 +706,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   Delete All
                 </button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-4">
+                {contextInput}
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -703,7 +733,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     </>
                   )}
                 </button>
-                {contextInput}
               </div>
             </div>
           )}
