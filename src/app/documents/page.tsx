@@ -25,5 +25,11 @@ export default async function DocumentsPage({
   const limit = Number(searchParams?.limit) || 10;
   const { documents, pagination } = await getDocuments(page, limit);
 
+  const _pagination = {
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: documents.length,
+  };
+
   return <DocumentsClient carId="all" initialDocuments={documents} />;
 }

@@ -4,7 +4,7 @@ import { Loader2, X, CheckCircle2, AlertCircle, Info } from "lucide-react";
 interface EnrichmentProgressProps {
   isVisible: boolean;
   step: number;
-  currentStep: string;
+  _currentStep: string;
   status: "pending" | "processing" | "complete" | "error";
   error?: string;
   details?: {
@@ -52,7 +52,7 @@ const steps = [
 export function EnrichmentProgress({
   isVisible,
   step,
-  currentStep,
+  _currentStep,
   status,
   error,
   details,

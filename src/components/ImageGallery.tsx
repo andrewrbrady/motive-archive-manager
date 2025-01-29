@@ -68,82 +68,6 @@ interface ImageGalleryProps {
   contextInput?: React.ReactNode;
 }
 
-const MetadataSection = ({
-  metadata,
-  currentIndex,
-}: {
-  metadata: ImageGalleryProps["images"];
-  currentIndex: number;
-}) => {
-  if (!metadata.length || !metadata[currentIndex]) return null;
-
-  const currentMetadata = metadata[currentIndex].metadata;
-
-  return (
-    <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm p-3">
-      <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
-        {currentMetadata.angle && (
-          <div className="flex items-center px-4 first:pl-0 last:pr-0">
-            <div className="flex items-center gap-1.5">
-              <Compass className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
-                Angle
-              </span>
-            </div>
-            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-              {currentMetadata.angle}
-            </span>
-          </div>
-        )}
-        {currentMetadata.view && (
-          <div className="flex items-center px-4 first:pl-0 last:pr-0">
-            <div className="flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
-                View
-              </span>
-            </div>
-            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-              {currentMetadata.view}
-            </span>
-          </div>
-        )}
-        {currentMetadata.tod && (
-          <div className="flex items-center px-4 first:pl-0 last:pr-0">
-            <div className="flex items-center gap-1.5">
-              <Sun className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
-                Time of Day
-              </span>
-            </div>
-            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-              {currentMetadata.tod}
-            </span>
-          </div>
-        )}
-        {currentMetadata.movement && (
-          <div className="flex items-center px-4 first:pl-0 last:pr-0">
-            <div className="flex items-center gap-1.5">
-              <Move className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
-                Movement
-              </span>
-            </div>
-            <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-              {currentMetadata.movement}
-            </span>
-          </div>
-        )}
-      </div>
-      {currentMetadata.description && (
-        <div className="mt-2 text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-800 pt-2">
-          {currentMetadata.description}
-        </div>
-      )}
-    </div>
-  );
-};
-
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
   <div
     className="animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg relative w-full"
@@ -187,7 +111,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
   const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
   const prevImagesLengthRef = useRef(images.length);
-  const _prevMainIndexRef = useRef(mainIndex);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -544,7 +467,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
         {/* Always show upload progress dialog */}
         <UploadProgressDialog
-          isOpen={uploadProgress.length > 0}
+          _isOpen={uploadProgress.length > 0}
           uploadProgress={uploadProgress}
         />
       </div>
@@ -927,7 +850,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       {/* Upload Progress */}
       <UploadProgressDialog
-        isOpen={uploadProgress.length > 0}
+        _isOpen={uploadProgress.length > 0}
         uploadProgress={uploadProgress}
       />
     </div>

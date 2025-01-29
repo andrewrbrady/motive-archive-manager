@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId, Document, WithId, UpdateFilter } from "mongodb";
+import { ObjectId, WithId, UpdateFilter } from "mongodb";
 
 interface CarDocument {
   _id: ObjectId;

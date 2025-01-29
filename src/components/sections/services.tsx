@@ -63,7 +63,7 @@ export default function ServicesSection() {
           whileInView="visible"
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12"
         >
-          {services.map((service, index) => (
+          {services.map((service, _index) => (
             <motion.div
               key={service.title}
               variants={itemVariants}

@@ -14,7 +14,7 @@ export function InventoryCard({ item, view }: InventoryCardProps) {
     <VehicleCard
       vehicle={item}
       variant="inventory"
-      view={view}
+      _view={view}
       showExternalLink
     />
   );

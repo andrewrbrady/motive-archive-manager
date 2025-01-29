@@ -1,12 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { ImageGallery } from "@/components/ImageGallery";
 import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
 import { Loader2 } from "lucide-react";
-import { DeleteImageDialog } from "@/components/DeleteImageDialog";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
 import { Pencil, Plus } from "lucide-react";
@@ -154,12 +152,6 @@ interface UploadProgress {
   currentStep?: string;
 }
 
-interface DeleteStatus {
-  imageId: string;
-  status: "pending" | "deleting" | "complete" | "error";
-  error?: string;
-}
-
 interface EditableSpecs
   extends Partial<
     Omit<
@@ -188,14 +180,6 @@ export default function CarPage() {
   const [editedSpecs, setEditedSpecs] = useState<EditableSpecs>({});
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [imagesToDelete, setImagesToDelete] = useState<
-    Array<{ index: number; image: { id: string; url: string } }>
-  >([]);
-  const [deleteStatus, setDeleteStatus] = useState<DeleteStatus[]>([]);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showFilters, setShowFilters] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
   const [showEnrichProgress, setShowEnrichProgress] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState<{
@@ -676,110 +660,6 @@ export default function CarPage() {
     }
   };
 
-  const handleDeleteConfirm = async (deleteFromCloudflare: boolean) => {
-    if (!car || imagesToDelete.length === 0) return;
-
-    try {
-      // Initialize deletion status if deleting from Cloudflare
-      if (deleteFromCloudflare) {
-        setIsDeleting(true);
-        setDeleteStatus(
-          imagesToDelete.map(({ image }) => ({
-            imageId: image.id,
-            status: "pending",
-          }))
-        );
-      }
-
-      // First remove from car
-      const indicesToRemove = new Set(imagesToDelete.map((img) => img.index));
-      const newImages = car.images.filter((_, i) => !indicesToRemove.has(i));
-
-      const response = await fetch(`/api/cars/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ images: newImages }),
-      });
-
-      if (!response.ok) throw new Error("Failed to update car images");
-
-      // If also deleting from Cloudflare
-      if (deleteFromCloudflare) {
-        await Promise.all(
-          imagesToDelete.map(async ({ image }, index) => {
-            const imageId = image.id;
-            if (imageId) {
-              try {
-                // Update status to deleting
-                setDeleteStatus((prev) =>
-                  prev.map((status, i) =>
-                    i === index ? { ...status, status: "deleting" } : status
-                  )
-                );
-
-                const cloudflareResponse = await fetch(
-                  "/api/cloudflare/images",
-                  {
-                    method: "DELETE",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ imageId }),
-                  }
-                );
-
-                if (!cloudflareResponse.ok) {
-                  throw new Error("Failed to delete from Cloudflare");
-                }
-
-                // Update status to complete
-                setDeleteStatus((prev) =>
-                  prev.map((status, i) =>
-                    i === index ? { ...status, status: "complete" } : status
-                  )
-                );
-              } catch (error) {
-                // Update status to error
-                setDeleteStatus((prev) =>
-                  prev.map((status, i) =>
-                    i === index
-                      ? {
-                          ...status,
-                          status: "error",
-                          error:
-                            error instanceof Error
-                              ? error.message
-                              : "Failed to delete",
-                        }
-                      : status
-                  )
-                );
-              }
-            }
-          })
-        );
-
-        // Wait a moment to show completion status before closing
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      // Update local state
-      setCar((prev) => ({
-        ...prev!,
-        images: newImages,
-      }));
-    } catch (error) {
-      console.error("Error removing images:", error);
-    } finally {
-      setIsDeleting(false);
-      setDeleteDialogOpen(false);
-      setImagesToDelete([]);
-      setDeleteStatus([]);
-    }
-  };
-
   const handleEnrichData = async () => {
     if (!car) return;
 
@@ -958,7 +838,6 @@ export default function CarPage() {
             uploadProgress={uploadProgress}
             setUploadProgress={setUploadProgress}
             showMetadata={true}
-            showFilters={showFilters}
             vehicleInfo={{
               year: car.year,
               make: car.make,
@@ -1564,15 +1443,11 @@ export default function CarPage() {
       <EnrichmentProgress
         isVisible={showEnrichProgress}
         step={enrichProgress.step}
-        currentStep={enrichProgress.currentStep}
+        _currentStep={enrichProgress.currentStep}
         status={enrichProgress.status}
         error={enrichProgress.error}
         details={enrichProgress.details}
-        onClose={() => {
-          if (enrichProgress.status !== "processing") {
-            setShowEnrichProgress(false);
-          }
-        }}
+        onClose={() => setShowEnrichProgress(false)}
       />
     </div>
   );

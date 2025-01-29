@@ -1,15 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import {
-  Car,
-  Calendar,
-  Gauge,
-  MapPin,
-  Tag,
-  Fuel,
-  Box,
-  ExternalLink,
-} from "lucide-react";
+import { Car, Tag, Box, ExternalLink } from "lucide-react";
 import { InventoryItem } from "./types";
 
 interface VehicleDetailsProps {
@@ -57,7 +48,7 @@ export const VehicleDetails: React.FC<VehicleDetailsProps> = ({
           </span>
         </div>
         <div className="flex items-center space-x-2">
-          <Gauge className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          <Car className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           <span className="text-sm text-gray-700 dark:text-gray-300">
             Mileage: {item.odometer}
           </span>

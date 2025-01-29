@@ -8,7 +8,7 @@ import { CarImage } from "@/types/car";
 
 type ImageMetadata = CarImage["metadata"];
 type MetadataKey = keyof Omit<ImageMetadata, "aiAnalysis">;
-type MetadataValue = string | undefined;
+type _MetadataValue = string | number | boolean | null;
 
 interface ImageMetadataEditorProps {
   imageId: string;
