@@ -194,8 +194,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use the direct Cloudflare URL without /public to avoid Vercel auth
-    const publicImageUrl = imageUrl;
+    // Ensure the URL is publicly accessible
+    const publicImageUrl = `${imageUrl}/public`;
+
+    // First validate that we can access the image
+    try {
+      const imageResponse = await fetch(publicImageUrl);
+      if (!imageResponse.ok) {
+        console.error("Failed to fetch image:", imageResponse.statusText);
+        return NextResponse.json(
+          { error: "Failed to fetch image" },
+          { status: imageResponse.status }
+        );
+      }
+    } catch (error) {
+      console.error("Error validating image URL:", error);
+      return NextResponse.json(
+        { error: "Failed to validate image URL" },
+        { status: 400 }
+      );
+    }
 
     // First, get color from OpenAI
     try {
