@@ -5,6 +5,45 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+interface ImageAnalysis {
+  angle?: string;
+  view?: string;
+  movement?: string;
+  tod?: string;
+  side?: string;
+  description?: string;
+}
+
+interface VehicleInfo {
+  year?: string | number;
+  make?: string;
+  model?: string;
+  type?: string;
+  color?: string;
+  description?: string;
+  condition?: string;
+  mileage?: {
+    value: number;
+    unit?: string;
+  };
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+  };
+  additionalContext?: string;
+}
+
 // Define the allowed values for each field
 const allowedValues = {
   angle: [
@@ -70,7 +109,7 @@ function normalizeValue(field: AllowedField, value: string): string {
     : "";
 }
 
-function normalizeAnalysis(analysis: any) {
+function normalizeAnalysis(analysis: ImageAnalysis): ImageAnalysis {
   if (!analysis) return {};
 
   const normalized = {
@@ -85,7 +124,10 @@ function normalizeAnalysis(analysis: any) {
   return normalized;
 }
 
-async function validateColorWithSerper(color: string, vehicleInfo: any) {
+async function validateColorWithSerper(
+  color: string,
+  vehicleInfo: VehicleInfo
+) {
   if (
     !color ||
     !vehicleInfo?.make ||
