@@ -64,7 +64,7 @@ interface ImageGalleryProps {
 
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
   <div
-    className="animate-pulse bg-gray-200 dark:bg-gray-800 rounded-lg relative w-full"
+    className="animate-pulse bg-[#f5f5f5] dark:bg-[#1a1a1a] rounded-lg relative w-full"
     style={{ aspectRatio }}
   />
 );
@@ -106,28 +106,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Set initial image loaded state to true if we have images
+  // Consolidated image loading effect
   useEffect(() => {
-    if (images.length > 0) {
-      setMainImageLoaded(true);
-    }
-  }, [images.length]);
-
-  // Handle initial image load and updates
-  useEffect(() => {
-    if (images.length > 0 && !hasSetInitialImage) {
+    // If this is our first image(s)
+    if (images.length > 0 && prevImagesLengthRef.current === 0) {
       setMainIndex(0);
-      setMainImageLoaded(true);
+      setMainImageLoaded(false);
       setHasSetInitialImage(true);
     }
-    // Reset states when there are no images
+    // If we have no images
     else if (images.length === 0) {
       setMainIndex(0);
       setMainImageLoaded(false);
       setHasSetInitialImage(false);
     }
+    // Update the previous images length reference
     prevImagesLengthRef.current = images.length;
-  }, [images.length, hasSetInitialImage]);
+  }, [images.length]);
 
   // Only force reload when entering/exiting edit mode
   useEffect(() => {
@@ -399,14 +394,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         <div className="flex gap-6">
           <div className="w-2/3">
             <div className="w-full aspect-[4/3] relative bg-neutral-100 dark:bg-neutral-800 rounded-lg">
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                <MotiveLogo className="w-16 h-16 opacity-50" />
-                <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
-                  {!images || images.length === 0
-                    ? "No Images Available"
-                    : "No Images Match The Selected Filters"}
-                </span>
-              </div>
+              {uploading ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400 dark:text-gray-500" />
+                  <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
+                    Uploading Images...
+                  </span>
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                  <MotiveLogo className="w-16 h-16 opacity-50" />
+                  <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
+                    {!images || images.length === 0
+                      ? "No Images Available"
+                      : "No Images Match The Selected Filters"}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -487,7 +491,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             }`}
           >
             <div
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900"
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#f5f5f5] dark:bg-[#1a1a1a]"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
