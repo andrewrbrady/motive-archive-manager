@@ -48,6 +48,7 @@ interface BaTListingGeneratorProps {
       seats: number;
       upholstery?: string;
     };
+    description?: string;
   };
 }
 

@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
         `Seats: ${carDetails.interior_features.seats}`,
       carDetails.interior_features?.upholstery &&
         `Upholstery: ${carDetails.interior_features.upholstery}`,
+      carDetails.description && `\nDescription:\n${carDetails.description}`,
     ]
       .filter(Boolean)
       .join("\n");
