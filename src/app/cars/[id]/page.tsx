@@ -15,6 +15,7 @@ import ImageUploadWithContext from "@/components/ImageUploadWithContext";
 import CaptionGenerator from "@/components/CaptionGenerator";
 import BaTListingGenerator from "@/components/BaTListingGenerator";
 import { toast } from "react-hot-toast";
+import ResearchFiles from "@/components/ResearchFiles";
 
 interface MeasurementValue {
   value: number | null;
@@ -1648,6 +1649,12 @@ export default function CarPage() {
               <DocumentsClient carId={id} initialDocuments={documents} />
             </div>
           </section>
+        </div>
+
+        {/* Add this section after the existing tabs */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-4">Research</h2>
+          <ResearchFiles carId={id} />
         </div>
       </main>
       <Footer />
