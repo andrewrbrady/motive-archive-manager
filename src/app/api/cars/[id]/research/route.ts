@@ -25,10 +25,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const carId = params.id;
     console.log("Research Files API - Request Details:", {
       url: request.url,
       method: request.method,
-      carId: params.id,
+      carId,
       headers: Object.fromEntries(request.headers.entries()),
     });
 
@@ -71,67 +72,37 @@ export async function GET(
         : null,
     });
 
-    // Try to find documents with a string carId first
-    const filesWithStringId = await db
-      .collection("research_files")
-      .find({ carId: params.id })
-      .toArray();
-
-    console.log("Research Files API - String ID Query Results:", {
-      filesFound: filesWithStringId.length,
-      carId: params.id,
-      query: { carId: params.id },
-    });
-
-    // Then try with ObjectId
+    // Query using string ID
     const files = await db
       .collection("research_files")
-      .find({ carId: new ObjectId(params.id) })
-      .sort({ createdAt: -1 })
+      .find({ carId: carId })
       .toArray();
 
-    console.log("Research Files API - MongoDB Query Results:", {
+    console.log("Research Files API - Query Results:", {
       filesFound: files.length,
-      carId: params.id,
-      query: { carId: new ObjectId(params.id).toString() },
-      fileIds: files.map((f) => f._id.toString()),
+      carId,
+      query: { carId },
+      fileIds: files.map((f) => f._id),
     });
 
-    // Generate presigned URLs for each file
-    const filesWithUrls = await Promise.all(
-      files.map(async (file) => {
-        try {
-          const url = await generatePresignedDownloadUrl(file.s3Key);
-          console.log("Research Files API - Generated URL for file:", {
-            fileId: file._id.toString(),
-            s3Key: file.s3Key,
-            urlGenerated: !!url,
-          });
-          return {
-            ...file,
-            _id: file._id.toString(),
-            url,
-          };
-        } catch (error) {
-          console.error("Research Files API - Error generating URL:", {
-            fileId: file._id.toString(),
-            s3Key: file.s3Key,
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
-          throw error;
-        }
-      })
-    );
+    // Process files and generate URLs
+    const signedUrls = files.length > 0 ? await generateSignedUrls(files) : [];
+
+    const response = {
+      totalFiles: files.length,
+      hasUrls: true,
+      files: signedUrls,
+    };
 
     console.log("Research Files API - Response prepared:", {
-      totalFiles: filesWithUrls.length,
-      hasUrls: filesWithUrls.every((f) => !!f.url),
+      totalFiles: files.length,
+      hasUrls: signedUrls.length > 0,
     });
 
-    return NextResponse.json(filesWithUrls);
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Research Files API - Error:", {
-      message: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
@@ -139,6 +110,33 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+async function generateSignedUrls(files: any[]) {
+  return Promise.all(
+    files.map(async (file) => {
+      try {
+        const url = await generatePresignedDownloadUrl(file.s3Key);
+        console.log("Research Files API - Generated URL for file:", {
+          fileId: file._id.toString(),
+          s3Key: file.s3Key,
+          urlGenerated: !!url,
+        });
+        return {
+          ...file,
+          _id: file._id.toString(),
+          url,
+        };
+      } catch (error) {
+        console.error("Research Files API - Error generating URL:", {
+          fileId: file._id.toString(),
+          s3Key: file.s3Key,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        throw error;
+      }
+    })
+  );
 }
 
 // POST new research file
