@@ -81,11 +81,7 @@ export async function GET(
 
     console.log("Research Files API - Response prepared:", {
       totalFiles: filesWithUrls.length,
-      filesWithUrls: filesWithUrls.map((f) => ({
-        id: f._id,
-        filename: f.filename,
-        hasUrl: !!f.url,
-      })),
+      hasUrls: filesWithUrls.every((f) => !!f.url),
     });
 
     return NextResponse.json(filesWithUrls);
