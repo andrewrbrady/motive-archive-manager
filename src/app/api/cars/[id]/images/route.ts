@@ -1,7 +1,6 @@
 // Location: app/api/cars/[id]/images/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId } from "mongodb";
-import { ImageMetadata } from "@/lib/cloudflare";
 
 const uri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 const client = new MongoClient(uri);
@@ -9,20 +8,23 @@ const client = new MongoClient(uri);
 interface ImageData {
   imageUrl: string;
   imageId: string;
+  metadata?: any;
 }
 
-interface CarImage {
-  id: string;
+interface Image {
+  _id: ObjectId;
+  cloudflareId: string;
   url: string;
   filename: string;
-  metadata: ImageMetadata;
+  metadata: any;
+  carId: ObjectId;
   createdAt: string;
   updatedAt: string;
 }
 
 interface CarDocument {
   _id: ObjectId;
-  images: CarImage[];
+  imageIds: ObjectId[];
 }
 
 async function connectToDatabase() {
@@ -54,28 +56,41 @@ export async function POST(
       );
     }
 
-    const { imageUrl, imageId } = JSON.parse(imageData as string) as ImageData;
+    const {
+      imageUrl,
+      imageId,
+      metadata = {},
+    } = JSON.parse(imageData as string) as ImageData;
     console.log("Received image data:", { imageUrl, imageId });
 
     await connectToDatabase();
     const database = client.db("motive_archive");
-    const collection = database.collection<CarDocument>("cars");
+    const carsCollection = database.collection<CarDocument>("cars");
+    const imagesCollection = database.collection<Image>("images");
 
-    const newImage: CarImage = {
-      id: imageId,
+    // Create new image document
+    const imageDoc = {
+      _id: new ObjectId(),
+      cloudflareId: imageId,
       url: imageUrl,
       filename: imageUrl.split("/").pop() || "",
-      metadata: {} as ImageMetadata,
+      metadata,
+      carId: new ObjectId(id),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    console.log("Attempting to add new image to car:", newImage);
+    // Insert the image document
+    await imagesCollection.insertOne(imageDoc);
+    console.log("Created new image document:", imageDoc._id);
 
-    // Update the car document with the new image
-    const result = await collection.updateOne(
+    // Update the car document with the new image ID
+    const result = await carsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $push: { images: newImage } }
+      {
+        $push: { imageIds: imageDoc._id },
+        $set: { updatedAt: new Date().toISOString() },
+      }
     );
 
     console.log("MongoDB update result:", result);
@@ -93,8 +108,21 @@ export async function POST(
       );
     }
 
-    // Get the updated car document
-    const updatedCar = await collection.findOne({ _id: new ObjectId(id) });
+    // Get the updated car document with populated images
+    const updatedCar = await carsCollection
+      .aggregate([
+        { $match: { _id: new ObjectId(id) } },
+        {
+          $lookup: {
+            from: "images",
+            localField: "imageIds",
+            foreignField: "_id",
+            as: "images",
+          },
+        },
+      ])
+      .next();
+
     console.log("Updated car document:", updatedCar);
 
     return NextResponse.json(updatedCar);
@@ -125,34 +153,36 @@ export async function DELETE(
 
     mongoClient = await MongoClient.connect(uri);
     const database = mongoClient.db("motive_archive");
-    const collection = database.collection<CarDocument>("cars");
+    const imagesCollection = database.collection<Image>("images");
+    const carsCollection = database.collection<CarDocument>("cars");
 
-    // First, get the image details from the car
-    const car = await collection.findOne({ _id: new ObjectId(id) });
-    if (!car) {
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
-    }
-
-    const image = car.images.find((img) => img.url === imageUrl);
+    // First, get the image details
+    const image = await imagesCollection.findOne({ url: imageUrl });
     if (!image) {
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    // Remove the image from the car document
-    const result = await collection.updateOne(
+    // Remove the image ID from the car document
+    const result = await carsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $pull: { images: { url: imageUrl } } }
+      {
+        $pull: { imageIds: image._id },
+        $set: { updatedAt: new Date().toISOString() },
+      }
     );
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
+    // Delete the image document
+    await imagesCollection.deleteOne({ _id: image._id });
+
     // If deleteFromStorage is true, delete from Cloudflare
-    if (deleteFromStorage && image.id) {
+    if (deleteFromStorage && image.cloudflareId) {
       try {
         const response = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.id}`,
+          `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`,
           {
             method: "DELETE",
             headers: {

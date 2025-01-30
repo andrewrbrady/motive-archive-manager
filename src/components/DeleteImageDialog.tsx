@@ -7,6 +7,7 @@ interface DeleteStatus {
   imageId: string;
   status: "pending" | "deleting" | "complete" | "error";
   error?: string;
+  filename?: string;
 }
 
 interface DeleteImageDialogProps {
@@ -139,7 +140,7 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
                       <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />
                     )}
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Image {status.imageId.slice(-6)}
+                      {status.filename || `Image ${index + 1}`}
                     </span>
                   </div>
                   {status.error && (

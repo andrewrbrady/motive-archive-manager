@@ -20,6 +20,24 @@ import { ImageFilterControls } from "./ImageFilterControls";
 import { UploadProgressDialog } from "./UploadProgressDialog";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import Image from "next/image";
+import ImageManager from "./ImageManager";
+
+interface ImageMetadata {
+  angle?: string;
+  description?: string;
+  movement?: string;
+  tod?: string;
+  view?: string;
+  side?: string;
+  aiAnalysis?: {
+    angle?: string;
+    description?: string;
+    movement?: string;
+    tod?: string;
+    view?: string;
+    side?: string;
+  };
+}
 
 interface UploadProgress {
   fileName: string;
@@ -27,39 +45,37 @@ interface UploadProgress {
   status: "pending" | "uploading" | "analyzing" | "complete" | "error";
   error?: string;
   currentStep?: string;
+  imageUrl?: string;
+  metadata?: ImageMetadata;
+}
+
+interface Image {
+  id: string;
+  url: string;
+  filename: string;
+  metadata: ImageMetadata;
+  variants?: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ImageGalleryProps {
-  images: {
-    id: string;
-    url: string;
-    filename: string;
-    metadata: {
-      angle?: string;
-      description?: string;
-      movement?: string;
-      tod?: string;
-      view?: string;
-      side?: string;
-    };
-    variants?: {
-      [key: string]: string;
-    };
-    createdAt: string;
-    updatedAt: string;
-  }[];
-  title?: string;
+  images: Image[];
+  isEditMode: boolean;
+  onRemoveImage: (indices: number[]) => void;
+  onImagesChange: (files: FileList) => void;
+  uploading: boolean;
+  uploadProgress: UploadProgress[];
+  showMetadata?: boolean;
+  showFilters?: boolean;
+  title: string;
   aspectRatio?: string;
   thumbnailsPerRow?: number;
   rowsPerPage?: number;
-  isEditMode?: boolean;
-  onRemoveImage?: (indices: number[], deleteFromStorage: boolean) => void;
-  onImagesChange?: (files: FileList) => void;
-  uploading?: boolean;
-  uploadProgress?: UploadProgress[];
-  showMetadata?: boolean;
-  showFilters?: boolean;
   contextInput?: React.ReactNode;
+  carId: string;
 }
 
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
@@ -69,21 +85,22 @@ const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
   />
 );
 
-export const ImageGallery: React.FC<ImageGalleryProps> = ({
+export function ImageGallery({
   images,
+  isEditMode,
+  onRemoveImage,
+  onImagesChange,
+  uploading,
+  uploadProgress,
+  showMetadata = true,
+  showFilters = false,
   title,
   aspectRatio = "4/3",
   thumbnailsPerRow = 8,
   rowsPerPage = 3,
-  isEditMode = false,
-  onRemoveImage,
-  onImagesChange,
-  uploading = false,
-  uploadProgress = [],
-  showMetadata = true,
-  showFilters = true,
   contextInput,
-}) => {
+  carId,
+}: ImageGalleryProps) {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
@@ -106,6 +123,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const initialLoadRef = useRef(true);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const maxSelection = 10;
+  const itemsPerPage = thumbnailsPerRow * rowsPerPage;
 
   // Update effect to handle transition from no images to having images
   useEffect(() => {
@@ -141,8 +160,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       setSelectedImages([]); // Clear selections when exiting edit mode
     }
   }, [isEditMode]);
-
-  const itemsPerPage = thumbnailsPerRow * rowsPerPage;
 
   // Extract available filter values from images
   const availableFilters = images.reduce(
@@ -279,7 +296,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   const handleDeleteSelected = useCallback(() => {
     if (onRemoveImage) {
-      onRemoveImage(selectedImages, false);
+      onRemoveImage(selectedImages.map((index) => index));
       setSelectedImages([]);
     }
   }, [onRemoveImage, selectedImages]);
@@ -288,10 +305,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     if (onRemoveImage && images.length > 0) {
       try {
         setIsDeleting(true);
-        await onRemoveImage(
-          images.map((_, index) => index),
-          true
-        );
+        await onRemoveImage(images.map((_, index) => index));
       } finally {
         setIsDeleting(false);
         setShowDeleteAllConfirm(false);
@@ -373,18 +387,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  const handleImageSelect = (index: number, event: React.MouseEvent) => {
-    if (!isEditMode) return;
-    event.preventDefault();
-    event.stopPropagation();
-
+  const handleImageSelect = (index: number) => {
     setSelectedImages((prev) => {
-      const isSelected = prev.includes(index);
-      if (isSelected) {
+      if (prev.includes(index)) {
         return prev.filter((i) => i !== index);
-      } else {
-        return [...prev, index];
       }
+      if (prev.length >= maxSelection) {
+        return prev;
+      }
+      return [...prev, index];
     });
   };
 
@@ -392,6 +403,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const handleThumbnailClick = (index: number) => {
     if (!isEditMode) {
       setMainIndex(index);
+    }
+  };
+
+  const handleImageProgress = (progress: UploadProgress) => {
+    // Forward progress to parent component
+    if (progress.status === "complete" && progress.imageUrl) {
+      const index = images.findIndex((img) => img.url === progress.imageUrl);
+      if (index !== -1) {
+        handleImageSelect(index);
+      }
     }
   };
 
@@ -664,9 +685,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
                     if (allSelected) {
                       setSelectedImages((prev) =>
-                        prev.filter(
-                          (index) => !currentPageImages.includes(index)
-                        )
+                        prev.filter((i) => !currentPageImages.includes(i))
                       );
                     } else {
                       setSelectedImages((prev) => [
@@ -755,7 +774,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     className="relative group cursor-pointer"
                     onClick={(e) => {
                       if (isEditMode) {
-                        handleImageSelect(actualIndex, e);
+                        handleImageSelect(actualIndex);
                       } else {
                         handleThumbnailClick(actualIndex);
                       }
@@ -889,8 +908,22 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       {/* Upload Progress */}
       <UploadProgressDialog uploadProgress={uploadProgress} />
+
+      <ImageManager
+        selectedImages={selectedImages.map((index) => images[index].url)}
+        onSelect={(imageUrl) => {
+          const index = images.findIndex((img) => img.url === imageUrl);
+          if (index !== -1) {
+            handleImageSelect(index);
+          }
+        }}
+        maxSelection={maxSelection}
+        showUploader={isEditMode}
+        onImageProgress={handleImageProgress}
+        carId={carId}
+      />
     </div>
   );
-};
+}
 
 export default ImageGallery;

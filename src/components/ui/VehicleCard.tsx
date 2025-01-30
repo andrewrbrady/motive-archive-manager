@@ -82,9 +82,7 @@ export function VehicleCard({
     ? auction.images?.[0]
     : variant === "inventory"
     ? inventory?.images?.[0] || null
-    : car?.images?.[0]?.url
-    ? `${car.images[0].url}/public`
-    : null;
+    : car?.images?.[0]?.url || null;
 
   return (
     <div className="bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">

@@ -118,9 +118,11 @@ export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
                 <span className="text-sm truncate max-w-[200px] text-gray-700 dark:text-gray-300">
                   {progress.fileName}
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {progress.currentStep}
-                </span>
+                {progress.currentStep && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {progress.currentStep}
+                  </span>
+                )}
               </div>
             </div>
             {progress.error ? (
