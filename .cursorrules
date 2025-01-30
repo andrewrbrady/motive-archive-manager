@@ -95,3 +95,11 @@ const { isEnabled } = await draftMode();
 const params = await props.params;
 const searchParams = await props.searchParams;
 ```
+
+### building and deploying
+
+always run a buildd before deploying to git
+
+### styling
+
+we need to use a monochrome color palette for the website.

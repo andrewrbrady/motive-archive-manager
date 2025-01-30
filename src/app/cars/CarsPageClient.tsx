@@ -63,13 +63,6 @@ export default function CarsPageClient({
         <div className="space-y-6">
           <PageTitle title="Cars Collection" count={totalPages * pageSize}>
             <div className="flex items-center gap-4 ml-auto">
-              <Link
-                href="/cars/new"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Car
-              </Link>
               <PageSizeSelector
                 currentPageSize={pageSize}
                 options={[12, 24, 48, 96]}
@@ -81,8 +74,15 @@ export default function CarsPageClient({
                   pageSize={pageSize}
                 />
               )}
-              <EditModeToggle isEditMode={isEditMode} />
               <ViewModeSelector currentView={view} />
+              <EditModeToggle isEditMode={isEditMode} />
+              <Link
+                href="/cars/new"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                title="Add New Car"
+              >
+                <Plus className="h-4 w-4" />
+              </Link>
             </div>
           </PageTitle>
 
