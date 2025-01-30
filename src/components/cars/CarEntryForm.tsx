@@ -46,7 +46,7 @@ interface CarFormData {
   type: string;
   vin: string;
   interior_color: string;
-  status: string;
+  status: "available" | "sold" | "pending";
   client?: string;
   engine: {
     type: string;
