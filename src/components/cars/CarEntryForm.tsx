@@ -32,7 +32,15 @@ interface Torque {
   Nm: number;
 }
 
-interface CarFormData {
+interface Engine {
+  type: string;
+  displacement: MeasurementValue;
+  power: Power;
+  torque: Torque;
+  features: string[];
+}
+
+export interface CarFormData {
   make: string;
   model: string;
   year: number;
@@ -48,13 +56,7 @@ interface CarFormData {
   interior_color: string;
   status: "available" | "sold" | "pending";
   client?: string;
-  engine: {
-    type: string;
-    displacement: MeasurementValue;
-    power: Power;
-    torque: Torque;
-    features: string[];
-  };
+  engine?: Engine;
 }
 
 interface CarEntryFormProps {

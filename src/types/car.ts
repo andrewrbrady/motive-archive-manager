@@ -1,9 +1,20 @@
 // types/car.ts
+interface Power {
+  hp: number;
+  kW: number;
+  ps: number;
+}
+
+interface Torque {
+  "lb-ft": number;
+  Nm: number;
+}
+
 interface Engine {
   type: string;
-  displacement: string;
-  power_output: string;
-  torque: string;
+  displacement: MeasurementValue;
+  power: Power;
+  torque: Torque;
   features: string[];
 }
 
@@ -46,7 +57,7 @@ export interface Car {
   make: string;
   model: string;
   year: number;
-  price: number;
+  price: number | string;
   mileage: MeasurementValue;
   color: string;
   horsepower: number;
@@ -55,7 +66,8 @@ export interface Car {
   description: string;
   type?: string;
   vin?: string;
-  images: CarImage[];
+  images?: CarImage[];
+  imageIds?: Array<{ $oid: string }>;
   owner_id?: string;
   engine?: Engine;
   interior_color?: string;

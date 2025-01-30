@@ -296,10 +296,14 @@ export default function CarPage() {
     setEditedSpecs((prev: EditableSpecs) => {
       // Handle nested fields
       if (nestedField && isNestedField(field)) {
+        const existingFieldValue = (prev[field] || {}) as Record<
+          string,
+          unknown
+        >;
         return {
           ...prev,
           [field]: {
-            ...(prev[field] as Record<string, unknown>),
+            ...existingFieldValue,
             [nestedField]: newValue,
           },
         };
@@ -336,14 +340,12 @@ export default function CarPage() {
 
       // Handle nested fields with explicit nestedField parameter
       if (nestedField && isNestedField(field as keyof EditableSpecs)) {
-        const fieldValue = (prev[field as keyof EditableSpecs] || {}) as Record<
-          string,
-          unknown
-        >;
+        const existingFieldValue = (prev[field as keyof EditableSpecs] ||
+          {}) as Record<string, unknown>;
         return {
           ...prev,
           [field]: {
-            ...fieldValue,
+            ...existingFieldValue,
             [nestedField]: value,
           },
         };

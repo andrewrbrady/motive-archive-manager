@@ -21,9 +21,22 @@ const Car =
         color: String,
         engine: {
           type: String,
-          displacement: String,
-          power_output: String,
-          torque: String,
+          displacement: {
+            value: Number,
+            unit: {
+              type: String,
+              default: "L",
+            },
+          },
+          power: {
+            hp: Number,
+            kW: Number,
+            ps: Number,
+          },
+          torque: {
+            "lb-ft": Number,
+            Nm: Number,
+          },
           features: [String],
         },
         horsepower: Number,

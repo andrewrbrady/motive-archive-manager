@@ -6,12 +6,13 @@ import Navbar from "@/components/layout/navbar";
 import CarEntryForm from "@/components/cars/CarEntryForm";
 import { Car } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
+import type { CarFormData } from "@/components/cars/CarEntryForm";
 
 export default function NewCarPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (carData: Partial<Car>) => {
+  const handleSubmit = async (formData: Partial<CarFormData>) => {
     try {
       setIsSubmitting(true);
       const response = await fetch("/api/cars", {
@@ -19,7 +20,7 @@ export default function NewCarPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(carData),
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
