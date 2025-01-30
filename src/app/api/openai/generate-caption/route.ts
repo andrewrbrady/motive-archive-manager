@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     // Format car specifications for generation only
     const specs = [
       `${carDetails.year} ${carDetails.make} ${carDetails.model}`,
+      carDetails.description && `Description: ${carDetails.description}`,
       carDetails.type && `Type: ${carDetails.type}`,
       carDetails.color && `Color: ${carDetails.color}`,
       carDetails.mileage?.value &&
@@ -50,6 +51,19 @@ export async function POST(request: NextRequest) {
     ]
       .filter(Boolean)
       .join("\n");
+
+    console.log("Caption Generation Input:");
+    console.log("------------------------");
+    console.log("Car Details:", carDetails);
+    console.log("Description:", carDetails.description);
+    console.log("Formatted Specs:", specs);
+    console.log("Template:", template);
+    console.log("Platform:", platform);
+    console.log("Tone:", tone);
+    console.log("Style:", style);
+    console.log("Length:", length);
+    console.log("Temperature:", temperature);
+    console.log("------------------------");
 
     // Get platform-specific guidelines
     const guidelines =
@@ -80,6 +94,26 @@ export async function POST(request: NextRequest) {
       minimal: "Focus on essential information with minimal elaboration",
       storytelling: "Weave the car's features into a compelling narrative",
     };
+
+    // Add description to the prompt instructions
+    const promptInstructions = `
+- Start with the title line in the specified format
+- Create a caption that stands out and differs from previous ones
+- Incorporate key details from the car's description when available
+- Avoid generic or overused phrases
+- Do not use subjective terms like "beautiful", "stunning", "gorgeous"
+- Focus on factual information and specifications
+- Maintain the specified tone and style
+- Do not mention price unless specifically provided
+- Do not make assumptions about the car's history or modifications
+${
+  template === "dealer"
+    ? "- Do not include the dealer reference - it will be added separately"
+    : ""
+}
+- Use proper formatting based on the platform
+- Make the title descriptive and impactful, focusing on a key feature or characteristic
+- End with relevant hashtags on a new line`;
 
     // If this is a question template, use different instructions
     if (template === "question") {
@@ -119,18 +153,7 @@ Car Specifications:
 ${specs}
 
 Follow these rules:
-- Start with the title line in the specified format
-- Create a caption that stands out and differs from previous ones
-- Avoid generic or overused phrases
-- Do not use subjective terms like "beautiful", "stunning", "gorgeous"
-- Focus on factual information and specifications
-- Maintain the specified tone and style
-- Do not mention price unless specifically provided
-- Do not make assumptions about the car's history or modifications
-- Do not include the question - it will be added separately
-- Use proper formatting based on the platform
-- Make the title descriptive and impactful, focusing on a key feature or characteristic
-- End with relevant hashtags on a new line`,
+${promptInstructions}`,
           },
         ],
       });
@@ -163,7 +186,7 @@ Follow these rules:
 
     // Regular caption generation (including dealer template)
     const response = await anthropic.messages.create({
-      model: "claude-3-sonnet-20240229",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 500,
       temperature: temperature || 1.0,
       system: `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
@@ -201,22 +224,7 @@ Car Specifications:
 ${specs}
 
 Follow these rules:
-- Start with the title line in the specified format
-- Create a caption that stands out and differs from previous ones
-- Avoid generic or overused phrases
-- Do not use subjective terms like "beautiful", "stunning", "gorgeous"
-- Focus on factual information and specifications
-- Maintain the specified tone and style
-- Do not mention price unless specifically provided
-- Do not make assumptions about the car's history or modifications
-${
-  template === "dealer"
-    ? "- Do not include the dealer reference - it will be added separately"
-    : ""
-}
-- Use proper formatting based on the platform
-- Make the title descriptive and impactful, focusing on a key feature or characteristic
-- End with relevant hashtags on a new line`,
+${promptInstructions}`,
         },
       ],
     });
