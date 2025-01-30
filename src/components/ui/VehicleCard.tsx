@@ -4,13 +4,14 @@ import Image from "next/image";
 import { Clock, MapPin } from "lucide-react";
 import { getTimeRemaining } from "@/lib/utils";
 import { MotiveLogo } from "./MotiveLogo";
+import { MeasurementValue } from "@/types/car";
 
 type BaseVehicle = {
   year: number;
   make: string;
   model: string;
   price?: number;
-  mileage?: number;
+  mileage?: MeasurementValue;
 };
 
 type Car = BaseVehicle & {
@@ -91,7 +92,7 @@ export function VehicleCard({
           {imageUrl ? (
             variant === "car" ? (
               <Image
-                src={imageUrl}
+                src={`${imageUrl}/public`}
                 alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                 fill
                 className="object-cover"
@@ -151,8 +152,10 @@ export function VehicleCard({
                   Mileage
                 </span>
                 <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {vehicle.mileage
-                    ? `${vehicle.mileage.toLocaleString()} MILES`
+                  {vehicle.mileage && vehicle.mileage.value !== null
+                    ? `${vehicle.mileage.value.toLocaleString()} ${
+                        vehicle.mileage.unit
+                      }`
                     : "N/A"}
                 </span>
               </div>
@@ -175,13 +178,14 @@ export function VehicleCard({
                   {inventory?.dealer || "N/A"}
                 </span>
               </div>
-              {vehicle.mileage && (
+              {vehicle.mileage && vehicle.mileage.value !== null && (
                 <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
                   <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
                     Mileage
                   </span>
                   <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                    {vehicle.mileage.toLocaleString()} MILES
+                    {vehicle.mileage.value.toLocaleString()}{" "}
+                    {vehicle.mileage.unit}
                   </span>
                 </div>
               )}

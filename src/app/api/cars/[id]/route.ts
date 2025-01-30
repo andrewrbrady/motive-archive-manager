@@ -166,9 +166,9 @@ export async function DELETE(
   request: Request,
   context: { params: { id: string } }
 ) {
-  const client = await getMongoClient();
+  let client;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const { id } = context.params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
@@ -176,32 +176,21 @@ export async function DELETE(
       );
     }
     const objectId = new ObjectId(id);
+
+    client = await getMongoClient();
     const db = client.db(DB_NAME);
 
-    // First, get the car to check if it exists and get associated documents
-    const car = await db.collection<Car>("cars").findOne({
+    console.log(`Deleting car with ID: ${id}`);
+    const result = await db.collection("cars").deleteOne({
       _id: objectId,
     });
 
-    if (!car) {
+    if (result.deletedCount === 0) {
+      console.log(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Delete associated documents if they exist
-    if (car.documents?.length > 0) {
-      await db.collection("receipts").deleteMany({
-        _id: { $in: car.documents.map((docId: string) => new ObjectId(docId)) },
-      });
-    }
-
-    // Delete the car
-    await db.collection<Car>("cars").deleteOne({
-      _id: objectId,
-    });
-
-    return NextResponse.json({
-      message: "Car and associated documents deleted successfully",
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting car:", error);
     return NextResponse.json(
@@ -209,7 +198,10 @@ export async function DELETE(
       { status: 500 }
     );
   } finally {
-    await client.close();
+    if (client) {
+      console.log(`Closing MongoDB connection for car ${context.params.id}`);
+      await client.close();
+    }
   }
 }
 
