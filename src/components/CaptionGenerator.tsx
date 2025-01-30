@@ -56,6 +56,7 @@ interface CaptionGeneratorProps {
     };
     type?: string;
     client?: string;
+    description: string;
   };
 }
 
@@ -155,6 +156,7 @@ export default function CaptionGenerator({
             engine: carDetails.engine,
             mileage: carDetails.mileage,
             type: carDetails.type,
+            description: carDetails.description || "",
           },
           temperature,
           tone,

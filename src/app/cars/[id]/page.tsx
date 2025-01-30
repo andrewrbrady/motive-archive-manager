@@ -979,6 +979,7 @@ export default function CarPage() {
                 : undefined,
               type: car.type,
               client: car.client,
+              description: car.description,
             }}
           />
           <BaTListingGenerator carDetails={car} />
