@@ -68,7 +68,15 @@ export default function InventoryItemPage() {
               updatedAt: item.timestamp || new Date().toISOString(),
             }))}
             title={`${item.year} ${item.make} ${item.model}`}
-            aspectRatio="16/9"
+            aspectRatio="4/3"
+            isEditMode={false}
+            onRemoveImage={() => {}}
+            onImagesChange={() => {}}
+            uploading={false}
+            uploadProgress={[]}
+            carId={item.id}
+            showMetadata={false}
+            showFilters={false}
           />
           <div className="mt-8">
             <VehicleDetails item={item} showExternalLink={true} />

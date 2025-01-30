@@ -32,6 +32,14 @@ interface Car {
   type: string;
 }
 
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  error?: string;
+  currentStep?: string;
+}
+
 export default function CarPage() {
   const params = useParams();
   const router = useRouter();
@@ -40,6 +48,7 @@ export default function CarPage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
 
   useEffect(() => {
     const fetchCar = async () => {
@@ -74,34 +83,83 @@ export default function CarPage() {
   }, [params.id]);
 
   const handleImageUpload = async (fileList: FileList) => {
-    if (!car || !fileList.length) return;
+    if (!car) return;
 
     setUploadingImages(true);
+    const files = Array.from(fileList);
+    const uploadedUrls: string[] = [];
+
     try {
-      const files = Array.from(fileList);
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append("images", file);
-      });
+      for (const file of files) {
+        setUploadProgress((prev) => [
+          ...prev,
+          {
+            fileName: file.name,
+            progress: 0,
+            status: "uploading",
+            currentStep: "Uploading to Cloudflare",
+          },
+        ]);
 
-      const response = await fetch(`/api/cars/${params.id}/images`, {
-        method: "POST",
-        body: formData,
-      });
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("carId", car._id);
 
-      if (!response.ok) {
-        throw new Error("Failed to upload images");
+        const response = await fetch("/api/cloudflare/images", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to upload image");
+        }
+
+        const data = await response.json();
+        uploadedUrls.push(data.imageUrl);
+
+        setUploadProgress((prev) =>
+          prev.map((p) =>
+            p.fileName === file.name
+              ? { ...p, progress: 100, status: "complete" }
+              : p
+          )
+        );
       }
 
-      const data: { imageUrls: string[] } = await response.json();
-      setCar((prevCar) => ({
-        ...prevCar!,
-        images: [...prevCar!.images, ...data.imageUrls],
-      }));
-    } catch (err) {
-      console.error("Error uploading images:", err);
+      // Update the car with new images
+      const updatedCar = {
+        ...car,
+        images: [...car.images, ...uploadedUrls],
+      };
+
+      const updateResponse = await fetch(`/api/cars/${car._id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedCar),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error("Failed to update car with new images");
+      }
+
+      setCar(updatedCar);
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      setUploadProgress((prev) =>
+        prev.map((p) => ({
+          ...p,
+          status: "error",
+          error: "Failed to upload image",
+        }))
+      );
     } finally {
       setUploadingImages(false);
+      // Clear progress after a delay
+      setTimeout(() => {
+        setUploadProgress([]);
+      }, 3000);
     }
   };
 
@@ -229,6 +287,11 @@ export default function CarPage() {
               onRemoveImage={handleRemoveImage}
               onImagesChange={handleImageUpload}
               uploading={uploadingImages}
+              uploadProgress={uploadProgress}
+              carId={car._id}
+              showMetadata={true}
+              showFilters={true}
+              aspectRatio="4/3"
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
