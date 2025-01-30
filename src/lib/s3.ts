@@ -118,6 +118,13 @@ export async function generatePresignedDownloadUrl(key: string) {
   try {
     const signedUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 3600, // URL expires in 1 hour
+      // Add response headers to allow CORS
+      requestOptions: {
+        headers: {
+          "response-content-disposition": "inline",
+          "response-content-type": "text/markdown",
+        },
+      },
     });
     return signedUrl;
   } catch (error) {
