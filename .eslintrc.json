@@ -14,5 +14,13 @@
     "@next/next/no-img-element": "warn",
     "prefer-const": "warn",
     "react/no-unescaped-entities": "warn"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/components/ui/*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-empty-object-type": "off"
+      }
+    }
+  ]
 }
