@@ -152,6 +152,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith(".md")) {
+      return NextResponse.json(
+        { error: "Only markdown (.md) files are supported" },
+        { status: 400 }
+      );
+    }
+
     // Upload file to S3
     const uploadResult = await uploadResearchFile(file, params.id);
 
