@@ -33,6 +33,7 @@ interface UploadProgress {
 
 interface DeleteStatus {
   imageId: string;
+  filename: string;
   status: "pending" | "deleting" | "complete" | "error";
   error?: string;
 }
@@ -49,6 +50,7 @@ interface ImageUploadWithContextProps {
   showFilters?: boolean;
   title: string;
   onContextChange: (context: string) => void;
+  carId: string;
 }
 
 export default function ImageUploadWithContext({
@@ -63,6 +65,7 @@ export default function ImageUploadWithContext({
   showFilters = false,
   title,
   onContextChange,
+  carId,
 }: ImageUploadWithContextProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [imagesToDelete, setImagesToDelete] = useState<
@@ -87,6 +90,7 @@ export default function ImageUploadWithContext({
       setDeleteStatus(
         imagesToDelete.map(({ image }) => ({
           imageId: image.id,
+          filename: image.filename,
           status: "deleting",
         }))
       );
@@ -122,7 +126,7 @@ export default function ImageUploadWithContext({
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       setImagesToDelete([]);
-      setDeleteStatus([]);
+      // Don't clear deleteStatus here - let it persist until dialog is closed
     }
   };
 
@@ -134,8 +138,18 @@ export default function ImageUploadWithContext({
           images={images}
           isEditMode={isEditMode}
           onRemoveImage={(indices) => {
-            setImagesToDelete(
-              indices.map((index) => ({ index, image: images[index] }))
+            const imagesToDelete = indices.map((index) => ({
+              index,
+              image: images[index],
+            }));
+            setImagesToDelete(imagesToDelete);
+            // Initialize delete status when opening dialog
+            setDeleteStatus(
+              imagesToDelete.map(({ image }) => ({
+                imageId: image.id,
+                filename: image.filename,
+                status: "pending",
+              }))
             );
             setDeleteDialogOpen(true);
           }}
@@ -148,6 +162,7 @@ export default function ImageUploadWithContext({
           aspectRatio="4/3"
           thumbnailsPerRow={8}
           rowsPerPage={3}
+          carId={carId}
           contextInput={
             isEditMode && (
               <div className="w-full">

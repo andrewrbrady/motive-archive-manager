@@ -1,116 +1,141 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MongoClient, ObjectId } from "mongodb";
 
-const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+
+if (!MONGODB_URI) {
+  throw new Error("Please add your Mongo URI to .env");
+}
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-interface CloudflareResponse {
-  result: {
-    id: string;
-    filename: string;
-    meta: {
-      angle?: string;
-      view?: string;
-      tod?: string;
-      movement?: string;
-      description?: string;
-      [key: string]: string | undefined;
-    };
-    uploaded: string;
-    variants: string[];
-  };
-  success: boolean;
-  errors?: Array<{ code: number; message: string }>;
-  messages?: Array<{ code: number; message: string }>;
+interface ImageMetadata {
+  angle?: string;
+  view?: string;
+  tod?: string;
+  movement?: string;
+  description?: string;
+  [key: string]: string | undefined;
+}
+
+interface Image {
+  _id: ObjectId;
+  cloudflareId: string;
+  url: string;
+  filename: string;
+  metadata: ImageMetadata;
+  carId: ObjectId;
+  createdAt: string;
+  updatedAt: string;
+}
+
+async function getMongoClient() {
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  return client;
 }
 
 export async function GET(request: NextRequest, { params }: Props) {
+  let client;
   try {
     const { id } = await params;
 
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
-        },
-      }
-    );
+    client = await getMongoClient();
+    const db = client.db(DB_NAME);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Cloudflare API error response:", errorText);
+    // Find the image directly in the images collection
+    const image = await db
+      .collection<Image>("images")
+      .findOne({ cloudflareId: id });
+
+    if (!image) {
       return NextResponse.json(
-        { error: "Failed to fetch from Cloudflare API" },
-        { status: response.status }
+        { error: "Image metadata not found" },
+        { status: 404 }
       );
     }
 
-    const data: CloudflareResponse = await response.json();
-
-    if (!data.success) {
-      console.error("Cloudflare API error:", data.errors);
-      return NextResponse.json(
-        { error: data.errors?.[0]?.message || "Unknown Cloudflare API error" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(data);
+    return NextResponse.json({
+      result: {
+        id: image.cloudflareId,
+        filename: image.filename,
+        meta: image.metadata,
+        uploaded: image.createdAt,
+        variants: [image.url],
+      },
+      success: true,
+    });
   } catch (error) {
-    console.error("Error fetching Cloudflare metadata:", error);
+    console.error("Error fetching metadata:", error);
     return NextResponse.json(
       { error: "Failed to fetch metadata" },
       { status: 500 }
     );
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }
 
 export async function PATCH(request: NextRequest, { params }: Props) {
+  let client;
   try {
     const { id } = await params;
     const body = await request.json();
 
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
+    client = await getMongoClient();
+    const db = client.db(DB_NAME);
+
+    // Update the metadata in MongoDB
+    const result = await db.collection<Image>("images").updateOne(
+      { cloudflareId: id },
       {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
-          "Content-Type": "application/json",
+        $set: {
+          metadata: body.metadata,
+          updatedAt: new Date().toISOString(),
         },
-        body: JSON.stringify({ metadata: body.metadata }),
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Cloudflare API error response:", errorText);
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    }
+
+    // Get the updated image data
+    const image = await db
+      .collection<Image>("images")
+      .findOne({ cloudflareId: id });
+
+    if (!image) {
       return NextResponse.json(
-        { error: "Failed to update in Cloudflare API" },
-        { status: response.status }
+        { error: "Failed to fetch updated image" },
+        { status: 500 }
       );
     }
 
-    const data: CloudflareResponse = await response.json();
-
-    if (!data.success) {
-      console.error("Cloudflare API error:", data.errors);
-      return NextResponse.json(
-        { error: data.errors?.[0]?.message || "Unknown Cloudflare API error" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(data);
+    return NextResponse.json({
+      result: {
+        id: image.cloudflareId,
+        filename: image.filename,
+        meta: image.metadata,
+        uploaded: image.createdAt,
+        variants: [image.url],
+      },
+      success: true,
+    });
   } catch (error) {
-    console.error("Error updating Cloudflare metadata:", error);
+    console.error("Error updating metadata:", error);
     return NextResponse.json(
       { error: "Failed to update metadata" },
       { status: 500 }
     );
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }

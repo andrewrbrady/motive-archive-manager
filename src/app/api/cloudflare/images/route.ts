@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MongoClient, ObjectId, Collection } from "mongodb";
 
 // Set maximum execution time to 60 seconds
 export const maxDuration = 60;
 export const runtime = "nodejs";
+
+// Ensure environment variables are set
+if (!process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.CLOUDFLARE_API_TOKEN) {
+  throw new Error("Cloudflare credentials not set in environment variables");
+}
 
 interface CloudflareImage {
   id: string;
@@ -23,13 +29,43 @@ interface CloudflareResponse {
   }>;
 }
 
+interface Image {
+  _id: ObjectId;
+  cloudflareId: string;
+  url: string;
+  filename: string;
+  metadata: any;
+  carId: ObjectId;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Car {
+  _id: ObjectId;
+  imageIds: ObjectId[];
+  updatedAt: string;
+}
+
+// Add type for MongoDB collections
+interface Collections {
+  images: Collection<Image>;
+  cars: Collection<Car>;
+}
+
+// Helper function to get MongoDB client
+async function getMongoClient() {
+  const client = new MongoClient(process.env.MONGODB_URI || "");
+  await client.connect();
+  return client;
+}
+
 export async function GET() {
   try {
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
         },
       }
     );
@@ -59,29 +95,35 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  let mongoClient;
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const metadata = formData.get("metadata") as string;
     const vehicleInfo = formData.get("vehicleInfo") as string;
+    const carId = formData.get("carId") as string;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    if (!carId) {
+      return NextResponse.json(
+        { error: "No car ID provided" },
+        { status: 400 }
+      );
+    }
+
     const uploadFormData = new FormData();
     uploadFormData.append("file", file);
-    if (metadata) {
-      uploadFormData.append("metadata", metadata);
-    }
     uploadFormData.append("requireSignedURLs", "false");
 
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
         },
         body: uploadFormData,
       }
@@ -128,56 +170,63 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    if (!analysisResponse.ok) {
+    let combinedMetadata = {};
+
+    if (analysisResponse.ok) {
+      const analysisResult = await analysisResponse.json();
+      // Combine the original metadata with the AI analysis
+      combinedMetadata = {
+        ...JSON.parse(metadata || "{}"),
+        angle: analysisResult.analysis?.angle || "",
+        view: analysisResult.analysis?.view || "",
+        movement: analysisResult.analysis?.movement || "",
+        tod: analysisResult.analysis?.tod || "",
+        side: analysisResult.analysis?.side || "",
+        description: analysisResult.analysis?.description || "",
+        aiAnalysis: analysisResult.analysis,
+      };
+    } else {
       const errorText = await analysisResponse.text();
       console.error("OpenAI analysis error:", {
         status: analysisResponse.status,
         statusText: analysisResponse.statusText,
         body: errorText,
       });
-      return NextResponse.json({
-        success: true,
-        imageId: result.result.id,
-        imageUrl,
-        metadata: {},
-      });
+      combinedMetadata = JSON.parse(metadata || "{}");
     }
 
-    const analysisResult = await analysisResponse.json();
+    // Store the image metadata in MongoDB
+    mongoClient = await getMongoClient();
+    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
+    const collections = {
+      images: db.collection("images"),
+      cars: db.collection("cars"),
+    } as Collections;
 
-    // Combine the original metadata with the AI analysis
-    const combinedMetadata = {
-      ...JSON.parse(metadata || "{}"),
-      angle: analysisResult.analysis?.angle || "",
-      view: analysisResult.analysis?.view || "",
-      movement: analysisResult.analysis?.movement || "",
-      tod: analysisResult.analysis?.tod || "",
-      side: analysisResult.analysis?.side || "",
-      description: analysisResult.analysis?.description || "",
-      aiAnalysis: analysisResult.analysis,
+    const imageDoc = {
+      _id: new ObjectId(),
+      cloudflareId: result.result.id,
+      url: imageUrl,
+      filename: file.name,
+      metadata: combinedMetadata,
+      carId: new ObjectId(carId),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    // Update the image metadata in Cloudflare
-    const metadataResponse = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${result.result.id}`,
+    // Insert the image document
+    await collections.images.insertOne(imageDoc);
+
+    // Update the car document with the new image ID
+    await collections.cars.updateOne(
+      { _id: new ObjectId(carId) },
       {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ metadata: combinedMetadata }),
+        $push: { imageIds: imageDoc._id },
+        $set: { updatedAt: new Date().toISOString() },
       }
     );
 
-    if (!metadataResponse.ok) {
-      console.error(
-        "Failed to update Cloudflare metadata:",
-        await metadataResponse.text()
-      );
-    }
-
-    // Return both the image ID, URL, and the analysis
+    // Return both the image ID, URL, and the metadata
     return NextResponse.json({
       success: true,
       imageId: result.result.id,
@@ -190,26 +239,32 @@ export async function POST(request: NextRequest) {
       { error: "Failed to upload image" },
       { status: 500 }
     );
+  } finally {
+    if (mongoClient) {
+      await mongoClient.close();
+    }
   }
 }
 
 export async function DELETE(request: NextRequest) {
+  let mongoClient;
   try {
-    const { imageId } = await request.json();
+    const { imageId, carId } = await request.json();
 
-    if (!imageId) {
+    if (!imageId || !carId) {
       return NextResponse.json(
-        { error: "No image ID provided" },
+        { error: "No image ID or car ID provided" },
         { status: 400 }
       );
     }
 
+    // Delete from Cloudflare
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}`,
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}`,
       {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
         },
       }
     );
@@ -223,12 +278,41 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Remove image from MongoDB
+    mongoClient = await getMongoClient();
+    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
+    const collections = {
+      images: db.collection("images"),
+      cars: db.collection("cars"),
+    } as Collections;
+
+    // Find and delete the image document
+    const image = await collections.images.findOne({ cloudflareId: imageId });
+    if (!image) {
+      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    }
+
+    await collections.images.deleteOne({ _id: image._id });
+
+    // Remove the image ID from the car document
+    await collections.cars.updateOne(
+      { _id: new ObjectId(carId) },
+      {
+        $pull: { imageIds: image._id },
+        $set: { updatedAt: new Date().toISOString() },
+      }
+    );
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting from Cloudflare Images:", error);
+    console.error("Error deleting image:", error);
     return NextResponse.json(
       { error: "Failed to delete image" },
       { status: 500 }
     );
+  } finally {
+    if (mongoClient) {
+      await mongoClient.close();
+    }
   }
 }

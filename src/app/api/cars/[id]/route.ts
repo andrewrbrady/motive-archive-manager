@@ -12,7 +12,7 @@ if (!MONGODB_URI) {
 interface Car {
   _id: ObjectId;
   documents: string[];
-  images?: CarImage[];
+  imageIds: ObjectId[];
   client?: string;
   clientInfo?: {
     _id: string;
@@ -23,11 +23,13 @@ interface Car {
   };
 }
 
-interface CarImage {
-  id: string;
+interface Image {
+  _id: ObjectId;
+  cloudflareId: string;
   url: string;
   filename: string;
   metadata: ImageMetadata;
+  carId: ObjectId;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,9 +64,21 @@ export async function GET(
     const db = client.db(DB_NAME);
 
     console.log(`Fetching car with ID: ${id}`);
-    const car = (await db.collection("cars").findOne({
-      _id: objectId,
-    })) as Car | null;
+    // Use aggregation to populate images
+    const car = (await db
+      .collection("cars")
+      .aggregate([
+        { $match: { _id: objectId } },
+        {
+          $lookup: {
+            from: "images",
+            localField: "imageIds",
+            foreignField: "_id",
+            as: "images",
+          },
+        },
+      ])
+      .next()) as Car | null;
 
     if (!car) {
       console.log(`Car not found with ID: ${id}`);
@@ -254,18 +268,32 @@ export async function PATCH(
         );
       }
 
+      // Convert image IDs to ObjectIds
+      const imageIds = images.map((image) => new ObjectId(image._id));
+
       const updateResult = await db
         .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $set: { images } });
+        .updateOne({ _id: objectId }, { $set: { imageIds } });
 
       if (updateResult.matchedCount === 0) {
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
       }
 
-      // Fetch the updated car to return the new state
-      const updatedCar = await db.collection<Car>("cars").findOne({
-        _id: objectId,
-      });
+      // Fetch the updated car with populated images
+      const updatedCar = await db
+        .collection("cars")
+        .aggregate([
+          { $match: { _id: objectId } },
+          {
+            $lookup: {
+              from: "images",
+              localField: "imageIds",
+              foreignField: "_id",
+              as: "images",
+            },
+          },
+        ])
+        .next();
 
       return NextResponse.json(updatedCar);
     }
@@ -280,10 +308,21 @@ export async function PATCH(
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
       }
 
-      // Fetch the updated car to return the new state
-      const updatedCar = await db.collection<Car>("cars").findOne({
-        _id: objectId,
-      });
+      // Fetch the updated car with populated images
+      const updatedCar = await db
+        .collection("cars")
+        .aggregate([
+          { $match: { _id: objectId } },
+          {
+            $lookup: {
+              from: "images",
+              localField: "imageIds",
+              foreignField: "_id",
+              as: "images",
+            },
+          },
+        ])
+        .next();
 
       return NextResponse.json(updatedCar);
     }

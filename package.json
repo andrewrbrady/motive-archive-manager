@@ -2,12 +2,13 @@
   "name": "motive-archive-next",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "migrate:metadata": "ts-node src/scripts/migrateImageMetadata.ts",
+    "migrate:metadata": "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/migrate-image-metadata.ts",
     "test:mongodb": "ts-node scripts/test-mongodb.ts",
     "migrate:cars": "ts-node scripts/migrate-to-atlas.ts"
   },
@@ -32,6 +33,7 @@
     "mongodb": "^6.11.0",
     "mongoose": "^8.8.3",
     "next": "^14.1.0",
+    "node-fetch": "^3.3.2",
     "openai": "^4.78.1",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",

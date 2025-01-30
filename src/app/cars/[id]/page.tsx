@@ -421,6 +421,7 @@ export default function CarPage() {
       const uploadPromises = fileArray.map((file, i) => {
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("carId", id);
         formData.append(
           "vehicleInfo",
           JSON.stringify({
@@ -510,12 +511,6 @@ export default function CarPage() {
                   updatedAt: new Date().toISOString(),
                 };
 
-                // Update UI immediately after successful upload
-                setCar((prevCar) => ({
-                  ...prevCar!,
-                  images: [...prevCar!.images, imageData],
-                }));
-
                 // Update status to complete for this image
                 setUploadProgress((prev) =>
                   prev.map((p, idx) =>
@@ -565,34 +560,52 @@ export default function CarPage() {
         .map((result) => result.value.imageData);
 
       if (successfulUploads.length > 0) {
-        // Fetch latest car data once for the batch
-        const carResponse = await fetch(`/api/cars/${id}`);
-        if (!carResponse.ok) {
-          throw new Error("Failed to fetch latest car data");
+        try {
+          // Fetch latest car data once for the batch
+          const carResponse = await fetch(`/api/cars/${id}`);
+          if (!carResponse.ok) {
+            throw new Error("Failed to fetch latest car data");
+          }
+          const latestCarData = await carResponse.json();
+
+          // Combine existing images with new uploads
+          const allImages = [...latestCarData.images];
+
+          // Add new images, ensuring no duplicates by ID
+          successfulUploads.forEach((newImage) => {
+            if (!allImages.some((existing) => existing.id === newImage.id)) {
+              allImages.push(newImage);
+            }
+          });
+
+          // Update the backend with all images
+          const dbResponse = await fetch(`/api/cars/${id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              images: allImages,
+            }),
+          });
+
+          if (!dbResponse.ok) {
+            throw new Error("Failed to update car images in database");
+          }
+
+          // Verify the update by fetching the latest data
+          const verifyResponse = await fetch(`/api/cars/${id}`);
+          if (!verifyResponse.ok) {
+            throw new Error("Failed to verify image update");
+          }
+          const verifiedData = await verifyResponse.json();
+
+          // Update UI with verified data
+          setCar(verifiedData);
+        } catch (error) {
+          console.error("Error updating images:", error);
+          throw error;
         }
-        const latestCarData = await carResponse.json();
-
-        // Update the backend with all new images
-        const updatedImages = [...latestCarData.images, ...successfulUploads];
-        const dbResponse = await fetch(`/api/cars/${id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            images: updatedImages,
-          }),
-        });
-
-        if (!dbResponse.ok) {
-          throw new Error("Failed to update car images in database");
-        }
-
-        // Sync UI with database state to ensure consistency
-        setCar((prevCar) => ({
-          ...prevCar!,
-          images: updatedImages,
-        }));
       }
 
       // Update error status for failed uploads
@@ -864,6 +877,7 @@ export default function CarPage() {
             showMetadata={true}
             title={`${car.year} ${car.make} ${car.model}`}
             onContextChange={setAdditionalContext}
+            carId={id}
           />
         </div>
 
