@@ -90,13 +90,14 @@ export async function GET(
 
     const response = {
       totalFiles: files.length,
-      hasUrls: true,
-      files: signedUrls,
+      hasUrls: signedUrls.length > 0,
+      files: signedUrls || [], // Ensure we always return an array
     };
 
     console.log("Research Files API - Response prepared:", {
       totalFiles: files.length,
       hasUrls: signedUrls.length > 0,
+      filesArrayLength: signedUrls?.length || 0,
     });
 
     return NextResponse.json(response);
