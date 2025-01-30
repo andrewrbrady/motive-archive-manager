@@ -35,7 +35,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
       const response = await fetch(`/api/cars/${carId}/research`);
       if (!response.ok) throw new Error("Failed to fetch research files");
       const data = await response.json();
-      setFiles(data);
+      setFiles(data.files || []);
     } catch (error) {
       console.error("Error fetching research files:", error);
       setError("Failed to load research files");
