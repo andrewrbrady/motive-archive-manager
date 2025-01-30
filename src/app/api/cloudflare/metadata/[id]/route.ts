@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { MongoClient, ObjectId, Collection } from "mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -45,11 +45,10 @@ export async function GET(request: NextRequest, { params }: Props) {
 
     client = await getMongoClient();
     const db = client.db(DB_NAME);
+    const collection: Collection<Image> = db.collection("images");
 
     // Find the image directly in the images collection
-    const image = await db
-      .collection<Image>("images")
-      .findOne({ cloudflareId: id });
+    const image = await collection.findOne({ cloudflareId: id });
 
     if (!image) {
       return NextResponse.json(
@@ -89,9 +88,10 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     client = await getMongoClient();
     const db = client.db(DB_NAME);
+    const collection: Collection<Image> = db.collection("images");
 
     // Update the metadata in MongoDB
-    const result = await db.collection<Image>("images").updateOne(
+    const result = await collection.updateOne(
       { cloudflareId: id },
       {
         $set: {
@@ -106,9 +106,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     }
 
     // Get the updated image data
-    const image = await db
-      .collection<Image>("images")
-      .findOne({ cloudflareId: id });
+    const image = await collection.findOne({ cloudflareId: id });
 
     if (!image) {
       return NextResponse.json(

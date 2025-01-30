@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { MongoClient, ObjectId, Collection } from "mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     client = await MongoClient.connect(MONGODB_URI);
     const db = client.db(DB_NAME);
-    const collection = db.collection<Image>("images");
+    const collection: Collection<Image> = db.collection("images");
 
     const images = await collection.find({ _id: { $in: imageIds } }).toArray();
 
