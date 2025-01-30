@@ -41,15 +41,32 @@ export async function GET(
     const { db } = await connectToDatabase();
     console.log("Research Files API - MongoDB Connected");
 
+    // Check a document directly
+    const sampleDoc = await db.collection("research_files").findOne({});
+    console.log("Research Files API - Sample Document:", {
+      exists: !!sampleDoc,
+      structure: sampleDoc
+        ? {
+            _id: sampleDoc._id.toString(),
+            carId:
+              sampleDoc.carId instanceof ObjectId
+                ? sampleDoc.carId.toString()
+                : sampleDoc.carId,
+            fields: Object.keys(sampleDoc || {}),
+          }
+        : null,
+    });
+
     const files = await db
       .collection("research_files")
-      .find({ carId: params.id })
+      .find({ carId: new ObjectId(params.id) })
       .sort({ createdAt: -1 })
       .toArray();
 
     console.log("Research Files API - MongoDB Query Results:", {
       filesFound: files.length,
       carId: params.id,
+      query: { carId: new ObjectId(params.id).toString() },
       fileIds: files.map((f) => f._id.toString()),
     });
 
