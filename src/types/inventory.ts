@@ -1,3 +1,5 @@
+import { MeasurementValue } from "./car";
+
 export interface InventoryPageProps {
   searchParams: {
     page?: string;
@@ -17,29 +19,17 @@ export interface InventoryPageProps {
 }
 
 export interface InventoryItemRaw {
-  _id: { toString(): string };
+  id: string;
   url: string;
-  category: string;
-  timestamp?: string | Date | { $date: string };
-  color?: string;
-  condition?: string;
-  dealer?: string;
-  fuel_type?: string;
-  images?: string[];
-  primary_image?: string;
-  location?: string;
-  make?: string;
-  model?: string;
-  mileage?: number;
-  mileage_raw?: string;
-  odometer?: number;
+  year: number;
+  make: string;
+  model: string;
   price?: number;
-  price_raw?: string;
-  stock_number?: string;
-  vehicle_type?: string;
-  vin?: string;
-  year?: number;
-  trans?: string;
+  mileage?: MeasurementValue;
+  transmission?: string;
+  dealer?: string;
+  primary_image?: string;
+  images?: string[];
 }
 
 interface BaseVehicle {
@@ -47,59 +37,30 @@ interface BaseVehicle {
   make: string;
   model: string;
   price?: number;
-  mileage?: number;
+  mileage?: MeasurementValue;
 }
 
 export interface InventoryItem extends BaseVehicle {
   id: string;
   url: string;
-  category: string;
-  timestamp?: string;
-  color?: string;
-  interior_color?: string;
-  condition?: string;
-  dealer?: string;
-  fuel_type?: string;
-  images?: string[];
-  primary_image?: string;
-  location?: string;
-  mileage_raw?: string;
-  odometer?: number;
-  price_raw?: string;
-  stock_number?: string;
-  vehicle_type?: string;
-  type?: string;
-  vin?: string;
   transmission?: string;
+  dealer?: string;
+  primary_image?: string;
+  images?: string[];
 }
 
 export function transformInventoryItem(item: InventoryItemRaw): InventoryItem {
   return {
-    id: item._id.toString(),
+    id: item.id,
     url: item.url,
-    category: item.category,
-    year: item.year || 0,
-    make: item.make || "Unknown Make",
-    model: item.model || "Unknown Model",
-    timestamp:
-      typeof item.timestamp === "object" && "$date" in item.timestamp
-        ? item.timestamp.$date
-        : item.timestamp?.toString(),
-    color: item.color,
-    condition: item.condition,
-    dealer: item.dealer,
-    fuel_type: item.fuel_type,
-    images: item.images,
-    primary_image: item.primary_image,
-    location: item.location,
-    mileage: item.mileage,
-    mileage_raw: item.mileage_raw,
-    odometer: item.odometer,
+    year: item.year,
+    make: item.make,
+    model: item.model,
     price: item.price,
-    price_raw: item.price_raw,
-    stock_number: item.stock_number,
-    vehicle_type: item.vehicle_type,
-    vin: item.vin,
-    transmission: item.trans,
+    mileage: item.mileage,
+    transmission: item.transmission,
+    dealer: item.dealer,
+    primary_image: item.primary_image,
+    images: item.images,
   };
 }

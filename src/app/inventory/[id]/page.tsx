@@ -4,7 +4,7 @@ import React from "react";
 import { useParams } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import { ImageGallery } from "@/components/ImageGallery";
-import { VehicleDetails } from "@/components/inventory/VehicleDetails";
+import VehicleDetails from "@/components/inventory/VehicleDetails";
 import { InventoryItem } from "@/components/inventory/types";
 
 export default function InventoryItemPage() {
@@ -64,8 +64,8 @@ export default function InventoryItemPage() {
               filename: url.split("/").pop() || "",
               metadata: {},
               variants: {},
-              createdAt: item.timestamp || new Date().toISOString(),
-              updatedAt: item.timestamp || new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             }))}
             title={`${item.year} ${item.make} ${item.model}`}
             aspectRatio="4/3"
@@ -79,7 +79,7 @@ export default function InventoryItemPage() {
             showFilters={false}
           />
           <div className="mt-8">
-            <VehicleDetails item={item} showExternalLink={true} />
+            <VehicleDetails item={item} />
           </div>
         </div>
       </div>

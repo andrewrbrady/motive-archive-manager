@@ -18,8 +18,10 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
             <th className="py-2 px-3 text-left font-medium border">Model</th>
             <th className="py-2 px-3 text-right font-medium border">Price</th>
             <th className="py-2 px-3 text-right font-medium border">Mileage</th>
-            <th className="py-2 px-3 text-left font-medium border">Location</th>
             <th className="py-2 px-3 text-left font-medium border">Dealer</th>
+            <th className="py-2 px-3 text-left font-medium border">
+              Transmission
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -41,12 +43,12 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
                   : car.price}
               </td>
               <td className="py-2 px-3 text-right border">
-                {typeof car.mileage === "number"
-                  ? car.mileage.toLocaleString()
-                  : car.mileage || "-"}
+                {car.mileage && car.mileage.value !== null
+                  ? `${car.mileage.value.toLocaleString()} ${car.mileage.unit}`
+                  : "-"}
               </td>
-              <td className="py-2 px-3 border">{car.location || "-"}</td>
               <td className="py-2 px-3 border">{car.dealer || "-"}</td>
+              <td className="py-2 px-3 border">{car.transmission || "-"}</td>
             </tr>
           ))}
         </tbody>
