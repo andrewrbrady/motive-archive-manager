@@ -154,7 +154,10 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
   const handleFileClick = async (file: ResearchFile) => {
     try {
-      const response = await fetch(file.url);
+      const response = await fetch(
+        `/api/cars/${carId}/research/content?fileId=${file._id}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch file content");
       const content = await response.text();
       setMarkdownContent(content);
       setSelectedFile(file);

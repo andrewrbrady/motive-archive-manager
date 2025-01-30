@@ -2,12 +2,17 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 
 interface MarkdownViewerProps {
   content: string;
   filename: string;
+}
+
+interface CodeBlockProps {
+  className?: string;
+  children: React.ReactNode;
 }
 
 export default function MarkdownViewer({
@@ -22,21 +27,18 @@ export default function MarkdownViewer({
       <div className="p-6 prose prose-invert max-w-none">
         <ReactMarkdown
           components={{
-            code({ node, inline, className, children, ...props }) {
+            code({ className, children }: CodeBlockProps) {
               const match = /language-(\w+)/.exec(className || "");
-              return !inline && match ? (
+              return match ? (
                 <SyntaxHighlighter
                   style={oneDark}
                   language={match[1]}
                   PreTag="div"
-                  {...props}
                 >
                   {String(children).replace(/\n$/, "")}
                 </SyntaxHighlighter>
               ) : (
-                <code className={className} {...props}>
-                  {children}
-                </code>
+                <code className={className}>{children}</code>
               );
             },
           }}
