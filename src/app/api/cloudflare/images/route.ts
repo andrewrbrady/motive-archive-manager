@@ -6,7 +6,10 @@ export const maxDuration = 60;
 export const runtime = "nodejs";
 
 // Ensure environment variables are set
-if (!process.env.CLOUDFLARE_ACCOUNT_ID || !process.env.CLOUDFLARE_API_TOKEN) {
+if (
+  !process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID ||
+  !process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN
+) {
   throw new Error("Cloudflare credentials not set in environment variables");
 }
 
@@ -62,10 +65,10 @@ async function getMongoClient() {
 export async function GET() {
   try {
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
         },
       }
     );
@@ -119,11 +122,11 @@ export async function POST(request: NextRequest) {
     uploadFormData.append("requireSignedURLs", "false");
 
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
         },
         body: uploadFormData,
       }
@@ -260,11 +263,11 @@ export async function DELETE(request: NextRequest) {
 
     // Delete from Cloudflare
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}`,
+      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${imageId}`,
       {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
         },
       }
     );
