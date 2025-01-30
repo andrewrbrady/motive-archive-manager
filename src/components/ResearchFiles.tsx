@@ -5,6 +5,17 @@ import { FileText, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import MarkdownViewer from "./MarkdownViewer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ResearchFile {
   _id: string;
@@ -35,11 +46,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   }>({});
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
-  useEffect(() => {
-    fetchFiles();
-  }, [carId]);
-
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     setIsLoadingFiles(true);
     try {
       const response = await fetch(`/api/cars/${carId}/research`);
@@ -52,7 +59,11 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     } finally {
       setIsLoadingFiles(false);
     }
-  };
+  }, [carId]);
+
+  useEffect(() => {
+    fetchFiles();
+  }, [fetchFiles]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -334,25 +345,51 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   Research Files
                 </h3>
                 {files.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDeleteAll}
-                    disabled={isDeletingAll}
-                    className="text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
-                  >
-                    {isDeletingAll ? (
-                      <span className="flex items-center gap-2">
-                        <Trash2 className="h-4 w-4 animate-spin" />
-                        Deleting...
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <Trash2 className="h-4 w-4" />
-                        Delete All
-                      </span>
-                    )}
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={isDeletingAll}
+                        className="text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          Delete All
+                        </span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-900 border border-zinc-800">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-zinc-100">
+                          Delete All Research Files
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-zinc-400">
+                          This action cannot be undone. This will permanently
+                          delete all research files for this car.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-800 text-zinc-100 hover:bg-zinc-700 border-zinc-700">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteAll}
+                          disabled={isDeletingAll}
+                          className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                        >
+                          {isDeletingAll ? (
+                            <span className="flex items-center gap-2">
+                              <Trash2 className="h-4 w-4 animate-spin" />
+                              Deleting...
+                            </span>
+                          ) : (
+                            "Delete All"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
               <div className="divide-y divide-zinc-800">
