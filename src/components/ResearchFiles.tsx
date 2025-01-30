@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FileText, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
@@ -16,6 +16,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
+import { KeyboardEvent } from "react";
 
 interface ResearchFile {
   _id: string;
@@ -45,6 +47,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     [key: string]: number;
   }>({});
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [focusArea, setFocusArea] = useState<"list" | "preview">("list");
+  const fileListRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const fetchFiles = useCallback(async () => {
     setIsLoadingFiles(true);
@@ -242,14 +247,104 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }
   };
 
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!selectedFile) return;
+
+      const currentIndex = files.findIndex((f) => f._id === selectedFile._id);
+
+      switch (e.key) {
+        case "ArrowUp":
+          if (focusArea === "list" && currentIndex > 0) {
+            e.preventDefault();
+            const prevFile = files[currentIndex - 1];
+            handleFileClick(prevFile);
+          }
+          break;
+        case "ArrowDown":
+          if (focusArea === "list" && currentIndex < files.length - 1) {
+            e.preventDefault();
+            const nextFile = files[currentIndex + 1];
+            handleFileClick(nextFile);
+          }
+          break;
+        case "ArrowLeft":
+          if (focusArea === "list") {
+            e.preventDefault();
+            setFocusArea("preview");
+            previewRef.current?.focus();
+          }
+          break;
+        case "ArrowRight":
+          if (focusArea === "preview") {
+            e.preventDefault();
+            setFocusArea("list");
+            fileListRef.current?.focus();
+          }
+          break;
+      }
+    },
+    [files, selectedFile, focusArea, handleFileClick]
+  );
+
+  useEffect(() => {
+    if (selectedFile) {
+      fileListRef.current?.focus();
+    }
+  }, [selectedFile]);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
+        <div className="min-h-[600px]">
+          {isLoadingContent ? (
+            <div className="rounded-lg border border-zinc-800 h-full">
+              <div className="p-4 border-b border-zinc-800">
+                <div className="h-6 bg-zinc-800 rounded w-1/3 animate-pulse" />
+              </div>
+              <div className="p-6">
+                <div className="space-y-4 animate-pulse">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="h-4 bg-zinc-800 rounded w-full" />
+                      <div className="h-4 bg-zinc-800 rounded w-5/6" />
+                      <div className="h-4 bg-zinc-800 rounded w-4/6" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : selectedFile ? (
+            <div
+              ref={previewRef}
+              tabIndex={0}
+              onFocus={() => setFocusArea("preview")}
+              className={cn(
+                "outline-none",
+                focusArea === "preview" && "ring-1 ring-zinc-500 rounded-lg"
+              )}
+              onKeyDown={handleKeyDown}
+            >
+              <MarkdownViewer
+                content={markdownContent}
+                filename={selectedFile.filename}
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-zinc-800 h-full flex items-center justify-center">
+              <div className="text-center text-zinc-400">
+                <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p>Select a file to view its contents</p>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="space-y-4">
           <div className="rounded-lg border border-zinc-800">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold leading-none tracking-tight text-zinc-100">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[0.625rem] font-medium uppercase tracking-wider text-zinc-100">
                   Upload Research Files
                 </h3>
               </div>
@@ -258,7 +353,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
                   isDragging
                     ? "border-zinc-500 bg-zinc-800/50"
                     : "border-zinc-800 hover:border-zinc-700"
@@ -274,14 +369,14 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                 />
                 <label
                   htmlFor="file"
-                  className="flex flex-col items-center justify-center gap-2 cursor-pointer"
+                  className="flex flex-col items-center justify-center gap-1 cursor-pointer"
                 >
-                  <Upload className="h-8 w-8 text-zinc-400" />
+                  <Upload className="h-6 w-6 text-zinc-400" />
                   <div className="text-zinc-400">
-                    <span className="font-medium text-zinc-300">
+                    <span className="text-sm font-medium text-zinc-300">
                       Drop files here or click to upload
                     </span>
-                    <p className="text-sm mt-1">
+                    <p className="text-xs mt-0.5">
                       Supports markdown (.md) files only
                     </p>
                   </div>
@@ -289,13 +384,17 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               </div>
 
               {selectedFiles.length > 0 && (
-                <div className="mt-4 space-y-4">
+                <div className="mt-3 space-y-3">
                   <div className="space-y-2">
                     {selectedFiles.map((file) => (
                       <div key={file.name} className="text-sm text-zinc-400">
                         <div className="flex items-center justify-between mb-1">
-                          <span>{file.name}</span>
-                          <span>{uploadProgress[file.name] || 0}%</span>
+                          <span className="text-xs">
+                            {truncateFilename(file.name)}
+                          </span>
+                          <span className="text-xs">
+                            {uploadProgress[file.name] || 0}%
+                          </span>
                         </div>
                         <div className="w-full bg-zinc-800 rounded-full h-1">
                           <div
@@ -312,16 +411,17 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     onClick={handleUpload}
                     disabled={uploading}
                     variant="secondary"
+                    size="sm"
                     className="w-full !bg-zinc-800 hover:!bg-zinc-700 !text-zinc-100 !border-transparent"
                   >
                     {uploading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Upload className="h-4 w-4 animate-spin" />
+                        <Upload className="h-3 w-3 animate-spin" />
                         Uploading...
                       </span>
                     ) : (
                       <span className="flex items-center justify-center gap-2">
-                        <Upload className="h-4 w-4" />
+                        <Upload className="h-3 w-3" />
                         Upload {selectedFiles.length} File
                         {selectedFiles.length > 1 ? "s" : ""}
                       </span>
@@ -333,15 +433,24 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-4 text-red-400">
+            <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-3 text-red-400 text-sm">
               {error}
             </div>
           )}
 
-          <div className="rounded-lg border border-zinc-800">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold leading-none tracking-tight text-zinc-100">
+          <div
+            ref={fileListRef}
+            tabIndex={0}
+            onFocus={() => setFocusArea("list")}
+            onKeyDown={handleKeyDown}
+            className={cn(
+              "rounded-lg border border-zinc-800 outline-none",
+              focusArea === "list" && "ring-1 ring-zinc-500"
+            )}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[0.625rem] font-medium uppercase tracking-wider text-zinc-100">
                   Research Files
                 </h3>
                 {files.length > 0 && (
@@ -351,10 +460,10 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                         variant="ghost"
                         size="sm"
                         disabled={isDeletingAll}
-                        className="text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
+                        className="h-7 text-xs text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
                       >
-                        <span className="flex items-center gap-2">
-                          <Trash2 className="h-4 w-4" />
+                        <span className="flex items-center gap-1">
+                          <Trash2 className="h-3 w-3" />
                           Delete All
                         </span>
                       </Button>
@@ -394,14 +503,14 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               </div>
               <div className="divide-y divide-zinc-800">
                 {isLoadingFiles ? (
-                  <div className="py-8 text-center text-zinc-400">
-                    <div className="animate-pulse space-y-4">
+                  <div className="py-4 text-center text-zinc-400">
+                    <div className="animate-pulse space-y-3">
                       {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex items-center space-x-4">
-                          <div className="h-5 w-5 bg-zinc-800 rounded" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-4 bg-zinc-800 rounded w-3/4" />
-                            <div className="h-3 bg-zinc-800 rounded w-1/2" />
+                        <div key={i} className="flex items-center space-x-3">
+                          <div className="h-4 w-4 bg-zinc-800 rounded" />
+                          <div className="flex-1 space-y-1">
+                            <div className="h-3 bg-zinc-800 rounded w-3/4" />
+                            <div className="h-2 bg-zinc-800 rounded w-1/2" />
                           </div>
                         </div>
                       ))}
@@ -412,18 +521,19 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     {files.map((file) => (
                       <div
                         key={file._id}
-                        className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 px-4 -mx-4 rounded ${
-                          selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
-                        }`}
+                        className={cn(
+                          "group py-2 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 px-2 -mx-2 rounded",
+                          selectedFile?._id === file._id && "bg-zinc-800/50"
+                        )}
                         onClick={() => handleFileClick(file)}
                       >
-                        <div className="flex gap-4 min-w-0 flex-1">
-                          <FileText className="h-5 w-5 mt-0.5 text-zinc-400 flex-shrink-0" />
-                          <div className="space-y-1 min-w-0">
-                            <span className="font-medium text-zinc-100 hover:text-zinc-300 block truncate">
+                        <div className="flex gap-2 min-w-0 flex-1">
+                          <FileText className="h-4 w-4 mt-0.5 text-zinc-400 flex-shrink-0" />
+                          <div className="space-y-0.5 min-w-0">
+                            <span className="text-sm font-medium text-zinc-100 hover:text-zinc-300 block truncate">
                               {truncateFilename(file.filename)}
                             </span>
-                            <div className="text-sm text-zinc-400">
+                            <div className="text-xs text-zinc-400">
                               {formatFileSize(file.size)} •{" "}
                               {formatDistanceToNow(new Date(file.createdAt), {
                                 addSuffix: true,
@@ -438,16 +548,18 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                             e.stopPropagation();
                             handleDelete(file._id);
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     ))}
                     {files.length === 0 && (
-                      <div className="py-8 text-center text-zinc-400">
-                        <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                        <p>No research files uploaded yet</p>
+                      <div className="py-6 text-center text-zinc-400">
+                        <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">
+                          No research files uploaded yet
+                        </p>
                       </div>
                     )}
                   </>
@@ -455,39 +567,6 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="min-h-[600px]">
-          {isLoadingContent ? (
-            <div className="rounded-lg border border-zinc-800 h-full">
-              <div className="p-4 border-b border-zinc-800">
-                <div className="h-6 bg-zinc-800 rounded w-1/3 animate-pulse" />
-              </div>
-              <div className="p-6">
-                <div className="space-y-4 animate-pulse">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="h-4 bg-zinc-800 rounded w-full" />
-                      <div className="h-4 bg-zinc-800 rounded w-5/6" />
-                      <div className="h-4 bg-zinc-800 rounded w-4/6" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : selectedFile ? (
-            <MarkdownViewer
-              content={markdownContent}
-              filename={selectedFile.filename}
-            />
-          ) : (
-            <div className="rounded-lg border border-zinc-800 h-full flex items-center justify-center">
-              <div className="text-center text-zinc-400">
-                <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>Select a file to view its contents</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

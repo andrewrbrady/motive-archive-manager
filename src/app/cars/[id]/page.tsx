@@ -1651,10 +1651,18 @@ export default function CarPage() {
           </section>
         </div>
 
-        {/* Add this section after the existing tabs */}
+        {/* Research Section */}
         <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Research</h2>
-          <ResearchFiles carId={id} />
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
+                Research
+              </h2>
+            </div>
+            <div className="border border-gray-200 dark:border-gray-800 rounded-lg">
+              <ResearchFiles carId={id} />
+            </div>
+          </section>
         </div>
       </main>
       <Footer />
