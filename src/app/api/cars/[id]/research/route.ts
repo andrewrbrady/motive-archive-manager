@@ -36,12 +36,23 @@ export async function GET(
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
       NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
       NODE_ENV: process.env.NODE_ENV,
+      MONGODB_URI:
+        process.env.MONGODB_URI?.split("@")[1]?.split("/")[0] ||
+        "URI not found", // Only log the host part for security
     });
 
     const { db } = await connectToDatabase();
     console.log("Research Files API - MongoDB Connected");
 
-    // Check a document directly
+    // List all collections to verify we're in the right database
+    const collections = await db.listCollections().toArray();
+    console.log("Research Files API - Database Info:", {
+      databaseName: db.databaseName,
+      collections: collections.map((c) => c.name),
+      researchFilesExists: collections.some((c) => c.name === "research_files"),
+    });
+
+    // Check a document directly without any query to verify connection
     const sampleDoc = await db.collection("research_files").findOne({});
     console.log("Research Files API - Sample Document:", {
       exists: !!sampleDoc,
@@ -51,12 +62,28 @@ export async function GET(
             carId:
               sampleDoc.carId instanceof ObjectId
                 ? sampleDoc.carId.toString()
-                : sampleDoc.carId,
+                : typeof sampleDoc.carId === "string"
+                ? sampleDoc.carId
+                : "unknown type",
             fields: Object.keys(sampleDoc || {}),
+            collectionName: "research_files",
           }
         : null,
     });
 
+    // Try to find documents with a string carId first
+    const filesWithStringId = await db
+      .collection("research_files")
+      .find({ carId: params.id })
+      .toArray();
+
+    console.log("Research Files API - String ID Query Results:", {
+      filesFound: filesWithStringId.length,
+      carId: params.id,
+      query: { carId: params.id },
+    });
+
+    // Then try with ObjectId
     const files = await db
       .collection("research_files")
       .find({ carId: new ObjectId(params.id) })
