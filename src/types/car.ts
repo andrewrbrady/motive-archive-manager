@@ -36,13 +36,18 @@ export interface CarImage {
   updatedAt: string;
 }
 
+export interface MeasurementValue {
+  value: number | null;
+  unit: string;
+}
+
 export interface Car {
   _id: string;
   make: string;
   model: string;
   year: number;
   price: number;
-  mileage: number;
+  mileage: MeasurementValue;
   color: string;
   horsepower: number;
   condition: string;

@@ -11,7 +11,13 @@ const Car =
         model: String,
         year: Number,
         price: Number,
-        mileage: Number,
+        mileage: {
+          value: Number,
+          unit: {
+            type: String,
+            default: "mi",
+          },
+        },
         color: String,
         engine: {
           type: String,

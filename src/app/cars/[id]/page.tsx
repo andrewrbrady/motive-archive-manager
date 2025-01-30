@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
-import { Loader2, Plus, Sparkles } from "lucide-react";
+import { Loader2, Plus, Sparkles, Pencil, Trash2 } from "lucide-react";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
-import { Pencil } from "lucide-react";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Footer from "@/components/layout/footer";
 import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
@@ -38,6 +37,7 @@ interface Engine {
   displacement?: MeasurementValue;
   power?: Power;
   torque?: Torque;
+  features?: string[];
 }
 
 interface Dimensions {
@@ -200,6 +200,7 @@ export default function CarPage() {
     status: "pending",
   });
   const [additionalContext, setAdditionalContext] = useState("");
+  const router = useRouter();
 
   type NestedFields =
     | "engine"
@@ -314,17 +315,35 @@ export default function CarPage() {
 
   // Helper function to handle measurement input changes
   const handleMeasurementChange = (
-    field: keyof EditableSpecs,
+    field: keyof EditableSpecs | string,
     value: MeasurementValue,
     nestedField?: string
   ): void => {
-    setEditedSpecs((prev: EditableSpecs) => {
-      // Handle nested fields
-      if (nestedField && isNestedField(field)) {
+    setEditedSpecs((prev) => {
+      // Handle nested paths like "engine.displacement"
+      if (field.includes(".")) {
+        const [parentField, childField] = field.split(".");
+        const parentValue = (prev[parentField as keyof EditableSpecs] ||
+          {}) as Record<string, unknown>;
+        return {
+          ...prev,
+          [parentField]: {
+            ...parentValue,
+            [childField]: value,
+          },
+        };
+      }
+
+      // Handle nested fields with explicit nestedField parameter
+      if (nestedField && isNestedField(field as keyof EditableSpecs)) {
+        const fieldValue = (prev[field as keyof EditableSpecs] || {}) as Record<
+          string,
+          unknown
+        >;
         return {
           ...prev,
           [field]: {
-            ...(prev[field] as Record<string, unknown>),
+            ...fieldValue,
             [nestedField]: value,
           },
         };
@@ -336,6 +355,37 @@ export default function CarPage() {
         [field]: value,
       };
     });
+  };
+
+  // Add helper function to handle power change
+  const handlePowerChange = (value: MeasurementValue) => {
+    // Convert hp to kW and ps
+    const hp = value.value || 0;
+    const kW = Math.round(hp * 0.7457);
+    const ps = Math.round(hp * 1.014);
+
+    setEditedSpecs((prev) => ({
+      ...prev,
+      engine: {
+        ...prev.engine,
+        power: { hp, kW, ps },
+      },
+    }));
+  };
+
+  // Add helper function to handle torque change
+  const handleTorqueChange = (value: MeasurementValue) => {
+    // Convert lb-ft to Nm
+    const lbFt = value.value || 0;
+    const Nm = Math.round(lbFt * 1.3558);
+
+    setEditedSpecs((prev) => ({
+      ...prev,
+      engine: {
+        ...prev.engine,
+        torque: { "lb-ft": lbFt, Nm },
+      },
+    }));
   };
 
   // Add escape key handler
@@ -829,6 +879,31 @@ export default function CarPage() {
     return `${torque["lb-ft"]} lb-ft / ${torque.Nm} Nm`;
   };
 
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this car? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/cars/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete car");
+      }
+
+      router.push("/cars");
+    } catch (error) {
+      console.error("Error deleting car:", error);
+      alert("Failed to delete car. Please try again.");
+    }
+  };
+
   if (loading) {
     return <CarPageSkeleton />;
   }
@@ -859,6 +934,12 @@ export default function CarPage() {
                 className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700"
               >
                 <Pencil className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleDelete}
+                className="p-2 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800"
+              >
+                <Trash2 className="w-5 h-5" />
               </button>
             </div>
           </PageTitle>
@@ -1162,25 +1243,70 @@ export default function CarPage() {
                       {isSpecsEditMode ? (
                         <input
                           type="text"
-                          value={getInputValue(
-                            editedSpecs.engine?.type ?? car.engine.type
-                          )}
+                          value={
+                            editedSpecs.engine?.type ?? car.engine?.type ?? ""
+                          }
                           onChange={(e) =>
                             handleInputChange("engine", e.target.value, "type")
                           }
                           className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
                         />
                       ) : (
-                        car.engine.type
+                        car.engine?.type || "N/A"
                       )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-3 py-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Power
+                      Displacement
                     </span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
-                      {formatPower(car.engine?.power)}
+                      {isSpecsEditMode ? (
+                        <MeasurementInputWithUnit
+                          value={
+                            editedSpecs.engine?.displacement ??
+                            car.engine?.displacement ?? {
+                              value: null,
+                              unit: "L",
+                            }
+                          }
+                          onChange={(value) =>
+                            handleMeasurementChange(
+                              "engine.displacement",
+                              value
+                            )
+                          }
+                          availableUnits={["L", "cc"]}
+                          className="justify-end"
+                        />
+                      ) : (
+                        formatMeasurement(car.engine?.displacement)
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Power Output
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                      {isSpecsEditMode ? (
+                        <MeasurementInputWithUnit
+                          value={{
+                            value:
+                              editedSpecs.engine?.power?.hp ??
+                              car.engine?.power?.hp ??
+                              null,
+                            unit: "hp",
+                          }}
+                          onChange={handlePowerChange}
+                          availableUnits={["hp"]}
+                          className="justify-end"
+                        />
+                      ) : car.engine?.power ? (
+                        `${car.engine.power.hp} hp / ${car.engine.power.kW} kW / ${car.engine.power.ps} PS`
+                      ) : (
+                        "N/A"
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-3 py-2">
@@ -1188,7 +1314,24 @@ export default function CarPage() {
                       Torque
                     </span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
-                      {formatTorque(car.engine?.torque)}
+                      {isSpecsEditMode ? (
+                        <MeasurementInputWithUnit
+                          value={{
+                            value:
+                              editedSpecs.engine?.torque?.["lb-ft"] ??
+                              car.engine?.torque?.["lb-ft"] ??
+                              null,
+                            unit: "lb-ft",
+                          }}
+                          onChange={handleTorqueChange}
+                          availableUnits={["lb-ft", "Nm"]}
+                          className="justify-end"
+                        />
+                      ) : car.engine?.torque ? (
+                        `${car.engine.torque["lb-ft"]} lb-ft / ${car.engine.torque.Nm} Nm`
+                      ) : (
+                        "N/A"
+                      )}
                     </span>
                   </div>
                 </>
