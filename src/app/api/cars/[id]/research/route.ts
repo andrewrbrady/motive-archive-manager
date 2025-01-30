@@ -25,28 +25,75 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log("Research Files API - Request Details:", {
+      url: request.url,
+      method: request.method,
+      carId: params.id,
+      headers: Object.fromEntries(request.headers.entries()),
+    });
+
+    console.log("Research Files API - Environment:", {
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+      NODE_ENV: process.env.NODE_ENV,
+    });
+
     const { db } = await connectToDatabase();
+    console.log("Research Files API - MongoDB Connected");
+
     const files = await db
       .collection("research_files")
       .find({ carId: params.id })
       .sort({ createdAt: -1 })
       .toArray();
 
+    console.log("Research Files API - MongoDB Query Results:", {
+      filesFound: files.length,
+      carId: params.id,
+      fileIds: files.map((f) => f._id.toString()),
+    });
+
     // Generate presigned URLs for each file
     const filesWithUrls = await Promise.all(
       files.map(async (file) => {
-        const url = await generatePresignedDownloadUrl(file.s3Key);
-        return {
-          ...file,
-          _id: file._id.toString(),
-          url,
-        };
+        try {
+          const url = await generatePresignedDownloadUrl(file.s3Key);
+          console.log("Research Files API - Generated URL for file:", {
+            fileId: file._id.toString(),
+            s3Key: file.s3Key,
+            urlGenerated: !!url,
+          });
+          return {
+            ...file,
+            _id: file._id.toString(),
+            url,
+          };
+        } catch (error) {
+          console.error("Research Files API - Error generating URL:", {
+            fileId: file._id.toString(),
+            s3Key: file.s3Key,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+          throw error;
+        }
       })
     );
 
+    console.log("Research Files API - Response prepared:", {
+      totalFiles: filesWithUrls.length,
+      filesWithUrls: filesWithUrls.map((f) => ({
+        id: f._id,
+        filename: f.filename,
+        hasUrl: !!f.url,
+      })),
+    });
+
     return NextResponse.json(filesWithUrls);
   } catch (error) {
-    console.error("Error fetching research files:", error);
+    console.error("Research Files API - Error:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { error: "Failed to fetch research files" },
       { status: 500 }
@@ -72,7 +119,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     // Create research file document
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "motive_archive");
-    const collection = db.collection("researchfiles");
+    const collection = db.collection("research_files");
 
     const researchFile = {
       carId: new ObjectId(params.id),
