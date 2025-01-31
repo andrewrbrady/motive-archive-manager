@@ -1,6 +1,6 @@
 // app/receipts/[id]/page.tsx
 import { ObjectId } from "mongodb";
-import clientPromise from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import { format } from "date-fns";
 import Navbar from "@/components/layout/navbar";
 
@@ -12,8 +12,9 @@ interface ReceiptItem {
 }
 
 async function getReceipt(id: string) {
-  const client = await clientPromise;
-  const db = client.db("motive_archive");
+  // Get database connection from our connection pool
+  const dbConnection = await connectToDatabase();
+  const db = dbConnection.db;
 
   const receipt = await db
     .collection("receipts")

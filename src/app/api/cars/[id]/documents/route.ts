@@ -1,29 +1,15 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
 
-const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
-
-if (!MONGODB_URI) {
-  throw new Error("Please add your Mongo URI to .env.local");
-}
-
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  await client.connect();
-  return client;
-}
 
 // GET documents for a car
 export async function GET(
   request: Request,
   context: { params: { id: string } }
 ) {
-  let client;
+  let dbConnection;
   try {
     // Get and validate ID first, before any other operations
     const { id } = await Promise.resolve(context.params);
@@ -38,9 +24,9 @@ export async function GET(
     }
     const objectId = new ObjectId(id);
 
-    // Connect to MongoDB after ID validation
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
     // Get the car to check if it exists and get document references
     console.log(`Looking up car: ${id}`);
@@ -90,12 +76,5 @@ export async function GET(
       { error: "Failed to fetch car documents" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      console.log(
-        `Closing MongoDB connection for car documents ${context.params.id}`
-      );
-      await client.close();
-    }
   }
 }

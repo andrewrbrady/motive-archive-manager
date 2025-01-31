@@ -1,7 +1,7 @@
 // app/api/documents/[id]/route.ts
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
 import { ObjectId, UpdateFilter } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 interface CarDocument {
   _id: ObjectId;
@@ -20,6 +20,7 @@ export async function GET(
   request: Request,
   context: { params: { id: string } }
 ) {
+  let dbConnection;
   try {
     // Get ID safely
     const documentId = await getDocumentId(context.params);
@@ -31,8 +32,9 @@ export async function GET(
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
     const document = await db
       .collection("documents")
@@ -59,6 +61,7 @@ export async function PUT(
   request: Request,
   context: { params: { id: string } }
 ) {
+  let dbConnection;
   try {
     const documentId = await getDocumentId(context.params);
 
@@ -69,8 +72,9 @@ export async function PUT(
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
     const updateData = await request.json();
 
     const result = await db
@@ -102,6 +106,7 @@ export async function DELETE(
   request: Request,
   context: { params: { id: string } }
 ) {
+  let dbConnection;
   try {
     const documentId = await getDocumentId(context.params);
 
@@ -112,8 +117,9 @@ export async function DELETE(
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
     const body = await request.json();
 
@@ -137,7 +143,7 @@ export async function DELETE(
     };
 
     await db
-      .collection<CarDocument>("cars")
+      .collection("cars")
       .updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
 
     // Delete document

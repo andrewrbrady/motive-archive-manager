@@ -1,18 +1,14 @@
-import { MongoClient } from "mongodb";
 import { NextApiRequest, NextApiResponse } from "next";
-
-const uri = "mongodb://localhost:27017";
-const dbName = "motive_archive";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   try {
-    const client = new MongoClient(uri);
-    await client.connect();
-
-    const db = client.db(dbName);
+    // Get database connection from our connection pool
+    const dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
     const carsCollection = db.collection("cars");
 
     const pageQuery = Array.isArray(req.query.page)
@@ -34,8 +30,6 @@ export default async function handler(
 
     const total = await carsCollection.countDocuments();
 
-    await client.close();
-
     res.status(200).json({
       cars,
       pagination: {
@@ -45,8 +39,8 @@ export default async function handler(
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch {
-    console.error("Failed to fetch cars");
+  } catch (error) {
+    console.error("Failed to fetch cars:", error);
     res.status(500).json({ error: "Failed to fetch cars" });
   }
 }

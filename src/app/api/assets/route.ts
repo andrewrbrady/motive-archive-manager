@@ -1,17 +1,11 @@
-import { MongoClient, Collection, ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const dbName = process.env.MONGODB_DB || "arb_assets";
 
-async function getClient() {
-  const client = await MongoClient.connect(uri);
-  return client;
-}
-
 export async function GET(request: NextRequest) {
-  let client;
+  let dbConnection;
   try {
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
@@ -21,9 +15,12 @@ export async function GET(request: NextRequest) {
     const sortDirection = searchParams.get("sortDirection") || "desc";
     const skip = (page - 1) * limit;
 
-    client = await getClient();
-    const db = client.db(dbName);
-    const collection = db.collection("raw");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const assetsCollection: Collection<Asset> = db.collection("raw");
 
     // Build search query
     const searchQuery = search
@@ -41,10 +38,10 @@ export async function GET(request: NextRequest) {
     };
 
     // Get total count with search filter
-    const total = await collection.countDocuments(searchQuery);
+    const total = await assetsCollection.countDocuments(searchQuery);
 
     // Get paginated, filtered, and sorted assets
-    const assets = await collection
+    const assets = await assetsCollection
       .find(searchQuery)
       .sort(sortObject)
       .skip(skip)
@@ -69,8 +66,6 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }
 

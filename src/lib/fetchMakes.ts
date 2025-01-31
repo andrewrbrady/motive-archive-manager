@@ -1,5 +1,5 @@
 // lib/fetchMakes.ts
-import clientPromise from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export interface Make {
   _id: string;
@@ -15,8 +15,9 @@ export interface Make {
 
 export async function fetchMakes() {
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    const dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
     console.log("Fetching makes from MongoDB...");
     const makes = await db

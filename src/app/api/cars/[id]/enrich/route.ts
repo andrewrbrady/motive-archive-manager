@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 import { Car } from "@/types/car";
+import { connectToDatabase } from "@/lib/mongodb";
 
 interface SerperResult {
   organic: Array<{
@@ -51,17 +52,6 @@ interface EnrichedCarData {
   weight?: {
     curb_weight: { value: number | null; unit: string };
   };
-}
-
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  console.log("🔄 Connecting to MongoDB...");
-  const client = new MongoClient(
-    process.env.MONGODB_URI || "mongodb://localhost:27017"
-  );
-  await client.connect();
-  console.log("✅ MongoDB connected");
-  return client;
 }
 
 async function searchVehicleInfo(query: string) {
@@ -185,15 +175,19 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   console.log("\n🚀 Starting car data enrichment process...");
-  const client = await getMongoClient();
+  let dbConnection;
 
   try {
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
     const collection = db.collection("cars");
     const carId = new ObjectId(params.id);
 
     // Get existing car data
-    const existingCarData = await collection.findOne<Car>({ _id: carId });
+    const existingCarData = (await collection.findOne({
+      _id: carId,
+    })) as Car | null;
     if (!existingCarData) {
       throw new Error("Car not found");
     }
@@ -255,7 +249,6 @@ export async function POST(
             "mileage",
             "vin",
             "client",
-            "clientInfo",
             "location",
           ],
         },
@@ -266,20 +259,10 @@ export async function POST(
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to enrich car data",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-        progress: {
-          step: 0,
-          currentStep: "",
-          status: "error",
-          error:
-            error instanceof Error ? error.message : "Unknown error occurred",
-        },
+        message:
+          error instanceof Error ? error.message : "Failed to enrich car data",
       },
       { status: 500 }
     );
-  } finally {
-    await client.close();
   }
 }

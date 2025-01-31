@@ -1,5 +1,5 @@
 // lib/fetchInventory.ts
-import clientPromise from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import { InventoryItemRaw } from "@/types/inventory";
 
 interface InventoryFilters {
@@ -28,8 +28,9 @@ export async function fetchInventory(
   filters: InventoryFilters = {}
 ) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    // Get database connection from our connection pool
+    const dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
     const collection = db.collection<InventoryItemRaw>("inventory");
 
     const skip = (page - 1) * limit;

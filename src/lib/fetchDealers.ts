@@ -1,5 +1,5 @@
 // lib/fetchDealers.ts
-import clientPromise from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export interface Dealer {
   _id: string;
@@ -9,8 +9,9 @@ export interface Dealer {
 
 export async function fetchDealers() {
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    const dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
     const dealers = await db
       .collection("dealers")

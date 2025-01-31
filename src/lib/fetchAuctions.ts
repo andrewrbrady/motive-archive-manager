@@ -1,7 +1,7 @@
 import { cache } from "react";
-import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Auction, AuctionFilters, AuctionsResponse } from "@/types/auction";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export type { AuctionFilters, Auction };
 
@@ -28,8 +28,9 @@ export const fetchAuctions = cache(async function fetchAuctions(
   pageSize: number = 24
 ): Promise<AuctionsResponse> {
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    const dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
     const skip = (page - 1) * pageSize;
 
     // Build MongoDB query from filters

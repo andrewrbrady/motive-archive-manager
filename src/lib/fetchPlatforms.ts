@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export interface Platform {
   _id: string;
@@ -9,8 +9,9 @@ export interface Platform {
 
 export async function fetchPlatforms() {
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    const dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
     console.log("Fetching platforms from MongoDB...");
     const platforms = await db.collection("platforms").find({}).toArray();
