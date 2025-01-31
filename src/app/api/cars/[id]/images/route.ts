@@ -33,13 +33,10 @@ export async function POST(
   let dbConnection;
   try {
     const { id } = context.params;
-    console.log("Processing request for car ID:", id);
-
     const formData = await request.formData();
     const imageData = formData.get("imageData");
 
     if (!imageData) {
-      console.error("No image data provided in request");
       return NextResponse.json(
         { error: "No image data provided" },
         { status: 400 }
@@ -51,7 +48,6 @@ export async function POST(
       imageId,
       metadata = {},
     } = JSON.parse(imageData as string) as ImageData;
-    console.log("Received image data:", { imageUrl, imageId });
 
     // Get database connection from our connection pool
     dbConnection = await connectToDatabase();
@@ -73,56 +69,56 @@ export async function POST(
       updatedAt: new Date().toISOString(),
     };
 
-    // Insert the image document
-    await imagesCollection.insertOne(imageDoc);
-    console.log("Created new image document:", imageDoc._id);
+    // Execute database operations in parallel
+    const [insertResult, updateResult] = await Promise.all([
+      imagesCollection.insertOne(imageDoc),
+      carsCollection.findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        {
+          $push: { imageIds: imageDoc._id },
+          $set: { updatedAt: new Date().toISOString() },
+        },
+        {
+          returnDocument: "after",
+          projection: { imageIds: 1 },
+        }
+      ),
+    ]);
 
-    // Update the car document with the new image ID
-    const result = await carsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $push: { imageIds: imageDoc._id },
-        $set: { updatedAt: new Date().toISOString() },
-      }
-    );
-
-    console.log("MongoDB update result:", result);
-
-    if (result.matchedCount === 0) {
-      console.error("Car not found with ID:", id);
+    if (!updateResult) {
+      await imagesCollection.deleteOne({ _id: imageDoc._id });
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    if (result.modifiedCount === 0) {
-      console.error("Car found but not modified:", id);
-      return NextResponse.json(
-        { error: "Failed to update car" },
-        { status: 500 }
-      );
-    }
-
-    // Get the updated car with populated images
-    const updatedCar = await carsCollection
-      .aggregate([
-        { $match: { _id: new ObjectId(id) } },
+    // Get the newly added image with the car's images
+    const images = await imagesCollection
+      .find(
+        { _id: { $in: updateResult.imageIds } },
         {
-          $lookup: {
-            from: "images",
-            localField: "imageIds",
-            foreignField: "_id",
-            as: "images",
+          projection: {
+            cloudflareId: 1,
+            url: 1,
+            filename: 1,
+            metadata: 1,
+            createdAt: 1,
           },
-        },
-      ])
-      .next();
+        }
+      )
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    console.log("Updated car document:", updatedCar);
-
-    return NextResponse.json(updatedCar);
+    return NextResponse.json({
+      success: true,
+      images: images.map((img) => ({
+        ...img,
+        _id: img._id.toString(),
+        carId: id,
+      })),
+    });
   } catch (error) {
     console.error("Error in POST /api/cars/[id]/images:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }
@@ -135,7 +131,7 @@ export async function DELETE(
   let dbConnection;
   try {
     const { id } = context.params;
-    const { imageUrl, deleteFromStorage } = await request.json();
+    const { imageUrl } = await request.json();
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -152,29 +148,36 @@ export async function DELETE(
     const carsCollection: Collection<Car> = db.collection("cars");
     const imagesCollection: Collection<Image> = db.collection("images");
 
-    // First, get the image details
-    const image = await imagesCollection.findOne({ url: imageUrl });
+    // Find the image using the indexed url field
+    const image = await imagesCollection.findOne(
+      { url: imageUrl },
+      { projection: { _id: 1 } }
+    );
+
     if (!image) {
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    // Remove the image ID from the car document
-    const result = await carsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $pull: { imageIds: image._id },
-        $set: { updatedAt: new Date().toISOString() },
-      }
-    );
+    // Execute delete operations in parallel
+    const [updateResult, deleteResult] = await Promise.all([
+      carsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $pull: { imageIds: image._id },
+          $set: { updatedAt: new Date().toISOString() },
+        }
+      ),
+      imagesCollection.deleteOne({ _id: image._id }),
+    ]);
 
-    if (result.matchedCount === 0) {
+    if (updateResult.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Delete the image document
-    await imagesCollection.deleteOne({ _id: image._id });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      deletedImageId: image._id.toString(),
+    });
   } catch (error) {
     console.error("Error deleting image:", error);
     return NextResponse.json(

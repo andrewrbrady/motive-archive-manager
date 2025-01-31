@@ -18,7 +18,25 @@ export async function ensureIndexes(db: Db) {
       },
     ]);
 
-    console.log("Successfully created indexes for research_files collection");
+    // Images collection indexes
+    await db.collection("images").createIndexes([
+      {
+        key: { carId: 1, createdAt: -1 },
+        name: "images_car_date",
+      },
+      {
+        key: { cloudflareId: 1 },
+        name: "images_cloudflare",
+        unique: true,
+      },
+      {
+        key: { url: 1 },
+        name: "images_url",
+        unique: true,
+      },
+    ]);
+
+    console.log("Successfully created indexes for collections");
   } catch (error) {
     console.error("Error creating indexes:", error);
     throw error;
