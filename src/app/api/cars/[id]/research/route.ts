@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 import { ResearchFile } from "@/models/ResearchFile";
 import {
   uploadResearchFile,
-  deleteResearchFile,
-  generatePresignedDownloadUrl,
   deleteFile,
+  generatePresignedDownloadUrl,
 } from "@/lib/s3";
-import clientPromise from "@/lib/mongodb";
 import { connectToDatabase } from "@/lib/mongodb";
 
 export const maxDuration = 60;
@@ -26,118 +24,68 @@ export async function GET(
 ) {
   try {
     const carId = params.id;
-    console.log("Research Files API - Request Details:", {
-      url: request.url,
-      method: request.method,
-      carId,
-      headers: Object.fromEntries(request.headers.entries()),
-    });
-
-    console.log("Research Files API - Environment:", {
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
-      NODE_ENV: process.env.NODE_ENV,
-      MONGODB_URI:
-        process.env.MONGODB_URI?.split("@")[1]?.split("/")[0] ||
-        "URI not found", // Only log the host part for security
-    });
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "20");
+    const shouldGenerateUrls = url.searchParams.get("includeUrls") === "true";
+    const skip = (page - 1) * limit;
 
     const { db } = await connectToDatabase();
-    console.log("Research Files API - MongoDB Connected");
 
-    // List all collections to verify we're in the right database
-    const collections = await db.listCollections().toArray();
-    console.log("Research Files API - Database Info:", {
-      databaseName: db.databaseName,
-      collections: collections.map((c) => c.name),
-      researchFilesExists: collections.some((c) => c.name === "research_files"),
-    });
-
-    // Check a document directly without any query to verify connection
-    const sampleDoc = await db.collection("research_files").findOne({});
-    console.log("Research Files API - Sample Document:", {
-      exists: !!sampleDoc,
-      structure: sampleDoc
-        ? {
-            _id: sampleDoc._id.toString(),
-            carId:
-              sampleDoc.carId instanceof ObjectId
-                ? sampleDoc.carId.toString()
-                : typeof sampleDoc.carId === "string"
-                ? sampleDoc.carId
-                : "unknown type",
-            fields: Object.keys(sampleDoc || {}),
-            collectionName: "research_files",
-          }
-        : null,
-    });
-
-    // Query using string ID
-    const files = await db
-      .collection("research_files")
-      .find({ carId: carId })
-      .toArray();
-
-    console.log("Research Files API - Query Results:", {
-      filesFound: files.length,
-      carId,
-      query: { carId },
-      fileIds: files.map((f) => f._id),
-    });
-
-    // Process files and generate URLs
-    const signedUrls = files.length > 0 ? await generateSignedUrls(files) : [];
-
-    const response = {
-      totalFiles: files.length,
-      hasUrls: signedUrls.length > 0,
-      files: signedUrls || [], // Ensure we always return an array
+    // Use projection to only get necessary fields
+    const query = { carId };
+    const projection = {
+      s3Key: 1,
+      filename: 1,
+      description: 1,
+      tags: 1,
+      createdAt: 1,
+      size: 1,
     };
 
-    console.log("Research Files API - Response prepared:", {
-      totalFiles: files.length,
-      hasUrls: signedUrls.length > 0,
-      filesArrayLength: signedUrls?.length || 0,
-    });
+    // Execute queries in parallel
+    const [files, total] = await Promise.all([
+      db
+        .collection("research_files")
+        .find(query, { projection })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      db.collection("research_files").countDocuments(query),
+    ]);
 
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error("Research Files API - Error:", {
-      error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
+    // Process files based on whether URLs are needed
+    const processedFiles = shouldGenerateUrls
+      ? await Promise.all(
+          files.map(async (file) => ({
+            ...file,
+            _id: file._id.toString(),
+            url: await generatePresignedDownloadUrl(file.s3Key),
+          }))
+        )
+      : files.map((file) => ({
+          ...file,
+          _id: file._id.toString(),
+        }));
+
+    return NextResponse.json({
+      files: processedFiles,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasMore: total > skip + files.length,
+      },
     });
+  } catch (error) {
+    console.error("Error fetching research files:", error);
     return NextResponse.json(
       { error: "Failed to fetch research files" },
       { status: 500 }
     );
   }
-}
-
-async function generateSignedUrls(files: any[]) {
-  return Promise.all(
-    files.map(async (file) => {
-      try {
-        const url = await generatePresignedDownloadUrl(file.s3Key);
-        console.log("Research Files API - Generated URL for file:", {
-          fileId: file._id.toString(),
-          s3Key: file.s3Key,
-          urlGenerated: !!url,
-        });
-        return {
-          ...file,
-          _id: file._id.toString(),
-          url,
-        };
-      } catch (error) {
-        console.error("Research Files API - Error generating URL:", {
-          fileId: file._id.toString(),
-          s3Key: file.s3Key,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-        throw error;
-      }
-    })
-  );
 }
 
 // POST new research file
@@ -163,13 +111,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     // Upload file to S3
     const uploadResult = await uploadResearchFile(file, params.id);
 
-    // Create research file document
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    // Create research file document using connection pool
+    const { db } = await connectToDatabase();
     const collection = db.collection("research_files");
 
     const researchFile = {
-      carId: new ObjectId(params.id),
+      carId: params.id, // Store as string for consistent querying
       filename: uploadResult.filename,
       s3Key: uploadResult.key,
       contentType: uploadResult.contentType,
@@ -213,21 +160,21 @@ export async function DELETE(
     }
 
     const { db } = await connectToDatabase();
+
+    // Use projection to only get the s3Key
     const file = await db
       .collection("research_files")
-      .findOne({ _id: new ObjectId(fileId) });
+      .findOne({ _id: new ObjectId(fileId) }, { projection: { s3Key: 1 } });
 
     if (!file) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
-    // Delete from S3
-    await deleteFile(file.s3Key);
-
-    // Delete from MongoDB
-    await db
-      .collection("research_files")
-      .deleteOne({ _id: new ObjectId(fileId) });
+    // Execute delete operations in parallel
+    await Promise.all([
+      deleteFile(file.s3Key),
+      db.collection("research_files").deleteOne({ _id: new ObjectId(fileId) }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

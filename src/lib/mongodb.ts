@@ -1,5 +1,6 @@
 // MongoDB configuration v2.0.0
 import { MongoClient, MongoClientOptions, Db } from "mongodb";
+import { ensureIndexes } from "./db/indexes";
 
 // Vercel deployment configuration - triggers rebuild
 if (!process.env.MONGODB_URI) {
@@ -60,46 +61,27 @@ function monitorConnection(client: MongoClient) {
 }
 
 // Get a database connection
-export async function connectToDatabase() {
+export async function connectToDatabase(): Promise<{
+  client: MongoClient;
+  db: Db;
+}> {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
   try {
-    // If we have a cached connection, return it
-    if (cached.conn) {
-      return cached.conn;
-    }
-
-    // If we have a promise for a connection in progress, return it
-    if (cached.promise) {
-      return await cached.promise;
-    }
-
-    // Create a new connection
     const client = new MongoClient(uri, options);
     monitorConnection(client);
+    await client.connect();
+    const db = client.db(dbName);
 
-    // Cache the connection promise
-    cached.promise = client
-      .connect()
-      .then((client) => {
-        console.log("MongoDB - Connected successfully");
-        return {
-          client,
-          db: client.db(dbName),
-        };
-      })
-      .catch((error) => {
-        console.error("MongoDB - Connection error:", {
-          error: error instanceof Error ? error.message : "Unknown error",
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        cached.promise = null;
-        throw error;
-      });
+    // Ensure indexes exist
+    await ensureIndexes(db);
 
-    // Wait for connection
-    cached.conn = await cached.promise;
+    cached.conn = { client, db };
     return cached.conn;
   } catch (error) {
-    console.error("MongoDB - Connection error:", error);
+    console.error("Error connecting to database:", error);
     // Clear cache on error
     cached.conn = null;
     cached.promise = null;
