@@ -1,16 +1,32 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
+
+interface InventoryItem {
+  _id: ObjectId;
+  name: string;
+  description: string;
+  quantity: number;
+  location: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  let dbConnection;
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    const item = await db.collection("inventory").findOne({
+    // Get typed collection
+    const inventoryCollection: Collection<InventoryItem> =
+      db.collection("inventory");
+
+    const item = await inventoryCollection.findOne({
       _id: new ObjectId(params.id),
     });
 

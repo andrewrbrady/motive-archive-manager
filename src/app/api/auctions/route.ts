@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,15 @@ interface AuctionQuery {
   };
 }
 
+interface Auction {
+  _id: ObjectId;
+  platformId: ObjectId;
+  make: string;
+  end_date: Date;
+}
+
 export async function GET(request: Request) {
+  let dbConnection;
   try {
     const { searchParams } = new URL(request.url);
     console.log("API Route - Search Params:", Object.fromEntries(searchParams));
@@ -26,8 +34,12 @@ export async function GET(request: Request) {
     const pageSize = parseInt(searchParams.get("pageSize") || "24", 10);
     const skip = (page - 1) * pageSize;
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const auctionsCollection: Collection<Auction> = db.collection("auctions");
 
     // Build base query
     const query: AuctionQuery = {};
@@ -83,29 +95,32 @@ export async function GET(request: Request) {
 
       query.end_date = {
         $ne: null,
-        $gte: now, // Date object
-        $lte: endDateTime, // Date object
+        $gte: now,
+        $lte: endDateTime,
       };
 
       console.log("Computed end_date filter:", query.end_date);
     }
 
-    const auctions = await db
-      .collection("auctions")
+    // Get total count for pagination
+    const total = await auctionsCollection.countDocuments(query);
+
+    // Get auctions with pagination
+    const auctions = await auctionsCollection
       .find(query)
       .sort({ end_date: 1 })
       .skip(skip)
       .limit(pageSize)
       .toArray();
 
-    const total = await db.collection("auctions").countDocuments(query);
-
     return NextResponse.json({
-      results: auctions,
+      auctions,
       total,
+      page,
+      totalPages: Math.ceil(total / pageSize),
     });
-  } catch (err) {
-    console.error("Failed to fetch auctions:", err);
+  } catch (error) {
+    console.error("Error fetching auctions:", error);
     return NextResponse.json(
       { error: "Failed to fetch auctions" },
       { status: 500 }

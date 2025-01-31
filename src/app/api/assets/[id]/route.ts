@@ -1,20 +1,14 @@
 // app/api/assets/[id]/route.ts
-import { MongoClient, ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
 
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB || "motive_archive";
-
-if (!uri) {
-  throw new Error("Please add your Mongo URI to .env.local");
-}
-
-async function getClient() {
-  const client = await MongoClient.connect(uri, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  return client;
+interface Asset {
+  _id: ObjectId;
+  name: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 type RouteContext = {
@@ -25,15 +19,19 @@ type RouteContext = {
 
 // GET single asset
 export async function GET(_request: NextRequest, { params }: RouteContext) {
-  let client;
+  let dbConnection;
   try {
     const id = params.id;
     console.log(`Fetching asset with ID: ${id}`);
 
-    client = await getClient();
-    const db = client.db(dbName);
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    const asset = await db.collection("raw").findOne({
+    // Get typed collection
+    const assetsCollection: Collection<Asset> = db.collection("raw");
+
+    const asset = await assetsCollection.findOne({
       _id: new ObjectId(id),
     });
 
@@ -51,37 +49,35 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      console.log(`Closing MongoDB connection for asset ${params.id}`);
-      await client.close();
-    }
   }
 }
 
-// PATCH single asset
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
-  let client;
+// PUT single asset
+export async function PUT(request: NextRequest, { params }: RouteContext) {
+  let dbConnection;
   try {
     const id = params.id;
-    const data = await request.json();
-    const { field, value } = data;
+    const body = await request.json();
 
-    if (!field || value === undefined) {
+    if (!body.name || !body.description) {
       return NextResponse.json(
-        { error: "Field and value are required" },
+        { error: "Name and description are required" },
         { status: 400 }
       );
     }
 
-    client = await getClient();
-    const db = client.db(dbName);
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    const updateResult = await db.collection("raw").updateOne(
+    // Get typed collection
+    const assetsCollection: Collection<Asset> = db.collection("raw");
+
+    const updateResult = await assetsCollection.updateOne(
       { _id: new ObjectId(id) },
       {
         $set: {
-          [field]: value,
+          ...body,
           updatedAt: new Date(),
         },
       }
@@ -91,7 +87,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ message: "Asset updated successfully" });
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(
@@ -101,20 +97,23 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }
 
 // DELETE single asset
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
-  let client;
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  let dbConnection;
   try {
     const id = params.id;
-    client = await getClient();
-    const db = client.db(dbName);
 
-    const deleteResult = await db.collection("raw").deleteOne({
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const assetsCollection: Collection<Asset> = db.collection("raw");
+
+    const deleteResult = await assetsCollection.deleteOne({
       _id: new ObjectId(id),
     });
 
@@ -122,7 +121,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ message: "Asset deleted successfully" });
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(
@@ -132,8 +131,6 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }
 

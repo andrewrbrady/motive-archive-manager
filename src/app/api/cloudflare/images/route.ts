@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, Collection } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 // Set maximum execution time to 60 seconds
 export const maxDuration = 60;
@@ -49,19 +50,6 @@ interface Car {
   updatedAt: string;
 }
 
-// Add type for MongoDB collections
-interface Collections {
-  images: Collection<Image>;
-  cars: Collection<Car>;
-}
-
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(process.env.MONGODB_URI || "");
-  await client.connect();
-  return client;
-}
-
 export async function GET() {
   try {
     const response = await fetch(
@@ -98,7 +86,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  let mongoClient;
+  let dbConnection;
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -199,12 +187,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the image metadata in MongoDB
-    mongoClient = await getMongoClient();
-    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
-    const collections = {
-      images: db.collection("images"),
-      cars: db.collection("cars"),
-    } as Collections;
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const imagesCollection: Collection<Image> = db.collection("images");
+    const carsCollection: Collection<Car> = db.collection("cars");
 
     const imageDoc = {
       _id: new ObjectId(),
@@ -218,10 +206,10 @@ export async function POST(request: NextRequest) {
     };
 
     // Insert the image document
-    await collections.images.insertOne(imageDoc);
+    await imagesCollection.insertOne(imageDoc);
 
     // Update the car document with the new image ID
-    await collections.cars.updateOne(
+    await carsCollection.updateOne(
       { _id: new ObjectId(carId) },
       {
         $push: { imageIds: imageDoc._id },
@@ -242,15 +230,11 @@ export async function POST(request: NextRequest) {
       { error: "Failed to upload image" },
       { status: 500 }
     );
-  } finally {
-    if (mongoClient) {
-      await mongoClient.close();
-    }
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  let mongoClient;
+  let dbConnection;
   try {
     const { imageId, carId } = await request.json();
 
@@ -281,24 +265,24 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Remove image from MongoDB
-    mongoClient = await getMongoClient();
-    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
-    const collections = {
-      images: db.collection("images"),
-      cars: db.collection("cars"),
-    } as Collections;
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const imagesCollection: Collection<Image> = db.collection("images");
+    const carsCollection: Collection<Car> = db.collection("cars");
 
     // Find and delete the image document
-    const image = await collections.images.findOne({ cloudflareId: imageId });
+    const image = await imagesCollection.findOne({ cloudflareId: imageId });
     if (!image) {
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    await collections.images.deleteOne({ _id: image._id });
+    await imagesCollection.deleteOne({ _id: image._id });
 
     // Remove the image ID from the car document
-    await collections.cars.updateOne(
+    await carsCollection.updateOne(
       { _id: new ObjectId(carId) },
       {
         $pull: { imageIds: image._id },
@@ -313,9 +297,5 @@ export async function DELETE(request: NextRequest) {
       { error: "Failed to delete image" },
       { status: 500 }
     );
-  } finally {
-    if (mongoClient) {
-      await mongoClient.close();
-    }
   }
 }

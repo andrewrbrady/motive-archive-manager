@@ -1,9 +1,7 @@
 // Location: app/api/cars/[id]/images/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
-
-const uri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
-const client = new MongoClient(uri);
+import { ObjectId, Collection } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 interface ImageData {
   imageUrl: string;
@@ -22,27 +20,19 @@ interface Image {
   updatedAt: string;
 }
 
-interface CarDocument {
+interface Car {
   _id: ObjectId;
   imageIds: ObjectId[];
-}
-
-async function connectToDatabase() {
-  try {
-    await client.connect();
-    console.log("Connected to MongoDB");
-  } catch (error) {
-    console.error("Failed to connect to MongoDB:", error);
-    throw error;
-  }
+  updatedAt: string;
 }
 
 export async function POST(
   request: NextRequest,
-  context: { params: { id: Promise<string> } }
+  context: { params: { id: string } }
 ) {
+  let dbConnection;
   try {
-    const id = await context.params.id;
+    const { id } = context.params;
     console.log("Processing request for car ID:", id);
 
     const formData = await request.formData();
@@ -63,10 +53,13 @@ export async function POST(
     } = JSON.parse(imageData as string) as ImageData;
     console.log("Received image data:", { imageUrl, imageId });
 
-    await connectToDatabase();
-    const database = client.db("motive_archive");
-    const carsCollection = database.collection<CarDocument>("cars");
-    const imagesCollection = database.collection<Image>("images");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const carsCollection: Collection<Car> = db.collection("cars");
+    const imagesCollection: Collection<Image> = db.collection("images");
 
     // Create new image document
     const imageDoc = {
@@ -108,7 +101,7 @@ export async function POST(
       );
     }
 
-    // Get the updated car document with populated images
+    // Get the updated car with populated images
     const updatedCar = await carsCollection
       .aggregate([
         { $match: { _id: new ObjectId(id) } },
@@ -137,11 +130,11 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: Promise<string> } }
+  context: { params: { id: string } }
 ) {
-  let mongoClient: MongoClient | null = null;
+  let dbConnection;
   try {
-    const id = await context.params.id;
+    const { id } = context.params;
     const { imageUrl, deleteFromStorage } = await request.json();
 
     if (!imageUrl) {
@@ -151,10 +144,13 @@ export async function DELETE(
       );
     }
 
-    mongoClient = await MongoClient.connect(uri);
-    const database = mongoClient.db("motive_archive");
-    const imagesCollection = database.collection<Image>("images");
-    const carsCollection = database.collection<CarDocument>("cars");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const carsCollection: Collection<Car> = db.collection("cars");
+    const imagesCollection: Collection<Image> = db.collection("images");
 
     // First, get the image details
     const image = await imagesCollection.findOne({ url: imageUrl });
@@ -178,42 +174,12 @@ export async function DELETE(
     // Delete the image document
     await imagesCollection.deleteOne({ _id: image._id });
 
-    // If deleteFromStorage is true, delete from Cloudflare
-    if (deleteFromStorage && image.cloudflareId) {
-      try {
-        const response = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          console.error(
-            "Failed to delete image from Cloudflare:",
-            await response.text()
-          );
-          // Don't return error here, just log it since we already removed from DB
-        }
-      } catch (error) {
-        console.error("Error deleting from Cloudflare:", error);
-        // Don't return error here, just log it since we already removed from DB
-      }
-    }
-
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error deleting image:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "Failed to delete image" },
       { status: 500 }
     );
-  } finally {
-    if (mongoClient) {
-      await mongoClient.close();
-    }
   }
 }

@@ -1,44 +1,40 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
 import { NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.MONGODB_DB || "motive_archive";
-
-if (!MONGODB_URI) {
-  throw new Error("Please add your Mongo URI to .env.local");
-}
-
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  await client.connect();
-  return client;
+interface Client {
+  _id: ObjectId;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  instagram: string;
 }
 
 export async function GET(
   request: Request,
   context: { params: { id: string } }
 ) {
-  let client;
+  let dbConnection;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const { id } = context.params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid client ID format" },
         { status: 400 }
       );
     }
-    const objectId = new ObjectId(id);
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const clientsCollection: Collection<Client> = db.collection("clients");
 
     console.log(`Fetching client with ID: ${id}`);
-    const clientDoc = await db.collection("clients").findOne({
-      _id: objectId,
+    const clientDoc = await clientsCollection.findOne({
+      _id: new ObjectId(id),
     });
 
     if (!clientDoc) {
@@ -60,10 +56,5 @@ export async function GET(
       { error: "Failed to fetch client" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      console.log(`Closing MongoDB connection for client ${context.params.id}`);
-      await client.close();
-    }
   }
 }

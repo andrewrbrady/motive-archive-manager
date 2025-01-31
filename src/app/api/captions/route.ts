@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 interface Car {
   _id: ObjectId;
@@ -21,6 +21,7 @@ interface Caption {
 }
 
 export async function POST(request: NextRequest) {
+  let dbConnection;
   try {
     const data = await request.json();
 
@@ -31,10 +32,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
-    const cars = db.collection<Car>("cars");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const captionsCollection: Collection<Caption> = db.collection("captions");
+    const carsCollection: Collection<Car> = db.collection("cars");
 
     // Create the caption document
     const captionDoc: Caption = {
@@ -46,10 +50,10 @@ export async function POST(request: NextRequest) {
     };
 
     // Insert the caption
-    const result = await captions.insertOne(captionDoc);
+    const result = await captionsCollection.insertOne(captionDoc);
 
     // Update the car document to include the caption ID
-    await cars.updateOne(
+    await carsCollection.updateOne(
       { _id: new ObjectId(data.carId) },
       {
         $addToSet: {
@@ -80,6 +84,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  let dbConnection;
   try {
     const data = await request.json();
     const { searchParams } = new URL(request.url);
@@ -92,11 +97,14 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    const result = await captions.findOneAndUpdate(
+    // Get typed collection
+    const captionsCollection: Collection<Caption> = db.collection("captions");
+
+    const result = await captionsCollection.findOneAndUpdate(
       { _id: new ObjectId(captionId) },
       {
         $set: {
@@ -124,6 +132,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  let dbConnection;
   try {
     const { searchParams } = new URL(request.url);
     const captionId = searchParams.get("id");
@@ -136,26 +145,31 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
-    const cars = db.collection<Car>("cars");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const captionsCollection: Collection<Caption> = db.collection("captions");
+    const carsCollection: Collection<Car> = db.collection("cars");
 
     // Delete the caption
-    const result = await captions.deleteOne({ _id: new ObjectId(captionId) });
+    const result = await captionsCollection.deleteOne({
+      _id: new ObjectId(captionId),
+    });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Caption not found" }, { status: 404 });
     }
 
     // Get the car document first
-    const car = await cars.findOne({ _id: new ObjectId(carId) });
+    const car = await carsCollection.findOne({ _id: new ObjectId(carId) });
     if (!car) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
     // Update the car document to remove the caption ID
-    await cars.updateOne(
+    await carsCollection.updateOne(
       { _id: new ObjectId(carId) },
       {
         $set: {
@@ -177,6 +191,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  let dbConnection;
   try {
     const { searchParams } = new URL(request.url);
     const carId = searchParams.get("carId");
@@ -188,24 +203,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    const results = await captions
+    // Get typed collection
+    const captionsCollection: Collection<Caption> = db.collection("captions");
+
+    const captions = await captionsCollection
       .find({ carId: new ObjectId(carId) })
       .sort({ createdAt: -1 })
       .toArray();
 
-    // Convert ObjectIds to strings and format dates for frontend
-    const formattedResults = results.map((caption) => ({
-      ...caption,
-      _id: caption._id!.toString(),
-      carId: caption.carId.toString(),
-      createdAt: caption.createdAt.toISOString(),
-    }));
-
-    return NextResponse.json(formattedResults);
+    return NextResponse.json(
+      captions.map((caption) => ({
+        ...caption,
+        _id: caption._id?.toString(),
+        carId: caption.carId.toString(),
+        createdAt: caption.createdAt.toISOString(),
+      }))
+    );
   } catch (error) {
     console.error("Error fetching captions:", error);
     return NextResponse.json(

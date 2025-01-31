@@ -1,14 +1,30 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
+
+interface Client {
+  _id: ObjectId;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  documents: string[];
+  cars: string[];
+  instagram: string;
+}
 
 export async function GET() {
+  let dbConnection;
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const clientsCollection: Collection<Client> = db.collection("clients");
 
     console.log("Fetching clients from MongoDB...");
-    const clients = await db
-      .collection("clients")
+    const clients = await clientsCollection
       .find({})
       .sort({ name: 1 })
       .toArray();

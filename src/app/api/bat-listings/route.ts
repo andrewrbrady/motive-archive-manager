@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
+
+interface BATListing {
+  _id?: ObjectId;
+  carId: ObjectId;
+  content: string;
+  focus?: string;
+  style?: string;
+  tone?: string;
+  length?: string;
+  additionalContext?: string;
+  car?: any;
+  createdAt: string;
+  updatedAt: string;
+}
 
 // GET /api/bat-listings?carId=xxx
 export async function GET(request: NextRequest) {
+  let dbConnection;
   try {
     const { searchParams } = new URL(request.url);
     const carId = searchParams.get("carId");
@@ -15,10 +30,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-    const listings = await db
-      .collection("bat_listings")
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const listingsCollection: Collection<BATListing> =
+      db.collection("bat_listings");
+
+    const listings = await listingsCollection
       .find({ carId: new ObjectId(carId) })
       .sort({ createdAt: -1 })
       .toArray();
@@ -35,6 +55,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/bat-listings
 export async function POST(request: NextRequest) {
+  let dbConnection;
   try {
     const body = await request.json();
     const {
@@ -55,8 +76,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const listingsCollection: Collection<BATListing> =
+      db.collection("bat_listings");
+
     const now = new Date().toISOString();
 
     const listing = {
@@ -72,7 +99,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     };
 
-    const result = await db.collection("bat_listings").insertOne(listing);
+    const result = await listingsCollection.insertOne(listing);
 
     return NextResponse.json({
       ...listing,

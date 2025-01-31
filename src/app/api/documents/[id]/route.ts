@@ -1,36 +1,60 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId, WithId, UpdateFilter } from "mongodb";
+import { Collection, ObjectId, UpdateFilter } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
-interface CarDocument {
+interface Document {
+  _id: ObjectId;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Car {
   _id: ObjectId;
   documents: ObjectId[];
 }
-
-type _Car = WithId<CarDocument>;
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const id = await Promise.resolve(params.id);
+  let dbConnection;
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-    const receipt = await db
-      .collection("documents")
-      .findOne({ _id: new ObjectId(id) });
-    if (!receipt) {
+    const { id } = params;
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid document ID format" },
+        { status: 400 }
+      );
+    }
+
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const documentsCollection: Collection<Document> =
+      db.collection("documents");
+
+    const document = await documentsCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!document) {
       return NextResponse.json(
         { error: "Document not found" },
         { status: 404 }
       );
     }
-    return NextResponse.json(receipt);
+
+    return NextResponse.json(document);
   } catch (error) {
     console.error("Database error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch receipt" },
+      { error: "Failed to fetch document" },
       { status: 500 }
     );
   }
@@ -40,10 +64,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  let dbConnection;
   try {
-    const id = await Promise.resolve(params.id);
-
-    // Validate ID format
+    const { id } = params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid document ID format" },
@@ -51,19 +74,30 @@ export async function DELETE(
       );
     }
 
-    const documentId = new ObjectId(id);
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-
-    // Get request body for carId
     const body = await request.json();
+    if (!body.carId || !ObjectId.isValid(body.carId)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
 
-    // First, find the document to ensure it exists
-    const document = await db
-      .collection("documents")
-      .findOne({ _id: documentId });
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    if (!document) {
+    // Get typed collections
+    const documentsCollection: Collection<Document> =
+      db.collection("documents");
+    const carsCollection: Collection<Car> = db.collection("cars");
+
+    // Delete the document
+    const documentId = new ObjectId(id);
+    const result = await documentsCollection.deleteOne({
+      _id: documentId,
+    });
+
+    if (result.deletedCount === 0) {
       return NextResponse.json(
         { error: "Document not found" },
         { status: 404 }
@@ -71,35 +105,23 @@ export async function DELETE(
     }
 
     // Update the car to remove the document reference
-    const updateDoc: UpdateFilter<CarDocument> = {
+    const updateDoc: UpdateFilter<Car> = {
       $pull: {
         documents: documentId,
       },
+      $set: {
+        updatedAt: new Date().toISOString(),
+      },
     };
 
-    await db
-      .collection<CarDocument>("cars")
-      .updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
-
-    // Delete the document
-    const result = await db
-      .collection("documents")
-      .deleteOne({ _id: documentId });
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json(
-        { error: "Failed to delete document" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { message: "Document deleted successfully" },
-      { status: 200 }
+    await carsCollection.updateOne(
+      { _id: new ObjectId(body.carId) },
+      updateDoc
     );
-  } catch (error) {
-    console.error("Delete operation failed:", error);
 
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting document:", error);
     return NextResponse.json(
       { error: "Failed to delete document" },
       { status: 500 }

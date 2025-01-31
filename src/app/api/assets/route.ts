@@ -1,5 +1,6 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, Collection, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const dbName = process.env.MONGODB_DB || "arb_assets";
@@ -73,8 +74,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
+interface Asset {
+  _id: ObjectId;
+  name: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export async function POST(request: NextRequest) {
-  let client;
+  let dbConnection;
   try {
     const body = await request.json();
 
@@ -86,9 +95,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    client = await getClient();
-    const db = client.db(dbName);
-    const collection = db.collection("raw");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const assetsCollection: Collection<Asset> = db.collection("raw");
 
     // Add timestamp to the document
     const document = {
@@ -97,7 +109,7 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const result = await collection.insertOne(document);
+    const result = await assetsCollection.insertOne(document);
 
     return NextResponse.json({
       message: "Asset created successfully",
@@ -112,7 +124,5 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }

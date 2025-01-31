@@ -1,16 +1,33 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
 
+interface Make {
+  _id: ObjectId;
+  name: string;
+  country_of_origin: string;
+  founded: string;
+  type: string;
+  parent_company: string;
+  created_at: string;
+  updated_at: string;
+  active: boolean;
+}
+
 export async function GET() {
+  let dbConnection;
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const makesCollection: Collection<Make> = db.collection("makes");
 
     console.log("Fetching makes from MongoDB...");
-    const makes = await db
-      .collection("makes")
+    const makes = await makesCollection
       .find({ active: true })
       .sort({ name: 1 })
       .toArray();

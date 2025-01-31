@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, Collection } from "mongodb";
-
-const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.MONGODB_DB || "motive_archive";
-
-if (!MONGODB_URI) {
-  throw new Error("Please add your Mongo URI to .env");
-}
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -32,23 +26,20 @@ interface Image {
   updatedAt: string;
 }
 
-async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  return client;
-}
-
 export async function GET(request: NextRequest, { params }: Props) {
-  let client;
+  let dbConnection;
   try {
     const { id } = await params;
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
-    const collection: Collection<Image> = db.collection("images");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collection
+    const imagesCollection: Collection<Image> = db.collection("images");
 
     // Find the image directly in the images collection
-    const image = await collection.findOne({ cloudflareId: id });
+    const image = await imagesCollection.findOne({ cloudflareId: id });
 
     if (!image) {
       return NextResponse.json(
@@ -73,55 +64,47 @@ export async function GET(request: NextRequest, { params }: Props) {
       { error: "Failed to fetch metadata" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 
 export async function PATCH(request: NextRequest, { params }: Props) {
-  let client;
+  let dbConnection;
   try {
     const { id } = await params;
     const body = await request.json();
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
-    const collection: Collection<Image> = db.collection("images");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    // Update the metadata in MongoDB
-    const result = await collection.updateOne(
+    // Get typed collection
+    const imagesCollection: Collection<Image> = db.collection("images");
+
+    const result = await imagesCollection.findOneAndUpdate(
       { cloudflareId: id },
       {
         $set: {
           metadata: body.metadata,
           updatedAt: new Date().toISOString(),
         },
-      }
+      },
+      { returnDocument: "after" }
     );
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
-    }
-
-    // Get the updated image data
-    const image = await collection.findOne({ cloudflareId: id });
-
-    if (!image) {
+    if (!result) {
       return NextResponse.json(
-        { error: "Failed to fetch updated image" },
-        { status: 500 }
+        { error: "Image metadata not found" },
+        { status: 404 }
       );
     }
 
     return NextResponse.json({
       result: {
-        id: image.cloudflareId,
-        filename: image.filename,
-        meta: image.metadata,
-        uploaded: image.createdAt,
-        variants: [image.url],
+        id: result.cloudflareId,
+        filename: result.filename,
+        meta: result.metadata,
+        uploaded: result.createdAt,
+        variants: [result.url],
       },
       success: true,
     });
@@ -131,9 +114,5 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       { error: "Failed to update metadata" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }

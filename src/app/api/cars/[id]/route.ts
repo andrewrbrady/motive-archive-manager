@@ -1,13 +1,7 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
 import { NextResponse } from "next/server";
 import { ImageMetadata } from "@/lib/cloudflare";
-
-const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.MONGODB_DB || "motive_archive";
-
-if (!MONGODB_URI) {
-  throw new Error("Please add your Mongo URI to .env.local");
-}
+import { connectToDatabase } from "@/lib/mongodb";
 
 interface Car {
   _id: ObjectId;
@@ -34,84 +28,82 @@ interface Image {
   updatedAt: string;
 }
 
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  await client.connect();
-  return client;
+interface Client {
+  _id: ObjectId;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
 }
 
-// GET car by ID
 export async function GET(
   request: Request,
   context: { params: { id: string } }
 ) {
-  let client;
+  let dbConnection;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const { id } = context.params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
         { status: 400 }
       );
     }
-    const objectId = new ObjectId(id);
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+
+    // Get typed collections
+    const carsCollection: Collection<Car> = db.collection("cars");
+    const imagesCollection: Collection<Image> = db.collection("images");
+    const clientsCollection: Collection<Client> = db.collection("clients");
 
     console.log(`Fetching car with ID: ${id}`);
-    // Use aggregation to populate images
-    const car = (await db
-      .collection("cars")
-      .aggregate([
-        { $match: { _id: objectId } },
-        {
-          $lookup: {
-            from: "images",
-            localField: "imageIds",
-            foreignField: "_id",
-            as: "images",
-          },
-        },
-      ])
-      .next()) as Car | null;
+    const car = await carsCollection.findOne({
+      _id: new ObjectId(id),
+    });
 
     if (!car) {
       console.log(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // If the car has a client field, populate the client information
-    if (car.client && ObjectId.isValid(car.client)) {
-      console.log(`Fetching client info for car ${id}`);
-      const clientDoc = await db.collection("clients").findOne({
-        _id: new ObjectId(car.client),
-      });
-
-      if (clientDoc) {
-        car.clientInfo = {
-          _id: clientDoc._id.toString(),
-          name: clientDoc.name,
-          email: clientDoc.email,
-          phone: clientDoc.phone,
-          address: clientDoc.address,
-        };
-      }
+    // Fetch associated images if car has imageIds
+    let images: Image[] = [];
+    if (car.imageIds && car.imageIds.length > 0) {
+      images = await imagesCollection
+        .find({
+          _id: { $in: car.imageIds },
+        })
+        .toArray();
     }
 
-    return NextResponse.json(car);
+    // If car has a client reference, fetch client info
+    let clientInfo = null;
+    if (car.client && ObjectId.isValid(car.client)) {
+      clientInfo = await clientsCollection.findOne(
+        { _id: new ObjectId(car.client) },
+        {
+          projection: {
+            name: 1,
+            email: 1,
+            phone: 1,
+            address: 1,
+          },
+        }
+      );
+    }
+
+    // Return car data with associated images and client info
+    return NextResponse.json({
+      ...car,
+      images,
+      clientInfo,
+    });
   } catch (error) {
     console.error("Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });
-  } finally {
-    if (client) {
-      console.log(`Closing MongoDB connection for car ${context.params.id}`);
-      await client.close();
-    }
   }
 }
 
@@ -120,33 +112,36 @@ export async function PUT(
   request: Request,
   context: { params: { id: string } }
 ) {
-  const client = await getMongoClient();
+  let dbConnection;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const { id } = context.params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
         { status: 400 }
       );
     }
-    const objectId = new ObjectId(id);
-    const updates = await request.json();
 
+    const updates = await request.json();
     // Remove _id from updates if present to prevent MongoDB errors
     delete updates._id;
 
-    const db = client.db(DB_NAME);
-    const result = await db
-      .collection<Car>("cars")
-      .updateOne({ _id: objectId }, { $set: updates });
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+    const carsCollection: Collection<Car> = db.collection("cars");
+
+    const result = await carsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updates }
+    );
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
     // Fetch and return the updated car
-    const updatedCar = await db.collection<Car>("cars").findOne({
-      _id: objectId,
+    const updatedCar = await carsCollection.findOne({
+      _id: new ObjectId(id),
     });
 
     return NextResponse.json(updatedCar);
@@ -156,8 +151,6 @@ export async function PUT(
       { error: "Failed to update car" },
       { status: 500 }
     );
-  } finally {
-    await client.close();
   }
 }
 
@@ -166,7 +159,7 @@ export async function DELETE(
   request: Request,
   context: { params: { id: string } }
 ) {
-  let client;
+  let dbConnection;
   try {
     const { id } = context.params;
     if (!ObjectId.isValid(id)) {
@@ -175,14 +168,14 @@ export async function DELETE(
         { status: 400 }
       );
     }
-    const objectId = new ObjectId(id);
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+    const carsCollection: Collection<Car> = db.collection("cars");
 
     console.log(`Deleting car with ID: ${id}`);
-    const result = await db.collection("cars").deleteOne({
-      _id: objectId,
+    const result = await carsCollection.deleteOne({
+      _id: new ObjectId(id),
     });
 
     if (result.deletedCount === 0) {
@@ -197,11 +190,6 @@ export async function DELETE(
       { error: "Failed to delete car" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      console.log(`Closing MongoDB connection for car ${context.params.id}`);
-      await client.close();
-    }
   }
 }
 
@@ -210,19 +198,23 @@ export async function PATCH(
   request: Request,
   context: { params: { id: string } }
 ) {
-  const client = await getMongoClient();
+  let dbConnection;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const { id } = context.params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
         { status: 400 }
       );
     }
-    const objectId = new ObjectId(id);
+
     const body = await request.json();
     const { documentId, images, ...updates } = body;
-    const db = client.db(DB_NAME);
+
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
+    const carsCollection: Collection<Car> = db.collection("cars");
+    const receiptsCollection: Collection<any> = db.collection("receipts");
 
     // Handle document removal
     if (documentId) {
@@ -232,20 +224,20 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      const docObjectId = new ObjectId(documentId);
 
       // Remove document reference from car
-      const updateResult = await db
-        .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $pull: { documents: documentId } });
+      const updateResult = await carsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $pull: { documents: documentId } }
+      );
 
       if (updateResult.matchedCount === 0) {
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
       }
 
       // Delete the document from receipts collection
-      await db.collection("receipts").deleteOne({
-        _id: docObjectId,
+      await receiptsCollection.deleteOne({
+        _id: new ObjectId(documentId),
       });
 
       return NextResponse.json({ message: "Document removed successfully" });
@@ -260,67 +252,20 @@ export async function PATCH(
         );
       }
 
-      // Convert image IDs to ObjectIds
-      const imageIds = images.map((image) => new ObjectId(image._id));
-
-      const updateResult = await db
-        .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $set: { imageIds } });
+      const updateResult = await carsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { images } }
+      );
 
       if (updateResult.matchedCount === 0) {
         return NextResponse.json({ error: "Car not found" }, { status: 404 });
       }
 
-      // Fetch the updated car with populated images
-      const updatedCar = await db
-        .collection("cars")
-        .aggregate([
-          { $match: { _id: objectId } },
-          {
-            $lookup: {
-              from: "images",
-              localField: "imageIds",
-              foreignField: "_id",
-              as: "images",
-            },
-          },
-        ])
-        .next();
-
-      return NextResponse.json(updatedCar);
-    }
-
-    // Handle general car data updates
-    if (Object.keys(updates).length > 0) {
-      const updateResult = await db
-        .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $set: updates });
-
-      if (updateResult.matchedCount === 0) {
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
-      }
-
-      // Fetch the updated car with populated images
-      const updatedCar = await db
-        .collection("cars")
-        .aggregate([
-          { $match: { _id: objectId } },
-          {
-            $lookup: {
-              from: "images",
-              localField: "imageIds",
-              foreignField: "_id",
-              as: "images",
-            },
-          },
-        ])
-        .next();
-
-      return NextResponse.json(updatedCar);
+      return NextResponse.json({ message: "Images updated successfully" });
     }
 
     return NextResponse.json(
-      { error: "No valid operation specified" },
+      { error: "No valid update operation specified" },
       { status: 400 }
     );
   } catch (error) {
@@ -329,7 +274,5 @@ export async function PATCH(
       { error: "Failed to update car" },
       { status: 500 }
     );
-  } finally {
-    await client.close();
   }
 }

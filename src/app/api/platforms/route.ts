@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { Collection, ObjectId } from "mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
+
+interface Platform {
+  _id: ObjectId;
+  name: string;
+  platformId: string;
+  color?: string;
+}
 
 export async function GET() {
+  let dbConnection;
   try {
-    const client = await clientPromise;
-    const collection = client.db("motive_archive").collection("platforms");
+    // Get database connection from our connection pool
+    dbConnection = await connectToDatabase();
+    const db = dbConnection.db;
 
-    const platforms = await collection.find({}).toArray();
+    // Get typed collection
+    const platformsCollection: Collection<Platform> =
+      db.collection("platforms");
+
+    const platforms = await platformsCollection.find({}).toArray();
     const formattedPlatforms = platforms.map((platform) => ({
       _id: platform._id.toString(),
       name: platform.name,
