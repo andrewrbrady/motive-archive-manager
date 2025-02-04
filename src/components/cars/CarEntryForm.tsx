@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { Car } from "@/types/car";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 interface Client {
   _id: string;
@@ -40,6 +43,43 @@ interface Engine {
   features: string[];
 }
 
+interface VINResponse {
+  make: string;
+  model: string;
+  year: number;
+  engineType?: string;
+  engineDisplacement?: number;
+  engineConfiguration?: string;
+  engineCylinders?: number;
+  error?: string;
+  bodyClass?: string;
+  horsepower?: number;
+  series?: string;
+  trim?: string;
+  plant?: {
+    city?: string;
+    country?: string;
+    company?: string;
+  };
+  aiAnalysis?: {
+    [key: string]: {
+      value: string;
+      confidence: string;
+    };
+  };
+  doors?: number;
+  dimensions?: {
+    gvwr?: {
+      value: number;
+      unit: string;
+    };
+  };
+  safety?: {
+    tpms?: boolean;
+  };
+  colorCode?: string;
+}
+
 export interface CarFormData {
   make: string;
   model: string;
@@ -57,6 +97,26 @@ export interface CarFormData {
   status: "available" | "sold" | "pending";
   client?: string;
   engine?: Engine;
+  manufacturing?: {
+    series?: string;
+    trim?: string;
+    bodyClass?: string;
+    plant?: {
+      city?: string;
+      country?: string;
+      company?: string;
+    };
+  };
+  safety?: {
+    tpms?: boolean;
+  };
+  dimensions?: {
+    gvwr?: {
+      value: number;
+      unit: string;
+    };
+  };
+  doors?: number;
 }
 
 interface CarEntryFormProps {
@@ -93,6 +153,7 @@ export default function CarEntryForm({
   });
 
   const [clients, setClients] = useState<Client[]>([]);
+  const [isDecodingVin, setIsDecodingVin] = useState(false);
 
   useEffect(() => {
     // Fetch clients when component mounts
@@ -163,6 +224,236 @@ export default function CarEntryForm({
     }));
   };
 
+  // Common OCR corrections for VIN numbers
+  const correctVinOCRErrors = (vin: string): string => {
+    // Convert to uppercase as VINs are always uppercase
+    let correctedVin = vin.toUpperCase();
+
+    // Common OCR misinterpretations
+    const corrections: { [key: string]: string } = {
+      O: "0", // Letter O to number 0
+      Q: "0", // Letter Q to number 0
+      I: "1", // Letter I to number 1
+      L: "1", // Letter L to number 1
+      S: "5", // Letter S to number 5
+      Z: "2", // Letter Z to number 2
+      B: "8", // Letter B to number 8
+      D: "0", // Letter D to number 0
+    };
+
+    // VIN never contains I, O, Q
+    // Position 1-3: World Manufacturer Identifier (letters and numbers)
+    // Position 4-8: Vehicle Descriptor Section (letters and numbers)
+    // Position 9: Check Digit (number or X)
+    // Position 10: Model Year (letter or number)
+    // Position 11: Plant Code (letter or number)
+    // Position 12-17: Production Sequence Number (numbers only)
+
+    // Apply corrections based on position
+    correctedVin = correctedVin
+      .split("")
+      .map((char, index) => {
+        // Production sequence numbers (positions 12-17) should always be numbers
+        if (index >= 11) {
+          return corrections[char] || char;
+        }
+
+        // Check digit (position 9) should be a number or X
+        if (index === 8) {
+          return char === "O" ? "0" : char;
+        }
+
+        // For other positions, apply general corrections
+        return corrections[char] || char;
+      })
+      .join("");
+
+    // Log if corrections were made
+    if (correctedVin !== vin.toUpperCase()) {
+      console.log(`VIN corrected from ${vin} to ${correctedVin}`);
+      toast.info(`VIN corrected from ${vin} to ${correctedVin}`);
+    }
+
+    return correctedVin;
+  };
+
+  const decodeVin = async () => {
+    if (!formData.vin) {
+      toast.error("Please enter a VIN");
+      return;
+    }
+
+    // Apply OCR corrections
+    const correctedVin = correctVinOCRErrors(formData.vin);
+
+    // Update the form with the corrected VIN
+    if (correctedVin !== formData.vin) {
+      handleChange("vin", correctedVin);
+    }
+
+    if (correctedVin.length !== 17) {
+      toast.error("Please enter a valid 17-character VIN");
+      return;
+    }
+
+    console.log("Starting VIN decode for:", correctedVin);
+    setIsDecodingVin(true);
+
+    // Create a loading toast that we can update
+    const toastId = toast.loading("Initiating VIN decode...", {
+      duration: 20000, // Long duration as we'll dismiss it manually
+    });
+
+    try {
+      toast.loading("Fetching vehicle data from NHTSA...", { id: toastId });
+      const response = await fetch(`/api/vin?vin=${correctedVin}`);
+      const data: VINResponse = await response.json();
+
+      console.log("Received VIN decode response:", data);
+
+      if (data.error) {
+        console.error("VIN decode error:", data.error);
+        toast.error(data.error, { id: toastId });
+        return;
+      }
+
+      toast.loading("Processing vehicle information...", { id: toastId });
+      console.log("Previous form data:", formData);
+
+      // Update form data with decoded information
+      const updatedFormData = {
+        ...formData,
+        vin: correctedVin,
+        make: data.make || formData.make,
+        model: data.model || formData.model,
+        year: data.year || formData.year,
+        type: data.bodyClass || formData.type,
+        horsepower: data.horsepower || formData.horsepower,
+        engine: {
+          ...formData.engine!,
+          type: data.engineType || formData.engine!.type,
+          displacement: {
+            value:
+              data.engineDisplacement || formData.engine!.displacement.value,
+            unit: "L",
+          },
+          power: {
+            hp: data.horsepower || formData.engine!.power.hp,
+            kW: Math.round(
+              (data.horsepower || formData.engine!.power.hp) * 0.7457
+            ),
+            ps: Math.round(
+              (data.horsepower || formData.engine!.power.hp) * 1.014
+            ),
+          },
+          features: [
+            ...(formData.engine!.features || []),
+            ...(data.series ? [`Series: ${data.series}`] : []),
+            ...(data.trim ? [`Trim: ${data.trim}`] : []),
+            ...(data.engineConfiguration ? [data.engineConfiguration] : []),
+            ...(data.engineCylinders
+              ? [`${data.engineCylinders} cylinders`]
+              : []),
+          ],
+        },
+        manufacturing: {
+          series: data.series || formData.manufacturing?.series,
+          trim: data.trim || formData.manufacturing?.trim,
+          bodyClass: data.bodyClass || formData.manufacturing?.bodyClass,
+          plant: {
+            city: data.plant?.city || formData.manufacturing?.plant?.city,
+            country:
+              data.plant?.country || formData.manufacturing?.plant?.country,
+            company:
+              data.plant?.company || formData.manufacturing?.plant?.company,
+          },
+        },
+        safety: {
+          ...formData.safety,
+          tpms: data.safety?.tpms || formData.safety?.tpms,
+        },
+        dimensions: {
+          ...formData.dimensions,
+          gvwr: data.dimensions?.gvwr
+            ? {
+                value: data.dimensions.gvwr.value,
+                unit: data.dimensions.gvwr.unit || "lbs", // Fallback to lbs if no unit
+              }
+            : formData.dimensions?.gvwr,
+        },
+        doors: data.doors || formData.doors,
+      } as typeof formData;
+
+      // If we got a color code from the VIN, try to look it up
+      if (data.colorCode) {
+        toast.loading(`Looking up color code: ${data.colorCode}...`, {
+          id: toastId,
+        });
+        try {
+          const colorResponse = await fetch("/api/color-codes", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              make: data.make,
+              colorCode: data.colorCode,
+              year: data.year,
+            }),
+          });
+
+          if (colorResponse.ok) {
+            const colorData = await colorResponse.json();
+            if (colorData.color) {
+              updatedFormData.color = colorData.color;
+              toast.success(`Found color: ${colorData.color}`, { id: toastId });
+            } else {
+              console.log(`Color code ${data.colorCode} not found in database`);
+              toast.info(`Color code found in VIN: ${data.colorCode}`, {
+                id: toastId,
+              });
+            }
+          }
+        } catch (colorError) {
+          console.error("Error looking up color code:", colorError);
+          // Store the color code in the description if we couldn't look it up
+          updatedFormData.description += `\nVIN Color Code: ${data.colorCode}`;
+        }
+      }
+
+      // Add AI analysis insights if available
+      if ("aiAnalysis" in data) {
+        toast.loading("Processing AI insights...", { id: toastId });
+        (updatedFormData as any).aiAnalysis = data.aiAnalysis;
+
+        // Update description with AI insights
+        const highlights = Object.entries(data.aiAnalysis || {})
+          .filter(([_, info]) => info.confidence === "confirmed")
+          .map(([_, info]) => info.value)
+          .join("\n");
+
+        if (highlights) {
+          updatedFormData.description =
+            formData.description + "\n\nVehicle Highlights:\n" + highlights;
+        }
+      }
+
+      console.log("Updated form data:", updatedFormData);
+      setFormData(updatedFormData);
+
+      // Show success message with summary
+      toast.success(
+        `Successfully decoded VIN for ${data.year} ${data.make} ${data.model}`,
+        { id: toastId }
+      );
+    } catch (error) {
+      console.error("Error decoding VIN:", error);
+      toast.error("Failed to decode VIN", { id: toastId });
+    } finally {
+      setIsDecodingVin(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSubmit(formData);
@@ -175,7 +466,7 @@ export default function CarEntryForm({
     "text-lg font-semibold text-gray-900 dark:text-white uppercase";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-8">
       <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
           {/* Basic Information */}
@@ -265,12 +556,36 @@ export default function CarEntryForm({
 
             <div>
               <label className={labelClasses}>VIN</label>
-              <input
-                type="text"
-                value={formData.vin}
-                onChange={(e) => handleChange("vin", e.target.value)}
-                className={inputClasses}
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="vin"
+                  value={formData.vin}
+                  onChange={(e) => handleChange("vin", e.target.value)}
+                  placeholder="VIN"
+                  className={inputClasses}
+                  maxLength={17}
+                />
+                <Button
+                  type="button"
+                  onClick={decodeVin}
+                  disabled={isDecodingVin || formData.vin.length !== 17}
+                  variant="outline"
+                  className="whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  {isDecodingVin ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Decoding...
+                    </>
+                  ) : (
+                    "Decode VIN"
+                  )}
+                </Button>
+              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {formData.vin.length}/17 characters
+              </p>
             </div>
 
             <div>
@@ -361,6 +676,145 @@ export default function CarEntryForm({
               onChange={handleTorqueChange}
               availableUnits={["lb-ft", "Nm"]}
               className="w-full"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Vehicle Details */}
+      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800 p-6">
+        <h2 className={sectionTitleClasses}>Vehicle Details</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+          <div>
+            <label className={labelClasses}>Series</label>
+            <input
+              type="text"
+              value={formData.manufacturing?.series || ""}
+              onChange={(e) =>
+                handleChange("manufacturing", {
+                  ...formData.manufacturing,
+                  series: e.target.value,
+                })
+              }
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>Trim Level</label>
+            <input
+              type="text"
+              value={formData.manufacturing?.trim || ""}
+              onChange={(e) =>
+                handleChange("manufacturing", {
+                  ...formData.manufacturing,
+                  trim: e.target.value,
+                })
+              }
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>Body Style</label>
+            <input
+              type="text"
+              value={formData.manufacturing?.bodyClass || ""}
+              onChange={(e) =>
+                handleChange("manufacturing", {
+                  ...formData.manufacturing,
+                  bodyClass: e.target.value,
+                })
+              }
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>Number of Doors</label>
+            <input
+              type="number"
+              value={formData.doors || ""}
+              onChange={(e) => handleChange("doors", parseInt(e.target.value))}
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>GVWR</label>
+            <MeasurementInputWithUnit
+              value={formData.dimensions?.gvwr || { value: null, unit: "lbs" }}
+              onChange={(value) =>
+                handleChange("dimensions", {
+                  ...formData.dimensions,
+                  gvwr: {
+                    value: value.value,
+                    unit: value.unit || "lbs", // Fallback to lbs if no unit
+                  },
+                })
+              }
+              availableUnits={["lbs"]} // Only allow lbs since that's what NHTSA uses
+              className="w-full"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Manufacturing Information */}
+      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800 p-6">
+        <h2 className={sectionTitleClasses}>Manufacturing Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+          <div>
+            <label className={labelClasses}>Plant City</label>
+            <input
+              type="text"
+              value={formData.manufacturing?.plant?.city || ""}
+              onChange={(e) =>
+                handleChange("manufacturing", {
+                  ...formData.manufacturing,
+                  plant: {
+                    ...formData.manufacturing?.plant,
+                    city: e.target.value,
+                  },
+                })
+              }
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>Plant Country</label>
+            <input
+              type="text"
+              value={formData.manufacturing?.plant?.country || ""}
+              onChange={(e) =>
+                handleChange("manufacturing", {
+                  ...formData.manufacturing,
+                  plant: {
+                    ...formData.manufacturing?.plant,
+                    country: e.target.value,
+                  },
+                })
+              }
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>Manufacturing Company</label>
+            <input
+              type="text"
+              value={formData.manufacturing?.plant?.company || ""}
+              onChange={(e) =>
+                handleChange("manufacturing", {
+                  ...formData.manufacturing,
+                  plant: {
+                    ...formData.manufacturing?.plant,
+                    company: e.target.value,
+                  },
+                })
+              }
+              className={inputClasses}
             />
           </div>
         </div>
