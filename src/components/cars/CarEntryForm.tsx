@@ -77,7 +77,6 @@ interface VINResponse {
   safety?: {
     tpms?: boolean;
   };
-  colorCode?: string;
 }
 
 export interface CarFormData {
@@ -384,42 +383,9 @@ export default function CarEntryForm({
         doors: data.doors || formData.doors,
       } as typeof formData;
 
-      // If we got a color code from the VIN, try to look it up
-      if (data.colorCode) {
-        toast.loading(`Looking up color code: ${data.colorCode}...`, {
-          id: toastId,
-        });
-        try {
-          const colorResponse = await fetch("/api/color-codes", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              make: data.make,
-              colorCode: data.colorCode,
-              year: data.year,
-            }),
-          });
-
-          if (colorResponse.ok) {
-            const colorData = await colorResponse.json();
-            if (colorData.color) {
-              updatedFormData.color = colorData.color;
-              toast.success(`Found color: ${colorData.color}`, { id: toastId });
-            } else {
-              console.log(`Color code ${data.colorCode} not found in database`);
-              toast.info(`Color code found in VIN: ${data.colorCode}`, {
-                id: toastId,
-              });
-            }
-          }
-        } catch (colorError) {
-          console.error("Error looking up color code:", colorError);
-          // Store the color code in the description if we couldn't look it up
-          updatedFormData.description += `\nVIN Color Code: ${data.colorCode}`;
-        }
-      }
+      console.log("Dimensions data received:", data.dimensions);
+      console.log("GVWR from API:", data.dimensions?.gvwr);
+      console.log("Updated GVWR in form:", updatedFormData.dimensions?.gvwr);
 
       // Add AI analysis insights if available
       if ("aiAnalysis" in data) {

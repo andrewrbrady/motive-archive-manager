@@ -1,4 +1,1 @@
-export interface MeasurementValue {
-  value: number | null;
-  unit: string;
-}
+export interface MeasurementValue { value: number | null; unit: string; }

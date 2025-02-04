@@ -228,7 +228,6 @@ export async function POST(
       mileage: existingCarData.mileage,
       vin: existingCarData.vin,
       client: existingCarData.client,
-      clientInfo: existingCarData.clientInfo,
       location: existingCarData.location,
     };
 
@@ -255,7 +254,6 @@ export async function POST(
             "mileage",
             "vin",
             "client",
-            "clientInfo",
             "location",
           ],
         },

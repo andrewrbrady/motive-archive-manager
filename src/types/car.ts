@@ -1,5 +1,7 @@
 // types/car.ts
-import { MeasurementValue } from "./measurements";
+import type { MeasurementValue } from "./measurements";
+
+export type { MeasurementValue };
 
 interface Power {
   hp: number;
@@ -100,6 +102,8 @@ export interface Car {
   type: string;
   client?: string;
   engine: Engine;
+  imageIds?: string[];
+  horsepower?: number;
   // New fields
   safety?: SafetyFeatures;
   dimensions?: Dimensions;
