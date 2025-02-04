@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Metadata } from "next";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Motive Archive",
@@ -29,6 +30,7 @@ export default function RootLayout({
       </head>
       <body className="bg-white dark:bg-[#111111]">
         <ThemeProvider>{children}</ThemeProvider>
+        <Toaster />
       </body>
     </html>
   );
