@@ -465,6 +465,128 @@ export default function CarEntryForm({
     }
   };
 
+  const decodeVinWithoutCorrections = async () => {
+    if (!formData.vin) {
+      toast.error("Please enter a VIN");
+      return;
+    }
+
+    if (formData.vin.length !== 17) {
+      toast.error("Please enter a valid 17-character VIN");
+      return;
+    }
+
+    console.log("Starting VIN decode without corrections for:", formData.vin);
+    setIsDecodingVin(true);
+
+    const toastId = toast.loading("Initiating VIN decode...", {
+      duration: 20000,
+    });
+
+    try {
+      toast.loading("Fetching vehicle data from NHTSA...", { id: toastId });
+      const response = await fetch(`/api/vin?vin=${formData.vin}`);
+      const data: VINResponse = await response.json();
+
+      console.log("Received VIN decode response:", data);
+
+      if (data.error) {
+        console.error("VIN decode error:", data.error);
+        toast.error(data.error, { id: toastId });
+        return;
+      }
+
+      toast.loading("Processing vehicle information...", { id: toastId });
+      console.log("Previous form data:", formData);
+
+      // Update form data with decoded information
+      const updatedFormData = {
+        ...formData,
+        make: data.make || formData.make,
+        model: data.model || formData.model,
+        year: data.year || formData.year,
+        type: data.bodyClass || formData.type,
+        horsepower: data.horsepower || formData.horsepower,
+        engine: {
+          ...formData.engine,
+          type: data.engineType || formData.engine.type,
+          displacement: {
+            value:
+              data.engineDisplacement || formData.engine.displacement.value,
+            unit: "L",
+          },
+          power: {
+            hp: data.horsepower || formData.engine.power.hp,
+            kW: Math.round(
+              (data.horsepower || formData.engine.power.hp) * 0.7457
+            ),
+            ps: Math.round(
+              (data.horsepower || formData.engine.power.hp) * 1.014
+            ),
+          },
+          features: [
+            ...(formData.engine.features || []),
+            ...(data.series ? [`Series: ${data.series}`] : []),
+            ...(data.trim ? [`Trim: ${data.trim}`] : []),
+            ...(data.engineConfiguration ? [data.engineConfiguration] : []),
+            ...(data.engineCylinders
+              ? [`${data.engineCylinders} cylinders`]
+              : []),
+          ],
+        },
+        manufacturing: {
+          series: data.series || formData.manufacturing?.series,
+          trim: data.trim || formData.manufacturing?.trim,
+          bodyClass: data.bodyClass || formData.manufacturing?.bodyClass,
+          plant: {
+            city: data.plant?.city || formData.manufacturing?.plant?.city,
+            country:
+              data.plant?.country || formData.manufacturing?.plant?.country,
+            company:
+              data.plant?.company || formData.manufacturing?.plant?.company,
+          },
+        },
+        safety: {
+          ...formData.safety,
+          tpms: data.safety?.tpms || formData.safety?.tpms,
+        },
+        dimensions: {
+          ...formData.dimensions,
+          ...data.dimensions,
+        },
+        doors: data.doors || formData.doors,
+      } as typeof formData;
+
+      if ("aiAnalysis" in data) {
+        toast.loading("Processing AI insights...", { id: toastId });
+        const highlights = Object.entries(data.aiAnalysis || {})
+          .filter(([_, info]) => info.confidence === "confirmed")
+          .map(([_, info]) => info.value)
+          .join("\n");
+
+        if (highlights) {
+          updatedFormData.description =
+            formData.description + "\n\nVehicle Highlights:\n" + highlights;
+        }
+      }
+
+      console.log("Updated form data:", updatedFormData);
+      setFormData(updatedFormData);
+
+      toast.success(
+        `Successfully decoded VIN for ${data.year} ${data.make} ${data.model}`,
+        {
+          id: toastId,
+        }
+      );
+    } catch (error) {
+      console.error("Error decoding VIN:", error);
+      toast.error("Failed to decode VIN", { id: toastId });
+    } finally {
+      setIsDecodingVin(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSubmit(formData);
@@ -567,36 +689,56 @@ export default function CarEntryForm({
 
             <div>
               <label className={labelClasses}>VIN</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 <input
                   type="text"
                   name="vin"
                   value={formData.vin}
                   onChange={(e) => handleChange("vin", e.target.value)}
                   placeholder="VIN"
-                  className={inputClasses}
+                  className={`${inputClasses} font-mono tracking-wider`}
                   maxLength={17}
                 />
-                <Button
-                  type="button"
-                  onClick={decodeVin}
-                  disabled={isDecodingVin || formData.vin.length !== 17}
-                  variant="outline"
-                  className="whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  {isDecodingVin ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Decoding...
-                    </>
-                  ) : (
-                    "Decode VIN"
-                  )}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={decodeVin}
+                    disabled={isDecodingVin || formData.vin.length !== 17}
+                    variant="outline"
+                    className="flex-1 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                    title="Decode VIN with OCR corrections"
+                  >
+                    {isDecodingVin ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Decoding...
+                      </>
+                    ) : (
+                      "Auto-Correct & Decode"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={decodeVinWithoutCorrections}
+                    disabled={isDecodingVin || formData.vin.length !== 17}
+                    variant="outline"
+                    className="flex-1 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                    title="Decode VIN without OCR corrections"
+                  >
+                    {isDecodingVin ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Decoding...
+                      </>
+                    ) : (
+                      "Decode As-Is"
+                    )}
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {formData.vin.length}/17 characters
+                </p>
               </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {formData.vin.length}/17 characters
-              </p>
             </div>
 
             <div>
