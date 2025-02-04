@@ -274,8 +274,43 @@ export default function CarEntryForm({
     // Position 11: Plant Code (letter or number)
     // Position 12-17: Production Sequence Number (numbers only)
 
-    // Apply corrections based on position
-    correctedVin = correctedVin
+    // Known manufacturer codes that should be preserved
+    const preservedCodes = [
+      "WBA", // BMW AG
+      "WBS", // BMW M GmbH
+      "WBY", // BMW Electric Vehicles
+      "WP0", // Porsche
+      "WP1", // Porsche SUV
+      "SCA", // Rolls-Royce
+      "ZFF", // Ferrari
+      "JN1", // Nissan
+      "VF9", // Bugatti
+    ];
+
+    // Check if the first three characters match any preserved codes
+    const firstThree = correctedVin.slice(0, 3);
+    if (preservedCodes.includes(firstThree)) {
+      // If it's a preserved code, only apply corrections after the first three characters
+      return (
+        firstThree +
+        correctedVin
+          .slice(3)
+          .split("")
+          .map((char, index) => {
+            // Production sequence numbers (positions 12-17) should always be numbers
+            if (index >= 8) {
+              return corrections[char] || char;
+            }
+            // For other positions, apply general corrections except for X in check digit position
+            if (index === 5 && char === "X") return char;
+            return corrections[char] || char;
+          })
+          .join("")
+      );
+    }
+
+    // For non-preserved codes, apply corrections based on position
+    return correctedVin
       .split("")
       .map((char, index) => {
         // Production sequence numbers (positions 12-17) should always be numbers
@@ -285,21 +320,13 @@ export default function CarEntryForm({
 
         // Check digit (position 9) should be a number or X
         if (index === 8) {
-          return char === "O" ? "0" : char;
+          return char === "X" ? char : corrections[char] || char;
         }
 
         // For other positions, apply general corrections
         return corrections[char] || char;
       })
       .join("");
-
-    // Log if corrections were made
-    if (correctedVin !== vin.toUpperCase()) {
-      console.log(`VIN corrected from ${vin} to ${correctedVin}`);
-      toast.info(`VIN corrected from ${vin} to ${correctedVin}`);
-    }
-
-    return correctedVin;
   };
 
   const decodeVin = async () => {

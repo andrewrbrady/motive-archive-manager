@@ -1,8 +1,11 @@
 import { Car } from "@/types/car";
 import { MeasurementValue } from "@/types/measurements";
-import { Pencil } from "lucide-react";
+import { Pencil, Sparkles } from "lucide-react";
 import { getUnitsForType } from "@/constants/units";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { Client } from "@/types/car";
 
 // Define the car data structure as we receive it from the API
 interface CarData {
@@ -96,6 +99,8 @@ interface SpecificationProps {
   onEdit?: () => void;
   onSave?: () => void;
   onCancel?: () => void;
+  onEnrich?: () => void;
+  isEnriching?: boolean;
   editedSpecs?: any;
   onInputChange?: (field: string, value: any, nestedField?: string) => void;
   onMeasurementChange?: (
@@ -254,10 +259,31 @@ export default function Specifications({
   onEdit,
   onSave,
   onCancel,
+  onEnrich,
+  isEnriching,
   editedSpecs = {},
   onInputChange,
   onMeasurementChange,
 }: SpecificationProps) {
+  const [clients, setClients] = useState<Client[]>([]);
+
+  useEffect(() => {
+    // Fetch clients when component mounts
+    const fetchClients = async () => {
+      try {
+        const response = await fetch("/api/clients");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch clients: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setClients(data);
+      } catch (error) {
+        console.error("Error fetching clients:", error);
+      }
+    };
+    fetchClients();
+  }, []);
+
   // Add detailed logging of the car object
   console.log("=== Specifications Component Debug Logs ===");
   console.log("Full car object:", JSON.stringify(car, null, 2));
@@ -275,29 +301,47 @@ export default function Specifications({
           Specifications
         </h2>
         <div className="flex items-center gap-2">
-          {isEditMode ? (
+          {onEnrich && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onEnrich}
+              disabled={isEnriching || isEditMode}
+              title="Enrich car data"
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50"
+            >
+              <Sparkles className="h-4 w-4" />
+            </Button>
+          )}
+          {onEdit && !isEditMode && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onEdit}
+              disabled={isEnriching}
+              title="Edit specifications"
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {isEditMode && (
             <>
-              <button
+              <Button
+                variant="default"
                 onClick={onSave}
-                className="px-3 py-1 text-sm text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 border border-green-200 dark:border-green-800 hover:border-green-300 dark:hover:border-green-700 rounded-md transition-colors flex items-center gap-1"
+                className="bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-200"
               >
                 Save
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
                 onClick={onCancel}
-                className="px-3 py-1 text-sm text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 border border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700 rounded-md transition-colors flex items-center gap-1"
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50"
               >
                 Cancel
-              </button>
+              </Button>
             </>
-          ) : (
-            <button
-              onClick={onEdit}
-              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 rounded-md transition-colors flex items-center gap-1"
-            >
-              <Pencil className="w-4 h-4" />
-              Edit
-            </button>
           )}
         </div>
       </div>
@@ -416,7 +460,22 @@ export default function Specifications({
             Client
           </span>
           <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
-            {car.clientInfo?.name || "N/A"}
+            {isEditMode ? (
+              <select
+                value={editedSpecs.client ?? car.client ?? ""}
+                onChange={(e) => onInputChange?.("client", e.target.value)}
+                className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+              >
+                <option value="">Select client</option>
+                {clients.map((client) => (
+                  <option key={client._id} value={client._id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              car.clientInfo?.name || "N/A"
+            )}
           </span>
         </div>
 
