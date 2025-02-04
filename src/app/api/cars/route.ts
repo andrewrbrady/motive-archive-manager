@@ -8,15 +8,39 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log("Creating car with data:", JSON.stringify(body, null, 2));
 
     // Connect to the database
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "motive_archive");
 
+    // Ensure dimensions are properly structured
+    if (body.dimensions) {
+      // Ensure GVWR has proper structure
+      if (body.dimensions.gvwr && typeof body.dimensions.gvwr === "object") {
+        body.dimensions.gvwr = {
+          value: body.dimensions.gvwr.value || null,
+          unit: body.dimensions.gvwr.unit || "lbs",
+        };
+      }
+
+      // Ensure weight has proper structure
+      if (
+        body.dimensions.weight &&
+        typeof body.dimensions.weight === "object"
+      ) {
+        body.dimensions.weight = {
+          value: body.dimensions.weight.value || null,
+          unit: body.dimensions.weight.unit || "lbs",
+        };
+      }
+    }
+
     // Create a new car document
     const result = await db.collection("cars").insertOne(body);
     const car = await db.collection("cars").findOne({ _id: result.insertedId });
 
+    console.log("Created car:", JSON.stringify(car, null, 2));
     return NextResponse.json(car, { status: 201 });
   } catch (error) {
     console.error("Error creating car:", error);

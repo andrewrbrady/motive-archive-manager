@@ -103,13 +103,24 @@ export async function GET(request: Request) {
 
       if (aiResponse.ok) {
         const aiResult = await aiResponse.json();
-        aiAnalysis = aiResult.additionalFields as Record<
-          string,
-          AIAnalysisField
-        >;
+        // Filter out any AI analysis fields that we already have structured data for
+        aiAnalysis = Object.fromEntries(
+          Object.entries(aiResult.additionalFields || {}).filter(([key]) => {
+            // Remove fields we already have structured data for
+            return (
+              !key.toLowerCase().includes("gvwr") &&
+              !key.toLowerCase().includes("weight") &&
+              !key.toLowerCase().includes("engine") &&
+              !key.toLowerCase().includes("doors") &&
+              !key.toLowerCase().includes("displacement") &&
+              !key.toLowerCase().includes("horsepower") &&
+              !key.toLowerCase().includes("tire")
+            );
+          })
+        );
 
         // Check if AI found GVWR in the data
-        const gvwrField = Object.entries(aiAnalysis || {}).find(
+        const gvwrField = Object.entries(aiResult.additionalFields || {}).find(
           ([key, info]: [string, AIAnalysisField]) =>
             key.toLowerCase().includes("gvwr") ||
             key.toLowerCase().includes("weight") ||
