@@ -61,6 +61,24 @@ const Car =
           enum: ["available", "sold", "pending"],
           default: "available",
         },
+        dimensions: {
+          wheelbase: {
+            value: Number,
+            unit: String,
+          },
+          weight: {
+            value: Number,
+            unit: String,
+          },
+          gvwr: {
+            value: Number,
+            unit: String,
+          },
+          trackWidth: {
+            value: Number,
+            unit: String,
+          },
+        },
       },
       {
         collection: "cars",

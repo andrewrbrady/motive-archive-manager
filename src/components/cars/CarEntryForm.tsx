@@ -69,10 +69,10 @@ interface VINResponse {
   };
   doors?: number;
   dimensions?: {
-    gvwr?: {
-      value: number;
-      unit: string;
-    };
+    wheelbase?: MeasurementValue;
+    weight?: MeasurementValue;
+    gvwr?: MeasurementValue;
+    trackWidth?: MeasurementValue;
   };
   safety?: {
     tpms?: boolean;
@@ -95,7 +95,7 @@ export interface CarFormData {
   interior_color: string;
   status: "available" | "sold" | "pending";
   client?: string;
-  engine?: Engine;
+  engine: Engine;
   manufacturing?: {
     series?: string;
     trim?: string;
@@ -109,11 +109,11 @@ export interface CarFormData {
   safety?: {
     tpms?: boolean;
   };
-  dimensions?: {
-    gvwr?: {
-      value: number;
-      unit: string;
-    };
+  dimensions: {
+    wheelbase?: MeasurementValue;
+    weight: MeasurementValue;
+    gvwr: MeasurementValue;
+    trackWidth?: MeasurementValue;
   };
   doors?: number;
 }
@@ -149,6 +149,22 @@ export default function CarEntryForm({
       torque: { "lb-ft": 0, Nm: 0 },
       features: [],
     },
+    dimensions: {
+      weight: { value: null, unit: "lbs" },
+      gvwr: { value: null, unit: "lbs" },
+      wheelbase: { value: null, unit: "in" },
+      trackWidth: { value: null, unit: "in" },
+    },
+    manufacturing: {
+      series: "",
+      trim: "",
+      bodyClass: "",
+      plant: {
+        city: "",
+        country: "",
+        company: "",
+      },
+    },
   });
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -173,10 +189,20 @@ export default function CarEntryForm({
   }, []);
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    if (field === "dimensions") {
+      setFormData((prev) => ({
+        ...prev,
+        dimensions: {
+          ...prev.dimensions,
+          ...value,
+        },
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
   };
 
   const handleEngineChange = (field: string, value: any) => {
@@ -329,24 +355,24 @@ export default function CarEntryForm({
         type: data.bodyClass || formData.type,
         horsepower: data.horsepower || formData.horsepower,
         engine: {
-          ...formData.engine!,
-          type: data.engineType || formData.engine!.type,
+          ...formData.engine,
+          type: data.engineType || formData.engine.type,
           displacement: {
             value:
-              data.engineDisplacement || formData.engine!.displacement.value,
+              data.engineDisplacement || formData.engine.displacement.value,
             unit: "L",
           },
           power: {
-            hp: data.horsepower || formData.engine!.power.hp,
+            hp: data.horsepower || formData.engine.power.hp,
             kW: Math.round(
-              (data.horsepower || formData.engine!.power.hp) * 0.7457
+              (data.horsepower || formData.engine.power.hp) * 0.7457
             ),
             ps: Math.round(
-              (data.horsepower || formData.engine!.power.hp) * 1.014
+              (data.horsepower || formData.engine.power.hp) * 1.014
             ),
           },
           features: [
-            ...(formData.engine!.features || []),
+            ...(formData.engine.features || []),
             ...(data.series ? [`Series: ${data.series}`] : []),
             ...(data.trim ? [`Trim: ${data.trim}`] : []),
             ...(data.engineConfiguration ? [data.engineConfiguration] : []),
@@ -373,25 +399,17 @@ export default function CarEntryForm({
         },
         dimensions: {
           ...formData.dimensions,
-          gvwr: data.dimensions?.gvwr
-            ? {
-                value: data.dimensions.gvwr.value,
-                unit: data.dimensions.gvwr.unit || "lbs", // Fallback to lbs if no unit
-              }
-            : formData.dimensions?.gvwr,
+          ...data.dimensions,
         },
         doors: data.doors || formData.doors,
       } as typeof formData;
 
       console.log("Dimensions data received:", data.dimensions);
-      console.log("GVWR from API:", data.dimensions?.gvwr);
-      console.log("Updated GVWR in form:", updatedFormData.dimensions?.gvwr);
+      console.log("Updated dimensions in form:", updatedFormData.dimensions);
 
       // Add AI analysis insights if available
       if ("aiAnalysis" in data) {
         toast.loading("Processing AI insights...", { id: toastId });
-        (updatedFormData as any).aiAnalysis = data.aiAnalysis;
-
         // Update description with AI insights
         const highlights = Object.entries(data.aiAnalysis || {})
           .filter(([_, info]) => info.confidence === "confirmed")
@@ -682,6 +700,36 @@ export default function CarEntryForm({
           </div>
 
           <div>
+            <label className={labelClasses}>Weight</label>
+            <MeasurementInputWithUnit
+              value={formData.dimensions.weight}
+              onChange={(value) =>
+                handleChange("dimensions", {
+                  ...formData.dimensions,
+                  weight: value,
+                })
+              }
+              availableUnits={["lbs", "kg"]}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>GVWR</label>
+            <MeasurementInputWithUnit
+              value={formData.dimensions.gvwr}
+              onChange={(value) =>
+                handleChange("dimensions", {
+                  ...formData.dimensions,
+                  gvwr: value,
+                })
+              }
+              availableUnits={["lbs"]}
+              className="w-full"
+            />
+          </div>
+
+          <div>
             <label className={labelClasses}>Body Style</label>
             <input
               type="text"
@@ -703,24 +751,6 @@ export default function CarEntryForm({
               value={formData.doors || ""}
               onChange={(e) => handleChange("doors", parseInt(e.target.value))}
               className={inputClasses}
-            />
-          </div>
-
-          <div>
-            <label className={labelClasses}>GVWR</label>
-            <MeasurementInputWithUnit
-              value={formData.dimensions?.gvwr || { value: null, unit: "lbs" }}
-              onChange={(value) =>
-                handleChange("dimensions", {
-                  ...formData.dimensions,
-                  gvwr: {
-                    value: value.value,
-                    unit: value.unit || "lbs", // Fallback to lbs if no unit
-                  },
-                })
-              }
-              availableUnits={["lbs"]} // Only allow lbs since that's what NHTSA uses
-              className="w-full"
             />
           </div>
         </div>

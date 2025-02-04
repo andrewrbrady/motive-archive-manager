@@ -34,6 +34,12 @@ interface Image {
   updatedAt: string;
 }
 
+interface UpdateBody {
+  documentId?: string;
+  images?: any[];
+  [key: string]: any;
+}
+
 // Helper function to get MongoDB client
 async function getMongoClient() {
   const client = new MongoClient(MONGODB_URI, {
@@ -205,24 +211,78 @@ export async function DELETE(
   }
 }
 
-// PATCH to remove a specific document from a car or update images
+// Helper function to clean aiAnalysis
+function cleanAiAnalysis(car: any) {
+  if (!car.aiAnalysis) return car;
+
+  // Remove redundant fields that we already have structured data for
+  const cleanedAnalysis = Object.fromEntries(
+    Object.entries(car.aiAnalysis).filter(([key]) => {
+      return (
+        !key.toLowerCase().includes("gvwr") &&
+        !key.toLowerCase().includes("weight") &&
+        !key.toLowerCase().includes("engine") &&
+        !key.toLowerCase().includes("doors") &&
+        !key.toLowerCase().includes("displacement") &&
+        !key.toLowerCase().includes("horsepower") &&
+        !key.toLowerCase().includes("tire")
+      );
+    })
+  );
+
+  // If there are no fields left, remove the aiAnalysis object entirely
+  if (Object.keys(cleanedAnalysis).length === 0) {
+    delete car.aiAnalysis;
+  } else {
+    car.aiAnalysis = cleanedAnalysis;
+  }
+
+  return car;
+}
+
+// PATCH to update car information
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   const client = await getMongoClient();
   try {
-    const { id } = await Promise.resolve(context.params);
+    let requestBody: UpdateBody = {};
+    try {
+      requestBody = await request.json();
+    } catch (e) {
+      // No body provided, that's ok for cleanup
+    }
+
+    const { id } = params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
         { status: 400 }
       );
     }
+
+    const { documentId, images, ...updates } = requestBody;
+
     const objectId = new ObjectId(id);
-    const body = await request.json();
-    const { documentId, images, ...updates } = body;
-    const db = client.db(DB_NAME);
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+
+    // Clean up aiAnalysis if this is a normal update or cleanup request
+    if (!documentId && !images) {
+      const car = await db.collection("cars").findOne({ _id: objectId });
+      if (car) {
+        const cleanedCar = cleanAiAnalysis(car);
+        await db
+          .collection("cars")
+          .updateOne({ _id: objectId }, { $set: cleanedCar });
+
+        // Return the cleaned car
+        const updatedCar = await db
+          .collection("cars")
+          .findOne({ _id: objectId });
+        return NextResponse.json(updatedCar);
+      }
+    }
 
     // Handle document removal
     if (documentId) {
