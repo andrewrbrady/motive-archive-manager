@@ -43,6 +43,9 @@ interface Dimensions {
   weight?: MeasurementValue;
   gvwr?: MeasurementValue;
   trackWidth?: MeasurementValue;
+  length?: MeasurementValue;
+  width?: MeasurementValue;
+  height?: MeasurementValue;
 }
 
 interface Manufacturing {

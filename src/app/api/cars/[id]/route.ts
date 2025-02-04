@@ -69,7 +69,7 @@ export async function GET(
     client = await getMongoClient();
     const db = client.db(DB_NAME);
 
-    console.log(`Fetching car with ID: ${id}`);
+    console.error(`[DEBUG] GET - Fetching car with ID: ${id}`);
     // Use aggregation to populate images
     const car = (await db
       .collection("cars")
@@ -87,16 +87,26 @@ export async function GET(
       .next()) as Car | null;
 
     if (!car) {
-      console.log(`Car not found with ID: ${id}`);
+      console.error(`[DEBUG] GET - Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
+    console.error("[DEBUG] GET - Initial car data:", {
+      _id: car._id,
+      client: car.client,
+      clientInfo: car.clientInfo,
+    });
+
     // If the car has a client field, populate the client information
     if (car.client && ObjectId.isValid(car.client)) {
-      console.log(`Fetching client info for car ${id}`);
+      console.error(
+        `[DEBUG] GET - Fetching client info for car ${id}, client ID: ${car.client}`
+      );
       const clientDoc = await db.collection("clients").findOne({
         _id: new ObjectId(car.client),
       });
+
+      console.error("[DEBUG] GET - Found client document:", clientDoc);
 
       if (clientDoc) {
         car.clientInfo = {
@@ -106,16 +116,19 @@ export async function GET(
           phone: clientDoc.phone,
           address: clientDoc.address,
         };
+        console.error(
+          "[DEBUG] GET - Updated car with client info:",
+          car.clientInfo
+        );
       }
     }
 
     return NextResponse.json(car);
   } catch (error) {
-    console.error("Error fetching car:", error);
+    console.error("[DEBUG] GET - Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });
   } finally {
     if (client) {
-      console.log(`Closing MongoDB connection for car ${context.params.id}`);
       await client.close();
     }
   }
@@ -352,6 +365,17 @@ export async function PATCH(
 
     // Handle general car data updates
     if (Object.keys(updates).length > 0) {
+      console.error("[DEBUG] PATCH - Updating car with data:", updates);
+
+      // Convert client ID to ObjectId if present
+      if (updates.client) {
+        if (ObjectId.isValid(updates.client)) {
+          updates.client = new ObjectId(updates.client);
+        } else {
+          delete updates.client; // Remove invalid client ID
+        }
+      }
+
       const updateResult = await db
         .collection<Car>("cars")
         .updateOne({ _id: objectId }, { $set: updates });
@@ -375,6 +399,35 @@ export async function PATCH(
           },
         ])
         .next();
+
+      console.error("[DEBUG] PATCH - After update - Car data:", {
+        _id: updatedCar._id,
+        client: updatedCar.client,
+        clientInfo: updatedCar.clientInfo,
+      });
+
+      // If the car has a client field, populate the client information
+      if (updatedCar.client && ObjectId.isValid(updatedCar.client)) {
+        console.error(
+          "[DEBUG] PATCH - Fetching client info for client ID:",
+          updatedCar.client
+        );
+        const clientDoc = await db.collection("clients").findOne({
+          _id: new ObjectId(updatedCar.client.toString()),
+        });
+
+        console.error("[DEBUG] PATCH - Found client document:", clientDoc);
+
+        if (clientDoc) {
+          updatedCar.clientInfo = {
+            _id: clientDoc._id.toString(),
+            name: clientDoc.name,
+            email: clientDoc.email,
+            phone: clientDoc.phone,
+            address: clientDoc.address,
+          };
+        }
+      }
 
       return NextResponse.json(updatedCar);
     }

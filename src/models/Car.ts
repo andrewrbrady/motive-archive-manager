@@ -78,6 +78,18 @@ const Car =
             value: Number,
             unit: String,
           },
+          length: {
+            value: Number,
+            unit: String,
+          },
+          width: {
+            value: Number,
+            unit: String,
+          },
+          height: {
+            value: Number,
+            unit: String,
+          },
         },
       },
       {

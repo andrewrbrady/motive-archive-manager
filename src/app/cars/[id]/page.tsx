@@ -274,6 +274,11 @@ export default function CarPage() {
     value: string | number | { [key: string]: number | string | null },
     nestedField?: string
   ): void => {
+    console.error("[DEBUG] handleInputChange called with:", {
+      field,
+      value,
+      nestedField,
+    });
     let newValue:
       | string
       | number
@@ -302,20 +307,24 @@ export default function CarPage() {
           string,
           unknown
         >;
-        return {
+        const newSpecs = {
           ...prev,
           [field]: {
             ...existingFieldValue,
             [nestedField]: newValue,
           },
         };
+        console.error("[DEBUG] Updated editedSpecs (nested):", newSpecs);
+        return newSpecs;
       }
 
       // Handle top-level fields
-      return {
+      const newSpecs = {
         ...prev,
         [field]: newValue,
       };
+      console.error("[DEBUG] Updated editedSpecs (top-level):", newSpecs);
+      return newSpecs;
     });
   };
 
@@ -754,6 +763,7 @@ export default function CarPage() {
     });
 
     try {
+      // Start enrichment process
       const response = await fetch(`/api/cars/${car._id}/enrich`, {
         method: "POST",
       });
@@ -763,6 +773,7 @@ export default function CarPage() {
       }
 
       const data = await response.json();
+      console.log("Enrichment response:", data);
 
       if (data.success && data.data) {
         // Update progress based on backend response
@@ -785,34 +796,39 @@ export default function CarPage() {
           throw new Error("Failed to fetch updated car data");
         }
         const freshData = await freshDataResponse.json();
+        console.log("Fresh car data:", freshData);
 
         // Only update if we have valid data
-        if (freshData._id && freshData.images) {
-          setCar(freshData);
+        if (freshData._id) {
+          // Force a re-render by creating a new object
+          setCar({ ...freshData });
+          toast.success("Car data enriched successfully");
+        } else {
+          throw new Error("Invalid car data received");
         }
       } else {
         // Handle error progress from backend
-        if (data.progress) {
-          setEnrichProgress(data.progress);
-        } else {
-          setEnrichProgress({
-            step: 0,
-            currentStep: "",
-            status: "error",
-            error: data.error || "Failed to enrich car data",
-          });
-        }
-        console.error("Failed to enrich car data:", data.error);
+        const errorMessage = data.error || "Failed to enrich car data";
+        setEnrichProgress({
+          step: 0,
+          currentStep: "",
+          status: "error",
+          error: errorMessage,
+        });
+        toast.error(errorMessage);
+        console.error("Failed to enrich car data:", errorMessage);
       }
     } catch (error) {
       // Handle error progress
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to enrich car data";
       setEnrichProgress({
         step: 0,
         currentStep: "",
         status: "error",
-        error:
-          error instanceof Error ? error.message : "Failed to enrich car data",
+        error: errorMessage,
       });
+      toast.error(errorMessage);
       console.error("Error enriching car data:", error);
     } finally {
       // Keep isEnriching true for a moment to show completion state
@@ -832,6 +848,7 @@ export default function CarPage() {
     if (!car || !isSpecsEditMode) return;
 
     try {
+      console.error("[DEBUG] Saving specs - editedSpecs:", editedSpecs);
       const response = await fetch(`/api/cars/${car._id}`, {
         method: "PATCH",
         headers: {
@@ -841,6 +858,7 @@ export default function CarPage() {
       });
 
       const data = await response.json();
+      console.error("[DEBUG] PATCH response:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to update specifications");
@@ -852,6 +870,7 @@ export default function CarPage() {
         throw new Error("Failed to fetch updated car data");
       }
       const updatedCar = await updatedCarResponse.json();
+      console.error("[DEBUG] GET response after update:", updatedCar);
       setCar(updatedCar);
 
       // Reset edit mode and clear edited specs
@@ -990,6 +1009,8 @@ export default function CarPage() {
                 setIsSpecsEditMode(false);
                 setEditedSpecs({});
               }}
+              onEnrich={handleEnrichData}
+              isEnriching={isEnriching}
               editedSpecs={editedSpecs}
               onInputChange={handleInputChange}
               onMeasurementChange={handleMeasurementChange}
