@@ -168,7 +168,10 @@ export default function CarEntryForm({
   });
 
   const [clients, setClients] = useState<Client[]>([]);
-  const [isDecodingVin, setIsDecodingVin] = useState(false);
+  const [isDecodingVinWithCorrections, setIsDecodingVinWithCorrections] =
+    useState(false);
+  const [isDecodingVinWithoutCorrections, setIsDecodingVinWithoutCorrections] =
+    useState(false);
 
   useEffect(() => {
     // Fetch clients when component mounts
@@ -266,50 +269,37 @@ export default function CarEntryForm({
       D: "0", // Letter D to number 0
     };
 
-    // VIN never contains I, O, Q
-    // Position 1-3: World Manufacturer Identifier (letters and numbers)
-    // Position 4-8: Vehicle Descriptor Section (letters and numbers)
-    // Position 9: Check Digit (number or X)
-    // Position 10: Model Year (letter or number)
-    // Position 11: Plant Code (letter or number)
-    // Position 12-17: Production Sequence Number (numbers only)
+    // Known manufacturer codes and their common misinterpretations
+    const manufacturerCorrections: { [key: string]: string } = {
+      // BMW
+      W85: "WBS", // Common misinterpretation for BMW M
+      W8A: "WBA", // Common misinterpretation for BMW AG
+      W8S: "WBS", // Common misinterpretation for BMW M
+      W8Y: "WBY", // Common misinterpretation for BMW Electric
+      // Porsche
+      WPO: "WP0", // Common misinterpretation for Porsche
+      WP0: "WP0", // Preserve correct Porsche code
+      WP1: "WP1", // Preserve correct Porsche SUV code
+      // Other manufacturers
+      SCA: "SCA", // Preserve Rolls-Royce code
+      ZFF: "ZFF", // Preserve Ferrari code
+      JN1: "JN1", // Preserve Nissan code
+      VF9: "VF9", // Preserve Bugatti code
+    };
 
-    // Known manufacturer codes that should be preserved
-    const preservedCodes = [
-      "WBA", // BMW AG
-      "WBS", // BMW M GmbH
-      "WBY", // BMW Electric Vehicles
-      "WP0", // Porsche
-      "WP1", // Porsche SUV
-      "SCA", // Rolls-Royce
-      "ZFF", // Ferrari
-      "JN1", // Nissan
-      "VF9", // Bugatti
-    ];
-
-    // Check if the first three characters match any preserved codes
+    // First, try to correct the manufacturer code (first 3 characters)
     const firstThree = correctedVin.slice(0, 3);
-    if (preservedCodes.includes(firstThree)) {
-      // If it's a preserved code, only apply corrections after the first three characters
-      return (
-        firstThree +
-        correctedVin
-          .slice(3)
-          .split("")
-          .map((char, index) => {
-            // Production sequence numbers (positions 12-17) should always be numbers
-            if (index >= 8) {
-              return corrections[char] || char;
-            }
-            // For other positions, apply general corrections except for X in check digit position
-            if (index === 5 && char === "X") return char;
-            return corrections[char] || char;
-          })
-          .join("")
+    const correctedManufacturer = manufacturerCorrections[firstThree];
+
+    if (correctedManufacturer) {
+      // If we found a manufacturer correction, use it and apply general corrections to the rest
+      correctedVin = correctedManufacturer + correctedVin.slice(3);
+      console.log(
+        `Corrected manufacturer code from ${firstThree} to ${correctedManufacturer}`
       );
     }
 
-    // For non-preserved codes, apply corrections based on position
+    // Now apply position-specific corrections
     return correctedVin
       .split("")
       .map((char, index) => {
@@ -318,9 +308,14 @@ export default function CarEntryForm({
           return corrections[char] || char;
         }
 
-        // Check digit (position 9) should be a number or X
+        // Check digit (position 9) can be a number or X
         if (index === 8) {
           return char === "X" ? char : corrections[char] || char;
+        }
+
+        // For positions 0-2 (manufacturer code), preserve if it's already corrected
+        if (index < 3 && correctedManufacturer) {
+          return correctedVin[index];
         }
 
         // For other positions, apply general corrections
@@ -349,7 +344,7 @@ export default function CarEntryForm({
     }
 
     console.log("Starting VIN decode for:", correctedVin);
-    setIsDecodingVin(true);
+    setIsDecodingVinWithCorrections(true);
 
     // Create a loading toast that we can update
     const toastId = toast.loading("Initiating VIN decode...", {
@@ -461,7 +456,7 @@ export default function CarEntryForm({
       console.error("Error decoding VIN:", error);
       toast.error("Failed to decode VIN", { id: toastId });
     } finally {
-      setIsDecodingVin(false);
+      setIsDecodingVinWithCorrections(false);
     }
   };
 
@@ -477,7 +472,7 @@ export default function CarEntryForm({
     }
 
     console.log("Starting VIN decode without corrections for:", formData.vin);
-    setIsDecodingVin(true);
+    setIsDecodingVinWithoutCorrections(true);
 
     const toastId = toast.loading("Initiating VIN decode...", {
       duration: 20000,
@@ -583,7 +578,7 @@ export default function CarEntryForm({
       console.error("Error decoding VIN:", error);
       toast.error("Failed to decode VIN", { id: toastId });
     } finally {
-      setIsDecodingVin(false);
+      setIsDecodingVinWithoutCorrections(false);
     }
   };
 
@@ -703,12 +698,16 @@ export default function CarEntryForm({
                   <Button
                     type="button"
                     onClick={decodeVin}
-                    disabled={isDecodingVin || formData.vin.length !== 17}
+                    disabled={
+                      isDecodingVinWithCorrections ||
+                      isDecodingVinWithoutCorrections ||
+                      formData.vin.length !== 17
+                    }
                     variant="outline"
                     className="flex-1 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                     title="Decode VIN with OCR corrections"
                   >
-                    {isDecodingVin ? (
+                    {isDecodingVinWithCorrections ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Decoding...
@@ -720,12 +719,16 @@ export default function CarEntryForm({
                   <Button
                     type="button"
                     onClick={decodeVinWithoutCorrections}
-                    disabled={isDecodingVin || formData.vin.length !== 17}
+                    disabled={
+                      isDecodingVinWithCorrections ||
+                      isDecodingVinWithoutCorrections ||
+                      formData.vin.length !== 17
+                    }
                     variant="outline"
                     className="flex-1 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                     title="Decode VIN without OCR corrections"
                   >
-                    {isDecodingVin ? (
+                    {isDecodingVinWithoutCorrections ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Decoding...
