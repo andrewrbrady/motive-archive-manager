@@ -1,10 +1,10 @@
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Clock, MapPin } from "lucide-react";
 import { getTimeRemaining } from "@/lib/utils";
-import { MotiveLogo } from "./MotiveLogo";
+import { CardImage } from "./CardImage";
 import { MeasurementValue } from "@/types/car";
+import { cn } from "@/lib/utils";
 
 type BaseVehicle = {
   year: number;
@@ -83,75 +83,54 @@ export function VehicleCard({
     ? auction.images?.[0]
     : variant === "inventory"
     ? inventory?.images?.[0] || null
-    : car?.images?.[0]?.url || null;
+    : car?.images?.[0]?.url
+    ? `${car.images[0].url}/public`
+    : null;
+
+  const labelClasses =
+    "text-[10px] uppercase tracking-wider text-text-secondary font-medium p-2";
+  const valueClasses = "text-sm text-text-primary font-medium uppercase p-2";
+  const sectionClasses = "flex flex-col divide-y divide-border-primary";
 
   return (
-    <div className="bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+    <div className="bg-background-secondary rounded-lg border border-border-primary overflow-hidden">
       <Link {...linkProps}>
         <div className="relative aspect-[16/9]">
-          {imageUrl ? (
-            variant === "car" ? (
-              <Image
-                src={`${imageUrl}/public`}
-                alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                priority
-              />
-            ) : (
-              <Image
-                src={imageUrl}
-                alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                className="object-cover"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
-            )
-          ) : (
-            <div className="w-full h-full bg-gray-50 dark:bg-black flex items-center justify-center">
-              <MotiveLogo className="w-16 h-16 opacity-50" />
-            </div>
-          )}
+          <CardImage
+            src={imageUrl}
+            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={variant === "car"}
+          />
         </div>
       </Link>
 
-      <div className="divide-y divide-gray-200 dark:divide-gray-800">
+      <div className="divide-y divide-border-primary">
         {/* Combined Year Make Model */}
-        <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-          <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-            Vehicle
-          </span>
-          <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+        <div className={sectionClasses}>
+          <span className={labelClasses}>Vehicle</span>
+          <span className={valueClasses}>
             {vehicle.year} {vehicle.make} {vehicle.model}
           </span>
         </div>
 
         {/* Additional Info */}
-        <div className="grid grid-cols-3 divide-x divide-gray-200 dark:divide-gray-800">
+        <div className="grid grid-cols-3 divide-x divide-border-primary">
           {variant === "car" ? (
             <>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Client
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Client</span>
+                <span className={valueClasses}>
                   {car?.clientInfo?.name || "N/A"}
                 </span>
               </div>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  VIN
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
-                  {car?.vin || "N/A"}
-                </span>
+              <div className={sectionClasses}>
+                <span className={labelClasses}>VIN</span>
+                <span className={valueClasses}>{car?.vin || "N/A"}</span>
               </div>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Mileage
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Mileage</span>
+                <span className={valueClasses}>
                   {vehicle.mileage && vehicle.mileage.value !== null
                     ? `${vehicle.mileage.value.toLocaleString()} ${
                         vehicle.mileage.unit
@@ -162,28 +141,22 @@ export function VehicleCard({
             </>
           ) : variant === "inventory" ? (
             <>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Transmission
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Transmission</span>
+                <span className={valueClasses}>
                   {inventory?.transmission || "N/A"}
                 </span>
               </div>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Dealer
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Dealer</span>
+                <span className={valueClasses}>
                   {inventory?.dealer || "N/A"}
                 </span>
               </div>
               {vehicle.mileage && vehicle.mileage.value !== null && (
-                <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                    Mileage
-                  </span>
-                  <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+                <div className={sectionClasses}>
+                  <span className={labelClasses}>Mileage</span>
+                  <span className={valueClasses}>
                     {vehicle.mileage.value.toLocaleString()}{" "}
                     {vehicle.mileage.unit}
                   </span>
@@ -192,29 +165,23 @@ export function VehicleCard({
             </>
           ) : (
             <>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Current Bid
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium uppercase p-2">
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Current Bid</span>
+                <span className={valueClasses}>
                   ${auction?.current_bid?.toLocaleString() || "NO BIDS"}
                 </span>
               </div>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Time Left
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium flex items-center uppercase p-2">
-                  <Clock className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Time Left</span>
+                <span className={cn(valueClasses, "flex items-center")}>
+                  <Clock className="w-4 h-4 mr-1 text-text-secondary" />
                   {getTimeRemaining(auction?.end_date)}
                 </span>
               </div>
-              <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-                <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-                  Location
-                </span>
-                <span className="text-sm text-gray-700 dark:text-gray-200 font-medium flex items-center uppercase p-2">
-                  <MapPin className="w-4 h-4 mr-1 text-gray-500 dark:text-gray-400" />
+              <div className={sectionClasses}>
+                <span className={labelClasses}>Location</span>
+                <span className={cn(valueClasses, "flex items-center")}>
+                  <MapPin className="w-4 h-4 mr-1 text-text-secondary" />
                   {auction?.location || "N/A"}
                 </span>
               </div>
@@ -224,11 +191,9 @@ export function VehicleCard({
 
         {/* Price Info */}
         {!auction && vehicle.price && (
-          <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
-            <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium p-2">
-              Price
-            </span>
-            <span className="text-lg text-gray-700 dark:text-gray-200 font-semibold p-2">
+          <div className={sectionClasses}>
+            <span className={labelClasses}>Price</span>
+            <span className="text-lg text-text-primary font-semibold p-2">
               ${vehicle.price.toLocaleString()}
             </span>
           </div>

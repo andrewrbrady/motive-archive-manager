@@ -751,14 +751,14 @@ export default function CarEntryForm({
   };
 
   const inputClasses =
-    "w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]";
-  const labelClasses = "text-sm text-gray-600 dark:text-gray-400";
+    "w-full bg-transparent text-text-primary border border-border-primary rounded-md px-3 py-2 placeholder:text-text-tertiary transition-all duration-base focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50";
+  const labelClasses = "text-sm text-text-secondary";
   const sectionTitleClasses =
-    "text-lg font-semibold text-gray-900 dark:text-white uppercase";
+    "text-lg font-semibold text-text-primary uppercase tracking-tight";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800">
+    <form onSubmit={handleSubmit} className="space-y-8 mb-16">
+      <div className="rounded-lg border border-border-primary divide-y divide-border-primary">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
           {/* Basic Information */}
           <div className="space-y-4">
@@ -867,7 +867,7 @@ export default function CarEntryForm({
                       formData.vin.length !== 17
                     }
                     variant="outline"
-                    className="flex-1 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex-1 whitespace-nowrap bg-background-primary border border-border-primary text-text-primary hover:bg-background-secondary"
                     title="Decode VIN with OCR corrections"
                   >
                     {isDecodingVinWithCorrections ? (
@@ -888,7 +888,7 @@ export default function CarEntryForm({
                       formData.vin.length !== 17
                     }
                     variant="outline"
-                    className="flex-1 whitespace-nowrap bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex-1 whitespace-nowrap bg-background-primary border border-border-primary text-text-primary hover:bg-background-secondary"
                     title="Decode VIN without OCR corrections"
                   >
                     {isDecodingVinWithoutCorrections ? (
@@ -901,7 +901,7 @@ export default function CarEntryForm({
                     )}
                   </Button>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-text-tertiary">
                   {formData.vin.length}/17 characters
                 </p>
               </div>
@@ -953,7 +953,7 @@ export default function CarEntryForm({
       </div>
 
       {/* Engine Information */}
-      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800 p-6">
+      <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
         <h2 className={sectionTitleClasses}>Engine Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -1001,7 +1001,7 @@ export default function CarEntryForm({
       </div>
 
       {/* Vehicle Details */}
-      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800 p-6">
+      <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
         <h2 className={sectionTitleClasses}>Vehicle Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
           <div>
@@ -1092,7 +1092,7 @@ export default function CarEntryForm({
       </div>
 
       {/* Manufacturing Information */}
-      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800 p-6">
+      <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
         <h2 className={sectionTitleClasses}>Manufacturing Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
           <div>
@@ -1152,7 +1152,7 @@ export default function CarEntryForm({
       </div>
 
       {/* Description */}
-      <div className="rounded-lg bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 divide-y divide-gray-200 dark:divide-gray-800 p-6">
+      <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
         <h2 className={sectionTitleClasses}>Description</h2>
         <div>
           <textarea
@@ -1169,7 +1169,7 @@ export default function CarEntryForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111] disabled:opacity-50"
+          className="px-4 py-2 text-text-secondary hover:text-text-primary border border-border-primary hover:border-border-secondary rounded-md transition-all duration-base focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-background-primary disabled:opacity-50"
         >
           {isSubmitting ? "Creating..." : "Create Car"}
         </button>
