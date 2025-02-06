@@ -19,3 +19,15 @@ always run a buildd before deploying to git
 ### styling
 
 we need to use a monochrome color palette for the website.
+
+## Styling Guidelines
+
+Please follow the comprehensive styling guide located in docs/STYLING.md. This guide defines our dark-mode-first approach, color palette, typography, spacing, and component styling.
+
+Key points:
+
+1. Use the defined color variables for consistency
+2. Follow the dark-mode-first philosophy
+3. Maintain accessibility standards
+4. Use Tailwind utility classes when possible
+5. Keep components modular and reusable

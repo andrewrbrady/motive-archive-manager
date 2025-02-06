@@ -5,7 +5,9 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Car } from "@/types/car";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
+import { MotiveLogo } from "@/components/ui/MotiveLogo";
+import { cn } from "@/lib/utils";
 
 interface CarImage {
   _id: string;
@@ -122,11 +124,18 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       href={`/cars/${car._id}${
         currentSearchParams ? `?${currentSearchParams}` : ""
       }`}
-      className="block bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden hover:border-gray-300 dark:hover:border-gray-700 transition-colors relative group"
+      className="block bg-background-secondary rounded-lg border border-border-primary overflow-hidden hover:border-border-secondary transition-colors relative group"
     >
       {/* Image */}
       <div className="relative aspect-[16/9]">
-        {primaryImage ? (
+        {loading ? (
+          <div className="w-full h-full bg-background-primary/50 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-8 h-8 text-text-secondary animate-spin" />
+            <span className="text-sm font-medium text-text-secondary">
+              Loading...
+            </span>
+          </div>
+        ) : primaryImage ? (
           <Image
             src={primaryImage.url}
             alt={`${car.year} ${car.make} ${car.model}`}
@@ -148,10 +157,13 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
             }}
           />
         ) : (
-          <div className="w-full h-full bg-gray-100 dark:bg-black flex items-center justify-center">
-            <span className="text-gray-400 dark:text-gray-600">
-              {loading ? "Loading..." : "No Image"}
-            </span>
+          <div className="w-full h-full bg-black/10 dark:bg-black/40 flex items-center justify-center">
+            <div className="flex items-center gap-4 px-6">
+              <MotiveLogo className="w-12 h-12 text-text-primary fill-current" />
+              <span className="text-sm font-medium text-text-secondary uppercase tracking-wider">
+                No Image
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -159,19 +171,25 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       {/* Delete Button - Absolutely positioned */}
       <button
         onClick={handleDelete}
-        className="absolute top-2 right-2 p-1.5 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700 bg-white dark:bg-black/50 opacity-0 group-hover:opacity-100"
+        className={cn(
+          "absolute top-2 right-2 p-1.5 rounded-full border transition-all duration-base",
+          "text-accent-error hover:text-accent-error/90",
+          "border-accent-error/20 hover:border-accent-error/30",
+          "bg-background-primary/90 hover:bg-background-primary",
+          "opacity-0 group-hover:opacity-100"
+        )}
       >
         <Trash2 className="w-4 h-4" />
       </button>
 
       {/* Car Info */}
       <div className="p-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-text-primary">
           {car.year} {car.make} {car.model}
         </h3>
         <div className="mt-2 space-y-1">
           {car.price && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-text-secondary">
               $
               {typeof car.price === "number"
                 ? car.price.toLocaleString()
@@ -179,14 +197,12 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
             </p>
           )}
           {car.mileage && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-text-secondary">
               {formatMileage(car.mileage)}
             </p>
           )}
           {car.location && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {car.location}
-            </p>
+            <p className="text-sm text-text-secondary">{car.location}</p>
           )}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import "./globals.css";
+import "@/styles/theme.css";
 import { Metadata } from "next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "sonner";
@@ -28,7 +29,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-white dark:bg-[#111111]">
+      <body className="min-h-screen bg-background text-text-primary antialiased">
         <ThemeProvider>{children}</ThemeProvider>
         <Toaster />
       </body>
