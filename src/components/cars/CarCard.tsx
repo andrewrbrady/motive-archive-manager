@@ -124,7 +124,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       href={`/cars/${car._id}${
         currentSearchParams ? `?${currentSearchParams}` : ""
       }`}
-      className="block bg-background-secondary rounded-lg border border-border-primary overflow-hidden hover:border-border-secondary transition-colors relative group"
+      className="block bg-background rounded-lg border border-border-primary overflow-hidden hover:border-border-secondary transition-colors relative group"
     >
       {/* Image */}
       <div className="relative aspect-[16/9]">

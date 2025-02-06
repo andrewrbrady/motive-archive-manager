@@ -93,7 +93,7 @@ export function VehicleCard({
   const sectionClasses = "flex flex-col divide-y divide-border-primary";
 
   return (
-    <div className="bg-background-secondary rounded-lg border border-border-primary overflow-hidden">
+    <div className="bg-background rounded-lg border border-border-primary overflow-hidden">
       <Link {...linkProps}>
         <div className="relative aspect-[16/9]">
           <CardImage
