@@ -8,17 +8,53 @@ interface VINResponse {
   engineDisplacement?: number;
   engineConfiguration?: string;
   engineCylinders?: number;
-  error?: string;
+  error?: {
+    code: string;
+    text: string;
+    additionalInfo?: string;
+  };
+  validationStatus?: {
+    isPartial: boolean;
+    suggestedVIN?: string;
+    possibleValues?: string[];
+  };
   series?: string;
   trim?: string;
   bodyClass?: string;
   horsepower?: number;
-  // Additional fields
   doors?: number;
   plant?: {
     city?: string;
     country?: string;
     company?: string;
+  };
+  transmission?: {
+    style?: string;
+    speeds?: number;
+  };
+  driveType?: string;
+  braking?: {
+    abs?: boolean;
+    systemType?: string;
+    description?: string;
+  };
+  airbags?: {
+    front?: boolean;
+    side?: boolean;
+    knee?: boolean;
+    curtain?: boolean;
+    locations?: string[];
+  };
+  safetyFeatures?: {
+    pretensioner?: boolean;
+    stabilityControl?: boolean;
+    tractionControl?: boolean;
+    parkingAssist?: boolean;
+    backupCamera?: boolean;
+    blindSpotWarning?: boolean;
+    laneDepartureWarning?: boolean;
+    forwardCollisionWarning?: boolean;
+    adaptiveCruiseControl?: boolean;
   };
   safety?: {
     tpms?: {
@@ -28,6 +64,21 @@ interface VINResponse {
   };
   dimensions?: {
     gvwr?: {
+      value: number;
+      unit: string;
+    };
+    wheelBase?: {
+      from?: number;
+      to?: number;
+      unit: string;
+    };
+    trackWidth?: number;
+    bedLength?: number;
+    curbWeight?: number;
+  };
+  performance?: {
+    topSpeed?: number;
+    enginePower?: {
       value: number;
       unit: string;
     };
@@ -153,6 +204,22 @@ export async function GET(request: Request) {
       engineConfiguration: results["Engine Configuration"],
       engineCylinders:
         parseInt(results["Engine Number of Cylinders"]) || undefined,
+      error: data.Results.some((r) => r.Variable === "Error Code" && r.Value)
+        ? {
+            code: results["Error Code"],
+            text: results["Error Text"],
+            additionalInfo: results["Additional Error Text"],
+          }
+        : undefined,
+      validationStatus: {
+        isPartial: data.Results.some(
+          (r) => r.Variable === "Error Code" && r.Value === "6"
+        ),
+        suggestedVIN: results["Suggested VIN"],
+        possibleValues: results["Possible Values"]
+          ? results["Possible Values"].split(",")
+          : undefined,
+      },
       series: results["Series"],
       trim: results["Trim"],
       bodyClass: results["Body Class"],
@@ -162,6 +229,42 @@ export async function GET(request: Request) {
         city: results["Plant City"],
         country: results["Plant Country"],
         company: results["Plant Company Name"],
+      },
+      transmission: {
+        style: results["Transmission Style"],
+        speeds: parseInt(results["Transmission Speeds"]) || undefined,
+      },
+      driveType: results["Drive Type"],
+      braking: {
+        abs: results["Anti-lock Braking System (ABS)"] === "Yes",
+        systemType: results["Brake System Type"],
+        description: results["Brake System Description"],
+      },
+      airbags: {
+        front: results["Front Air Bag Locations"] ? true : undefined,
+        side: results["Side Air Bag Locations"] ? true : undefined,
+        knee: results["Knee Air Bag Locations"] ? true : undefined,
+        curtain: results["Curtain Air Bag Locations"] ? true : undefined,
+        locations: [
+          results["Front Air Bag Locations"],
+          results["Side Air Bag Locations"],
+          results["Knee Air Bag Locations"],
+          results["Curtain Air Bag Locations"],
+        ].filter(Boolean),
+      },
+      safetyFeatures: {
+        pretensioner: results["Pretensioner"] === "Yes",
+        stabilityControl:
+          results["Electronic Stability Control (ESC)"] === "Yes",
+        tractionControl: results["Traction Control"] === "Yes",
+        parkingAssist: results["Parking Assist"] === "Yes",
+        backupCamera: results["Backup Camera"] === "Yes",
+        blindSpotWarning: results["Blind Spot Warning (BSW)"] === "Yes",
+        laneDepartureWarning: results["Lane Departure Warning (LDW)"] === "Yes",
+        forwardCollisionWarning:
+          results["Forward Collision Warning (FCW)"] === "Yes",
+        adaptiveCruiseControl:
+          results["Adaptive Cruise Control (ACC)"] === "Yes",
       },
       safety: {
         tpms: results["Tire Pressure Monitoring System (TPMS) Type"]
@@ -173,6 +276,25 @@ export async function GET(request: Request) {
       },
       dimensions: {
         gvwr: results.GVWR,
+        wheelBase: results["Wheel Base (inches) From"]
+          ? {
+              from: parseFloat(results["Wheel Base (inches) From"]),
+              to: parseFloat(results["Wheel Base (inches) To"]) || undefined,
+              unit: "inches",
+            }
+          : undefined,
+        trackWidth: parseFloat(results["Track Width (inches)"]) || undefined,
+        bedLength: parseFloat(results["Bed Length (inches)"]) || undefined,
+        curbWeight: parseFloat(results["Curb Weight (pounds)"]) || undefined,
+      },
+      performance: {
+        topSpeed: parseFloat(results["Top Speed (MPH)"]) || undefined,
+        enginePower: results["Engine Power (kW)"]
+          ? {
+              value: parseFloat(results["Engine Power (kW)"]),
+              unit: "kW",
+            }
+          : undefined,
       },
       aiAnalysis,
     };
