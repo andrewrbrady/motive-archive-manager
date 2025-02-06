@@ -51,7 +51,16 @@ interface VINResponse {
   engineDisplacement?: number;
   engineConfiguration?: string;
   engineCylinders?: number;
-  error?: string;
+  error?: {
+    code: string;
+    text: string;
+    additionalInfo?: string;
+  };
+  validationStatus?: {
+    isPartial: boolean;
+    suggestedVIN?: string;
+    possibleValues?: string[];
+  };
   bodyClass?: string;
   horsepower?: number;
   series?: string;
@@ -324,6 +333,155 @@ export default function CarEntryForm({
       .join("");
   };
 
+  const handleVinError = (data: VINResponse, toastId: string) => {
+    if (!data.error) return false;
+
+    const errorMessages: { [key: string]: string } = {
+      "1": "Check digit (9th position) is incorrect. Please verify the VIN.",
+      "4": data.validationStatus?.suggestedVIN
+        ? `VIN has been corrected. Suggested VIN: ${data.validationStatus.suggestedVIN}`
+        : "VIN has an error in one position.",
+      "14": "Some characters in the VIN cannot be validated against manufacturer data.",
+    };
+
+    const errorCodes = String(data.error.code)
+      .split(",")
+      .map((code) => code.trim());
+    console.log("Processing error codes:", errorCodes);
+
+    // Check if we have position-specific errors
+    const positionErrors = data.validationStatus?.possibleValues
+      ?.map((value) => {
+        const match = value.match(/\((\d+):([^)]+)\)/);
+        if (match) {
+          const [_, position, values] = match;
+          return `Position ${position}: Possible values are ${values}`;
+        }
+        return value;
+      })
+      .join("\n");
+
+    // Show error messages but don't block form updates unless it's a critical error
+    if (errorCodes.includes("4") && data.validationStatus?.suggestedVIN) {
+      const suggestedVin = data.validationStatus.suggestedVIN;
+      const originalVin = formData.vin;
+
+      // Create a visual diff of the VINs
+      const vinDiff = Array.from(suggestedVin).map((char, i) => {
+        if (char === "!") return { char: originalVin[i], changed: true };
+        return { char, changed: false };
+      });
+
+      toast.error(
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="font-medium">VIN validation issues found:</p>
+            <ul className="list-disc pl-4 space-y-1 text-sm">
+              {errorCodes.map((code) => (
+                <li key={code}>{errorMessages[code] || `Error ${code}`}</li>
+              ))}
+            </ul>
+            {positionErrors && (
+              <div className="mt-2 text-sm">
+                <p className="font-medium">Position-specific details:</p>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1">
+                  {positionErrors}
+                </pre>
+              </div>
+            )}
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+            <p className="font-medium mb-1">Suggested correction:</p>
+            <div className="font-mono bg-gray-100 dark:bg-gray-800 p-2 rounded">
+              {vinDiff.map((char, i) => (
+                <span
+                  key={i}
+                  className={
+                    char.changed ? "bg-yellow-200 dark:bg-yellow-900" : ""
+                  }
+                  title={char.changed ? "Changed character" : ""}
+                >
+                  {char.char}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                handleChange(
+                  "vin",
+                  suggestedVin.replace(
+                    "!",
+                    originalVin[suggestedVin.indexOf("!")]
+                  )
+                );
+                toast.success("VIN updated with suggestion", { id: toastId });
+                decodeVinWithoutCorrections();
+              }}
+              className="px-2 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Use Suggested
+            </button>
+            <button
+              onClick={() => toast.dismiss(toastId)}
+              className="px-2 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              Keep Current
+            </button>
+          </div>
+        </div>,
+        { id: toastId, duration: 15000 }
+      );
+      // Don't return true - allow form updates to proceed
+    }
+
+    // For error code 14 or other non-critical errors, show warning but continue
+    if (errorCodes.includes("14") || (errorCodes.includes("1") && data.make)) {
+      toast.warning(
+        <div className="space-y-2">
+          <p className="font-medium">VIN validation issues:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            {errorCodes.map((code) => (
+              <li key={code}>{errorMessages[code] || `Error ${code}`}</li>
+            ))}
+          </ul>
+          {positionErrors && (
+            <pre className="text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1">
+              {positionErrors}
+            </pre>
+          )}
+          <p className="text-sm mt-2">
+            Proceeding with available vehicle data.
+          </p>
+        </div>,
+        { id: toastId }
+      );
+      return false; // Continue processing with available data
+    }
+
+    // For critical errors with no useful data, show error and stop
+    if (!data.make || !data.model || !data.year) {
+      toast.error(
+        <div className="space-y-2">
+          <p className="font-medium">Critical VIN validation error:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            {errorCodes.map((code) => (
+              <li key={code}>{errorMessages[code] || `Error ${code}`}</li>
+            ))}
+          </ul>
+          <p className="text-sm mt-2 text-red-500">
+            Unable to retrieve basic vehicle information.
+          </p>
+        </div>,
+        { id: toastId }
+      );
+      return true; // Stop processing only if we couldn't get basic info
+    }
+
+    return false; // Allow updates to proceed by default
+  };
+
   const decodeVin = async () => {
     if (!formData.vin) {
       toast.error("Please enter a VIN");
@@ -336,6 +494,9 @@ export default function CarEntryForm({
     // Update the form with the corrected VIN
     if (correctedVin !== formData.vin) {
       handleChange("vin", correctedVin);
+      toast.info(`VIN corrected from ${formData.vin} to ${correctedVin}`, {
+        id: "vin-correction",
+      });
     }
 
     if (correctedVin.length !== 17) {
@@ -347,8 +508,10 @@ export default function CarEntryForm({
     setIsDecodingVinWithCorrections(true);
 
     // Create a loading toast that we can update
-    const toastId = toast.loading("Initiating VIN decode...", {
+    const toastId = `decode-${Date.now()}`;
+    toast.loading("Initiating VIN decode...", {
       duration: 20000, // Long duration as we'll dismiss it manually
+      id: toastId,
     });
 
     try {
@@ -358,9 +521,8 @@ export default function CarEntryForm({
 
       console.log("Received VIN decode response:", data);
 
-      if (data.error) {
-        console.error("VIN decode error:", data.error);
-        toast.error(data.error, { id: toastId });
+      // Handle errors and decide whether to continue
+      if (data.error && handleVinError(data, toastId)) {
         return;
       }
 
@@ -474,8 +636,10 @@ export default function CarEntryForm({
     console.log("Starting VIN decode without corrections for:", formData.vin);
     setIsDecodingVinWithoutCorrections(true);
 
-    const toastId = toast.loading("Initiating VIN decode...", {
+    const toastId = `decode-no-correct-${Date.now()}`;
+    toast.loading("Initiating VIN decode...", {
       duration: 20000,
+      id: toastId,
     });
 
     try {
@@ -485,9 +649,8 @@ export default function CarEntryForm({
 
       console.log("Received VIN decode response:", data);
 
-      if (data.error) {
-        console.error("VIN decode error:", data.error);
-        toast.error(data.error, { id: toastId });
+      // Handle errors and decide whether to continue
+      if (data.error && handleVinError(data, toastId)) {
         return;
       }
 
