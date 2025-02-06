@@ -36,12 +36,12 @@ export default function MeasurementInputWithUnit({
         value={value.value === null ? "" : value.value}
         onChange={handleValueChange}
         placeholder={placeholder}
-        className="w-16 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded px-2 py-1 text-left text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+        className="w-32 bg-background text-text-primary border border-border-primary rounded-md px-3 py-2 text-sm placeholder:text-text-tertiary transition-all duration-base focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
       />
       <select
         value={value.unit}
         onChange={handleUnitChange}
-        className="w-14 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded px-1 py-1 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+        className="w-20 bg-background text-text-primary border border-border-primary rounded-md px-2 py-2 text-sm placeholder:text-text-tertiary transition-all duration-base focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
       >
         {availableUnits.map((unit) => (
           <option key={unit} value={unit}>
