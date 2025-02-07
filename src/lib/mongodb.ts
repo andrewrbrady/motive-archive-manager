@@ -7,7 +7,13 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI;
-const options = {};
+const options: MongoClientOptions = {
+  maxPoolSize: 10,
+  minPoolSize: 5,
+  maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
@@ -29,6 +35,17 @@ if (process.env.NODE_ENV === "development") {
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
+
+// Handle cleanup on process termination
+["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
+  process.on(signal, () => {
+    if (client) {
+      console.log("Closing MongoDB connection due to process termination");
+      client.close(true).catch(console.error);
+    }
+    process.exit(0);
+  });
+});
 
 export default clientPromise;
 
@@ -57,22 +74,16 @@ export async function connectToDatabase() {
 
     if (!cached.promise) {
       console.log("MongoDB - Creating new connection");
-      const opts: MongoClientOptions = {
-        maxPoolSize: 10,
-        minPoolSize: 5,
-      };
-
-      cached.promise = MongoClient.connect(process.env.MONGODB_URI, opts).then(
-        (client) => {
-          console.log("MongoDB - Connected successfully");
-          return {
-            client,
-            db: client.db(process.env.MONGODB_DB || "motive_archive"),
-          };
-        }
-      );
-    } else {
-      console.log("MongoDB - Using existing connection promise");
+      cached.promise = MongoClient.connect(
+        process.env.MONGODB_URI,
+        options
+      ).then((client) => {
+        console.log("MongoDB - Connected successfully");
+        return {
+          client,
+          db: client.db(process.env.MONGODB_DB || "motive_archive"),
+        };
+      });
     }
 
     cached.conn = await cached.promise;
@@ -86,5 +97,15 @@ export async function connectToDatabase() {
         : "undefined",
     });
     throw error;
+  }
+}
+
+// Helper function to safely close a connection
+export async function closeConnection(client: MongoClient) {
+  try {
+    await client.close(true);
+    console.log("MongoDB - Connection closed successfully");
+  } catch (error) {
+    console.error("MongoDB - Error closing connection:", error);
   }
 }
