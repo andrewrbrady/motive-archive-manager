@@ -297,8 +297,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   className="w-full bg-background text-text-primary border border-border-primary rounded-md px-3 py-2 placeholder:text-text-tertiary"
                 />
                 <ModelSelector
-                  selectedModel={selectedModel}
-                  onModelChange={setSelectedModel}
+                  value={selectedModel}
+                  onChange={setSelectedModel}
                   className="pt-2"
                 />
                 <Button

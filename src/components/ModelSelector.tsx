@@ -10,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ModelType } from "@/types/models";
+
+export type ModelType = "claude-3-5-sonnet-20241022" | "gpt-4o-mini";
 
 interface ModelSelectorProps {
   value: ModelType;
   onChange: (value: ModelType) => void;
+  className?: string;
 }
 
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {

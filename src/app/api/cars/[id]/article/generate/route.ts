@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { ModelType } from "@/components/ModelSelector";
+import type { ModelType } from "@/components/ModelSelector";
 
 export async function POST(
   request: Request,

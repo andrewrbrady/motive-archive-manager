@@ -18,6 +18,7 @@ import { toast } from "react-hot-toast";
 import ResearchFiles from "@/components/ResearchFiles";
 import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
+import type { Car as CarType, CarImage } from "@/types/car";
 
 interface MeasurementValue {
   value: number | null;
@@ -35,12 +36,51 @@ interface Torque {
   Nm: number;
 }
 
-interface Engine {
-  type: string;
-  displacement?: MeasurementValue;
-  power?: Power;
-  torque?: Torque;
-  features?: string[];
+interface ApiCarResponse {
+  _id?: string;
+  make: string;
+  model: string;
+  year: number;
+  price: string | number;
+  mileage?: {
+    value: number;
+    unit: string;
+  };
+  color?: string;
+  interior_color?: string;
+  vin?: string;
+  status?: "available" | "sold" | "pending";
+  condition?: string;
+  location?: string;
+  description?: string;
+  type?: string;
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+    configuration?: string;
+    cylinders?: number;
+    fuelType?: string;
+    manufacturer?: string;
+  };
+  images?: CarImage[];
+}
+
+interface Car extends CarType {
+  _id: string;
+  images?: CarImage[];
 }
 
 interface Dimensions {
@@ -89,55 +129,6 @@ interface ImageVariants {
   [key: string]: string;
 }
 
-interface Car {
-  _id: string;
-  make: string;
-  model: string;
-  year: number;
-  mileage: MeasurementValue;
-  color: string | null;
-  dealer: string | null;
-  description: string | null;
-  price: number | string | null;
-  horsepower: number;
-  condition: string | null;
-  location: string;
-  type?: string;
-  vin?: string;
-  images: {
-    id: string;
-    url: string;
-    filename: string;
-    metadata: ImageMetadata;
-    variants: ImageVariants;
-    createdAt: string;
-    updatedAt: string;
-  }[];
-  owner_id?: string;
-  engine?: Engine;
-  client?: string;
-  clientInfo?: {
-    _id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    company?: string;
-    role?: string;
-    [key: string]: string | undefined;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-  status?: "available" | "sold" | "pending";
-  dimensions?: Dimensions;
-  fuel_capacity?: MeasurementValue;
-  interior_features?: InteriorFeatures;
-  interior_color?: string;
-  performance?: Performance;
-  transmission?: Transmission;
-  weight?: Weight;
-}
-
 interface UploadedImageData {
   id: string;
   url: string;
@@ -172,6 +163,39 @@ interface EditableSpecs
   weight?: Partial<Weight>;
   transmission?: Partial<Transmission>;
   interior_features?: Partial<InteriorFeatures>;
+}
+
+interface BaTCarDetails {
+  _id: string;
+  year: number;
+  make: string;
+  model: string;
+  color?: string;
+  mileage?: {
+    value: number;
+    unit: string;
+  };
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp?: number;
+    };
+  };
+  transmission: {
+    type: string;
+  };
+  vin?: string;
+  condition?: string;
+  interior_color?: string;
+  interior_features?: {
+    seats: number;
+    upholstery?: string;
+  };
+  description?: string;
 }
 
 export default function CarPage() {
@@ -432,29 +456,107 @@ export default function CarPage() {
   }, [isEditMode, id]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCar = async () => {
       try {
-        setLoading(true);
         const response = await fetch(`/api/cars/${id}`);
-        const data = await response.json();
-        console.log("Fetched car data:", JSON.stringify(data, null, 2));
-        setCar(data);
+        const apiData: ApiCarResponse = await response.json();
+
+        // Transform the API response to match our UI requirements
+        const carData: Car = {
+          _id: apiData._id || id, // Always provide an _id
+          make: apiData.make || "",
+          model: apiData.model || "",
+          year: apiData.year || new Date().getFullYear(),
+          price:
+            typeof apiData.price === "string"
+              ? parseFloat(apiData.price)
+              : apiData.price || 0,
+          mileage: apiData.mileage || { value: 0, unit: "mi" },
+          color: apiData.color || "Unknown",
+          interior_color: apiData.interior_color || "Unknown",
+          vin: apiData.vin || "Unknown",
+          status: apiData.status || "available",
+          condition: apiData.condition || "Unknown",
+          location: apiData.location || "Unknown",
+          description: apiData.description || "",
+          type: apiData.type || "Unknown",
+          // Ensure engine has all required fields
+          engine: {
+            type: apiData.engine?.type || "Unknown",
+            displacement: apiData.engine?.displacement || {
+              value: 0,
+              unit: "L",
+            },
+            power: apiData.engine?.power || { hp: 0, kW: 0, ps: 0 },
+            torque: apiData.engine?.torque || { "lb-ft": 0, Nm: 0 },
+            features: apiData.engine?.features || [],
+            configuration: apiData.engine?.configuration,
+            cylinders: apiData.engine?.cylinders,
+            fuelType: apiData.engine?.fuelType,
+            manufacturer: apiData.engine?.manufacturer,
+          },
+          // Convert images array to imageIds if needed
+          imageIds: apiData.images?.map((img) => img.id) || [],
+          // Keep the images array for UI purposes
+          images: apiData.images || [],
+          // Add any missing required fields with default values
+          transmission: {
+            type: "Unknown",
+          },
+        };
+
+        setCar(carData);
+        setLoading(false);
 
         // Fetch documents
         const docsResponse = await fetch(`/api/cars/${id}/documents`);
         const docsData = await docsResponse.json();
         setDocuments(docsData);
       } catch (error) {
-        console.error("Error fetching car data:", error);
-      } finally {
+        console.error("Error fetching car:", error);
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchData();
-    }
+    fetchCar();
   }, [id]);
+
+  // Helper function to convert Car type to CarData type for Specifications component
+  const toCarData = (car: Car) => {
+    return {
+      ...car,
+      price: car.price, // Keep as number since CarData accepts number | string | null
+      transmission: {
+        type: car.transmission?.type || "Unknown",
+      },
+    };
+  };
+
+  // Helper function to convert Car type to BaTCarDetails type for BaTListingGenerator
+  const toBaTCarDetails = (car: Car): BaTCarDetails => {
+    return {
+      _id: car._id,
+      year: car.year,
+      make: car.make,
+      model: car.model,
+      color: car.color,
+      mileage: car.mileage,
+      engine: {
+        type: car.engine?.type,
+        displacement: car.engine?.displacement,
+        power: {
+          hp: car.engine?.power?.hp,
+        },
+      },
+      transmission: {
+        type: car.transmission?.type || "Unknown", // Ensure type is always provided
+      },
+      vin: car.vin,
+      condition: car.condition,
+      interior_color: car.interior_color,
+      description: car.description,
+    };
+  };
 
   const handleImageUpload = async (files: FileList) => {
     if (!car) return;
@@ -995,14 +1097,14 @@ export default function CarPage() {
               description: car.description,
             }}
           />
-          <BaTListingGenerator carDetails={car} />
+          <BaTListingGenerator carDetails={toBaTCarDetails(car)} />
         </div>
 
         {/* Vehicle Information */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           <div>
             <Specifications
-              car={car}
+              car={toCarData(car)}
               isEditMode={isSpecsEditMode}
               onEdit={() => setIsSpecsEditMode(true)}
               onSave={handleSpecsEdit}
