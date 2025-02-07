@@ -17,6 +17,7 @@ import BaTListingGenerator from "@/components/BaTListingGenerator";
 import { toast } from "react-hot-toast";
 import ResearchFiles from "@/components/ResearchFiles";
 import Specifications from "@/components/cars/Specifications";
+import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 
 interface MeasurementValue {
   value: number | null;
@@ -1060,6 +1061,12 @@ export default function CarPage() {
         <div className="mt-8">
           <h2 className="text-2xl font-bold mb-4">Research</h2>
           <ResearchFiles carId={id} />
+        </div>
+
+        {/* Add this section after the Research section */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-4">Article Generation</h2>
+          <ArticleGenerator car={car} />
         </div>
       </main>
       <Footer />
