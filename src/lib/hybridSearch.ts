@@ -428,7 +428,7 @@ Answer:`;
           ? process.env.DEEPSEEK_API_URL || "https://api.deepseek.com"
           : isClaude
           ? process.env.CLAUDE_API_URL || "https://api.anthropic.com"
-          : "https://api.openai.com/v1/chat/completions",
+          : "https://api.openai.com",
         key: isDeepSeek
           ? process.env.DEEPSEEK_API_KEY
           : isClaude

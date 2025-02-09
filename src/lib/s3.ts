@@ -147,5 +147,5 @@ export function generateS3Key(carId: string, filename: string) {
   const cleanFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
   // Add timestamp to ensure uniqueness
   const timestamp = Date.now();
-  return `cars/${carId}/research/${timestamp}-${cleanFilename}`;
+  return `cars/${carId}/${timestamp}-${cleanFilename}`;
 }
