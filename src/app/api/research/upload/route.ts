@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     // Generate a unique filename
     const timestamp = Date.now();
     const filename = `${timestamp}-${file.name}`;
-    const s3Key = `research/${carId}/${filename}`;
+    const s3Key = `cars/${carId}/${filename}`;
 
     // Upload to S3
     await s3.send(

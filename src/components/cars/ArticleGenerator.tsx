@@ -57,6 +57,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
   const [selectedModel, setSelectedModel] = useState<ModelType>(
     "claude-3-5-sonnet-20241022"
   );
+  const [focus, setFocus] = useState("");
   const [isRevising, setIsRevising] = useState(false);
   const [revisionContext, setRevisionContext] = useState("");
   const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
@@ -129,6 +130,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
         model: selectedModel,
         stage,
         context: context || undefined,
+        focus: focus || undefined,
         currentStage: metadata?.currentStage,
       });
 
@@ -141,6 +143,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
           model: selectedModel,
           stage,
           context: context || undefined,
+          focus: focus || undefined,
         }),
       });
 
@@ -569,6 +572,8 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
             <ModelSelector
               value={selectedModel}
               onChange={(value) => setSelectedModel(value as ModelType)}
+              focus={focus}
+              onFocusChange={setFocus}
             />
             {!isGenerating && !isRevising && !isViewingSaved && (
               <Button

@@ -37,7 +37,7 @@ export async function uploadResearchFile(
   file: File,
   carId: string
 ): Promise<S3UploadResult> {
-  const key = `research/${carId}/${Date.now()}-${file.name}`;
+  const key = `cars/${carId}/${Date.now()}-${file.name}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const command = new PutObjectCommand({

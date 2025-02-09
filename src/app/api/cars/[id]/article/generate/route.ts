@@ -8,9 +8,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const model =
-      (searchParams.get("model") as ModelType) || "claude-3-5-sonnet";
+    const body = await request.json();
+    const { model, focus } = body;
     const carId = params.id;
 
     if (!carId) {
@@ -46,7 +45,11 @@ export async function POST(
     // Prepare the prompt for article generation
     const prompt = `You are a professional automotive journalist writing an in-depth article about a ${
       car.year
-    } ${car.make} ${car.model}. 
+    } ${car.make} ${car.model}. ${
+      focus
+        ? `\n\nSpecial focus for this article: ${focus}\n\nThis article should be primarily focused on ${focus}, diving deep into this specific aspect of the vehicle while briefly touching on other aspects only when directly relevant to ${focus}.`
+        : ""
+    }
     
 Car Details:
 ${JSON.stringify(car, null, 2)}
@@ -54,7 +57,34 @@ ${JSON.stringify(car, null, 2)}
 Research Content:
 ${researchContent}
 
-Please write a comprehensive, engaging article that covers:
+${
+  focus
+    ? `Please write a focused, in-depth article that thoroughly explores ${focus}. Structure your article as follows:
+
+1. Introduction
+   - Brief overview of the ${car.year} ${car.make} ${car.model}
+   - Why ${focus} is particularly significant for this vehicle
+
+2. Historical Context of ${focus}
+   - Evolution and development
+   - Key influences and inspirations
+   - Notable milestones or changes
+
+3. Detailed Analysis of ${focus}
+   - Key features and characteristics
+   - Technical details and specifications relevant to ${focus}
+   - Unique or innovative aspects
+
+4. Impact and Significance
+   - How ${focus} affects the vehicle's overall character
+   - Comparison with contemporaries (specifically regarding ${focus})
+   - Market reception and critical response to ${focus}
+
+5. Conclusion
+   - Summary of key points about ${focus}
+   - Legacy and influence
+   - Final thoughts on the significance of ${focus} for this vehicle`
+    : `Please write a comprehensive, engaging article that covers:
 1. Introduction and overview
 2. Historical context and significance
 3. Design and exterior features
@@ -63,9 +93,18 @@ Please write a comprehensive, engaging article that covers:
 6. Driving experience and handling
 7. Technology and features
 8. Market position and value
-9. Conclusion
+9. Conclusion`
+}
 
-Use a professional, journalistic tone and incorporate specific details from both the car data and research content. Format the article with appropriate headings and paragraphs.`;
+Use a professional, journalistic tone and incorporate specific details from both the car data and research content. Format the article with appropriate headings and paragraphs.${
+      focus
+        ? "\n\nRemember to maintain laser focus on " +
+          focus +
+          " throughout the article. Only mention other aspects of the vehicle when they directly relate to or influence " +
+          focus +
+          "."
+        : ""
+    }`;
 
     // Determine API configuration based on model
     const isDeepSeek = model.startsWith("deepseek");

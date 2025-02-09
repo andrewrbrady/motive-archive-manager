@@ -3,13 +3,19 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import type { ModelType } from "@/types/models";
+import Anthropic from "@anthropic-ai/sdk";
+
+// Initialize Anthropic client
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 // Add these utility functions at the top level
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-function chunkContent(content: string, maxTokens: number = 15000): string {
+function chunkContent(content: string, maxTokens: number = 20000): string {
   const paragraphs = content.split("\n\n");
   let currentChunk = "";
   let currentTokens = 0;
@@ -111,7 +117,8 @@ async function makeAPIRequest(
 
   // Estimate tokens and chunk if necessary
   const estimatedPromptTokens = estimateTokens(prompt);
-  const maxPromptTokens = 15000;
+  const maxPromptTokens = isClaude ? 12000 : 20000; // Reduced for Claude
+  const maxResponseTokens = isClaude ? 4096 : 12000; // Reduced for Claude
 
   if (estimatedPromptTokens > maxPromptTokens) {
     console.log(
@@ -120,104 +127,127 @@ async function makeAPIRequest(
     prompt = chunkContent(prompt, maxPromptTokens);
   }
 
-  const apiConfig = {
-    url: isClaude
-      ? process.env.CLAUDE_API_URL!
-      : process.env.OPENAI_API_ENDPOINT!,
-    key: isClaude
-      ? process.env.ANTHROPIC_API_KEY!
-      : process.env.OPENAI_API_KEY!,
-  };
-
-  const baseUrl = apiConfig.url.endsWith("/")
-    ? apiConfig.url.slice(0, -1)
-    : apiConfig.url;
-
-  const requestBody = isClaude
-    ? {
+  if (isClaude) {
+    try {
+      const response = await anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
+        max_tokens: maxResponseTokens,
+        temperature: 0.7,
         system: systemPrompt,
-      }
-    : {
-        model: "gpt-4o-mini",
         messages: [
           {
-            role: "system",
-            content: systemPrompt,
+            role: "user",
+            content: prompt,
           },
-          { role: "user", content: prompt },
         ],
-        max_tokens: 4000,
-        temperature: 0.7,
-      };
-
-  // Add delay between retries
-  const delay = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-  let retries = 3;
-  let lastError: any = null;
-
-  while (retries > 0) {
-    try {
-      const response = await fetch(baseUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(isClaude
-            ? {
-                "x-api-key": apiConfig.key,
-                "anthropic-version": "2023-06-01",
-              }
-            : { Authorization: `Bearer ${apiConfig.key}` }),
-        },
-        body: JSON.stringify(requestBody),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        if (response.status === 429) {
-          console.log(`Rate limit hit, retries left: ${retries - 1}`);
-          retries--;
-          if (retries > 0) {
-            const backoffTime = (4 - retries) * 10000; // 10s, 20s, 30s
-            await delay(backoffTime);
-            continue;
-          }
-        }
-        throw new Error(`API request failed: ${response.statusText}`);
+      const content = response.content[0];
+      if (!content || content.type !== "text") {
+        throw new Error("Invalid response format from Claude");
       }
 
-      const data = await response.json();
-      return isClaude ? data.content[0].text : data.choices[0].message.content;
+      return content.text;
     } catch (error) {
-      lastError = error;
-      if (retries <= 1) throw error;
-      retries--;
-      await delay(5000); // 5 second base delay between retries
+      console.error("Anthropic API Error:", error);
+      throw error;
     }
-  }
+  } else {
+    // OpenAI request handling
+    const apiConfig = {
+      url: process.env.OPENAI_API_ENDPOINT!,
+      key: process.env.OPENAI_API_KEY!,
+    };
 
-  throw lastError;
+    if (!apiConfig.key) {
+      throw new Error("Missing OPENAI_API_KEY environment variable");
+    }
+
+    const baseUrl = apiConfig.url.endsWith("/")
+      ? apiConfig.url.slice(0, -1)
+      : apiConfig.url;
+
+    const requestBody = {
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: maxResponseTokens,
+      temperature: 0.7,
+    };
+
+    const response = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiConfig.key}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error("OpenAI API Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+      });
+      throw new Error(
+        `API request failed: ${response.statusText}${
+          errorData?.error?.message ? ` - ${errorData.error.message}` : ""
+        }`
+      );
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
 }
 
 async function generateArticlePlan(
   car: any,
   researchContent: string,
   model: ModelType,
-  context?: string
+  context?: string,
+  focus?: string
 ) {
   const prompt = context
     ? `Please revise the article plan based on this feedback: ${context}`
     : `Create a detailed article plan for a ${car.year} ${car.make} ${
         car.model
-      }.
+      }.${
+        focus
+          ? `\n\nThis article should focus specifically on ${focus}. The outline and content should primarily explore and analyze this aspect of the vehicle, only mentioning other aspects when they directly relate to ${focus}.`
+          : ""
+      }
     
 Car Details:
 ${JSON.stringify(car, null, 2)}
 
-Please create a comprehensive outline that covers:
+${
+  focus
+    ? `Please create a focused outline that thoroughly explores ${focus}:
+1. Introduction
+   - Brief overview of the vehicle
+   - Why ${focus} is significant for this model
+2. Historical Context of ${focus}
+   - Evolution and development
+   - Key influences and inspirations
+3. Detailed Analysis of ${focus}
+   - Key features and characteristics
+   - Technical aspects related to ${focus}
+4. Impact and Significance
+   - How ${focus} defines the vehicle
+   - Comparison with contemporaries
+5. Conclusion
+   - Legacy and influence of ${focus}
+
+For each section, provide 3-4 key points that specifically relate to ${focus}.`
+    : `Please create a comprehensive outline that covers:
 1. Introduction and overview
 2. Historical context and significance
 3. Design and exterior features
@@ -228,7 +258,8 @@ Please create a comprehensive outline that covers:
 8. Market position and value
 9. Conclusion
 
-For each section, provide 3-4 key points to be covered.`;
+For each section, provide 3-4 key points to be covered.`
+}`;
 
   const response = await makeAPIRequest(
     prompt,
@@ -243,7 +274,8 @@ async function generateDraft(
   car: any,
   researchContent: string,
   model: ModelType,
-  context?: string
+  context?: string,
+  focus?: string
 ) {
   const prompt = context
     ? `Please revise the article draft based on this feedback: ${context}`
@@ -254,12 +286,21 @@ ${plan}
 Car Details:
 ${JSON.stringify(car, null, 2)}
 
-Write in a professional, journalistic style with engaging prose and technical accuracy.`;
+Research Content:
+${researchContent}
+
+${
+  focus
+    ? `Remember to maintain focus on ${focus} throughout the article. Only discuss other aspects of the vehicle when they directly relate to or influence ${focus}.`
+    : "Create a well-balanced article that covers all aspects outlined above."
+}
+
+Please write in a professional, journalistic style with clear section headings and engaging prose.`;
 
   const response = await makeAPIRequest(
     prompt,
     model,
-    "You are a professional automotive journalist writing in-depth articles about vehicles."
+    "You are a professional automotive journalist writing detailed vehicle articles."
   );
   return response;
 }
@@ -351,8 +392,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await request.json();
-    const { model, stage, context } = body;
+    const { model, stage, context, focus } = await request.json();
     const carId = params.id;
 
     if (!carId) {
@@ -377,62 +417,13 @@ export async function POST(
     // Get existing article metadata
     let metadata = await db.collection("article_metadata").findOne({ carId });
 
-    // If this is a revision (has context), ensure we have existing content
-    if (context) {
-      if (!metadata?.stages?.length) {
-        return NextResponse.json(
-          { error: "No existing content found for revision" },
-          { status: 400 }
-        );
-      }
-
-      const existingStage = metadata.stages.find((s: any) => s.stage === stage);
-      if (!existingStage) {
-        return NextResponse.json(
-          { error: "No existing content found for this stage" },
-          { status: 400 }
-        );
-      }
-
-      console.log("Processing revision request:", {
-        stage,
-        hasExistingContent: !!existingStage.content,
-        contextLength: context.length,
-      });
-
-      // Generate revised content
-      const content = await reviseContent(
-        existingStage.content,
-        context,
-        model,
-        stage
-      );
-
-      // Update the stage with revised content
-      const stageIndex = metadata.stages.findIndex(
-        (s: any) => s.stage === stage
-      );
-      metadata.stages[stageIndex] = {
-        stage,
-        content,
-        timestamp: new Date(),
-      };
-
-      // Save updated metadata
-      await db
-        .collection("article_metadata")
-        .updateOne({ carId }, { $set: metadata });
-
-      return NextResponse.json({ metadata });
-    }
-
-    // If not a revision, handle as new stage generation
-    if (!metadata || stage === "planning") {
+    // Initialize metadata if it doesn't exist
+    if (!metadata) {
       metadata = {
         carId,
         model,
         stages: [],
-        currentStage: "planning",
+        currentStage: stage,
         createdAt: new Date(),
         updatedAt: new Date(),
         isComplete: false,
@@ -441,30 +432,37 @@ export async function POST(
     }
 
     let content;
-    if (stage === "planning") {
-      content = await generateArticlePlan(car, "", model);
-    } else if (stage === "drafting") {
-      const planStage = metadata.stages.find(
-        (s: any) => s.stage === "planning"
-      );
-      if (!planStage) {
-        return NextResponse.json(
-          { error: "Planning stage must be completed first" },
-          { status: 400 }
-        );
+
+    if (!context) {
+      // Generate new content
+      switch (stage) {
+        case "planning":
+          content = await generateArticlePlan(car, "", model, undefined, focus);
+          break;
+        case "drafting":
+          const plan = metadata.stages.find(
+            (s) => s.stage === "planning"
+          )?.content;
+          if (!plan) throw new Error("No planning stage found");
+          content = await generateDraft(plan, car, "", model, undefined, focus);
+          break;
+        case "polishing":
+          const draft = metadata.stages.find(
+            (s) => s.stage === "drafting"
+          )?.content;
+          if (!draft) throw new Error("No draft stage found");
+          content = await polishArticle(draft, model);
+          break;
+        default:
+          throw new Error("Invalid stage");
       }
-      content = await generateDraft(planStage.content, car, "", model);
-    } else if (stage === "polishing") {
-      const draftStage = metadata.stages.find(
-        (s: any) => s.stage === "drafting"
-      );
-      if (!draftStage) {
-        return NextResponse.json(
-          { error: "Drafting stage must be completed first" },
-          { status: 400 }
-        );
-      }
-      content = await polishArticle(draftStage.content, model);
+    } else {
+      // Handle revision
+      const currentContent = metadata.stages.find(
+        (s) => s.stage === stage
+      )?.content;
+      if (!currentContent) throw new Error("No content found for revision");
+      content = await reviseContent(currentContent, context, model, stage);
     }
 
     if (!content) {
@@ -472,7 +470,7 @@ export async function POST(
     }
 
     // Update the stages array with the new content
-    const stageIndex = metadata.stages.findIndex((s: any) => s.stage === stage);
+    const stageIndex = metadata.stages.findIndex((s) => s.stage === stage);
     if (stageIndex >= 0) {
       metadata.stages[stageIndex] = {
         stage,
@@ -500,7 +498,7 @@ export async function POST(
     console.log("Returning metadata:", {
       currentStage: metadata.currentStage,
       stagesCount: metadata.stages.length,
-      hasContent: metadata.stages.some((s: any) => s.stage === stage),
+      hasContent: metadata.stages.some((s) => s.stage === stage),
     });
 
     return NextResponse.json({ metadata });
