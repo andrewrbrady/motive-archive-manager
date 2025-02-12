@@ -127,94 +127,60 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
     setError(null);
     setProgress(null);
 
-    try {
-      const stage =
-        targetStage ||
-        (!metadata ? "planning" : getNextStage(metadata.currentStage));
-
-      console.log("Sending article generation request:", {
+    const eventSource = new EventSource(
+      `/api/cars/${car._id}/article?${new URLSearchParams({
         model: selectedModel,
-        stage,
-        context: context || undefined,
-        focus: focus || undefined,
-        currentStage: metadata?.currentStage,
-      });
+        stage:
+          targetStage ||
+          (!metadata ? "planning" : getNextStage(metadata.currentStage)),
+        ...(context && { context }),
+        ...(focus && { focus }),
+      }).toString()}`
+    );
 
-      const response = await fetch(`/api/cars/${car._id}/article`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          stage,
-          context: context || undefined,
-          focus: focus || undefined,
-        }),
-      });
+    try {
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("Received SSE data:", data);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to generate article");
-      }
-
-      // Handle Server-Sent Events
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      if (!reader) {
-        throw new Error("Failed to initialize stream reader");
-      }
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete events in the buffer
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || ""; // Keep the last incomplete line in the buffer
-
-        for (const line of lines) {
-          if (line.trim() === "") continue;
-
-          if (line.startsWith("data: ")) {
-            try {
-              const jsonStr = line.slice(5).trim();
-              const data = JSON.parse(jsonStr);
-              console.log("Received SSE data:", data);
-
-              if (data.type === "error") {
-                setError(data.error);
-                setIsGenerating(false);
-                return;
-              }
-
-              if (data.type === "complete") {
-                setMetadata(data.metadata);
-                setProgress(null);
-                continue;
-              }
-
-              if (data.type === "progress") {
-                setProgress({
-                  stage: data.stage,
-                  step: data.step,
-                  message: data.message,
-                });
-              }
-            } catch (e) {
-              console.error("Error parsing SSE data:", e, "Line:", line);
-            }
+          if (data.type === "error") {
+            setError(data.error);
+            setIsGenerating(false);
+            eventSource.close();
+            return;
           }
-        }
-      }
 
-      setRevisionContext("");
-      setIsRevising(false);
+          if (data.type === "complete") {
+            setMetadata(data.metadata);
+            setProgress(null);
+            eventSource.close();
+            return;
+          }
+
+          if (data.type === "progress") {
+            setProgress({
+              stage: data.stage,
+              step: data.step,
+              message: data.message,
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing SSE data:", e);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("EventSource error:", error);
+        setError("Connection error. Please try again.");
+        setIsGenerating(false);
+        eventSource.close();
+      };
+
+      // Clean up function
+      return () => {
+        eventSource.close();
+      };
     } catch (err) {
       console.error("Article generation error:", err);
       setError(
@@ -222,9 +188,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
           ? err.message
           : "An error occurred while generating the article"
       );
-    } finally {
-      setIsGenerating(false);
-      setProgress(null);
+      eventSource.close();
     }
   };
 

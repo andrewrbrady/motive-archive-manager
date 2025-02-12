@@ -404,6 +404,8 @@ Please provide the complete revised version.`;
   );
 }
 
+export const runtime = "edge";
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -412,155 +414,181 @@ export async function POST(
     const { model, stage, context, focus } = await request.json();
     const carId = params.id;
 
-    // Create EventSource response
-    const stream = new TransformStream();
-    const writer = stream.writable.getWriter();
-    const encoder = new TextEncoder();
+    // Create EventSource response with proper headers for Vercel
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const { db } = await connectToDatabase();
+          const car = await db
+            .collection("cars")
+            .findOne({ _id: new ObjectId(carId) });
 
-    const sendProgress = async (progress: any) => {
-      const event = {
-        type: "progress",
-        ...progress,
-      };
-      await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-    };
+          if (!car) {
+            controller.enqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: "Car not found",
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
 
-    // Start SSE response
-    const response = new Response(stream.readable, {
+          let metadata = await db
+            .collection("article_metadata")
+            .findOne({ carId });
+
+          if (!metadata) {
+            metadata = {
+              carId,
+              model,
+              stages: [],
+              currentStage: stage,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              isComplete: false,
+              sessionId: new ObjectId().toString(),
+            };
+          }
+
+          const sendProgress = async (progress: any) => {
+            const event = {
+              type: "progress",
+              ...progress,
+            };
+            controller.enqueue(
+              new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`)
+            );
+          };
+
+          let content;
+
+          if (!context) {
+            switch (stage) {
+              case "planning":
+                content = await generateArticlePlan(
+                  car,
+                  "",
+                  model,
+                  undefined,
+                  focus,
+                  sendProgress
+                );
+                break;
+              case "drafting":
+                const plan = metadata.stages.find(
+                  (s) => s.stage === "planning"
+                )?.content;
+                if (!plan) throw new Error("No planning stage found");
+                content = await generateDraft(
+                  plan,
+                  car,
+                  "",
+                  model,
+                  undefined,
+                  focus,
+                  sendProgress
+                );
+                break;
+              case "polishing":
+                const draft = metadata.stages.find(
+                  (s) => s.stage === "drafting"
+                )?.content;
+                if (!draft) throw new Error("No draft stage found");
+                content = await polishArticle(draft, model, sendProgress);
+                break;
+              default:
+                throw new Error("Invalid stage");
+            }
+          } else {
+            await sendProgress({
+              stage,
+              step: "revision",
+              message: "Processing revision request...",
+            });
+            const currentContent = metadata.stages.find(
+              (s) => s.stage === stage
+            )?.content;
+            if (!currentContent)
+              throw new Error("No content found for revision");
+            content = await reviseContent(
+              currentContent,
+              context,
+              model,
+              stage
+            );
+            await sendProgress({
+              stage,
+              step: "revision-complete",
+              message: "Revision completed",
+            });
+          }
+
+          if (!content) {
+            throw new Error("Failed to generate content");
+          }
+
+          // Update metadata
+          const stageIndex = metadata.stages.findIndex(
+            (s) => s.stage === stage
+          );
+          if (stageIndex >= 0) {
+            metadata.stages[stageIndex] = {
+              stage,
+              content,
+              timestamp: new Date(),
+            };
+          } else {
+            metadata.stages.push({ stage, content, timestamp: new Date() });
+          }
+
+          metadata.currentStage = stage;
+          metadata.updatedAt = new Date();
+          metadata.isComplete = stage === "polishing";
+
+          await db
+            .collection("article_metadata")
+            .updateOne({ carId }, { $set: metadata }, { upsert: true });
+
+          // Send completion event
+          controller.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({
+                type: "complete",
+                metadata,
+                message: `${stage} stage completed successfully`,
+              })}\n\n`
+            )
+          );
+
+          controller.close();
+        } catch (error) {
+          console.error("Error in article generation:", error);
+          controller.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({
+                type: "error",
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to generate article",
+              })}\n\n`
+            )
+          );
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       },
     });
-
-    // Process in background
-    (async () => {
-      try {
-        const { db } = await connectToDatabase();
-        const car = await db
-          .collection("cars")
-          .findOne({ _id: new ObjectId(carId) });
-
-        if (!car) {
-          throw new Error("Car not found");
-        }
-
-        let metadata = await db
-          .collection("article_metadata")
-          .findOne({ carId });
-
-        if (!metadata) {
-          metadata = {
-            carId,
-            model,
-            stages: [],
-            currentStage: stage,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isComplete: false,
-            sessionId: new ObjectId().toString(),
-          };
-        }
-
-        let content;
-
-        if (!context) {
-          switch (stage) {
-            case "planning":
-              content = await generateArticlePlan(
-                car,
-                "",
-                model,
-                undefined,
-                focus,
-                sendProgress
-              );
-              break;
-            case "drafting":
-              const plan = metadata.stages.find(
-                (s) => s.stage === "planning"
-              )?.content;
-              if (!plan) throw new Error("No planning stage found");
-              content = await generateDraft(
-                plan,
-                car,
-                "",
-                model,
-                undefined,
-                focus,
-                sendProgress
-              );
-              break;
-            case "polishing":
-              const draft = metadata.stages.find(
-                (s) => s.stage === "drafting"
-              )?.content;
-              if (!draft) throw new Error("No draft stage found");
-              content = await polishArticle(draft, model, sendProgress);
-              break;
-            default:
-              throw new Error("Invalid stage");
-          }
-        } else {
-          await sendProgress({
-            stage,
-            step: "revision",
-            message: "Processing revision request...",
-          });
-          const currentContent = metadata.stages.find(
-            (s) => s.stage === stage
-          )?.content;
-          if (!currentContent) throw new Error("No content found for revision");
-          content = await reviseContent(currentContent, context, model, stage);
-          await sendProgress({
-            stage,
-            step: "revision-complete",
-            message: "Revision completed",
-          });
-        }
-
-        if (!content) {
-          throw new Error("Failed to generate content");
-        }
-
-        // Update metadata
-        const stageIndex = metadata.stages.findIndex((s) => s.stage === stage);
-        if (stageIndex >= 0) {
-          metadata.stages[stageIndex] = {
-            stage,
-            content,
-            timestamp: new Date(),
-          };
-        } else {
-          metadata.stages.push({ stage, content, timestamp: new Date() });
-        }
-
-        metadata.currentStage = stage;
-        metadata.updatedAt = new Date();
-        metadata.isComplete = stage === "polishing";
-
-        await db
-          .collection("article_metadata")
-          .updateOne({ carId }, { $set: metadata }, { upsert: true });
-
-        await sendProgress({
-          type: "complete",
-          metadata,
-          message: `${stage} stage completed successfully`,
-        });
-      } catch (error) {
-        console.error("Error in article generation:", error);
-        await sendProgress({
-          type: "error",
-          error: error.message || "Failed to generate article",
-        });
-      } finally {
-        await writer.close();
-      }
-    })();
-
-    return response;
   } catch (error) {
     console.error("Error in article generation:", error);
     return NextResponse.json(
