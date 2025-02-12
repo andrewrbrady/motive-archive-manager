@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import type { ModelType } from "@/types/models";
 import Anthropic from "@anthropic-ai/sdk";
@@ -418,10 +416,30 @@ export async function POST(
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const { db } = await connectToDatabase();
-          const car = await db
-            .collection("cars")
-            .findOne({ _id: new ObjectId(carId) });
+          // Fetch car data from MongoDB Data API
+          const carResponse = await fetch(
+            `${process.env.MONGODB_DATA_API_URL}/action/findOne`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "api-key": process.env.MONGODB_DATA_API_KEY!,
+              },
+              body: JSON.stringify({
+                dataSource: process.env.MONGODB_DATA_SOURCE,
+                database: process.env.MONGODB_DATABASE,
+                collection: "cars",
+                filter: { _id: { $oid: carId } },
+              }),
+            }
+          );
+
+          if (!carResponse.ok) {
+            throw new Error("Failed to fetch car data");
+          }
+
+          const carData = await carResponse.json();
+          const car = carData.document;
 
           if (!car) {
             controller.enqueue(
@@ -436,9 +454,30 @@ export async function POST(
             return;
           }
 
-          let metadata = await db
-            .collection("article_metadata")
-            .findOne({ carId });
+          // Fetch metadata from MongoDB Data API
+          const metadataResponse = await fetch(
+            `${process.env.MONGODB_DATA_API_URL}/action/findOne`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "api-key": process.env.MONGODB_DATA_API_KEY!,
+              },
+              body: JSON.stringify({
+                dataSource: process.env.MONGODB_DATA_SOURCE,
+                database: process.env.MONGODB_DATABASE,
+                collection: "article_metadata",
+                filter: { carId },
+              }),
+            }
+          );
+
+          if (!metadataResponse.ok) {
+            throw new Error("Failed to fetch metadata");
+          }
+
+          const metadataData = await metadataResponse.json();
+          let metadata = metadataData.document;
 
           if (!metadata) {
             metadata = {
@@ -446,10 +485,10 @@ export async function POST(
               model,
               stages: [],
               currentStage: stage,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
               isComplete: false,
-              sessionId: new ObjectId().toString(),
+              sessionId: crypto.randomUUID(),
             };
           }
 
@@ -479,7 +518,7 @@ export async function POST(
                 break;
               case "drafting":
                 const plan = metadata.stages.find(
-                  (s) => s.stage === "planning"
+                  (s: any) => s.stage === "planning"
                 )?.content;
                 if (!plan) throw new Error("No planning stage found");
                 content = await generateDraft(
@@ -494,7 +533,7 @@ export async function POST(
                 break;
               case "polishing":
                 const draft = metadata.stages.find(
-                  (s) => s.stage === "drafting"
+                  (s: any) => s.stage === "drafting"
                 )?.content;
                 if (!draft) throw new Error("No draft stage found");
                 content = await polishArticle(draft, model, sendProgress);
@@ -509,7 +548,7 @@ export async function POST(
               message: "Processing revision request...",
             });
             const currentContent = metadata.stages.find(
-              (s) => s.stage === stage
+              (s: any) => s.stage === stage
             )?.content;
             if (!currentContent)
               throw new Error("No content found for revision");
@@ -532,25 +571,49 @@ export async function POST(
 
           // Update metadata
           const stageIndex = metadata.stages.findIndex(
-            (s) => s.stage === stage
+            (s: any) => s.stage === stage
           );
           if (stageIndex >= 0) {
             metadata.stages[stageIndex] = {
               stage,
               content,
-              timestamp: new Date(),
+              timestamp: new Date().toISOString(),
             };
           } else {
-            metadata.stages.push({ stage, content, timestamp: new Date() });
+            metadata.stages.push({
+              stage,
+              content,
+              timestamp: new Date().toISOString(),
+            });
           }
 
           metadata.currentStage = stage;
-          metadata.updatedAt = new Date();
+          metadata.updatedAt = new Date().toISOString();
           metadata.isComplete = stage === "polishing";
 
-          await db
-            .collection("article_metadata")
-            .updateOne({ carId }, { $set: metadata }, { upsert: true });
+          // Update metadata in MongoDB using Data API
+          const updateResponse = await fetch(
+            `${process.env.MONGODB_DATA_API_URL}/action/updateOne`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "api-key": process.env.MONGODB_DATA_API_KEY!,
+              },
+              body: JSON.stringify({
+                dataSource: process.env.MONGODB_DATA_SOURCE,
+                database: process.env.MONGODB_DATABASE,
+                collection: "article_metadata",
+                filter: { carId },
+                update: { $set: metadata },
+                upsert: true,
+              }),
+            }
+          );
+
+          if (!updateResponse.ok) {
+            throw new Error("Failed to update metadata");
+          }
 
           // Send completion event
           controller.enqueue(
