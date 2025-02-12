@@ -65,6 +65,11 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
   const [selectedSavedArticle, setSelectedSavedArticle] =
     useState<SavedArticle | null>(null);
   const [isFetchingSaved, setIsFetchingSaved] = useState(false);
+  const [progress, setProgress] = useState<{
+    stage: "planning" | "drafting" | "polishing";
+    step: string;
+    message: string;
+  } | null>(null);
 
   const stages = ["planning", "drafting", "polishing"] as const;
 
@@ -120,6 +125,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
   ) => {
     setIsGenerating(true);
     setError(null);
+    setProgress(null);
 
     try {
       const stage =
@@ -152,25 +158,63 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
         throw new Error(data.error || "Failed to generate article");
       }
 
-      const data = await response.json();
-      console.log("Article generation response:", data);
+      // Handle Server-Sent Events
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      if (!data.metadata || !data.metadata.stages) {
-        throw new Error("Invalid response format from server");
+      if (!reader) {
+        throw new Error("Failed to initialize stream reader");
       }
 
-      setMetadata(data.metadata);
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete events in the buffer
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep the last incomplete line in the buffer
+
+        for (const line of lines) {
+          if (line.trim() === "") continue;
+
+          if (line.startsWith("data: ")) {
+            try {
+              const jsonStr = line.slice(5).trim();
+              const data = JSON.parse(jsonStr);
+              console.log("Received SSE data:", data);
+
+              if (data.type === "error") {
+                setError(data.error);
+                setIsGenerating(false);
+                return;
+              }
+
+              if (data.type === "complete") {
+                setMetadata(data.metadata);
+                setProgress(null);
+                continue;
+              }
+
+              if (data.type === "progress") {
+                setProgress({
+                  stage: data.stage,
+                  step: data.step,
+                  message: data.message,
+                });
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e, "Line:", line);
+            }
+          }
+        }
+      }
+
       setRevisionContext("");
       setIsRevising(false);
-
-      const currentStageContent = data.metadata.stages.find(
-        (s: Stage) => s.stage === data.metadata.currentStage
-      );
-      console.log("Current stage content:", {
-        stage: data.metadata.currentStage,
-        hasContent: !!currentStageContent?.content,
-        contentLength: currentStageContent?.content?.length,
-      });
     } catch (err) {
       console.error("Article generation error:", err);
       setError(
@@ -180,6 +224,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
       );
     } finally {
       setIsGenerating(false);
+      setProgress(null);
     }
   };
 
@@ -380,6 +425,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
                 const isCurrentStage = metadata.currentStage === stage;
                 const isPastStage =
                   stages.indexOf(metadata.currentStage) > index;
+                const isActiveStage = progress?.stage === stage;
                 return (
                   <div
                     key={stage}
@@ -391,7 +437,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      {isGenerating && isCurrentStage ? (
+                      {isGenerating && isActiveStage ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <div
@@ -416,10 +462,11 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
                 );
               })}
             </div>
-            {isGenerating && (
-              <span className="text-sm text-text-secondary animate-pulse">
-                Generating {metadata.currentStage} content...
-              </span>
+            {isGenerating && progress && (
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{progress.message}</span>
+              </div>
             )}
           </div>
         </div>

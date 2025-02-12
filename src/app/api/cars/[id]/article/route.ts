@@ -213,8 +213,17 @@ async function generateArticlePlan(
   researchContent: string,
   model: ModelType,
   context?: string,
-  focus?: string
+  focus?: string,
+  onProgress?: (progress: any) => void
 ) {
+  const sendProgress = onProgress || (() => {});
+
+  sendProgress({
+    stage: "planning",
+    step: "analyzing",
+    message: "Analyzing vehicle data...",
+  });
+
   const prompt = context
     ? `Please revise the article plan based on this feedback: ${context}`
     : `Create a detailed article plan for a ${car.year} ${car.make} ${
@@ -223,49 +232,26 @@ async function generateArticlePlan(
         focus
           ? `\n\nThis article should focus specifically on ${focus}. The outline and content should primarily explore and analyze this aspect of the vehicle, only mentioning other aspects when they directly relate to ${focus}.`
           : ""
-      }
-    
-Car Details:
-${JSON.stringify(car, null, 2)}
+      }`;
 
-${
-  focus
-    ? `Please create a focused outline that thoroughly explores ${focus}:
-1. Introduction
-   - Brief overview of the vehicle
-   - Why ${focus} is significant for this model
-2. Historical Context of ${focus}
-   - Evolution and development
-   - Key influences and inspirations
-3. Detailed Analysis of ${focus}
-   - Key features and characteristics
-   - Technical aspects related to ${focus}
-4. Impact and Significance
-   - How ${focus} defines the vehicle
-   - Comparison with contemporaries
-5. Conclusion
-   - Legacy and influence of ${focus}
-
-For each section, provide 3-4 key points that specifically relate to ${focus}.`
-    : `Please create a comprehensive outline that covers:
-1. Introduction and overview
-2. Historical context and significance
-3. Design and exterior features
-4. Interior and comfort
-5. Engine and performance
-6. Driving experience and handling
-7. Technology and features
-8. Market position and value
-9. Conclusion
-
-For each section, provide 3-4 key points to be covered.`
-}`;
+  sendProgress({
+    stage: "planning",
+    step: "generating",
+    message: "Generating article outline...",
+  });
 
   const response = await makeAPIRequest(
     prompt,
     model,
     "You are a professional automotive journalist creating detailed article plans."
   );
+
+  sendProgress({
+    stage: "planning",
+    step: "complete",
+    message: "Article plan generated",
+  });
+
   return response;
 }
 
@@ -275,8 +261,17 @@ async function generateDraft(
   researchContent: string,
   model: ModelType,
   context?: string,
-  focus?: string
+  focus?: string,
+  onProgress?: (progress: any) => void
 ) {
+  const sendProgress = onProgress || (() => {});
+
+  sendProgress({
+    stage: "drafting",
+    step: "preparing",
+    message: "Preparing draft content...",
+  });
+
   const prompt = context
     ? `Please revise the article draft based on this feedback: ${context}`
     : `Write a comprehensive article draft following this outline:
@@ -287,48 +282,70 @@ Car Details:
 ${JSON.stringify(car, null, 2)}
 
 Research Content:
-${researchContent}
+${researchContent}`;
 
-${
-  focus
-    ? `Remember to maintain focus on ${focus} throughout the article. Only discuss other aspects of the vehicle when they directly relate to or influence ${focus}.`
-    : "Create a well-balanced article that covers all aspects outlined above."
-}
-
-Please write in a professional, journalistic style with clear section headings and engaging prose.`;
+  sendProgress({
+    stage: "drafting",
+    step: "writing",
+    message: "Writing article draft...",
+  });
 
   const response = await makeAPIRequest(
     prompt,
     model,
     "You are a professional automotive journalist writing detailed vehicle articles."
   );
+
+  sendProgress({
+    stage: "drafting",
+    step: "complete",
+    message: "Article draft completed",
+  });
+
   return response;
 }
 
 async function polishArticle(
   draft: string,
   model: ModelType,
-  context?: string
+  onProgress?: (progress: any) => void
 ) {
-  const prompt = context
-    ? `Please revise the article based on this feedback: ${context}`
-    : `Polish and enhance this article draft to create the final version:
+  const sendProgress = onProgress || (() => {});
 
-${draft}
+  sendProgress({
+    stage: "polishing",
+    step: "starting",
+    message: "Starting final polish...",
+  });
 
-Focus on:
-1. Improving flow and transitions
-2. Enhancing language and style
-3. Ensuring technical accuracy
-4. Adding engaging hooks and conclusions
-5. Maintaining consistent tone
-6. Optimizing readability`;
+  const prompt = `Please polish and refine this article draft, focusing on:
+1. Improving flow and readability
+2. Enhancing technical accuracy
+3. Adding engaging transitions
+4. Ensuring consistent tone
+5. Strengthening the introduction and conclusion
+
+Article Draft:
+${draft}`;
+
+  sendProgress({
+    stage: "polishing",
+    step: "refining",
+    message: "Refining article...",
+  });
 
   const response = await makeAPIRequest(
     prompt,
     model,
-    "You are a professional automotive journalist polishing articles to their final form."
+    "You are a professional automotive journalist polishing vehicle articles."
   );
+
+  sendProgress({
+    stage: "polishing",
+    step: "complete",
+    message: "Article polishing completed",
+  });
+
   return response;
 }
 
@@ -395,113 +412,155 @@ export async function POST(
     const { model, stage, context, focus } = await request.json();
     const carId = params.id;
 
-    if (!carId) {
-      return NextResponse.json(
-        { error: "Car ID is required" },
-        { status: 400 }
-      );
-    }
+    // Create EventSource response
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+    const encoder = new TextEncoder();
 
-    // Connect to MongoDB
-    const { db } = await connectToDatabase();
-
-    // Get car details
-    const car = await db
-      .collection("cars")
-      .findOne({ _id: new ObjectId(carId) });
-
-    if (!car) {
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
-    }
-
-    // Get existing article metadata
-    let metadata = await db.collection("article_metadata").findOne({ carId });
-
-    // Initialize metadata if it doesn't exist
-    if (!metadata) {
-      metadata = {
-        carId,
-        model,
-        stages: [],
-        currentStage: stage,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isComplete: false,
-        sessionId: new ObjectId().toString(),
+    const sendProgress = async (progress: any) => {
+      const event = {
+        type: "progress",
+        ...progress,
       };
-    }
+      await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    };
 
-    let content;
-
-    if (!context) {
-      // Generate new content
-      switch (stage) {
-        case "planning":
-          content = await generateArticlePlan(car, "", model, undefined, focus);
-          break;
-        case "drafting":
-          const plan = metadata.stages.find(
-            (s) => s.stage === "planning"
-          )?.content;
-          if (!plan) throw new Error("No planning stage found");
-          content = await generateDraft(plan, car, "", model, undefined, focus);
-          break;
-        case "polishing":
-          const draft = metadata.stages.find(
-            (s) => s.stage === "drafting"
-          )?.content;
-          if (!draft) throw new Error("No draft stage found");
-          content = await polishArticle(draft, model);
-          break;
-        default:
-          throw new Error("Invalid stage");
-      }
-    } else {
-      // Handle revision
-      const currentContent = metadata.stages.find(
-        (s) => s.stage === stage
-      )?.content;
-      if (!currentContent) throw new Error("No content found for revision");
-      content = await reviseContent(currentContent, context, model, stage);
-    }
-
-    if (!content) {
-      throw new Error("Failed to generate content");
-    }
-
-    // Update the stages array with the new content
-    const stageIndex = metadata.stages.findIndex((s) => s.stage === stage);
-    if (stageIndex >= 0) {
-      metadata.stages[stageIndex] = {
-        stage,
-        content,
-        timestamp: new Date(),
-      };
-    } else {
-      metadata.stages.push({
-        stage,
-        content,
-        timestamp: new Date(),
-      });
-    }
-
-    // Update metadata
-    metadata.currentStage = stage;
-    metadata.updatedAt = new Date();
-    metadata.isComplete = stage === "polishing";
-
-    // Save metadata to database
-    await db
-      .collection("article_metadata")
-      .updateOne({ carId }, { $set: metadata }, { upsert: true });
-
-    console.log("Returning metadata:", {
-      currentStage: metadata.currentStage,
-      stagesCount: metadata.stages.length,
-      hasContent: metadata.stages.some((s) => s.stage === stage),
+    // Start SSE response
+    const response = new Response(stream.readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
 
-    return NextResponse.json({ metadata });
+    // Process in background
+    (async () => {
+      try {
+        const { db } = await connectToDatabase();
+        const car = await db
+          .collection("cars")
+          .findOne({ _id: new ObjectId(carId) });
+
+        if (!car) {
+          throw new Error("Car not found");
+        }
+
+        let metadata = await db
+          .collection("article_metadata")
+          .findOne({ carId });
+
+        if (!metadata) {
+          metadata = {
+            carId,
+            model,
+            stages: [],
+            currentStage: stage,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isComplete: false,
+            sessionId: new ObjectId().toString(),
+          };
+        }
+
+        let content;
+
+        if (!context) {
+          switch (stage) {
+            case "planning":
+              content = await generateArticlePlan(
+                car,
+                "",
+                model,
+                undefined,
+                focus,
+                sendProgress
+              );
+              break;
+            case "drafting":
+              const plan = metadata.stages.find(
+                (s) => s.stage === "planning"
+              )?.content;
+              if (!plan) throw new Error("No planning stage found");
+              content = await generateDraft(
+                plan,
+                car,
+                "",
+                model,
+                undefined,
+                focus,
+                sendProgress
+              );
+              break;
+            case "polishing":
+              const draft = metadata.stages.find(
+                (s) => s.stage === "drafting"
+              )?.content;
+              if (!draft) throw new Error("No draft stage found");
+              content = await polishArticle(draft, model, sendProgress);
+              break;
+            default:
+              throw new Error("Invalid stage");
+          }
+        } else {
+          await sendProgress({
+            stage,
+            step: "revision",
+            message: "Processing revision request...",
+          });
+          const currentContent = metadata.stages.find(
+            (s) => s.stage === stage
+          )?.content;
+          if (!currentContent) throw new Error("No content found for revision");
+          content = await reviseContent(currentContent, context, model, stage);
+          await sendProgress({
+            stage,
+            step: "revision-complete",
+            message: "Revision completed",
+          });
+        }
+
+        if (!content) {
+          throw new Error("Failed to generate content");
+        }
+
+        // Update metadata
+        const stageIndex = metadata.stages.findIndex((s) => s.stage === stage);
+        if (stageIndex >= 0) {
+          metadata.stages[stageIndex] = {
+            stage,
+            content,
+            timestamp: new Date(),
+          };
+        } else {
+          metadata.stages.push({ stage, content, timestamp: new Date() });
+        }
+
+        metadata.currentStage = stage;
+        metadata.updatedAt = new Date();
+        metadata.isComplete = stage === "polishing";
+
+        await db
+          .collection("article_metadata")
+          .updateOne({ carId }, { $set: metadata }, { upsert: true });
+
+        await sendProgress({
+          type: "complete",
+          metadata,
+          message: `${stage} stage completed successfully`,
+        });
+      } catch (error) {
+        console.error("Error in article generation:", error);
+        await sendProgress({
+          type: "error",
+          error: error.message || "Failed to generate article",
+        });
+      } finally {
+        await writer.close();
+      }
+    })();
+
+    return response;
   } catch (error) {
     console.error("Error in article generation:", error);
     return NextResponse.json(

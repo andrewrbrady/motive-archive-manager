@@ -3,11 +3,24 @@ import { connectToDatabase } from "./mongodb";
 import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import { ModelType } from "@/components/ModelSelector";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
-// Create a rate limiter for OpenAI API calls
-// 20 requests per minute (more conservative to stay within free tier limits)
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Create rate limiters for API calls
+// 20 requests per minute for OpenAI (more conservative to stay within free tier limits)
 const openAILimiter = new RateLimiter({
   tokensPerInterval: 20,
+  interval: "minute",
+});
+
+// 3 requests per minute for Claude
+const claudeLimiter = new RateLimiter({
+  tokensPerInterval: 3,
   interval: "minute",
 });
 
@@ -31,16 +44,26 @@ const embeddings = new OpenAIEmbeddings({
   maxConcurrency: 5,
 });
 
+// Initialize Anthropic client
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
 // Helper function to handle rate limiting for OpenAI calls
-async function callWithRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+async function callWithRateLimit<T>(
+  fn: () => Promise<T>,
+  model: ModelType
+): Promise<T> {
+  const limiter =
+    model === "claude-3-5-sonnet-20241022" ? claudeLimiter : openAILimiter;
   try {
-    await openAILimiter.removeTokens(1);
+    await limiter.removeTokens(1);
     return await fn();
   } catch (error: any) {
     if (error.status === 429) {
       console.log("Rate limit hit, waiting before retry...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      return callWithRateLimit(fn);
+      return callWithRateLimit(fn, model);
     }
     throw error;
   }
@@ -91,8 +114,9 @@ async function semanticSearch(
     const { db } = await connectToDatabase();
 
     // Generate query embedding with rate limiting
-    const queryEmbedding = await callWithRateLimit(() =>
-      embeddings.embedQuery(query)
+    const queryEmbedding = await callWithRateLimit(
+      () => embeddings.embedQuery(query),
+      "gpt-4o-mini"
     );
 
     // Get all documents for this car
@@ -226,7 +250,10 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
       const subChunks = chunkContent(chunk, 6000);
       const embeddings = await Promise.all(
         subChunks.map((subChunk) =>
-          callWithRateLimit(() => embeddings.embedQuery(subChunk))
+          callWithRateLimit(
+            () => embeddings.embedQuery(subChunk),
+            "gpt-4o-mini"
+          )
         )
       );
 
@@ -241,7 +268,10 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
       return averageEmbedding;
     }
 
-    return await callWithRateLimit(() => embeddings.embedQuery(chunk));
+    return await callWithRateLimit(
+      () => embeddings.embedQuery(chunk),
+      "gpt-4o-mini"
+    );
   } catch (error) {
     console.error("Error generating embedding for chunk:", error);
     if (error.error?.message?.includes("maximum context length")) {
@@ -419,95 +449,55 @@ Answer:`;
 
     // Call API with rate limiting
     return await callWithRateLimit(async () => {
-      // Determine API configuration based on model
-      const isDeepSeek = model.startsWith("deepseek");
-      const isClaude = model.startsWith("claude");
+      if (model === "claude-3-5-sonnet-20241022") {
+        const response = await anthropic.messages.create({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 1000,
+          temperature: 0.7,
+          system:
+            "You are a helpful research assistant that provides clear, accurate answers based on the provided documents.",
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        });
 
-      const apiConfig = {
-        url: isDeepSeek
-          ? process.env.DEEPSEEK_API_URL || "https://api.deepseek.com"
-          : isClaude
-          ? process.env.CLAUDE_API_URL || "https://api.anthropic.com"
-          : "https://api.openai.com",
-        key: isDeepSeek
-          ? process.env.DEEPSEEK_API_KEY
-          : isClaude
-          ? process.env.ANTHROPIC_API_KEY
-          : process.env.OPENAI_API_KEY,
-      };
+        if (
+          !response.content ||
+          !response.content[0] ||
+          response.content[0].type !== "text"
+        ) {
+          throw new Error("Invalid response format from Claude");
+        }
 
-      const endpoint = isClaude ? "/v1/messages" : "/v1/chat/completions";
-
-      // Prepare the request body based on the API
-      const requestBody = isClaude
-        ? {
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1000,
-            system:
-              "You are a helpful research assistant that provides clear, accurate answers based on the provided documents.",
-            messages: [
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-          }
-        : {
-            model: model,
+        return response.content[0].text;
+      } else {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
             messages: [
               {
                 role: "system",
                 content:
                   "You are a helpful research assistant that provides clear, accurate answers based on the provided documents.",
               },
-              {
-                role: "user",
-                content: prompt,
-              },
+              { role: "user", content: prompt },
             ],
             temperature: 0.7,
             max_tokens: 1000,
-          };
+          });
 
-      const response = await fetch(apiConfig.url + endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(isClaude
-            ? {
-                "x-api-key": apiConfig.key,
-                "anthropic-version": "2023-06-01",
-              }
-            : {
-                Authorization: `Bearer ${apiConfig.key}`,
-              }),
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error(
-          `${
-            isDeepSeek ? "DeepSeek" : isClaude ? "Claude" : "OpenAI"
-          } API Error:`,
-          {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData,
-          }
-        );
-
-        if (response.status === 429) {
-          throw new Error("Rate limit exceeded");
+          return (
+            completion.choices[0].message.content || "No response generated"
+          );
+        } catch (error) {
+          console.error("OpenAI API Error:", error);
+          throw error;
         }
-
-        throw new Error(`Failed to generate answer: ${response.statusText}`);
       }
-
-      const data = await response.json();
-      return isClaude ? data.content[0].text : data.choices[0].message.content;
-    });
+    }, model);
   } catch (error) {
     console.error("Error generating answer:", error);
     if (error.message === "Rate limit exceeded") {
@@ -577,8 +567,9 @@ export async function hybridSearch(
     }
 
     // Process semantic search in batches
-    const queryEmbedding = await callWithRateLimit(() =>
-      embeddings.embedQuery(query)
+    const queryEmbedding = await callWithRateLimit(
+      () => embeddings.embedQuery(query),
+      "gpt-4o-mini"
     );
 
     const semanticResults: SearchResult[] = [];
@@ -699,5 +690,82 @@ export async function prepareResearchContent(
   } catch (error) {
     console.error("Error preparing research content:", error);
     throw error;
+  }
+}
+
+// Helper function to join chunks while preserving structure
+function joinChunks(chunks: string[]): string {
+  return chunks.join("\n\n");
+}
+
+async function makeAPIRequest(
+  prompt: string,
+  model: ModelType,
+  systemPrompt: string
+) {
+  const isClaude = model === "claude-3-5-sonnet-20241022";
+
+  // Estimate tokens and chunk if necessary
+  const estimatedPromptTokens = estimateTokens(prompt);
+  const maxPromptTokens = isClaude ? 12000 : 20000;
+  const maxResponseTokens = isClaude ? 4096 : 12000;
+
+  let processedPrompt = prompt;
+  if (estimatedPromptTokens > maxPromptTokens) {
+    console.log(
+      `Chunking content: ${estimatedPromptTokens} tokens -> ${maxPromptTokens} max`
+    );
+    const chunks = chunkContent(prompt, maxPromptTokens);
+    processedPrompt = joinChunks(chunks);
+  }
+
+  if (isClaude) {
+    try {
+      const response = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: maxResponseTokens,
+        temperature: 0.7,
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: processedPrompt,
+          },
+        ],
+      });
+
+      if (
+        !response.content ||
+        !response.content[0] ||
+        response.content[0].type !== "text"
+      ) {
+        throw new Error("Invalid response format from Claude");
+      }
+
+      return response.content[0].text;
+    } catch (error) {
+      console.error("Claude API Error:", error);
+      throw error;
+    }
+  } else {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          { role: "user", content: processedPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: maxResponseTokens,
+      });
+
+      return completion.choices[0].message.content || "No response generated";
+    } catch (error) {
+      console.error("OpenAI API Error:", error);
+      throw error;
+    }
   }
 }
