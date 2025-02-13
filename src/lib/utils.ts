@@ -33,24 +33,36 @@ export function getApiUrl(path: string): string {
 
   // Special handling for OpenAI endpoint
   if (cleanPath === "openai") {
+    console.log("[DEBUG] getApiUrl - Constructing OpenAI endpoint");
     const endpoint = process.env.OPENAI_API_ENDPOINT;
+
     if (!endpoint) {
+      console.error("[ERROR] getApiUrl - OPENAI_API_ENDPOINT is not defined");
       throw new Error("OPENAI_API_ENDPOINT is not defined");
     }
+
+    console.log("[DEBUG] getApiUrl - OpenAI endpoint:", {
+      raw: endpoint,
+      cleaned: endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint,
+    });
+
     // Ensure the endpoint doesn't end with a slash
     return endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
   }
 
   // In development
   if (process.env.NODE_ENV === "development") {
+    console.log("[DEBUG] getApiUrl - Development environment");
     return `http://localhost:3000/api/${cleanPath}`;
   }
 
   // In production
   if (isBrowser) {
+    console.log("[DEBUG] getApiUrl - Browser environment");
     // Client-side: use relative URL
     return `/api/${cleanPath}`;
   } else {
+    console.log("[DEBUG] getApiUrl - Server environment");
     // Server-side: construct absolute URL
     let baseUrl = "";
 
@@ -65,12 +77,19 @@ export function getApiUrl(path: string): string {
         baseUrl = baseUrl.replace(/^http:/, "https:");
       }
     } else {
+      console.error(
+        "[ERROR] getApiUrl - No base URL configured for production"
+      );
       throw new Error("No base URL configured for production environment");
     }
 
     // Ensure baseUrl doesn't end with a slash
     baseUrl = baseUrl.replace(/\/$/, "");
 
+    console.log(
+      "[DEBUG] getApiUrl - Constructed URL:",
+      `${baseUrl}/api/${cleanPath}`
+    );
     return `${baseUrl}/api/${cleanPath}`;
   }
 }
