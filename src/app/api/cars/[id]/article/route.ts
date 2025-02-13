@@ -442,15 +442,24 @@ export async function POST(
       try {
         console.log("[DEBUG] GET - Fetching car with ID:", carId);
         const { db } = await connectToDatabase();
+        console.log("[DEBUG] MongoDB Connection established");
+
         const car = await db
           .collection("cars")
           .findOne({ _id: new ObjectId(carId) });
 
         if (!car) {
+          console.log("[DEBUG] Car not found:", carId);
           throw new Error(`Car not found with ID: ${carId}`);
         }
 
-        console.log("[DEBUG] GET - Initial car data:", car);
+        console.log("[DEBUG] GET - Initial car data:", {
+          _id: car._id.toString(),
+          client: car.client?.toString(),
+          hasClientId: !!car.client,
+          env: process.env.NODE_ENV,
+          mongoDbUri: process.env.MONGODB_URI ? "Set" : "Not Set",
+        });
 
         // Fetch client info if client ID exists
         if (car.client) {
@@ -460,22 +469,39 @@ export async function POST(
             "client ID:",
             car.client
           );
-          const clientInfo = await db
-            .collection("clients")
-            .findOne({ _id: new ObjectId(car.client.toString()) });
 
-          if (clientInfo) {
-            console.log("[DEBUG] GET - Found client document:", clientInfo);
-            car.clientInfo = {
-              _id: clientInfo._id.toString(),
-              name: clientInfo.name,
-              email: clientInfo.email || "",
-              phone: clientInfo.phone || "",
-              address: clientInfo.address || "",
-            };
-            console.log("[DEBUG] GET - Updated car with client info:", car);
-          } else {
-            console.warn("[WARN] Client not found for ID:", car.client);
+          try {
+            const clientInfo = await db
+              .collection("clients")
+              .findOne({ _id: new ObjectId(car.client.toString()) });
+
+            console.log("[DEBUG] GET - Client query result:", {
+              found: !!clientInfo,
+              clientId: car.client.toString(),
+              fields: clientInfo ? Object.keys(clientInfo) : null,
+            });
+
+            if (clientInfo) {
+              console.log("[DEBUG] GET - Found client document:", {
+                _id: clientInfo._id.toString(),
+                name: clientInfo.name,
+                hasEmail: !!clientInfo.email,
+                hasPhone: !!clientInfo.phone,
+              });
+              car.clientInfo = {
+                _id: clientInfo._id.toString(),
+                name: clientInfo.name,
+                email: clientInfo.email || "",
+                phone: clientInfo.phone || "",
+                address: clientInfo.address || "",
+              };
+              console.log("[DEBUG] GET - Updated car with client info:", car);
+            } else {
+              console.warn("[WARN] Client not found for ID:", car.client);
+            }
+          } catch (error) {
+            console.error("Error fetching client info:", error);
+            throw error;
           }
         }
 
