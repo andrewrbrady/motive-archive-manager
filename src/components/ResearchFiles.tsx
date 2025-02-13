@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { FileText, Trash2, Upload } from "lucide-react";
+import { FileText, Trash2, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import MarkdownViewer from "./MarkdownViewer";
+import { ModelSelector, ModelType } from "@/components/ModelSelector";
 
 interface ResearchFile {
   _id: string;
@@ -34,6 +35,21 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     [key: string]: number;
   }>({});
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<
+    Array<{
+      content: string;
+      metadata: {
+        fileId: string;
+        fileName: string;
+        matchType: "keyword" | "semantic" | "both";
+        score: number;
+      };
+    }>
+  >([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchAnswer, setSearchAnswer] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelType>("gpt-4o-mini");
 
   useEffect(() => {
     fetchFiles();
@@ -231,10 +247,130 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    setError(null);
+    setSearchAnswer(null);
+
+    try {
+      const response = await fetch(
+        `/api/cars/${carId}/research/search?q=${encodeURIComponent(
+          searchQuery
+        )}&model=${selectedModel}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to search research content");
+      }
+
+      const data = await response.json();
+      setSearchResults(data.results);
+      setSearchAnswer(data.answer || null);
+    } catch (error) {
+      console.error("Error searching research:", error);
+      setError("Failed to search research content");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-4">
+          <div className="rounded-lg border border-border-primary">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold leading-none tracking-tight text-text-primary">
+                  Search Research
+                </h3>
+              </div>
+              <form onSubmit={handleSearch} className="space-y-4">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search research files..."
+                  className="w-full bg-background text-text-primary border border-border-primary rounded-md px-3 py-2 placeholder:text-text-tertiary"
+                />
+                <ModelSelector
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  className="pt-2"
+                />
+                <Button
+                  type="submit"
+                  disabled={isSearching || !searchQuery.trim()}
+                  className="w-full"
+                >
+                  {isSearching ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    "Search"
+                  )}
+                </Button>
+              </form>
+            </div>
+          </div>
+
+          {searchResults.length > 0 && (
+            <div className="rounded-lg border border-border-primary">
+              <div className="p-6">
+                <h3 className="text-lg font-semibold leading-none tracking-tight text-text-primary mb-4">
+                  Search Results
+                </h3>
+
+                {searchAnswer && (
+                  <div className="mb-6 p-4 bg-background-secondary rounded-lg">
+                    <h4 className="text-sm font-medium text-text-secondary mb-2">
+                      AI-Generated Answer:
+                    </h4>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      {searchAnswer.split("\n").map((paragraph, index) => (
+                        <p key={index} className="text-text-primary">
+                          {paragraph}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {searchResults.map((result, index) => (
+                    <div
+                      key={`${result.metadata.fileId}-${index}`}
+                      className="p-4 rounded-lg bg-background-secondary hover:bg-background-tertiary transition-colors cursor-pointer"
+                      onClick={() => {
+                        const file = files.find(
+                          (f) => f._id === result.metadata.fileId
+                        );
+                        if (file) handleFileClick(file);
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-text-primary">
+                          {result.metadata.fileName}
+                        </span>
+                        <span className="text-xs text-text-tertiary">
+                          Match: {result.metadata.matchType}
+                        </span>
+                      </div>
+                      <p className="text-sm text-text-secondary line-clamp-3">
+                        {result.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-lg border border-zinc-800">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">

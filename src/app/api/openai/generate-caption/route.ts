@@ -187,7 +187,7 @@ ${promptInstructions}`,
     // Regular caption generation (including dealer template)
     const response = await anthropic.messages.create({
       model: "claude-3-5-sonnet-20241022",
-      max_tokens: 500,
+      max_tokens: 1000,
       temperature: temperature || 1.0,
       system: `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
 

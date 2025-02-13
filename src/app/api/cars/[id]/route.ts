@@ -92,9 +92,15 @@ export async function GET(
     }
 
     console.error("[DEBUG] GET - Initial car data:", {
-      _id: car._id,
-      client: car.client,
-      clientInfo: car.clientInfo,
+      _id: car._id.toString(),
+      client: car.client ? car.client.toString() : undefined,
+      clientInfo: car.clientInfo || {
+        _id: "",
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+      },
     });
 
     // If the car has a client field, populate the client information
@@ -103,18 +109,16 @@ export async function GET(
         `[DEBUG] GET - Fetching client info for car ${id}, client ID: ${car.client}`
       );
       const clientDoc = await db.collection("clients").findOne({
-        _id: new ObjectId(car.client),
+        _id: new ObjectId(car.client.toString()),
       });
-
-      console.error("[DEBUG] GET - Found client document:", clientDoc);
 
       if (clientDoc) {
         car.clientInfo = {
           _id: clientDoc._id.toString(),
-          name: clientDoc.name,
-          email: clientDoc.email,
-          phone: clientDoc.phone,
-          address: clientDoc.address,
+          name: clientDoc.name || "",
+          email: clientDoc.email || "",
+          phone: clientDoc.phone || "",
+          address: clientDoc.address || "",
         };
         console.error(
           "[DEBUG] GET - Updated car with client info:",

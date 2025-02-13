@@ -17,6 +17,10 @@ import BaTListingGenerator from "@/components/BaTListingGenerator";
 import { toast } from "react-hot-toast";
 import ResearchFiles from "@/components/ResearchFiles";
 import Specifications from "@/components/cars/Specifications";
+import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ImageGalleryEnhanced } from "@/components/cars/ImageGalleryEnhanced";
+import type { Car as BaseCar, CarImage, Engine } from "@/types/car";
 
 interface MeasurementValue {
   value: number | null;
@@ -34,12 +38,79 @@ interface Torque {
   Nm: number;
 }
 
-interface Engine {
-  type: string;
-  displacement?: MeasurementValue;
-  power?: Power;
-  torque?: Torque;
-  features?: string[];
+interface ApiCarResponse {
+  _id?: string;
+  make: string;
+  model: string;
+  year: number;
+  price: string | number;
+  mileage?: {
+    value: number;
+    unit: string;
+  };
+  color?: string;
+  interior_color?: string;
+  vin?: string;
+  status?: "available" | "sold" | "pending";
+  condition?: string;
+  location?: string;
+  description?: string;
+  type?: string;
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+    configuration?: string;
+    cylinders?: number;
+    fuelType?: string;
+    manufacturer?: string;
+  };
+  images?: CarImage[];
+  client?: string;
+  clientInfo?: any;
+  manufacturing?: any;
+  dimensions?: any;
+  safety?: any;
+  doors?: number;
+  interior_features?: any;
+  transmission?: {
+    type: string;
+  };
+  performance?: any;
+  aiAnalysis?: any;
+}
+
+interface ExtendedCar extends BaseCar {
+  images?: CarImage[];
+  clientInfo?: {
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    company?: string;
+    role?: string;
+    [key: string]: string | undefined;
+  } | null;
+  interior_features?: {
+    seats?: number;
+    upholstery?: string;
+  };
+  performance?: {
+    "0_to_60_mph"?: MeasurementValue;
+    top_speed?: MeasurementValue;
+  };
 }
 
 interface Dimensions {
@@ -88,55 +159,6 @@ interface ImageVariants {
   [key: string]: string;
 }
 
-interface Car {
-  _id: string;
-  make: string;
-  model: string;
-  year: number;
-  mileage: MeasurementValue;
-  color: string | null;
-  dealer: string | null;
-  description: string | null;
-  price: number | string | null;
-  horsepower: number;
-  condition: string | null;
-  location: string;
-  type?: string;
-  vin?: string;
-  images: {
-    id: string;
-    url: string;
-    filename: string;
-    metadata: ImageMetadata;
-    variants: ImageVariants;
-    createdAt: string;
-    updatedAt: string;
-  }[];
-  owner_id?: string;
-  engine?: Engine;
-  client?: string;
-  clientInfo?: {
-    _id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    company?: string;
-    role?: string;
-    [key: string]: string | undefined;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-  status?: "available" | "sold" | "pending";
-  dimensions?: Dimensions;
-  fuel_capacity?: MeasurementValue;
-  interior_features?: InteriorFeatures;
-  interior_color?: string;
-  performance?: Performance;
-  transmission?: Transmission;
-  weight?: Weight;
-}
-
 interface UploadedImageData {
   id: string;
   url: string;
@@ -158,7 +180,7 @@ interface UploadProgress {
 interface EditableSpecs
   extends Partial<
     Omit<
-      Car,
+      ExtendedCar,
       | "dimensions"
       | "performance"
       | "weight"
@@ -173,13 +195,69 @@ interface EditableSpecs
   interior_features?: Partial<InteriorFeatures>;
 }
 
+interface BaTCarDetails {
+  _id: string;
+  year: number;
+  make: string;
+  model: string;
+  color?: string;
+  mileage?: {
+    value: number;
+    unit: string;
+  };
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp?: number;
+    };
+  };
+  transmission: {
+    type: string;
+  };
+  vin?: string;
+  condition?: string;
+  interior_color?: string;
+  interior_features?: {
+    seats: number;
+    upholstery?: string;
+  };
+  description?: string;
+}
+
+interface CarFormData {
+  make: string;
+  model: string;
+  year: number;
+  price: number;
+  mileage: MeasurementValue;
+  color: string;
+  interior_color: string;
+  vin: string;
+  status: "available" | "sold" | "pending";
+  condition: string;
+  location: string;
+  description: string;
+  type: string;
+  client?: string;
+  engine: Engine;
+  transmission: {
+    type: string;
+  };
+  // ... other fields from BaseCar
+}
+
 export default function CarPage() {
   const { id } = useParams() as { id: string };
-  const [car, setCar] = useState<Car | null>(null);
+  const [car, setCar] = useState<ExtendedCar | null>(null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSpecsEditMode, setIsSpecsEditMode] = useState(false);
+  const [isSpecsSaving, setIsSpecsSaving] = useState(false);
   const [editedSpecs, setEditedSpecs] = useState<EditableSpecs>({});
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
@@ -270,61 +348,24 @@ export default function CarPage() {
 
   // Helper function to handle input changes
   const handleInputChange = (
-    field: keyof EditableSpecs,
-    value: string | number | { [key: string]: number | string | null },
+    field: string,
+    value: any,
     nestedField?: string
   ): void => {
-    console.error("[DEBUG] handleInputChange called with:", {
-      field,
-      value,
-      nestedField,
-    });
-    let newValue:
-      | string
-      | number
-      | { [key: string]: number | string | null }
-      | null = value;
-
-    // Handle number fields
-    if (
-      field === "year" ||
-      field === "mileage" ||
-      field === "price" ||
-      (field === "interior_features" && nestedField === "seats")
-    ) {
-      newValue = value
-        ? parseInt(value.toString())
-        : field === "price"
-        ? null
-        : 0;
-    }
-
-    // Update the editedSpecs state
-    setEditedSpecs((prev: EditableSpecs) => {
-      // Handle nested fields
-      if (nestedField && isNestedField(field)) {
-        const existingFieldValue = (prev[field] || {}) as Record<
-          string,
-          unknown
-        >;
-        const newSpecs = {
+    setEditedSpecs((prev) => {
+      if (nestedField) {
+        return {
           ...prev,
           [field]: {
-            ...existingFieldValue,
-            [nestedField]: newValue,
+            ...prev[field],
+            [nestedField]: value,
           },
         };
-        console.error("[DEBUG] Updated editedSpecs (nested):", newSpecs);
-        return newSpecs;
       }
-
-      // Handle top-level fields
-      const newSpecs = {
+      return {
         ...prev,
-        [field]: newValue,
+        [field]: value,
       };
-      console.error("[DEBUG] Updated editedSpecs (top-level):", newSpecs);
-      return newSpecs;
     });
   };
 
@@ -431,29 +472,163 @@ export default function CarPage() {
   }, [isEditMode, id]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCar = async () => {
       try {
-        setLoading(true);
         const response = await fetch(`/api/cars/${id}`);
-        const data = await response.json();
-        console.log("Fetched car data:", JSON.stringify(data, null, 2));
-        setCar(data);
+        const apiData: ApiCarResponse = await response.json();
+
+        // Transform the API response to match our UI requirements
+        const carData: ExtendedCar = {
+          _id: apiData._id || id,
+          make: apiData.make || "",
+          model: apiData.model || "",
+          year: apiData.year || new Date().getFullYear(),
+          price:
+            typeof apiData.price === "string"
+              ? parseFloat(apiData.price)
+              : apiData.price || 0,
+          mileage: apiData.mileage || { value: 0, unit: "mi" },
+          color: apiData.color || "",
+          interior_color: apiData.interior_color || "",
+          vin: apiData.vin || "",
+          status: apiData.status || "available",
+          condition: apiData.condition || "",
+          location: apiData.location || "",
+          description: apiData.description || "",
+          type: apiData.type || "",
+          client: apiData.client || "",
+          clientInfo: apiData.clientInfo || null,
+          // Preserve engine data exactly as received
+          engine: {
+            type: apiData.engine?.type || "Unknown",
+            displacement: apiData.engine?.displacement || {
+              value: 0,
+              unit: "L",
+            },
+            power: apiData.engine?.power || { hp: 0, kW: 0, ps: 0 },
+            torque: apiData.engine?.torque || { "lb-ft": 0, Nm: 0 },
+            features: apiData.engine?.features || [],
+            configuration: apiData.engine?.configuration,
+            cylinders: apiData.engine?.cylinders,
+            fuelType: apiData.engine?.fuelType,
+            manufacturer: apiData.engine?.manufacturer,
+          },
+          // Preserve manufacturing data
+          manufacturing: apiData.manufacturing || {},
+          // Preserve dimensions data
+          dimensions: apiData.dimensions || {},
+          // Preserve safety data
+          safety: apiData.safety || {},
+          // Preserve doors
+          doors: apiData.doors,
+          // Preserve interior features
+          interior_features: apiData.interior_features || {
+            seats: 0,
+            upholstery: "",
+          },
+          // Preserve transmission
+          transmission: apiData.transmission || { type: "" },
+          // Preserve performance data
+          performance: apiData.performance || {
+            "0_to_60_mph": null,
+            top_speed: null,
+          },
+          // Preserve AI analysis
+          aiAnalysis: apiData.aiAnalysis || {},
+          // Images
+          imageIds: apiData.images?.map((img) => img.id) || [],
+          images: apiData.images || [],
+        };
+
+        setCar(carData);
+        setLoading(false);
 
         // Fetch documents
         const docsResponse = await fetch(`/api/cars/${id}/documents`);
         const docsData = await docsResponse.json();
         setDocuments(docsData);
       } catch (error) {
-        console.error("Error fetching car data:", error);
-      } finally {
+        console.error("Error fetching car:", error);
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchData();
-    }
+    fetchCar();
   }, [id]);
+
+  // Helper function to convert ExtendedCar to CarFormData
+  const toCarFormData = (car: ExtendedCar): CarFormData => {
+    return {
+      ...car,
+      price: typeof car.price === "string" ? parseFloat(car.price) : car.price,
+      mileage: car.mileage,
+      color: car.color,
+      interior_color: car.interior_color,
+      vin: car.vin,
+      status: car.status,
+      condition: car.condition,
+      location: car.location,
+      description: car.description,
+      type: car.type,
+      client: car.client,
+      engine: car.engine,
+      transmission: {
+        type: car.transmission?.type || "N/A",
+      },
+      // Add any other necessary transformations
+    };
+  };
+
+  // Helper function to convert CarFormData back to ExtendedCar format
+  const fromCarFormData = (
+    formData: Partial<CarFormData>
+  ): Partial<ExtendedCar> => {
+    return {
+      ...formData,
+      price: formData.price ? Number(formData.price) : undefined,
+      mileage: formData.mileage,
+      color: formData.color,
+      interior_color: formData.interior_color,
+      vin: formData.vin,
+      status: formData.status,
+      condition: formData.condition,
+      location: formData.location,
+      description: formData.description,
+      type: formData.type,
+      client: formData.client,
+      engine: formData.engine,
+      transmission: {
+        type: formData.transmission?.type || "N/A",
+      },
+      // Add any other necessary transformations
+    };
+  };
+
+  // Helper function to convert Car type to BaTCarDetails type for BaTListingGenerator
+  const toBaTCarDetails = (car: ExtendedCar): BaTCarDetails => {
+    return {
+      _id: car._id,
+      year: car.year,
+      make: car.make,
+      model: car.model,
+      color: car.color,
+      mileage: car.mileage,
+      engine: {
+        type: car.engine?.type,
+        displacement: car.engine?.displacement,
+        power: {
+          hp: car.engine?.power?.hp,
+        },
+      },
+      transmission: {
+        type: car.transmission?.type || "Unknown", // Ensure type is always provided
+      },
+      vin: car.vin,
+      condition: car.condition,
+      interior_color: car.interior_color,
+      description: car.description,
+    };
+  };
 
   const handleImageUpload = async (files: FileList) => {
     if (!car) return;
@@ -844,40 +1019,34 @@ export default function CarPage() {
     }
   };
 
-  const handleSpecsEdit = async () => {
+  const handleSpecsEdit = async (editedSpecs: Partial<CarFormData>) => {
     if (!car || !isSpecsEditMode) return;
 
     try {
-      console.error("[DEBUG] Saving specs - editedSpecs:", editedSpecs);
+      setIsSpecsSaving(true);
+      const transformedSpecs = fromCarFormData(editedSpecs);
+
       const response = await fetch(`/api/cars/${car._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(editedSpecs),
+        body: JSON.stringify(transformedSpecs),
       });
 
-      const data = await response.json();
-      console.error("[DEBUG] PATCH response:", data);
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to update specifications");
+        throw new Error("Failed to update car specifications");
       }
 
-      // Fetch the updated car data to ensure we have the complete and correct state
-      const updatedCarResponse = await fetch(`/api/cars/${car._id}`);
-      if (!updatedCarResponse.ok) {
-        throw new Error("Failed to fetch updated car data");
-      }
-      const updatedCar = await updatedCarResponse.json();
-      console.error("[DEBUG] GET response after update:", updatedCar);
+      const updatedCar = await response.json();
       setCar(updatedCar);
-
-      // Reset edit mode and clear edited specs
       setIsSpecsEditMode(false);
-      setEditedSpecs({});
+      toast.success("Car specifications updated successfully");
     } catch (error) {
-      console.error("Error updating specifications:", error);
+      console.error("Error updating car specifications:", error);
+      toast.error("Failed to update car specifications");
+    } finally {
+      setIsSpecsSaving(false);
     }
   };
 
@@ -936,133 +1105,107 @@ export default function CarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#111111] flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
       <Navbar />
-      <main className="container mx-auto px-4 py-8 flex-grow">
-        {/* Header */}
-        <div className="mb-4">
-          <PageTitle title={`${car.year} ${car.make} ${car.model}`}>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700"
-              >
-                <Pencil className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleDelete}
-                className="p-2 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
-          </PageTitle>
-        </div>
-
-        {/* Replace both the context input and image gallery with the new component */}
-        <div className="mb-6">
-          <ImageUploadWithContext
-            images={car.images}
-            isEditMode={isEditMode}
-            onRemoveImage={handleRemoveImage}
-            onImagesChange={handleImageUpload}
-            uploading={uploadingImages}
-            uploadProgress={uploadProgress}
-            setUploadProgress={setUploadProgress}
-            showMetadata={true}
+      <main className="container mx-auto px-4 py-8">
+        <div className="space-y-6">
+          <PageTitle
             title={`${car.year} ${car.make} ${car.model}`}
-            onContextChange={setAdditionalContext}
-            carId={id}
+            className="mb-6"
           />
-        </div>
 
-        {/* Add CaptionGenerator after the image gallery */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <CaptionGenerator
-            carDetails={{
-              _id: car._id,
-              year: car.year,
-              make: car.make,
-              model: car.model,
-              color: car.color,
-              engine: car.engine,
-              mileage: car.mileage
-                ? { value: car.mileage.value, unit: car.mileage.unit }
-                : undefined,
-              type: car.type,
-              client: car.client,
-              description: car.description,
-            }}
-          />
-          <BaTListingGenerator carDetails={car} />
-        </div>
+          <Tabs defaultValue="gallery" className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="gallery">Image Gallery</TabsTrigger>
+              <TabsTrigger value="specs">Specifications</TabsTrigger>
+              <TabsTrigger value="bat">BaT Listing</TabsTrigger>
+              <TabsTrigger value="captions">Social Media</TabsTrigger>
+              <TabsTrigger value="service">Service History</TabsTrigger>
+              <TabsTrigger value="research">Research</TabsTrigger>
+              <TabsTrigger value="article">Article</TabsTrigger>
+            </TabsList>
 
-        {/* Vehicle Information */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <div>
-            <Specifications
-              car={car}
-              isEditMode={isSpecsEditMode}
-              onEdit={() => setIsSpecsEditMode(true)}
-              onSave={handleSpecsEdit}
-              onCancel={() => {
-                setIsSpecsEditMode(false);
-                setEditedSpecs({});
-              }}
-              onEnrich={handleEnrichData}
-              isEnriching={isEnriching}
-              editedSpecs={editedSpecs}
-              onInputChange={handleInputChange}
-              onMeasurementChange={handleMeasurementChange}
-            />
-          </div>
-        </div>
+            <TabsContent value="gallery">
+              {car.images && car.images.length > 0 ? (
+                <ImageGalleryEnhanced images={car.images} />
+              ) : (
+                <ImageUploadWithContext
+                  images={car.images || []}
+                  isEditMode={isEditMode}
+                  onRemoveImage={handleRemoveImage}
+                  onImagesChange={handleImageUpload}
+                  uploading={uploadingImages}
+                  uploadProgress={uploadProgress}
+                  setUploadProgress={setUploadProgress}
+                  showMetadata={true}
+                  showFilters={false}
+                  title={`${car.year} ${car.make} ${car.model}`}
+                  onContextChange={setAdditionalContext}
+                  carId={car._id}
+                />
+              )}
+            </TabsContent>
 
-        {/* Car Details */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            {car.description && (
-              <section className="space-y-4">
-                <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600 dark:text-gray-400">
-                  Description
-                </h2>
-                <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-                  <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                    {car.description}
-                  </p>
-                </div>
-              </section>
-            )}
-          </div>
-        </div>
+            <TabsContent value="specs">
+              <Specifications
+                car={toCarFormData(car)}
+                isEditMode={isSpecsEditMode}
+                onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
+                onSave={handleSpecsEdit}
+                editedSpecs={editedSpecs}
+                onInputChange={(field, value, nestedField) =>
+                  handleInputChange(field, value, nestedField)
+                }
+                onMeasurementChange={handleMeasurementChange}
+                onPowerChange={handlePowerChange}
+                onTorqueChange={handleTorqueChange}
+                onEnrich={handleEnrichData}
+                isEnriching={isEnriching}
+              />
+            </TabsContent>
 
-        {/* Service History */}
-        <div className="mt-8">
-          <section>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-sm uppercase tracking-wide font-medium text-gray-600 dark:text-gray-400">
-                Service History
-              </h2>
-              <button
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700"
-                aria-label="Add document"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="bg-white dark:bg-black/25 border border-gray-200 dark:border-gray-800 rounded-lg">
-              <DocumentsClient carId={id} initialDocuments={documents} />
-            </div>
-          </section>
-        </div>
+            <TabsContent value="bat">
+              <BaTListingGenerator carDetails={toBaTCarDetails(car)} />
+            </TabsContent>
 
-        {/* Add this section after the existing tabs */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Research</h2>
-          <ResearchFiles carId={id} />
+            <TabsContent value="captions">
+              <CaptionGenerator
+                carDetails={{
+                  _id: car._id,
+                  year: car.year,
+                  make: car.make,
+                  model: car.model,
+                  color: car.color,
+                  engine: car.engine,
+                  mileage: car.mileage,
+                  type: car.type,
+                  client: car.client,
+                  description: car.description || "",
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="service">
+              <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+                <h3 className="text-lg font-medium mb-4">Service History</h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Service history feature coming soon...
+                </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="research">
+              <ResearchFiles carId={car._id} />
+            </TabsContent>
+
+            <TabsContent value="article">
+              <ArticleGenerator car={car} />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
       <Footer />
+
       <EnrichmentProgress
         isVisible={showEnrichProgress}
         step={enrichProgress.step}

@@ -14,7 +14,7 @@ interface Torque {
   Nm: number;
 }
 
-interface Engine {
+export interface Engine {
   type: string;
   displacement: MeasurementValue;
   power: Power;
