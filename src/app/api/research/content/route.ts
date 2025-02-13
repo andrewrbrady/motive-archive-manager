@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION!,
@@ -11,7 +14,7 @@ const s3 = new S3Client({
   },
 });
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get("fileId");
