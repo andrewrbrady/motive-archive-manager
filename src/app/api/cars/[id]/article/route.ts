@@ -491,6 +491,13 @@ export async function POST(
     }
 
     // Initialize the car with clientInfo upfront
+    console.log("[DEBUG] Raw car data:", {
+      _id: rawCar._id.toString(),
+      client: rawCar.client ? rawCar.client.toString() : undefined,
+      hasClientInfo: "clientInfo" in rawCar,
+      keys: Object.keys(rawCar),
+    });
+
     const car = {
       ...rawCar,
       clientInfo: {
@@ -502,11 +509,15 @@ export async function POST(
       },
     };
 
-    console.log("[DEBUG] GET - Initial car data:", {
+    // Ensure proper serialization of ObjectId in logs
+    const serializedCar = {
       _id: car._id.toString(),
-      client: car.client?.toString(),
+      client: car.client ? car.client.toString() : undefined,
       clientInfo: car.clientInfo,
-    });
+      keys: Object.keys(car),
+    };
+
+    console.log("[DEBUG] GET - Initial car data:", serializedCar);
 
     // Fetch client info if it exists
     if (car.client) {
