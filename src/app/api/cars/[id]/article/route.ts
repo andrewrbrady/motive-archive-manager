@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import type { ModelType } from "@/types/models";
 import Anthropic from "@anthropic-ai/sdk";
+import { getApiUrl } from "@/lib/utils";
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -154,57 +155,59 @@ async function makeAPIRequest(
     }
   } else {
     // OpenAI request handling
-    const apiConfig = {
-      url: process.env.OPENAI_API_ENDPOINT!,
-      key: process.env.OPENAI_API_KEY!,
-    };
+    try {
+      const apiUrl = getApiUrl("openai");
+      if (!apiUrl) {
+        throw new Error("Failed to construct OpenAI API URL");
+      }
 
-    if (!apiConfig.key) {
-      throw new Error("Missing OPENAI_API_KEY environment variable");
-    }
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error("Missing OPENAI_API_KEY environment variable");
+      }
 
-    const baseUrl = apiConfig.url.endsWith("/")
-      ? apiConfig.url.slice(0, -1)
-      : apiConfig.url;
+      const requestBody = {
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: maxResponseTokens,
+        temperature: 0.7,
+      };
 
-    const requestBody = {
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
         },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: maxResponseTokens,
-      temperature: 0.7,
-    };
-
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiConfig.key}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.error("OpenAI API Error:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
+        body: JSON.stringify(requestBody),
       });
-      throw new Error(
-        `API request failed: ${response.statusText}${
-          errorData?.error?.message ? ` - ${errorData.error.message}` : ""
-        }`
-      );
-    }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("OpenAI API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+        });
+        throw new Error(
+          `API request failed: ${response.statusText}${
+            errorData?.error?.message ? ` - ${errorData.error.message}` : ""
+          }`
+        );
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error("OpenAI API request failed:", error);
+      throw error;
+    }
   }
 }
 
@@ -405,7 +408,7 @@ Please provide the complete revised version.`;
 }
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -553,7 +556,10 @@ export async function POST(
         console.error("Error in article generation:", error);
         await sendProgress({
           type: "error",
-          error: error.message || "Failed to generate article",
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to generate article",
         });
       } finally {
         await writer.close();

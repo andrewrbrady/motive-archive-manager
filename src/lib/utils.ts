@@ -31,6 +31,16 @@ export function getApiUrl(path: string): string {
   // Check if we're in a browser environment
   const isBrowser = typeof window !== "undefined";
 
+  // Special handling for OpenAI endpoint
+  if (cleanPath === "openai") {
+    const endpoint = process.env.OPENAI_API_ENDPOINT;
+    if (!endpoint) {
+      throw new Error("OPENAI_API_ENDPOINT is not defined");
+    }
+    // Ensure the endpoint doesn't end with a slash
+    return endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
+  }
+
   // In development
   if (process.env.NODE_ENV === "development") {
     return `http://localhost:3000/api/${cleanPath}`;
@@ -42,19 +52,20 @@ export function getApiUrl(path: string): string {
     return `/api/${cleanPath}`;
   } else {
     // Server-side: construct absolute URL
-    let baseUrl: string;
+    let baseUrl = "";
 
     if (process.env.VERCEL_URL) {
-      // Using Vercel's deployment URL - ensure HTTPS
+      // Using Vercel's deployment URL
       baseUrl = `https://${process.env.VERCEL_URL}`;
     } else if (process.env.NEXT_PUBLIC_BASE_URL) {
-      // Using configured base URL - ensure HTTPS if not localhost
-      baseUrl = process.env.NEXT_PUBLIC_BASE_URL.startsWith("http://localhost")
-        ? process.env.NEXT_PUBLIC_BASE_URL
-        : process.env.NEXT_PUBLIC_BASE_URL.replace(/^http:/, "https:");
+      // Using configured base URL
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      // Ensure HTTPS for non-localhost URLs
+      if (!baseUrl.startsWith("http://localhost")) {
+        baseUrl = baseUrl.replace(/^http:/, "https:");
+      }
     } else {
-      // Fallback URL
-      baseUrl = "https://motive-archive-manager.vercel.app";
+      throw new Error("No base URL configured for production environment");
     }
 
     // Ensure baseUrl doesn't end with a slash
