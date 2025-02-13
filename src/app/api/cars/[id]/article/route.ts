@@ -4,11 +4,16 @@ import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import type { ModelType } from "@/types/models";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { getApiUrl } from "@/lib/utils";
 
-// Initialize Anthropic client
+// Initialize clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Add these utility functions at the top level
@@ -126,9 +131,9 @@ async function makeAPIRequest(
 
   // Estimate tokens and chunk if necessary
   const estimatedPromptTokens = estimateTokens(prompt);
-  const maxPromptTokens = isClaude ? 12000 : 4000; // Further reduced for gpt-4o-mini
-  const maxResponseTokens = isClaude ? 4096 : 1000; // Further reduced for gpt-4o-mini
-  const maxTotalTokens = isClaude ? 16000 : 5000; // Total context length for gpt-4o-mini
+  const maxPromptTokens = isClaude ? 12000 : 4000;
+  const maxResponseTokens = isClaude ? 4096 : 1000;
+  const maxTotalTokens = isClaude ? 16000 : 5000;
 
   if (estimatedPromptTokens > maxPromptTokens) {
     console.log(
@@ -163,7 +168,6 @@ async function makeAPIRequest(
       throw error;
     }
   } else {
-    // OpenAI request handling
     try {
       console.log(
         "[DEBUG] makeAPIRequest - Starting OpenAI request with limits:",
@@ -175,16 +179,7 @@ async function makeAPIRequest(
         }
       );
 
-      const apiUrl = getApiUrl("openai");
-      console.log("[DEBUG] makeAPIRequest - API URL constructed:", apiUrl);
-
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        console.error("[ERROR] makeAPIRequest - Missing OpenAI API key");
-        throw new Error("Missing OPENAI_API_KEY environment variable");
-      }
-
-      const requestBody = {
+      const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
@@ -195,75 +190,14 @@ async function makeAPIRequest(
         ],
         max_tokens: maxResponseTokens,
         temperature: 0.7,
-      };
-
-      console.log("[DEBUG] makeAPIRequest - Sending request to OpenAI:", {
-        url: apiUrl,
-        model: requestBody.model,
-        hasApiKey: !!apiKey,
-        promptLength: prompt.length,
-        systemPromptLength: systemPrompt.length,
-        maxTokens: maxResponseTokens,
-        estimatedTotalTokens: estimatedPromptTokens + maxResponseTokens,
       });
 
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log("[DEBUG] makeAPIRequest - OpenAI response status:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries()),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch((parseError) => {
-          console.error(
-            "[ERROR] makeAPIRequest - Failed to parse error response:",
-            parseError
-          );
-          return response.text().catch(() => null);
-        });
-        console.error("[ERROR] makeAPIRequest - OpenAI API Error:", {
-          status: response.status,
-          statusText: response.statusText,
-          errorData,
-          url: apiUrl,
-          requestBody: {
-            ...requestBody,
-            messages: requestBody.messages.map((m) => ({
-              ...m,
-              content: m.content.length + " chars",
-            })),
-          },
-        });
-        throw new Error(
-          `OpenAI API request failed: ${response.statusText}${
-            errorData?.error?.message ? ` - ${errorData.error.message}` : ""
-          }`
-        );
-      }
-
-      const data = await response.json().catch((error) => {
-        console.error(
-          "[ERROR] makeAPIRequest - Failed to parse success response:",
-          error
-        );
-        throw new Error("Failed to parse OpenAI response");
-      });
       console.log("[DEBUG] makeAPIRequest - OpenAI response received:", {
-        hasChoices: !!data.choices,
-        choicesLength: data.choices?.length,
+        hasChoices: !!completion.choices,
+        choicesLength: completion.choices?.length,
       });
 
-      return data.choices[0].message.content;
+      return completion.choices[0].message.content;
     } catch (error) {
       console.error("OpenAI API request failed:", error);
       throw error;
