@@ -167,7 +167,7 @@ async function makeAPIRequest(
       }
 
       const requestBody = {
-        model: "gpt-4o-mini",
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -184,6 +184,8 @@ async function makeAPIRequest(
         model: requestBody.model,
         hasApiKey: !!apiKey,
         promptLength: prompt.length,
+        systemPromptLength: systemPrompt.length,
+        maxTokens: maxResponseTokens,
       });
 
       const response = await fetch(apiUrl, {
@@ -195,13 +197,33 @@ async function makeAPIRequest(
         body: JSON.stringify(requestBody),
       });
 
+      console.log("[DEBUG] makeAPIRequest - OpenAI response status:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
+        const errorData = await response.json().catch((parseError) => {
+          console.error(
+            "[ERROR] makeAPIRequest - Failed to parse error response:",
+            parseError
+          );
+          return response.text().catch(() => null);
+        });
         console.error("[ERROR] makeAPIRequest - OpenAI API Error:", {
           status: response.status,
           statusText: response.statusText,
           errorData,
           url: apiUrl,
+          requestBody: {
+            ...requestBody,
+            messages: requestBody.messages.map((m) => ({
+              ...m,
+              content: m.content.length + " chars",
+            })),
+          },
         });
         throw new Error(
           `OpenAI API request failed: ${response.statusText}${
@@ -210,7 +232,13 @@ async function makeAPIRequest(
         );
       }
 
-      const data = await response.json();
+      const data = await response.json().catch((error) => {
+        console.error(
+          "[ERROR] makeAPIRequest - Failed to parse success response:",
+          error
+        );
+        throw new Error("Failed to parse OpenAI response");
+      });
       console.log("[DEBUG] makeAPIRequest - OpenAI response received:", {
         hasChoices: !!data.choices,
         choicesLength: data.choices?.length,

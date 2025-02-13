@@ -33,7 +33,14 @@ export function getApiUrl(path: string): string {
 
   // Special handling for OpenAI endpoint
   if (cleanPath === "openai") {
-    console.log("[DEBUG] getApiUrl - Constructing OpenAI endpoint");
+    console.log("[DEBUG] getApiUrl - Environment variables:", {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL_URL: process.env.VERCEL_URL,
+      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+      hasOpenAIEndpoint: !!process.env.OPENAI_API_ENDPOINT,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+    });
+
     const endpoint = process.env.OPENAI_API_ENDPOINT;
 
     if (!endpoint) {
@@ -49,16 +56,24 @@ export function getApiUrl(path: string): string {
       cleaned: endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint,
       environment: process.env.NODE_ENV,
       isBrowser: typeof window !== "undefined",
+      isHttps: endpoint.startsWith("https://"),
+      isLocalhost: endpoint.includes("localhost"),
     });
 
     // Ensure the endpoint is a valid URL
     try {
-      new URL(endpoint);
+      const url = new URL(endpoint);
+      console.log("[DEBUG] getApiUrl - Parsed URL details:", {
+        protocol: url.protocol,
+        host: url.host,
+        pathname: url.pathname,
+        search: url.search,
+      });
     } catch (error) {
-      console.error(
-        "[ERROR] getApiUrl - Invalid OpenAI endpoint URL:",
-        endpoint
-      );
+      console.error("[ERROR] getApiUrl - Invalid OpenAI endpoint URL:", {
+        endpoint,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       throw new Error("Invalid OpenAI API endpoint URL");
     }
 
