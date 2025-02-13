@@ -7,6 +7,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { getApiUrl } from "@/lib/utils";
 
+// Configure Vercel edge runtime
+export const maxDuration = 60;
+export const runtime = "edge";
+
 // Initialize clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -142,9 +146,14 @@ async function makeAPIRequest(
     prompt = chunkContent(prompt, maxPromptTokens);
   }
 
+  // Create timeout promise
+  const timeoutPromise = new Promise(
+    (_, reject) => setTimeout(() => reject(new Error("Request timeout")), 55000) // 55 seconds timeout
+  );
+
   if (isClaude) {
     try {
-      const response = await anthropic.messages.create({
+      const responsePromise = anthropic.messages.create({
         model: "claude-3-5-sonnet-20241022",
         max_tokens: maxResponseTokens,
         temperature: 0.7,
@@ -157,6 +166,12 @@ async function makeAPIRequest(
         ],
       });
 
+      // Race between API call and timeout
+      const response = (await Promise.race([
+        responsePromise,
+        timeoutPromise,
+      ])) as Awaited<typeof responsePromise>;
+
       const content = response.content[0];
       if (!content || content.type !== "text") {
         throw new Error("Invalid response format from Claude");
@@ -164,22 +179,15 @@ async function makeAPIRequest(
 
       return content.text;
     } catch (error) {
+      if (error instanceof Error && error.message === "Request timeout") {
+        throw error;
+      }
       console.error("Anthropic API Error:", error);
       throw error;
     }
   } else {
     try {
-      console.log(
-        "[DEBUG] makeAPIRequest - Starting OpenAI request with limits:",
-        {
-          maxPromptTokens,
-          maxResponseTokens,
-          maxTotalTokens,
-          estimatedPromptTokens,
-        }
-      );
-
-      const completion = await openai.chat.completions.create({
+      const responsePromise = openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
@@ -192,13 +200,17 @@ async function makeAPIRequest(
         temperature: 0.7,
       });
 
-      console.log("[DEBUG] makeAPIRequest - OpenAI response received:", {
-        hasChoices: !!completion.choices,
-        choicesLength: completion.choices?.length,
-      });
+      // Race between API call and timeout
+      const completion = (await Promise.race([
+        responsePromise,
+        timeoutPromise,
+      ])) as Awaited<typeof responsePromise>;
 
       return completion.choices[0].message.content;
     } catch (error) {
+      if (error instanceof Error && error.message === "Request timeout") {
+        throw error;
+      }
       console.error("OpenAI API request failed:", error);
       throw error;
     }
@@ -644,9 +656,9 @@ export async function POST(
     return response;
   } catch (error) {
     console.error("Error in article generation:", error);
-    return NextResponse.json(
-      { error: "Failed to generate article" },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate article";
+    const status = errorMessage === "Request timeout" ? 504 : 500;
+    return NextResponse.json({ error: errorMessage }, { status });
   }
 }
