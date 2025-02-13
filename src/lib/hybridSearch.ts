@@ -87,7 +87,13 @@ async function keywordSearch(
         $text: { $search: query },
       },
       {
-        score: { $meta: "textScore" },
+        projection: {
+          score: { $meta: "textScore" },
+          content: 1,
+          carId: 1,
+          _id: 1,
+          filename: 1,
+        },
       }
     )
     .sort({ score: { $meta: "textScore" } })
@@ -99,7 +105,7 @@ async function keywordSearch(
       carId: doc.carId,
       fileId: doc._id.toString(),
       fileName: doc.filename,
-      matchType: "keyword",
+      matchType: "keyword" as const,
       score: doc.score,
     },
   }));
@@ -153,7 +159,7 @@ async function semanticSearch(
             carId: doc.carId,
             fileId: doc._id.toString(),
             fileName: doc.filename,
-            matchType: "semantic",
+            matchType: "semantic" as const,
             score: similarity,
           },
         };
@@ -551,7 +557,7 @@ export async function hybridSearch(
                   carId: doc.carId,
                   fileId: doc._id.toString(),
                   fileName: doc.filename,
-                  matchType: "keyword",
+                  matchType: "keyword" as const,
                   score: result[0].score,
                 },
               };
@@ -592,7 +598,7 @@ export async function hybridSearch(
               carId: doc.carId,
               fileId: doc._id.toString(),
               fileName: doc.filename,
-              matchType: "semantic",
+              matchType: "semantic" as const,
               score: similarity,
             },
           };

@@ -95,13 +95,13 @@ interface ApiCarResponse {
 interface ExtendedCar extends BaseCar {
   images?: CarImage[];
   clientInfo?: {
+    _id: string;
     name: string;
-    email?: string;
-    phone?: string;
-    address?: string;
+    email: string;
+    phone: string;
+    address: string;
     company?: string;
     role?: string;
-    [key: string]: string | undefined;
   } | null;
   interior_features?: {
     seats?: number;

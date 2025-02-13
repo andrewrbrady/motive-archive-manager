@@ -6,6 +6,7 @@ import type { ModelType } from "@/types/models";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { getApiUrl } from "@/lib/utils";
+import { Car } from "@/types/car";
 
 // Configure Vercel runtime
 export const maxDuration = 60;
@@ -116,6 +117,7 @@ interface ArticleStage {
 }
 
 interface ArticleMetadata {
+  _id?: ObjectId;
   carId: string;
   model: ModelType;
   stages: ArticleStage[];
@@ -218,7 +220,7 @@ async function makeAPIRequest(
 }
 
 async function generateArticlePlan(
-  car: any,
+  car: Car & { _id: ObjectId },
   researchContent: string,
   model: ModelType,
   context?: string,
@@ -439,26 +441,25 @@ export async function POST(
     // Initialize the car with clientInfo upfront
     console.log("[DEBUG] Raw car data:", {
       _id: rawCar._id.toString(),
-      client: rawCar.client ? rawCar.client.toString() : undefined,
       hasClientInfo: "clientInfo" in rawCar,
       keys: Object.keys(rawCar),
     });
 
     const car = {
       ...rawCar,
-      clientInfo: {
+      _id: rawCar._id,
+      clientInfo: rawCar.clientInfo || {
         _id: "",
         name: "",
         email: "",
         phone: "",
         address: "",
       },
-    };
+    } as Car & { _id: ObjectId };
 
     // Ensure proper serialization of ObjectId in logs
     const serializedCar = {
       _id: car._id.toString(),
-      client: car.client ? car.client.toString() : undefined,
       clientInfo: car.clientInfo,
       keys: Object.keys(car),
     };
@@ -471,14 +472,11 @@ export async function POST(
         "[DEBUG] GET - Fetching client info for car",
         carId,
         "client ID:",
-        typeof car.client === "object" ? car.client.toString() : car.client
+        car.client
       );
 
       try {
-        const clientId =
-          typeof car.client === "object"
-            ? car.client
-            : new ObjectId(car.client.toString());
+        const clientId = new ObjectId(car.client);
         const clientInfo = await db
           .collection("clients")
           .findOne({ _id: clientId });
@@ -542,6 +540,7 @@ export async function POST(
 
         if (!metadata) {
           metadata = {
+            _id: new ObjectId(),
             carId,
             model,
             stages: [],

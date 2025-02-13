@@ -104,6 +104,13 @@ export interface Car {
   description: string;
   type: string;
   client?: string;
+  clientInfo?: {
+    _id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+  };
   engine: Engine;
   imageIds?: string[];
   horsepower?: number;
