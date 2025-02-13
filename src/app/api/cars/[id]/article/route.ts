@@ -500,11 +500,11 @@ export async function POST(
     // Process in background
     (async () => {
       try {
-        console.log("[DEBUG] GET - Fetching car with ID:", carId);
         const { db } = await connectToDatabase();
         console.log("[DEBUG] MongoDB Connection established");
 
-        const car = await db
+        console.log("[DEBUG] GET - Fetching car with ID:", carId);
+        let car = await db
           .collection("cars")
           .findOne({ _id: new ObjectId(carId) });
 
@@ -513,13 +513,16 @@ export async function POST(
           throw new Error(`Car not found with ID: ${carId}`);
         }
 
-        // Initialize clientInfo with default empty values immediately after fetching car
-        car.clientInfo = {
-          _id: "",
-          name: "",
-          email: "",
-          phone: "",
-          address: "",
+        // Initialize clientInfo with default empty values BEFORE any car data logging
+        car = {
+          ...car,
+          clientInfo: {
+            _id: "",
+            name: "",
+            email: "",
+            phone: "",
+            address: "",
+          },
         };
 
         console.log("[DEBUG] GET - Initial car data:", {
@@ -554,7 +557,7 @@ export async function POST(
                 hasPhone: !!clientInfo.phone,
               });
 
-              // Update clientInfo with found data, maintaining default values for missing fields
+              // Update clientInfo with found data
               car.clientInfo = {
                 _id: clientInfo._id.toString(),
                 name: clientInfo.name || "",
