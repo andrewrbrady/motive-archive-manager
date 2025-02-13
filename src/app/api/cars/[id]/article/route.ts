@@ -156,13 +156,13 @@ async function makeAPIRequest(
   } else {
     // OpenAI request handling
     try {
+      console.log("[DEBUG] makeAPIRequest - Starting OpenAI request");
       const apiUrl = getApiUrl("openai");
-      if (!apiUrl) {
-        throw new Error("Failed to construct OpenAI API URL");
-      }
+      console.log("[DEBUG] makeAPIRequest - API URL constructed:", apiUrl);
 
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
+        console.error("[ERROR] makeAPIRequest - Missing OpenAI API key");
         throw new Error("Missing OPENAI_API_KEY environment variable");
       }
 
@@ -179,6 +179,13 @@ async function makeAPIRequest(
         temperature: 0.7,
       };
 
+      console.log("[DEBUG] makeAPIRequest - Sending request to OpenAI:", {
+        url: apiUrl,
+        model: requestBody.model,
+        hasApiKey: !!apiKey,
+        promptLength: prompt.length,
+      });
+
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
@@ -190,19 +197,25 @@ async function makeAPIRequest(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("OpenAI API Error:", {
+        console.error("[ERROR] makeAPIRequest - OpenAI API Error:", {
           status: response.status,
           statusText: response.statusText,
           errorData,
+          url: apiUrl,
         });
         throw new Error(
-          `API request failed: ${response.statusText}${
+          `OpenAI API request failed: ${response.statusText}${
             errorData?.error?.message ? ` - ${errorData.error.message}` : ""
           }`
         );
       }
 
       const data = await response.json();
+      console.log("[DEBUG] makeAPIRequest - OpenAI response received:", {
+        hasChoices: !!data.choices,
+        choicesLength: data.choices?.length,
+      });
+
       return data.choices[0].message.content;
     } catch (error) {
       console.error("OpenAI API request failed:", error);

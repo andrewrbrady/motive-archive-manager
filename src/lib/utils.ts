@@ -38,13 +38,29 @@ export function getApiUrl(path: string): string {
 
     if (!endpoint) {
       console.error("[ERROR] getApiUrl - OPENAI_API_ENDPOINT is not defined");
-      throw new Error("OPENAI_API_ENDPOINT is not defined");
+      throw new Error(
+        "OPENAI_API_ENDPOINT environment variable is not defined"
+      );
     }
 
-    console.log("[DEBUG] getApiUrl - OpenAI endpoint:", {
+    // Log the endpoint for debugging
+    console.log("[DEBUG] getApiUrl - OpenAI endpoint details:", {
       raw: endpoint,
       cleaned: endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint,
+      environment: process.env.NODE_ENV,
+      isBrowser: typeof window !== "undefined",
     });
+
+    // Ensure the endpoint is a valid URL
+    try {
+      new URL(endpoint);
+    } catch (error) {
+      console.error(
+        "[ERROR] getApiUrl - Invalid OpenAI endpoint URL:",
+        endpoint
+      );
+      throw new Error("Invalid OpenAI API endpoint URL");
+    }
 
     // Ensure the endpoint doesn't end with a slash
     return endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
