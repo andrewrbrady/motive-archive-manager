@@ -24,16 +24,18 @@ const claudeLimiter = new RateLimiter({
   interval: "minute",
 });
 
-interface SearchResult {
+export type MatchType = "keyword" | "semantic" | "both";
+
+export type SearchResult = {
   content: string;
   metadata: {
     carId: string;
     fileId: string;
     fileName: string;
-    matchType: "keyword" | "semantic" | "both";
+    matchType: MatchType;
     score: number;
   };
-}
+};
 
 // Initialize embeddings instance for semantic search with retry logic
 const embeddings = new OpenAIEmbeddings({
@@ -84,25 +86,31 @@ async function keywordSearch(
     .find(
       {
         carId,
-        $text: { $search: query },
+        $text: {
+          $search: query,
+        },
       },
       {
-        score: { $meta: "textScore" },
+        projection: {
+          score: { $meta: "textScore" },
+        },
       }
     )
     .sort({ score: { $meta: "textScore" } })
     .toArray();
 
-  return results.map((doc) => ({
-    content: doc.content,
+  const searchResults: SearchResult[] = results.map((result) => ({
+    content: result.content,
     metadata: {
-      carId: doc.carId,
-      fileId: doc._id.toString(),
-      fileName: doc.filename,
-      matchType: "keyword",
-      score: doc.score,
+      carId: result.carId,
+      fileId: result._id.toString(),
+      fileName: result.filename,
+      matchType: "keyword" as MatchType,
+      score: result.score,
     },
   }));
+
+  return searchResults;
 }
 
 // Perform semantic search using embeddings
@@ -153,7 +161,7 @@ async function semanticSearch(
             carId: doc.carId,
             fileId: doc._id.toString(),
             fileName: doc.filename,
-            matchType: "semantic",
+            matchType: "semantic" as MatchType,
             score: similarity,
           },
         };
@@ -400,7 +408,7 @@ function mergeAndRankResults(
         ...existing,
         metadata: {
           ...existing.metadata,
-          matchType: "both",
+          matchType: "both" as MatchType,
           score: (existing.metadata.score + result.metadata.score) / 2,
         },
       });
@@ -551,7 +559,7 @@ export async function hybridSearch(
                   carId: doc.carId,
                   fileId: doc._id.toString(),
                   fileName: doc.filename,
-                  matchType: "keyword",
+                  matchType: "keyword" as MatchType,
                   score: result[0].score,
                 },
               };
@@ -592,7 +600,7 @@ export async function hybridSearch(
               carId: doc.carId,
               fileId: doc._id.toString(),
               fileName: doc.filename,
-              matchType: "semantic",
+              matchType: "semantic" as MatchType,
               score: similarity,
             },
           };

@@ -72,10 +72,12 @@ export async function GET(
         : null,
     });
 
-    // Query using string ID
+    // Query using either ObjectId or string
     const files = await db
       .collection("research_files")
-      .find({ carId: carId })
+      .find({
+        $or: [{ carId: new ObjectId(carId) }, { carId: carId }],
+      })
       .toArray();
 
     console.log("Research Files API - Query Results:", {
@@ -169,7 +171,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const collection = db.collection("research_files");
 
     const researchFile = {
-      carId: new ObjectId(params.id),
+      carId: params.id,
       filename: uploadResult.filename,
       s3Key: uploadResult.key,
       contentType: uploadResult.contentType,
