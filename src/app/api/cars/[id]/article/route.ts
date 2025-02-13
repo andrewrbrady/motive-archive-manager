@@ -16,19 +16,27 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-function chunkContent(content: string, maxTokens: number = 20000): string {
+function chunkContent(content: string, maxTokens: number = 6000): string {
   const paragraphs = content.split("\n\n");
   let currentChunk = "";
   let currentTokens = 0;
+  const reservedTokens = 1000; // Reserve tokens for system prompt and response
 
   for (const paragraph of paragraphs) {
     const paragraphTokens = estimateTokens(paragraph);
-    if (currentTokens + paragraphTokens > maxTokens) {
+    if (currentTokens + paragraphTokens > maxTokens - reservedTokens) {
       break;
     }
     currentChunk += paragraph + "\n\n";
     currentTokens += paragraphTokens;
   }
+
+  console.log("[DEBUG] chunkContent - Chunked content stats:", {
+    originalTokens: estimateTokens(content),
+    chunkedTokens: currentTokens,
+    maxAllowedTokens: maxTokens,
+    reservedTokens,
+  });
 
   return currentChunk;
 }
@@ -118,8 +126,9 @@ async function makeAPIRequest(
 
   // Estimate tokens and chunk if necessary
   const estimatedPromptTokens = estimateTokens(prompt);
-  const maxPromptTokens = isClaude ? 12000 : 20000; // Reduced for Claude
-  const maxResponseTokens = isClaude ? 4096 : 12000; // Reduced for Claude
+  const maxPromptTokens = isClaude ? 12000 : 4000; // Further reduced for gpt-4o-mini
+  const maxResponseTokens = isClaude ? 4096 : 1000; // Further reduced for gpt-4o-mini
+  const maxTotalTokens = isClaude ? 16000 : 5000; // Total context length for gpt-4o-mini
 
   if (estimatedPromptTokens > maxPromptTokens) {
     console.log(
@@ -156,7 +165,16 @@ async function makeAPIRequest(
   } else {
     // OpenAI request handling
     try {
-      console.log("[DEBUG] makeAPIRequest - Starting OpenAI request");
+      console.log(
+        "[DEBUG] makeAPIRequest - Starting OpenAI request with limits:",
+        {
+          maxPromptTokens,
+          maxResponseTokens,
+          maxTotalTokens,
+          estimatedPromptTokens,
+        }
+      );
+
       const apiUrl = getApiUrl("openai");
       console.log("[DEBUG] makeAPIRequest - API URL constructed:", apiUrl);
 
@@ -167,7 +185,7 @@ async function makeAPIRequest(
       }
 
       const requestBody = {
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -186,6 +204,7 @@ async function makeAPIRequest(
         promptLength: prompt.length,
         systemPromptLength: systemPrompt.length,
         maxTokens: maxResponseTokens,
+        estimatedTotalTokens: estimatedPromptTokens + maxResponseTokens,
       });
 
       const response = await fetch(apiUrl, {
