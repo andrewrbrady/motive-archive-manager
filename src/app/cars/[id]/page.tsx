@@ -232,7 +232,7 @@ interface CarFormData {
   make: string;
   model: string;
   year: number;
-  price: number;
+  price: number | null;
   mileage: MeasurementValue;
   color: string;
   interior_color: string;
@@ -243,11 +243,47 @@ interface CarFormData {
   description: string;
   type: string;
   client?: string;
-  engine: Engine;
-  transmission: {
+  engine: {
+    type?: string;
+    displacement?: MeasurementValue;
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+  };
+  dimensions?: {
+    length?: MeasurementValue;
+    width?: MeasurementValue;
+    height?: MeasurementValue;
+    wheelbase?: MeasurementValue;
+    weight?: MeasurementValue;
+    gvwr?: MeasurementValue;
+    trackWidth?: MeasurementValue;
+  };
+  manufacturing?: {
+    series?: string;
+    trim?: string;
+    bodyClass?: string;
+    plant?: {
+      city?: string;
+      country?: string;
+      company?: string;
+    };
+  };
+  doors?: number | null;
+  interior_features?: {
+    seats?: number | null;
+    upholstery?: string;
+  };
+  transmission?: {
     type: string;
   };
-  // ... other fields from BaseCar
 }
 
 export default function CarPage() {
@@ -559,23 +595,54 @@ export default function CarPage() {
   // Helper function to convert ExtendedCar to CarFormData
   const toCarFormData = (car: ExtendedCar): CarFormData => {
     return {
-      ...car,
+      make: car.make || "",
+      model: car.model || "",
+      year: car.year || 0,
       price: typeof car.price === "string" ? parseFloat(car.price) : car.price,
-      mileage: car.mileage,
-      color: car.color,
-      interior_color: car.interior_color,
-      vin: car.vin,
-      status: car.status,
-      condition: car.condition,
-      location: car.location,
-      description: car.description,
-      type: car.type,
-      client: car.client,
-      engine: car.engine,
-      transmission: {
-        type: car.transmission?.type || "N/A",
+      mileage: car.mileage || { value: null, unit: "mi" },
+      color: car.color || "",
+      interior_color: car.interior_color || "",
+      vin: car.vin || "",
+      status: car.status || "available",
+      condition: car.condition || "",
+      location: car.location || "",
+      description: car.description || "",
+      type: car.type || "",
+      client: car.client || undefined,
+      engine: {
+        type: car.engine?.type || "",
+        displacement: car.engine?.displacement || { value: null, unit: "L" },
+        power: car.engine?.power || { hp: 0, kW: 0, ps: 0 },
+        torque: car.engine?.torque || { "lb-ft": 0, Nm: 0 },
+        features: car.engine?.features || [],
       },
-      // Add any other necessary transformations
+      dimensions: {
+        length: car.dimensions?.length || { value: null, unit: "in" },
+        width: car.dimensions?.width || { value: null, unit: "in" },
+        height: car.dimensions?.height || { value: null, unit: "in" },
+        wheelbase: car.dimensions?.wheelbase || { value: null, unit: "in" },
+        weight: car.dimensions?.weight || { value: null, unit: "lbs" },
+        gvwr: car.dimensions?.gvwr || { value: null, unit: "lbs" },
+        trackWidth: car.dimensions?.trackWidth || { value: null, unit: "in" },
+      },
+      manufacturing: {
+        series: car.manufacturing?.series || "",
+        trim: car.manufacturing?.trim || "",
+        bodyClass: car.manufacturing?.bodyClass || "",
+        plant: {
+          city: car.manufacturing?.plant?.city || "",
+          country: car.manufacturing?.plant?.country || "",
+          company: car.manufacturing?.plant?.company || "",
+        },
+      },
+      doors: car.doors || null,
+      interior_features: {
+        seats: car.interior_features?.seats || null,
+        upholstery: car.interior_features?.upholstery || "",
+      },
+      transmission: {
+        type: car.transmission?.type || "",
+      },
     };
   };
 
@@ -583,25 +650,122 @@ export default function CarPage() {
   const fromCarFormData = (
     formData: Partial<CarFormData>
   ): Partial<ExtendedCar> => {
-    return {
-      ...formData,
-      price: formData.price ? Number(formData.price) : undefined,
-      mileage: formData.mileage,
-      color: formData.color,
-      interior_color: formData.interior_color,
-      vin: formData.vin,
-      status: formData.status,
-      condition: formData.condition,
-      location: formData.location,
-      description: formData.description,
-      type: formData.type,
-      client: formData.client,
-      engine: formData.engine,
-      transmission: {
-        type: formData.transmission?.type || "N/A",
-      },
-      // Add any other necessary transformations
-    };
+    console.log("\n=== FROM CAR FORM DATA TRANSFORMATION STARTED ===");
+    console.log("Input formData:", formData);
+
+    const result: Partial<ExtendedCar> = {};
+
+    // Handle basic fields
+    const basicFields = [
+      "make",
+      "model",
+      "year",
+      "price",
+      "mileage",
+      "color",
+      "interior_color",
+      "vin",
+      "status",
+      "condition",
+      "location",
+      "description",
+      "type",
+      "client",
+    ] as const;
+
+    basicFields.forEach((field) => {
+      if (formData[field] !== undefined) {
+        console.log(`Processing basic field "${field}":`, formData[field]);
+        (result as any)[field] = formData[field];
+      }
+    });
+
+    // Handle engine - preserve existing data while merging updates
+    if (formData.engine) {
+      console.log("\nProcessing engine data:", formData.engine);
+      console.log("Current engine data:", car?.engine);
+
+      result.engine = {
+        // Start with existing engine data
+        ...car?.engine,
+        // Then apply any updates
+        ...(formData.engine.type !== undefined && {
+          type: formData.engine.type,
+        }),
+        ...(formData.engine.displacement !== undefined && {
+          displacement: formData.engine.displacement,
+        }),
+        ...(formData.engine.power !== undefined && {
+          power: formData.engine.power,
+        }),
+        ...(formData.engine.torque !== undefined && {
+          torque: formData.engine.torque,
+        }),
+        ...(formData.engine.features !== undefined && {
+          features: formData.engine.features,
+        }),
+      };
+
+      console.log("Processed engine result:", result.engine);
+    }
+
+    // Handle dimensions - preserve existing while merging updates
+    if (formData.dimensions) {
+      console.log("\nProcessing dimensions:", formData.dimensions);
+      const updatedDimensions = { ...car?.dimensions };
+
+      // Only update fields that are explicitly provided
+      Object.entries(formData.dimensions).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updatedDimensions[key] = value;
+        }
+      });
+
+      result.dimensions = updatedDimensions;
+      console.log("Processed dimensions result:", result.dimensions);
+    }
+
+    // Handle interior features - preserve existing while merging updates
+    if (formData.interior_features) {
+      console.log(
+        "\nProcessing interior features:",
+        formData.interior_features
+      );
+      const updatedFeatures = { ...car?.interior_features };
+
+      // Only update fields that are explicitly provided
+      Object.entries(formData.interior_features).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updatedFeatures[key] = value;
+        }
+      });
+
+      result.interior_features = updatedFeatures;
+      console.log(
+        "Processed interior features result:",
+        result.interior_features
+      );
+    }
+
+    // Handle transmission - preserve existing while merging updates
+    if (formData.transmission) {
+      console.log("\nProcessing transmission:", formData.transmission);
+      const updatedTransmission = { ...car?.transmission };
+
+      // Only update fields that are explicitly provided
+      Object.entries(formData.transmission).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updatedTransmission[key] = value;
+        }
+      });
+
+      result.transmission = updatedTransmission;
+      console.log("Processed transmission result:", result.transmission);
+    }
+
+    console.log("\nFinal transformed result:", result);
+    console.log("=== FROM CAR FORM DATA TRANSFORMATION COMPLETED ===\n");
+    return result;
   };
 
   // Helper function to convert Car type to BaTCarDetails type for BaTListingGenerator
@@ -1023,28 +1187,53 @@ export default function CarPage() {
     if (!car || !isSpecsEditMode) return;
 
     try {
+      console.log("\n=== SPECS EDIT STARTED ===");
+      console.log("Current car state:", car);
+      console.log("Edited specs to save:", editedSpecs);
+
       setIsSpecsSaving(true);
-      const transformedSpecs = fromCarFormData(editedSpecs);
+
+      // Transform editedSpecs to match ExtendedCar type and merge with current car
+      const optimisticUpdate: ExtendedCar = {
+        ...car,
+        ...fromCarFormData(editedSpecs),
+      };
+      setCar(optimisticUpdate);
 
       const response = await fetch(`/api/cars/${car._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(transformedSpecs),
+        body: JSON.stringify(editedSpecs),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update car specifications");
+        // If the request fails, revert to the original state
+        setCar(car);
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || "Failed to update car specifications"
+        );
       }
 
       const updatedCar = await response.json();
+      console.log("\nReceived updated car from API:", updatedCar);
+
+      // Update with the server response
       setCar(updatedCar);
       setIsSpecsEditMode(false);
       toast.success("Car specifications updated successfully");
+
+      console.log("=== SPECS EDIT COMPLETED ===\n");
     } catch (error) {
-      console.error("Error updating car specifications:", error);
-      toast.error("Failed to update car specifications");
+      console.error("\n=== SPECS EDIT ERROR ===");
+      console.error("Error details:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update car specifications"
+      );
     } finally {
       setIsSpecsSaving(false);
     }
