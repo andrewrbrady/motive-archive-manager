@@ -7,9 +7,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { getApiUrl } from "@/lib/utils";
 
-// Configure Vercel edge runtime
+// Configure Vercel runtime
 export const maxDuration = 60;
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 // Initialize clients
 const anthropic = new Anthropic({
