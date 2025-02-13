@@ -440,13 +440,43 @@ export async function POST(
     // Process in background
     (async () => {
       try {
+        console.log("[DEBUG] GET - Fetching car with ID:", carId);
         const { db } = await connectToDatabase();
         const car = await db
           .collection("cars")
           .findOne({ _id: new ObjectId(carId) });
 
         if (!car) {
-          throw new Error("Car not found");
+          throw new Error(`Car not found with ID: ${carId}`);
+        }
+
+        console.log("[DEBUG] GET - Initial car data:", car);
+
+        // Fetch client info if client ID exists
+        if (car.client) {
+          console.log(
+            "[DEBUG] GET - Fetching client info for car",
+            carId,
+            "client ID:",
+            car.client
+          );
+          const clientInfo = await db
+            .collection("clients")
+            .findOne({ _id: new ObjectId(car.client.toString()) });
+
+          if (clientInfo) {
+            console.log("[DEBUG] GET - Found client document:", clientInfo);
+            car.clientInfo = {
+              _id: clientInfo._id.toString(),
+              name: clientInfo.name,
+              email: clientInfo.email || "",
+              phone: clientInfo.phone || "",
+              address: clientInfo.address || "",
+            };
+            console.log("[DEBUG] GET - Updated car with client info:", car);
+          } else {
+            console.warn("[WARN] Client not found for ID:", car.client);
+          }
         }
 
         let metadata = await db
