@@ -475,6 +475,85 @@ export async function POST(
     const { model, stage, context, focus } = await request.json();
     const carId = params.id;
 
+    // Initialize database connection first, outside of the streaming context
+    const { db } = await connectToDatabase();
+    console.log("[DEBUG] MongoDB Connection established");
+
+    // Fetch and initialize car data before setting up the stream
+    console.log("[DEBUG] GET - Fetching car with ID:", carId);
+    const rawCar = await db
+      .collection("cars")
+      .findOne({ _id: new ObjectId(carId) });
+
+    if (!rawCar) {
+      console.log("[DEBUG] Car not found:", carId);
+      throw new Error(`Car not found with ID: ${carId}`);
+    }
+
+    // Initialize the car with clientInfo upfront
+    const car = {
+      ...rawCar,
+      clientInfo: {
+        _id: "",
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+      },
+    };
+
+    console.log("[DEBUG] GET - Initial car data:", {
+      _id: car._id.toString(),
+      client: car.client?.toString(),
+      clientInfo: car.clientInfo,
+    });
+
+    // Fetch client info if it exists
+    if (car.client) {
+      console.log(
+        "[DEBUG] GET - Fetching client info for car",
+        carId,
+        "client ID:",
+        typeof car.client === "object" ? car.client.toString() : car.client
+      );
+
+      try {
+        const clientId =
+          typeof car.client === "object"
+            ? car.client
+            : new ObjectId(car.client.toString());
+        const clientInfo = await db
+          .collection("clients")
+          .findOne({ _id: clientId });
+
+        if (clientInfo) {
+          console.log("[DEBUG] GET - Found client document:", {
+            _id: clientInfo._id.toString(),
+            name: clientInfo.name,
+            hasEmail: !!clientInfo.email,
+            hasPhone: !!clientInfo.phone,
+          });
+
+          car.clientInfo = {
+            _id: clientInfo._id.toString(),
+            name: clientInfo.name || "",
+            email: clientInfo.email || "",
+            phone: clientInfo.phone || "",
+            address: clientInfo.address || "",
+          };
+
+          console.log(
+            "[DEBUG] GET - Updated car with client info:",
+            car.clientInfo
+          );
+        } else {
+          console.warn("[WARN] Client not found for ID:", car.client);
+        }
+      } catch (error) {
+        console.error("[ERROR] Error fetching client info:", error);
+      }
+    }
+
     // Create EventSource response
     const stream = new TransformStream();
     const writer = stream.writable.getWriter();
@@ -497,88 +576,9 @@ export async function POST(
       },
     });
 
-    // Process in background
+    // Process in background with the already initialized car
     (async () => {
       try {
-        const { db } = await connectToDatabase();
-        console.log("[DEBUG] MongoDB Connection established");
-
-        console.log("[DEBUG] GET - Fetching car with ID:", carId);
-        let car = await db
-          .collection("cars")
-          .findOne({ _id: new ObjectId(carId) });
-
-        if (!car) {
-          console.log("[DEBUG] Car not found:", carId);
-          throw new Error(`Car not found with ID: ${carId}`);
-        }
-
-        // Initialize clientInfo with default empty values BEFORE any car data logging
-        car = {
-          ...car,
-          clientInfo: {
-            _id: "",
-            name: "",
-            email: "",
-            phone: "",
-            address: "",
-          },
-        };
-
-        console.log("[DEBUG] GET - Initial car data:", {
-          _id: car._id.toString(),
-          client: car.client?.toString(),
-          clientInfo: car.clientInfo,
-        });
-
-        // Fetch client info if client ID exists
-        if (car.client) {
-          console.log(
-            "[DEBUG] GET - Fetching client info for car",
-            carId,
-            "client ID:",
-            typeof car.client === "object" ? car.client.toString() : car.client
-          );
-
-          try {
-            const clientId =
-              typeof car.client === "object"
-                ? car.client
-                : new ObjectId(car.client.toString());
-            const clientInfo = await db
-              .collection("clients")
-              .findOne({ _id: clientId });
-
-            if (clientInfo) {
-              console.log("[DEBUG] GET - Found client document:", {
-                _id: clientInfo._id.toString(),
-                name: clientInfo.name,
-                hasEmail: !!clientInfo.email,
-                hasPhone: !!clientInfo.phone,
-              });
-
-              // Update clientInfo with found data
-              car.clientInfo = {
-                _id: clientInfo._id.toString(),
-                name: clientInfo.name || "",
-                email: clientInfo.email || "",
-                phone: clientInfo.phone || "",
-                address: clientInfo.address || "",
-              };
-
-              console.log(
-                "[DEBUG] GET - Updated car with client info:",
-                car.clientInfo
-              );
-            } else {
-              console.warn("[WARN] Client not found for ID:", car.client);
-            }
-          } catch (error) {
-            console.error("[ERROR] Error fetching client info:", error);
-            // Don't throw here, continue with default empty client info
-          }
-        }
-
         let metadata = await db
           .collection("article_metadata")
           .findOne({ carId });
