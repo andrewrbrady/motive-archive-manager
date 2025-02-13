@@ -513,7 +513,7 @@ export async function POST(
           throw new Error(`Car not found with ID: ${carId}`);
         }
 
-        // Initialize clientInfo with default empty values
+        // Initialize clientInfo with default empty values immediately after fetching car
         car.clientInfo = {
           _id: "",
           name: "",
@@ -521,6 +521,12 @@ export async function POST(
           phone: "",
           address: "",
         };
+
+        console.log("[DEBUG] GET - Initial car data:", {
+          _id: car._id.toString(),
+          client: car.client?.toString(),
+          clientInfo: car.clientInfo,
+        });
 
         // Fetch client info if client ID exists
         if (car.client) {
@@ -556,6 +562,11 @@ export async function POST(
                 phone: clientInfo.phone || "",
                 address: clientInfo.address || "",
               };
+
+              console.log(
+                "[DEBUG] GET - Updated car with client info:",
+                car.clientInfo
+              );
             } else {
               console.warn("[WARN] Client not found for ID:", car.client);
             }
