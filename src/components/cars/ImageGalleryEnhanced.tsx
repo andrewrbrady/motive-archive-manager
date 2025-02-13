@@ -42,7 +42,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   }>({});
   const mainImageRef = useRef<HTMLDivElement>(null);
   const imagesPerRow = 3;
-  const rowsPerPage = 8;
+  const rowsPerPage = 5;
 
   // Get unique filter values
   const filterOptions = images.reduce(
@@ -325,133 +325,151 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
               isMainVisible ? "opacity-100" : "opacity-0"
             }`}
           >
-            <div
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#f4f4f5] dark:bg-[#1a1a1a] shadow-sm dark:shadow-md transition-shadow hover:shadow-md dark:hover:shadow-lg"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-            >
-              <Image
-                src={`${filteredImages[mainIndex]?.url.replace(
-                  "/public",
-                  ""
-                )}/public`}
-                alt={`Vehicle view ${mainIndex + 1} of ${
-                  filteredImages.length
-                }`}
-                className="object-cover"
-                fill
-                sizes="100vw"
-                priority
-              />
-              <button
-                onClick={() => {
-                  setModalIndex(mainIndex);
-                  setIsModalOpen(true);
-                }}
-                className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
-                aria-label="Open fullscreen view"
-              >
-                <ZoomIn className="w-5 h-5" />
-              </button>
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
-              <button
-                onClick={handlePrev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
-                aria-label="Previous image"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
-                aria-label="Next image"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="mt-4 space-y-2 text-[#52525b] dark:text-[#a1a1aa]">
-              {filteredImages[mainIndex]?.metadata.description && (
-                <p className="text-sm">
-                  {filteredImages[mainIndex].metadata.description}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2 text-xs">
-                {filteredImages[mainIndex]?.metadata.angle && (
-                  <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
-                    Angle: {filteredImages[mainIndex].metadata.angle}
-                  </span>
-                )}
-                {filteredImages[mainIndex]?.metadata.view && (
-                  <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
-                    View: {filteredImages[mainIndex].metadata.view}
-                  </span>
-                )}
-                {filteredImages[mainIndex]?.metadata.movement && (
-                  <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
-                    Movement: {filteredImages[mainIndex].metadata.movement}
-                  </span>
-                )}
-                {filteredImages[mainIndex]?.metadata.tod && (
-                  <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
-                    Time of Day: {filteredImages[mainIndex].metadata.tod}
-                  </span>
-                )}
+            {filteredImages.length > 0 ? (
+              <>
+                <div
+                  className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#f4f4f5] dark:bg-[#1a1a1a] shadow-sm dark:shadow-md transition-shadow hover:shadow-md dark:hover:shadow-lg"
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <Image
+                    src={`${filteredImages[mainIndex]?.url.replace(
+                      "/public",
+                      ""
+                    )}/public`}
+                    alt={`Vehicle view ${mainIndex + 1} of ${
+                      filteredImages.length
+                    }`}
+                    className="object-cover"
+                    fill
+                    sizes="100vw"
+                    priority
+                  />
+                  <button
+                    onClick={() => {
+                      setModalIndex(mainIndex);
+                      setIsModalOpen(true);
+                    }}
+                    className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                    aria-label="Open fullscreen view"
+                  >
+                    <ZoomIn className="w-5 h-5" />
+                  </button>
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
+                  <button
+                    onClick={handlePrev}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="mt-4 space-y-2 text-[#52525b] dark:text-[#a1a1aa]">
+                  {filteredImages[mainIndex]?.metadata.description && (
+                    <p className="text-sm">
+                      {filteredImages[mainIndex].metadata.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {filteredImages[mainIndex]?.metadata.angle && (
+                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                        Angle: {filteredImages[mainIndex].metadata.angle}
+                      </span>
+                    )}
+                    {filteredImages[mainIndex]?.metadata.view && (
+                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                        View: {filteredImages[mainIndex].metadata.view}
+                      </span>
+                    )}
+                    {filteredImages[mainIndex]?.metadata.movement && (
+                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                        Movement: {filteredImages[mainIndex].metadata.movement}
+                      </span>
+                    )}
+                    {filteredImages[mainIndex]?.metadata.tod && (
+                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                        Time of Day: {filteredImages[mainIndex].metadata.tod}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[#f4f4f5] dark:bg-[#1a1a1a] text-[#52525b] dark:text-[#a1a1aa]">
+                <p>No images match the selected filters</p>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
         <div className="w-1/3">
-          <div className="grid grid-cols-3 gap-2">
-            {paginatedImages.map((image, index) => {
-              const actualIndex = (currentPage - 1) * itemsPerPage + index;
-              return (
-                <button
-                  key={actualIndex}
-                  onClick={() => setMainIndex(actualIndex)}
-                  className={`aspect-square relative transition-all duration-150 ease-in-out ${
-                    actualIndex === mainIndex
-                      ? "ring-2 ring-[#222222] dark:ring-[#222222]"
-                      : "opacity-75 hover:opacity-100"
-                  } focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]`}
-                  aria-label={`View image ${actualIndex + 1}`}
-                  aria-current={actualIndex === mainIndex ? "true" : "false"}
-                >
-                  <Image
-                    src={`${image.url.replace("/public", "")}/width=200`}
-                    alt={`Thumbnail ${actualIndex + 1}`}
-                    className="object-cover rounded-md"
-                    fill
-                    sizes="(max-width: 640px) 25vw, (max-width: 768px) 16.67vw, 12.5vw"
-                  />
-                </button>
-              );
-            })}
-          </div>
+          <div className="flex flex-col h-[calc(100vh-24rem)]">
+            {filteredImages.length > 0 ? (
+              <div className="grid grid-cols-3 gap-x-1 gap-y-1 auto-rows-max overflow-y-auto">
+                {paginatedImages.map((image, index) => {
+                  const actualIndex = (currentPage - 1) * itemsPerPage + index;
+                  return (
+                    <button
+                      key={actualIndex}
+                      onClick={() => setMainIndex(actualIndex)}
+                      className={`aspect-square relative transition-all duration-150 ease-in-out ${
+                        actualIndex === mainIndex
+                          ? "ring-2 ring-[#222222] dark:ring-[#222222]"
+                          : "opacity-75 hover:opacity-100"
+                      } focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]`}
+                      aria-label={`View image ${actualIndex + 1}`}
+                      aria-current={
+                        actualIndex === mainIndex ? "true" : "false"
+                      }
+                    >
+                      <Image
+                        src={`${image.url.replace("/public", "")}/width=200`}
+                        alt={`Thumbnail ${actualIndex + 1}`}
+                        className="object-cover rounded-md"
+                        fill
+                        sizes="(max-width: 640px) 25vw, (max-width: 768px) 16.67vw, 12.5vw"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-[#52525b] dark:text-[#a1a1aa]">
+                <p>No images match the selected filters</p>
+              </div>
+            )}
 
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 mt-4">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm text-[#52525b] dark:text-[#a1a1aa]">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
-                aria-label="Next page"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          )}
+            {totalPages > 1 && filteredImages.length > 0 && (
+              <div className="flex justify-center items-center gap-4 h-16 shrink-0 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className="text-sm text-[#52525b] dark:text-[#a1a1aa]">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {isModalOpen && (
