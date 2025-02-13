@@ -467,17 +467,43 @@ export async function POST(
             "[DEBUG] GET - Fetching client info for car",
             carId,
             "client ID:",
-            car.client
+            typeof car.client === "object" ? car.client.toString() : car.client
           );
 
           try {
+            let clientId;
+            try {
+              clientId =
+                typeof car.client === "object"
+                  ? car.client
+                  : new ObjectId(car.client.toString());
+            } catch (error) {
+              console.error("[ERROR] Invalid client ID format:", {
+                clientId: car.client,
+                type: typeof car.client,
+                error: error instanceof Error ? error.message : "Unknown error",
+              });
+              // Don't throw here, just skip client info
+              car.clientInfo = {
+                _id: car.client.toString(),
+                name: "",
+                email: "",
+                phone: "",
+                address: "",
+              };
+              console.log(
+                "[DEBUG] GET - Set empty client info due to invalid ID"
+              );
+              return; // Return from the inner try block
+            }
+
             const clientInfo = await db
               .collection("clients")
-              .findOne({ _id: new ObjectId(car.client.toString()) });
+              .findOne({ _id: clientId });
 
             console.log("[DEBUG] GET - Client query result:", {
               found: !!clientInfo,
-              clientId: car.client.toString(),
+              clientId: clientId.toString(),
               fields: clientInfo ? Object.keys(clientInfo) : null,
             });
 
@@ -487,15 +513,21 @@ export async function POST(
                 name: clientInfo.name,
                 hasEmail: !!clientInfo.email,
                 hasPhone: !!clientInfo.phone,
+                type: typeof clientInfo._id,
               });
+
+              // Ensure all fields are strings and not undefined
               car.clientInfo = {
                 _id: clientInfo._id.toString(),
-                name: clientInfo.name,
+                name: clientInfo.name || "",
                 email: clientInfo.email || "",
                 phone: clientInfo.phone || "",
                 address: clientInfo.address || "",
               };
-              console.log("[DEBUG] GET - Updated car with client info:", car);
+              console.log("[DEBUG] GET - Updated car with client info:", {
+                clientInfo: car.clientInfo,
+                carId: car._id.toString(),
+              });
             } else {
               console.warn("[WARN] Client not found for ID:", car.client);
             }
