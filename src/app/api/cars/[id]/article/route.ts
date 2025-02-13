@@ -513,13 +513,14 @@ export async function POST(
           throw new Error(`Car not found with ID: ${carId}`);
         }
 
-        console.log("[DEBUG] GET - Initial car data:", {
-          _id: car._id.toString(),
-          client: car.client?.toString(),
-          hasClientId: !!car.client,
-          env: process.env.NODE_ENV,
-          mongoDbUri: process.env.MONGODB_URI ? "Set" : "Not Set",
-        });
+        // Initialize clientInfo with default empty values
+        car.clientInfo = {
+          _id: "",
+          name: "",
+          email: "",
+          phone: "",
+          address: "",
+        };
 
         // Fetch client info if client ID exists
         if (car.client) {
@@ -531,41 +532,13 @@ export async function POST(
           );
 
           try {
-            let clientId;
-            try {
-              clientId =
-                typeof car.client === "object"
-                  ? car.client
-                  : new ObjectId(car.client.toString());
-            } catch (error) {
-              console.error("[ERROR] Invalid client ID format:", {
-                clientId: car.client,
-                type: typeof car.client,
-                error: error instanceof Error ? error.message : "Unknown error",
-              });
-              // Don't throw here, just skip client info
-              car.clientInfo = {
-                _id: car.client.toString(),
-                name: "",
-                email: "",
-                phone: "",
-                address: "",
-              };
-              console.log(
-                "[DEBUG] GET - Set empty client info due to invalid ID"
-              );
-              return; // Return from the inner try block
-            }
-
+            const clientId =
+              typeof car.client === "object"
+                ? car.client
+                : new ObjectId(car.client.toString());
             const clientInfo = await db
               .collection("clients")
               .findOne({ _id: clientId });
-
-            console.log("[DEBUG] GET - Client query result:", {
-              found: !!clientInfo,
-              clientId: clientId.toString(),
-              fields: clientInfo ? Object.keys(clientInfo) : null,
-            });
 
             if (clientInfo) {
               console.log("[DEBUG] GET - Found client document:", {
@@ -573,10 +546,9 @@ export async function POST(
                 name: clientInfo.name,
                 hasEmail: !!clientInfo.email,
                 hasPhone: !!clientInfo.phone,
-                type: typeof clientInfo._id,
               });
 
-              // Ensure all fields are strings and not undefined
+              // Update clientInfo with found data, maintaining default values for missing fields
               car.clientInfo = {
                 _id: clientInfo._id.toString(),
                 name: clientInfo.name || "",
@@ -584,16 +556,12 @@ export async function POST(
                 phone: clientInfo.phone || "",
                 address: clientInfo.address || "",
               };
-              console.log("[DEBUG] GET - Updated car with client info:", {
-                clientInfo: car.clientInfo,
-                carId: car._id.toString(),
-              });
             } else {
               console.warn("[WARN] Client not found for ID:", car.client);
             }
           } catch (error) {
-            console.error("Error fetching client info:", error);
-            throw error;
+            console.error("[ERROR] Error fetching client info:", error);
+            // Don't throw here, continue with default empty client info
           }
         }
 
