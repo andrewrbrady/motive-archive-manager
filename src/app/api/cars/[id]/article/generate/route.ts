@@ -15,6 +15,7 @@ interface OutlinePoint {
 }
 
 interface ArticleState {
+  _id: ObjectId;
   carId: string;
   outline: OutlinePoint[];
   workingDraft: string;
@@ -74,7 +75,9 @@ export async function POST(
         : "standard";
 
     // Get or create article state
-    let articleState = await db.collection("article_states").findOne({ carId });
+    let articleState = await db
+      .collection("article_states")
+      .findOne<ArticleState>({ carId });
 
     if (!articleState) {
       // Start with outline generation
@@ -106,6 +109,7 @@ The outline should be extremely detailed and support an article of ${detailLevel
       const outline = parseOutlineToStructure(outlineResponse);
 
       articleState = {
+        _id: new ObjectId(),
         carId,
         outline,
         workingDraft: "",
