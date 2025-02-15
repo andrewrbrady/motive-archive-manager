@@ -4,6 +4,16 @@ this is how to properly run node and npm on macos
 
 export PATH="/opt/homebrew/opt/node@20/bin:$PATH" && node --version && npm run build
 
+if you are running dev, you need to run the following command:
+
+export PATH="/opt/homebrew/opt/node@20/bin:$PATH" && node --version && npm run dev
+
+## using homebrew
+
+use the proper location for homebrew
+
+export PATH="/opt/homebrew/bin:$PATH"
+
 ## WORKING WITH MODELS
 
 DO NOT OVERWRITE MY MODEL CHOICES:

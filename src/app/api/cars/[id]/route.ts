@@ -257,196 +257,121 @@ function cleanAiAnalysis(car: any) {
   return car;
 }
 
+// Helper function to convert MongoDB document to plain object
+function convertToPlainObject(doc: any): any {
+  if (doc === null || typeof doc !== "object") {
+    return doc;
+  }
+
+  if (doc instanceof ObjectId) {
+    return doc.toString();
+  }
+
+  if (Array.isArray(doc)) {
+    return doc.map(convertToPlainObject);
+  }
+
+  const plainObj: any = {};
+  for (const key in doc) {
+    if (Object.prototype.hasOwnProperty.call(doc, key)) {
+      plainObj[key] = convertToPlainObject(doc[key]);
+    }
+  }
+  return plainObj;
+}
+
 // PATCH to update car information
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const client = await getMongoClient();
+  let client;
   try {
-    let requestBody: UpdateBody = {};
-    try {
-      requestBody = await request.json();
-    } catch (e) {
-      // No body provided, that's ok for cleanup
-    }
+    console.log("\n=== CAR UPDATE API CALLED ===");
+    console.log("Car ID:", params.id);
 
-    const { id } = params;
-    if (!ObjectId.isValid(id)) {
-      return NextResponse.json(
-        { error: "Invalid car ID format" },
-        { status: 400 }
-      );
-    }
+    const updates = await request.json();
+    console.log("\nReceived Updates:", JSON.stringify(updates, null, 2));
 
-    const { documentId, images, ...updates } = requestBody;
-
-    const objectId = new ObjectId(id);
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
-
-    // Clean up aiAnalysis if this is a normal update or cleanup request
-    if (!documentId && !images) {
-      const car = await db.collection("cars").findOne({ _id: objectId });
-      if (car) {
-        const cleanedCar = cleanAiAnalysis(car);
-        await db
-          .collection("cars")
-          .updateOne({ _id: objectId }, { $set: cleanedCar });
-
-        // Return the cleaned car
-        const updatedCar = await db
-          .collection("cars")
-          .findOne({ _id: objectId });
-        return NextResponse.json(updatedCar);
-      }
-    }
-
-    // Handle document removal
-    if (documentId) {
-      if (!ObjectId.isValid(documentId)) {
-        return NextResponse.json(
-          { error: "Invalid document ID format" },
-          { status: 400 }
-        );
-      }
-      const docObjectId = new ObjectId(documentId);
-
-      // Remove document reference from car
-      const updateResult = await db
-        .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $pull: { documents: documentId } });
-
-      if (updateResult.matchedCount === 0) {
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
-      }
-
-      // Delete the document from receipts collection
-      await db.collection("receipts").deleteOne({
-        _id: docObjectId,
-      });
-
-      return NextResponse.json({ message: "Document removed successfully" });
-    }
-
-    // Handle image updates
-    if (images) {
-      if (!Array.isArray(images)) {
-        return NextResponse.json(
-          { error: "Invalid images array provided" },
-          { status: 400 }
-        );
-      }
-
-      // Convert image IDs to ObjectIds
-      const imageIds = images.map((image) => new ObjectId(image._id));
-
-      const updateResult = await db
-        .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $set: { imageIds } });
-
-      if (updateResult.matchedCount === 0) {
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
-      }
-
-      // Fetch the updated car with populated images
-      const updatedCar = await db
-        .collection("cars")
-        .aggregate([
-          { $match: { _id: objectId } },
-          {
-            $lookup: {
-              from: "images",
-              localField: "imageIds",
-              foreignField: "_id",
-              as: "images",
-            },
-          },
-        ])
-        .next();
-
-      return NextResponse.json(updatedCar);
-    }
-
-    // Handle general car data updates
-    if (Object.keys(updates).length > 0) {
-      console.error("[DEBUG] PATCH - Updating car with data:", updates);
-
-      // Convert client ID to ObjectId if present
-      if (updates.client) {
-        if (ObjectId.isValid(updates.client)) {
-          updates.client = new ObjectId(updates.client);
-        } else {
-          delete updates.client; // Remove invalid client ID
+    // Clean up the updates object
+    const cleanedUpdates = Object.entries(updates).reduce(
+      (acc, [key, value]) => {
+        // Skip null, undefined, or empty string values
+        if (value === null || value === undefined || value === "") {
+          return acc;
         }
-      }
-
-      const updateResult = await db
-        .collection<Car>("cars")
-        .updateOne({ _id: objectId }, { $set: updates });
-
-      if (updateResult.matchedCount === 0) {
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
-      }
-
-      // Fetch the updated car with populated images
-      const updatedCar = await db
-        .collection("cars")
-        .aggregate([
-          { $match: { _id: objectId } },
-          {
-            $lookup: {
-              from: "images",
-              localField: "imageIds",
-              foreignField: "_id",
-              as: "images",
+        // Handle nested objects
+        if (typeof value === "object" && !Array.isArray(value)) {
+          const cleaned = Object.entries(value).reduce(
+            (nested, [nestedKey, nestedValue]) => {
+              if (
+                nestedValue === null ||
+                nestedValue === undefined ||
+                nestedValue === ""
+              ) {
+                return nested;
+              }
+              return { ...nested, [nestedKey]: nestedValue };
             },
-          },
-        ])
-        .next();
-
-      console.error("[DEBUG] PATCH - After update - Car data:", {
-        _id: updatedCar._id,
-        client: updatedCar.client,
-        clientInfo: updatedCar.clientInfo,
-      });
-
-      // If the car has a client field, populate the client information
-      if (updatedCar.client && ObjectId.isValid(updatedCar.client)) {
-        console.error(
-          "[DEBUG] PATCH - Fetching client info for client ID:",
-          updatedCar.client
-        );
-        const clientDoc = await db.collection("clients").findOne({
-          _id: new ObjectId(updatedCar.client.toString()),
-        });
-
-        console.error("[DEBUG] PATCH - Found client document:", clientDoc);
-
-        if (clientDoc) {
-          updatedCar.clientInfo = {
-            _id: clientDoc._id.toString(),
-            name: clientDoc.name,
-            email: clientDoc.email,
-            phone: clientDoc.phone,
-            address: clientDoc.address,
-          };
+            {}
+          );
+          if (Object.keys(cleaned).length > 0) {
+            acc[key] = cleaned;
+          }
+          return acc;
         }
-      }
-
-      return NextResponse.json(updatedCar);
-    }
-
-    return NextResponse.json(
-      { error: "No valid operation specified" },
-      { status: 400 }
+        acc[key] = value;
+        return acc;
+      },
+      {}
     );
+
+    console.log("\nCleaned Updates:", JSON.stringify(cleanedUpdates, null, 2));
+
+    client = await getMongoClient();
+    const db = client.db(DB_NAME);
+    const objectId = new ObjectId(params.id);
+
+    // First verify the car exists
+    const existingCar = await db.collection("cars").findOne({ _id: objectId });
+    if (!existingCar) {
+      console.error(`Car not found with ID: ${params.id}`);
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
+    // Perform the update with cleaned data
+    const result = await db
+      .collection("cars")
+      .findOneAndUpdate(
+        { _id: objectId },
+        { $set: cleanedUpdates },
+        { returnDocument: "after" }
+      );
+
+    if (!result) {
+      console.error("Update failed - no document returned");
+      throw new Error("Failed to update car");
+    }
+
+    // Convert to plain object to ensure it's JSON serializable
+    const serializedCar = convertToPlainObject(result);
+    console.log("\nUpdated Car State:", JSON.stringify(serializedCar, null, 2));
+    console.log("\n=== CAR UPDATE COMPLETED ===\n");
+
+    return NextResponse.json(serializedCar);
   } catch (error) {
-    console.error("Error updating car:", error);
+    console.error("\n=== CAR UPDATE ERROR ===");
+    console.error("Error details:", error);
+    console.error("Stack trace:", error.stack);
+    console.error("\n=========================\n");
+
     return NextResponse.json(
-      { error: "Failed to update car" },
+      { error: "Failed to update car", details: error.message },
       { status: 500 }
     );
   } finally {
-    await client.close();
+    if (client) {
+      await client.close();
+    }
   }
 }

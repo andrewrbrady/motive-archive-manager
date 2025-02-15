@@ -476,6 +476,32 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
       <div className="flex flex-col md:flex-row gap-8">
         {/* Left Panel - Content */}
         <div className="w-full md:w-2/3 space-y-6">
+          {isGenerating && progress && (
+            <div className="bg-background-secondary border border-border-primary rounded-lg p-6 animate-pulse">
+              <div className="flex items-center gap-4 mb-4">
+                <Loader2 className="w-6 h-6 animate-spin text-accent-primary" />
+                <div>
+                  <h3 className="font-medium capitalize">
+                    {progress.stage} in Progress
+                  </h3>
+                  <p className="text-sm text-text-secondary">
+                    {progress.message}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {stageDescriptions[progress.stage].details.map(
+                  (detail, index) => (
+                    <div
+                      key={index}
+                      className="h-4 bg-background-tertiary rounded animate-pulse"
+                    />
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
           {(metadata || selectedSavedArticle) && (
             <div className="space-y-6">
               {isViewingSaved && selectedSavedArticle && (
@@ -626,15 +652,18 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
               <Button
                 onClick={() => generateArticle("planning")}
                 disabled={isGenerating}
-                className="w-full"
+                className="w-full flex items-center justify-center gap-2"
               >
                 {isGenerating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating...
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Generating Article...
                   </>
                 ) : (
-                  "Generate Article"
+                  <>
+                    <PenLine className="w-5 h-5" />
+                    Generate Article
+                  </>
                 )}
               </Button>
             )}

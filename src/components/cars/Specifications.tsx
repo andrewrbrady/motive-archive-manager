@@ -6,6 +6,7 @@ import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { Client } from "@/types/car";
+import { toast } from "react-hot-toast";
 
 // Define the car data structure as we receive it from the API
 interface CarData {
@@ -255,7 +256,39 @@ const formatMileage = (mileage: MeasurementValue | undefined): string => {
   );
 };
 
-export default function Specifications({
+// Add type information for measurement values
+interface MeasurementWithUnit {
+  value: number | string | null;
+  unit: string;
+}
+
+// Add type information for nested objects
+interface EngineValue {
+  type?: string;
+  displacement?: MeasurementWithUnit;
+  power?: {
+    hp: number;
+    kW: number;
+    ps: number;
+  };
+  torque?: {
+    "lb-ft": number;
+    Nm: number;
+  };
+  features?: string[];
+}
+
+interface DimensionsValue {
+  [key: string]: MeasurementWithUnit;
+}
+
+interface InteriorFeaturesValue {
+  seats?: number | string | null;
+  upholstery?: string;
+}
+
+// Main component definition
+const Specifications = ({
   car,
   isEditMode = false,
   onEdit,
@@ -268,61 +301,37 @@ export default function Specifications({
   onMeasurementChange,
   onPowerChange,
   onTorqueChange,
-}: SpecificationProps) {
+}: SpecificationProps) => {
   const [clients, setClients] = useState<Client[]>([]);
-  const [localEditedSpecs, setLocalEditedSpecs] = useState(editedSpecs);
+  const [localSpecs, setLocalSpecs] = useState<Partial<CarData>>(car);
 
-  // Reset local state when edit mode changes or when editedSpecs changes
+  // Single useEffect to manage localSpecs state
   useEffect(() => {
-    setLocalEditedSpecs(editedSpecs);
-  }, [isEditMode, editedSpecs]);
+    // Only update localSpecs when not in edit mode or when car data changes significantly
+    const shouldUpdate =
+      !isEditMode ||
+      car._id !== localSpecs._id ||
+      car.year !== localSpecs.year ||
+      car.make !== localSpecs.make ||
+      car.model !== localSpecs.model;
 
-  // Handle local changes
-  const handleLocalInputChange = (
-    field: string,
-    value: any,
-    nestedField?: string
-  ) => {
-    setLocalEditedSpecs((prev: any) => {
-      if (nestedField) {
-        return {
-          ...prev,
-          [field]: {
-            ...prev[field],
-            [nestedField]: value,
-          },
-        };
-      }
-      return {
-        ...prev,
-        [field]: value,
-      };
-    });
-    onInputChange?.(field, value, nestedField);
-  };
+    if (shouldUpdate) {
+      console.log("Updating localSpecs with new car data");
+      setLocalSpecs(car);
+    }
+  }, [car, isEditMode]);
 
-  const handleLocalMeasurementChange = (
-    field: string,
-    value: any,
-    nestedField?: string
-  ) => {
-    setLocalEditedSpecs((prev: any) => {
+  const handleInputChange = (field: string, value: any) => {
+    console.log(`Updating field ${field} with value:`, value);
+    setLocalSpecs((prev) => {
+      // Handle nested fields (e.g., "engine.type")
       if (field.includes(".")) {
-        const [parentField, childField] = field.split(".");
+        const [parent, child] = field.split(".");
         return {
           ...prev,
-          [parentField]: {
-            ...prev[parentField],
-            [childField]: value,
-          },
-        };
-      }
-      if (nestedField) {
-        return {
-          ...prev,
-          [field]: {
-            ...prev[field],
-            [nestedField]: value,
+          [parent]: {
+            ...(prev[parent] || {}),
+            [child]: value,
           },
         };
       }
@@ -331,15 +340,42 @@ export default function Specifications({
         [field]: value,
       };
     });
-    onMeasurementChange?.(field, value, nestedField);
   };
 
-  const handleSave = () => {
-    onSave?.(localEditedSpecs);
+  const handleNestedInputChange = (
+    parent: string,
+    field: string,
+    value: any
+  ) => {
+    console.log(`Updating nested field ${parent}.${field} with value:`, value);
+    setLocalSpecs((prev) => ({
+      ...prev,
+      [parent]: {
+        ...(prev[parent] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSave = async () => {
+    console.log("\n=== SAVING SPECIFICATIONS ===");
+    console.log("Current local specs:", localSpecs);
+
+    try {
+      await onSave?.(localSpecs);
+      // Don't reset localSpecs here - let the parent component handle the update
+      console.log("Save successful");
+    } catch (error) {
+      console.error("Error saving specifications:", error);
+      toast.error("Failed to save specifications");
+      // On error, reset to car data
+      setLocalSpecs(car);
+    }
   };
 
   const handleCancel = () => {
-    setLocalEditedSpecs({});
+    console.log("Cancelling edit, resetting to car data");
+    setLocalSpecs(car);
     onCancel?.();
   };
 
@@ -353,22 +389,28 @@ export default function Specifications({
         }
         const data = await response.json();
         setClients(data);
+
+        // If we have a client ID but no clientInfo, find and set the client name
+        if (car.client && !car.clientInfo && data.length > 0) {
+          const clientMatch = data.find((c) => c._id === car.client);
+          if (clientMatch) {
+            setLocalSpecs((prev) => ({
+              ...prev,
+              clientInfo: {
+                name: clientMatch.name,
+                email: clientMatch.email,
+                phone: clientMatch.phone,
+                company: clientMatch.company,
+              },
+            }));
+          }
+        }
       } catch (error) {
         console.error("Error fetching clients:", error);
       }
     };
     fetchClients();
-  }, []);
-
-  // Add detailed logging of the car object
-  console.log("=== Specifications Component Debug Logs ===");
-  console.log("Full car object:", JSON.stringify(car, null, 2));
-  console.log("GVWR value:", JSON.stringify(car?.dimensions?.gvwr, null, 2));
-  console.log(
-    "Series value:",
-    JSON.stringify(car?.manufacturing?.series, null, 2)
-  );
-  console.log("Trim value:", JSON.stringify(car?.manufacturing?.trim, null, 2));
+  }, [car.client]);
 
   return (
     <div className="bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800">
@@ -436,8 +478,10 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="number"
-                value={getNumberInputValue(localEditedSpecs.year ?? car.year)}
-                onChange={(e) => handleLocalInputChange("year", e.target.value)}
+                value={localSpecs.year || ""}
+                onChange={(e) =>
+                  handleInputChange("year", parseInt(e.target.value) || "")
+                }
                 className="w-24 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
             ) : (
@@ -452,8 +496,8 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="text"
-                value={getInputValue(localEditedSpecs.make ?? car.make)}
-                onChange={(e) => handleLocalInputChange("make", e.target.value)}
+                value={localSpecs.make || ""}
+                onChange={(e) => handleInputChange("make", e.target.value)}
                 className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
             ) : (
@@ -470,10 +514,8 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="text"
-                value={getInputValue(localEditedSpecs.model ?? car.model)}
-                onChange={(e) =>
-                  handleLocalInputChange("model", e.target.value)
-                }
+                value={localSpecs.model || ""}
+                onChange={(e) => handleInputChange("model", e.target.value)}
                 className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
             ) : (
@@ -490,10 +532,8 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="text"
-                value={getInputValue(localEditedSpecs.color ?? car.color)}
-                onChange={(e) =>
-                  handleLocalInputChange("color", e.target.value)
-                }
+                value={localSpecs.color || ""}
+                onChange={(e) => handleInputChange("color", e.target.value)}
                 className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
             ) : (
@@ -510,14 +550,12 @@ export default function Specifications({
             {isEditMode ? (
               <MeasurementInputWithUnit
                 value={
-                  localEditedSpecs.mileage ?? {
+                  localSpecs.mileage ?? {
                     value: car.mileage?.value ?? null,
                     unit: car.mileage?.unit ?? getUnitsForType("MILEAGE")[0],
                   }
                 }
-                onChange={(value) =>
-                  handleLocalMeasurementChange("mileage", value)
-                }
+                onChange={(value) => handleInputChange("mileage", value)}
                 availableUnits={getUnitsForType("MILEAGE")}
                 className="justify-end"
               />
@@ -533,8 +571,8 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="text"
-                value={getInputValue(localEditedSpecs.vin ?? car.vin)}
-                onChange={(e) => handleLocalInputChange("vin", e.target.value)}
+                value={localSpecs.vin || car.vin || ""}
+                onChange={(e) => handleInputChange("vin", e.target.value)}
                 className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
             ) : (
@@ -550,10 +588,8 @@ export default function Specifications({
           <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
             {isEditMode ? (
               <select
-                value={localEditedSpecs.client ?? car.client ?? ""}
-                onChange={(e) =>
-                  handleLocalInputChange("client", e.target.value)
-                }
+                value={localSpecs.client ?? ""}
+                onChange={(e) => handleInputChange("client", e.target.value)}
                 className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               >
                 <option value="">Select client</option>
@@ -564,7 +600,10 @@ export default function Specifications({
                 ))}
               </select>
             ) : (
-              car.clientInfo?.name || "N/A"
+              localSpecs.clientInfo?.name ||
+              (localSpecs.client &&
+                clients.find((c) => c._id === localSpecs.client)?.name) ||
+              "N/A"
             )}
           </span>
         </div>
@@ -577,10 +616,8 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="text"
-                value={getInputValue(localEditedSpecs.location ?? car.location)}
-                onChange={(e) =>
-                  handleLocalInputChange("location", e.target.value)
-                }
+                value={localSpecs.location || car.location || ""}
+                onChange={(e) => handleInputChange("location", e.target.value)}
                 className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
             ) : (
@@ -597,9 +634,12 @@ export default function Specifications({
             {isEditMode ? (
               <input
                 type="number"
-                value={getNumberInputValue(localEditedSpecs.price ?? car.price)}
+                value={localSpecs.price || car.price || ""}
                 onChange={(e) =>
-                  handleLocalInputChange("price", e.target.value)
+                  handleInputChange(
+                    "price",
+                    e.target.value ? parseFloat(e.target.value) : ""
+                  )
                 }
                 className="w-28 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
@@ -624,11 +664,9 @@ export default function Specifications({
                 {isEditMode ? (
                   <input
                     type="text"
-                    value={
-                      localEditedSpecs.engine?.type ?? car.engine?.type ?? ""
-                    }
+                    value={localSpecs.engine?.type || ""}
                     onChange={(e) =>
-                      handleLocalInputChange("engine", e.target.value, "type")
+                      handleNestedInputChange("engine", "type", e.target.value)
                     }
                     className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
                   />
@@ -645,14 +683,14 @@ export default function Specifications({
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
-                      localEditedSpecs.engine?.displacement ??
+                      localSpecs.engine?.displacement ??
                       car.engine?.displacement ?? {
                         value: null,
                         unit: "L",
                       }
                     }
                     onChange={(value) =>
-                      handleLocalMeasurementChange("engine.displacement", value)
+                      handleInputChange("engine.displacement", value)
                     }
                     availableUnits={["L", "cc"]}
                     className="justify-end"
@@ -712,15 +750,16 @@ export default function Specifications({
                   {isEditMode ? (
                     <input
                       type="text"
-                      value={getInputValue(
-                        localEditedSpecs.manufacturing?.series ??
-                          car.manufacturing.series
-                      )}
+                      value={
+                        localSpecs.manufacturing?.series ??
+                        car.manufacturing.series ??
+                        ""
+                      }
                       onChange={(e) =>
-                        handleLocalInputChange(
+                        handleNestedInputChange(
                           "manufacturing",
-                          e.target.value,
-                          "series"
+                          "series",
+                          e.target.value
                         )
                       }
                       className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
@@ -740,15 +779,16 @@ export default function Specifications({
                   {isEditMode ? (
                     <input
                       type="text"
-                      value={getInputValue(
-                        localEditedSpecs.manufacturing?.trim ??
-                          car.manufacturing.trim
-                      )}
+                      value={
+                        localSpecs.manufacturing?.trim ??
+                        car.manufacturing.trim ??
+                        ""
+                      }
                       onChange={(e) =>
-                        handleLocalInputChange(
+                        handleNestedInputChange(
                           "manufacturing",
-                          e.target.value,
-                          "trim"
+                          "trim",
+                          e.target.value
                         )
                       }
                       className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
@@ -769,14 +809,14 @@ export default function Specifications({
                     <input
                       type="text"
                       value={getInputValue(
-                        localEditedSpecs.manufacturing?.bodyClass ??
+                        localSpecs.manufacturing?.bodyClass ??
                           car.manufacturing.bodyClass
                       )}
                       onChange={(e) =>
-                        handleLocalInputChange(
+                        handleNestedInputChange(
                           "manufacturing",
-                          e.target.value,
-                          "bodyClass"
+                          "bodyClass",
+                          e.target.value
                         )
                       }
                       className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
@@ -800,12 +840,8 @@ export default function Specifications({
               {isEditMode ? (
                 <input
                   type="number"
-                  value={getNumberInputValue(
-                    localEditedSpecs.doors ?? car.doors
-                  )}
-                  onChange={(e) =>
-                    handleLocalInputChange("doors", e.target.value)
-                  }
+                  value={getNumberInputValue(localSpecs.doors ?? car.doors)}
+                  onChange={(e) => handleInputChange("doors", e.target.value)}
                   className="w-24 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
                 />
               ) : (
@@ -826,13 +862,13 @@ export default function Specifications({
                 <input
                   type="text"
                   value={getInputValue(
-                    localEditedSpecs.safety?.tpms?.type ?? car.safety.tpms.type
+                    localSpecs.safety?.tpms?.type ?? car.safety.tpms.type
                   )}
                   onChange={(e) =>
-                    handleLocalInputChange(
+                    handleNestedInputChange(
                       "safety.tpms",
-                      e.target.value,
-                      "type"
+                      "type",
+                      e.target.value
                     )
                   }
                   className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
@@ -855,7 +891,7 @@ export default function Specifications({
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
-                      localEditedSpecs.dimensions?.length ?? {
+                      localSpecs.dimensions?.length ?? {
                         value: car.dimensions?.length?.value ?? null,
                         unit:
                           car.dimensions?.length?.unit ??
@@ -863,11 +899,7 @@ export default function Specifications({
                       }
                     }
                     onChange={(value) =>
-                      handleLocalMeasurementChange(
-                        "dimensions",
-                        value,
-                        "length"
-                      )
+                      handleNestedInputChange("dimensions", "length", value)
                     }
                     availableUnits={getUnitsForType("LENGTH")}
                     className="justify-end"
@@ -885,7 +917,7 @@ export default function Specifications({
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
-                      localEditedSpecs.dimensions?.width ?? {
+                      localSpecs.dimensions?.width ?? {
                         value: car.dimensions?.width?.value ?? null,
                         unit:
                           car.dimensions?.width?.unit ??
@@ -893,7 +925,7 @@ export default function Specifications({
                       }
                     }
                     onChange={(value) =>
-                      handleLocalMeasurementChange("dimensions", value, "width")
+                      handleNestedInputChange("dimensions", "width", value)
                     }
                     availableUnits={getUnitsForType("LENGTH")}
                     className="justify-end"
@@ -911,7 +943,7 @@ export default function Specifications({
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
-                      localEditedSpecs.dimensions?.height ?? {
+                      localSpecs.dimensions?.height ?? {
                         value: car.dimensions?.height?.value ?? null,
                         unit:
                           car.dimensions?.height?.unit ??
@@ -919,11 +951,7 @@ export default function Specifications({
                       }
                     }
                     onChange={(value) =>
-                      handleLocalMeasurementChange(
-                        "dimensions",
-                        value,
-                        "height"
-                      )
+                      handleNestedInputChange("dimensions", "height", value)
                     }
                     availableUnits={getUnitsForType("LENGTH")}
                     className="justify-end"
@@ -941,7 +969,7 @@ export default function Specifications({
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
-                      localEditedSpecs.dimensions?.wheelbase ?? {
+                      localSpecs.dimensions?.wheelbase ?? {
                         value: car.dimensions?.wheelbase?.value ?? null,
                         unit:
                           car.dimensions?.wheelbase?.unit ??
@@ -949,11 +977,7 @@ export default function Specifications({
                       }
                     }
                     onChange={(value) =>
-                      handleLocalMeasurementChange(
-                        "dimensions",
-                        value,
-                        "wheelbase"
-                      )
+                      handleNestedInputChange("dimensions", "wheelbase", value)
                     }
                     availableUnits={getUnitsForType("LENGTH")}
                     className="justify-end"
@@ -971,7 +995,7 @@ export default function Specifications({
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
-                      localEditedSpecs.dimensions?.gvwr ?? {
+                      localSpecs.dimensions?.gvwr ?? {
                         value: car.dimensions?.gvwr?.value ?? null,
                         unit:
                           car.dimensions?.gvwr?.unit ??
@@ -979,7 +1003,7 @@ export default function Specifications({
                       }
                     }
                     onChange={(value) =>
-                      handleLocalMeasurementChange("dimensions", value, "gvwr")
+                      handleNestedInputChange("dimensions", "gvwr", value)
                     }
                     availableUnits={getUnitsForType("WEIGHT")}
                     className="justify-end"
@@ -1003,11 +1027,11 @@ export default function Specifications({
                 {isEditMode ? (
                   <input
                     type="text"
-                    value={getInputValue(
-                      localEditedSpecs.interior_color ?? car.interior_color
-                    )}
+                    value={
+                      localSpecs.interior_color ?? car.interior_color ?? ""
+                    }
                     onChange={(e) =>
-                      handleLocalInputChange("interior_color", e.target.value)
+                      handleInputChange("interior_color", e.target.value)
                     }
                     className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
                   />
@@ -1024,15 +1048,15 @@ export default function Specifications({
                 {isEditMode ? (
                   <input
                     type="number"
-                    value={getNumberInputValue(
-                      localEditedSpecs.interior_features?.seats ??
-                        car.interior_features?.seats
-                    )}
+                    value={
+                      localSpecs.interior_features?.seats ??
+                      car.interior_features?.seats ??
+                      ""
+                    }
                     onChange={(e) =>
-                      handleLocalInputChange(
-                        "interior_features",
-                        e.target.value,
-                        "seats"
+                      handleInputChange(
+                        "interior_features.seats",
+                        parseInt(e.target.value) || ""
                       )
                     }
                     className="w-24 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
@@ -1055,20 +1079,20 @@ export default function Specifications({
               {isEditMode ? (
                 <input
                   type="text"
-                  value={getInputValue(
-                    localEditedSpecs.transmission?.type ?? car.transmission.type
-                  )}
+                  value={
+                    localSpecs.transmission?.type ?? car.transmission.type ?? ""
+                  }
                   onChange={(e) =>
-                    handleLocalInputChange(
+                    handleNestedInputChange(
                       "transmission",
-                      e.target.value,
-                      "type"
+                      "type",
+                      e.target.value
                     )
                   }
                   className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
                 />
               ) : (
-                car.transmission.type || "N/A"
+                car.transmission.type
               )}
             </span>
           </div>
@@ -1076,4 +1100,6 @@ export default function Specifications({
       </div>
     </div>
   );
-}
+};
+
+export default Specifications;

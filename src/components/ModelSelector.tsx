@@ -30,22 +30,26 @@ export function ModelSelector({
   onFocusChange,
 }: ModelSelectorProps) {
   return (
-    <div className={cn("space-y-2", className)}>
-      <Input
-        placeholder="What should we focus on? (optional)"
-        value={focus}
-        onChange={(e) => onFocusChange?.(e.target.value)}
-        className="w-full"
-      />
+    <div className={cn("relative", className)}>
+      {onFocusChange && (
+        <Input
+          placeholder="What should we focus on? (optional)"
+          value={focus}
+          onChange={(e) => onFocusChange?.(e.target.value)}
+          className="w-full mb-1"
+        />
+      )}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className="w-full h-6 text-xs">
           <SelectValue placeholder="Select a model" />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="claude-3-5-sonnet-20241022">
+        <SelectContent align="end" className="z-50">
+          <SelectItem value="claude-3-5-sonnet-20241022" className="text-xs">
             Claude 3.5 Sonnet
           </SelectItem>
-          <SelectItem value="gpt-4o-mini">GPT-4 Mini</SelectItem>
+          <SelectItem value="gpt-4o-mini" className="text-xs">
+            GPT-4 Mini
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>
