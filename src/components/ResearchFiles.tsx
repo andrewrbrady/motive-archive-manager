@@ -1,12 +1,28 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  Suspense,
+} from "react";
 import { FileText, Trash2, Upload, Loader2, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import MarkdownViewer from "./MarkdownViewer";
 import { ModelSelector, ModelType } from "@/components/ModelSelector";
-import MarkdownEditor from "./MarkdownEditor";
+import dynamic from "next/dynamic";
+
+// Dynamically import MarkdownEditor with no SSR
+const MarkdownEditor = dynamic(() => import("./MarkdownEditor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-6 h-6 animate-spin" />
+    </div>
+  ),
+});
 
 interface ResearchFile {
   _id: string;
@@ -148,32 +164,77 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
           [file.name]: 0,
         }));
 
-        const response = await fetch("/api/research/upload", {
-          method: "POST",
-          body: formData,
-        });
+        try {
+          const response = await fetch("/api/research/upload", {
+            method: "POST",
+            body: formData,
+          });
 
-        if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to upload ${file.name}`);
+          }
+
+          // Set progress to 100% when complete
+          setUploadProgress((prev) => ({
+            ...prev,
+            [file.name]: 100,
+          }));
+
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          setUploadProgress((prev) => ({
+            ...prev,
+            [file.name]: 0,
+          }));
+          throw error;
         }
-
-        // Set progress to 100% when complete
-        setUploadProgress((prev) => ({
-          ...prev,
-          [file.name]: 100,
-        }));
-
-        return response.json();
       });
 
-      const newFiles = await Promise.all(uploadPromises);
-      setFiles((prev) => [...prev, ...newFiles]);
+      const results = await Promise.allSettled(uploadPromises);
+
+      // Process successful uploads
+      const successfulUploads = results
+        .filter(
+          (result): result is PromiseFulfilledResult<any> =>
+            result.status === "fulfilled"
+        )
+        .map((result) => result.value);
+
+      if (successfulUploads.length > 0) {
+        setFiles((prev) => [...prev, ...successfulUploads]);
+      }
+
+      // Process failures
+      const failures = results
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected"
+        )
+        .map((result) => result.reason);
+
+      if (failures.length > 0) {
+        const errorMessage = failures
+          .map((error) =>
+            error instanceof Error ? error.message : "Upload failed"
+          )
+          .join(", ");
+        setError(`Some files failed to upload: ${errorMessage}`);
+      }
+
+      // Clear selected files regardless of success/failure
       setSelectedFiles([]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload files");
+    } catch (error) {
+      console.error("Error in upload process:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to upload files"
+      );
     } finally {
       setUploading(false);
-      setUploadProgress({});
+      // Keep progress visible briefly so users can see completion
+      setTimeout(() => setUploadProgress({}), 2000);
     }
   };
 
@@ -356,21 +417,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
         case "arrowright":
         case "l":
           e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < files.length) {
-            if (
-              !selectedFile ||
-              selectedFile._id !== files[selectedIndex]._id
-            ) {
-              handleFileClick(files[selectedIndex]);
-            }
-            viewerRef.current?.focus();
-          }
-          break;
-        case "enter":
-          e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < files.length) {
-            handleFileClick(files[selectedIndex]);
-          }
+          viewerRef.current?.focus();
           break;
         case "g":
           if (e.shiftKey) {
@@ -389,7 +436,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
           break;
       }
     },
-    [files, selectedIndex, isVimMode, selectedFile]
+    [files, selectedIndex, isVimMode]
   );
 
   useEffect(() => {
@@ -399,14 +446,51 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }
   }, [files]);
 
+  // Add new effect to automatically open file when selected
+  useEffect(() => {
+    if (selectedIndex >= 0 && selectedIndex < files.length) {
+      const selectedFile = files[selectedIndex];
+      handleFileClick(selectedFile);
+    }
+  }, [selectedIndex, files]);
+
   useEffect(() => {
     // Scroll selected item into view when using keyboard navigation
     if (selectedIndex >= 0 && fileListRef.current) {
-      const selectedElement = fileListRef.current.children[
-        selectedIndex
-      ] as HTMLElement;
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: "nearest" });
+      const fileListContainer = fileListRef.current;
+      // Find the actual file list div (the one with divide-y class)
+      const fileListDiv = fileListContainer.querySelector(
+        ".divide-y"
+      ) as HTMLElement;
+      if (!fileListDiv) return;
+
+      // Find the selected element within the file list
+      const selectedElement = fileListDiv.children[
+        selectedIndex + 1
+      ] as HTMLElement; // +1 to skip the header
+      if (!selectedElement) return;
+
+      // Calculate positions relative to the scrollable container
+      const containerRect = fileListContainer.getBoundingClientRect();
+      const elementRect = selectedElement.getBoundingClientRect();
+
+      // Calculate the relative positions
+      const elementTop = elementRect.top - containerRect.top;
+      const elementBottom = elementRect.bottom - containerRect.top;
+
+      // Check if element is not fully visible
+      if (elementTop < 0 || elementBottom > containerRect.height) {
+        // Calculate the new scroll position
+        const newScrollTop =
+          fileListContainer.scrollTop +
+          (elementTop < 0
+            ? elementTop // Scroll up if element is above
+            : elementBottom - containerRect.height); // Scroll down if element is below
+
+        fileListContainer.scrollTo({
+          top: newScrollTop,
+          behavior: "smooth",
+        });
       }
     }
   }, [selectedIndex]);
@@ -692,14 +776,22 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
             ) : (
               <div className="flex-1 flex flex-col min-h-0">
                 {isEditing ? (
-                  <MarkdownEditor
-                    content={selectedFile.content || ""}
-                    filename={selectedFile.filename}
-                    fileId={selectedFile._id}
-                    carId={carId}
-                    lastModified={selectedFile.updatedAt}
-                    onSave={handleContentSave}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      </div>
+                    }
+                  >
+                    <MarkdownEditor
+                      content={selectedFile.content || ""}
+                      filename={selectedFile.filename}
+                      fileId={selectedFile._id}
+                      carId={carId}
+                      lastModified={selectedFile.updatedAt}
+                      onSave={handleContentSave}
+                    />
+                  </Suspense>
                 ) : (
                   <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex-none px-2 py-1 border-b border-zinc-800 bg-background z-10 flex items-center justify-between">

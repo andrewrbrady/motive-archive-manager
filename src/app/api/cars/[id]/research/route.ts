@@ -39,68 +39,101 @@ export async function GET(
       NODE_ENV: process.env.NODE_ENV,
       MONGODB_URI:
         process.env.MONGODB_URI?.split("@")[1]?.split("/")[0] ||
-        "URI not found", // Only log the host part for security
+        "URI not found",
+      MONGODB_DB: process.env.MONGODB_DB || "motive_archive",
     });
 
     const { db } = await connectToDatabase();
     console.log("Research Files API - MongoDB Connected");
 
-    // List all collections to verify we're in the right database
+    // Convert carId to ObjectId
+    const carObjectId = new ObjectId(carId);
+    console.log("Research Files API - Car ObjectId:", carObjectId.toString());
+
+    // List all collections to verify research_files exists
     const collections = await db.listCollections().toArray();
-    console.log("Research Files API - Database Info:", {
-      databaseName: db.databaseName,
-      collections: collections.map((c) => c.name),
-      researchFilesExists: collections.some((c) => c.name === "research_files"),
-    });
+    console.log(
+      "Research Files API - Available Collections:",
+      collections.map((c) => c.name)
+    );
 
-    // Check a document directly without any query to verify connection
-    const sampleDoc = await db.collection("research_files").findOne({});
-    console.log("Research Files API - Sample Document:", {
-      exists: !!sampleDoc,
-      structure: sampleDoc
-        ? {
-            _id: sampleDoc._id.toString(),
-            carId:
-              sampleDoc.carId instanceof ObjectId
-                ? sampleDoc.carId.toString()
-                : typeof sampleDoc.carId === "string"
-                ? sampleDoc.carId
-                : "unknown type",
-            fields: Object.keys(sampleDoc || {}),
-            collectionName: "research_files",
-          }
-        : null,
-    });
+    // Try both research_files and research collections
+    let files = [];
 
-    // Query using string ID
-    const files = await db
+    // First try research_files collection with both string and ObjectId formats
+    const researchFilesQuery = {
+      $or: [
+        { carId: carObjectId },
+        { carId: carId },
+        { "metadata.carId": carObjectId },
+        { "metadata.carId": carId },
+      ],
+    };
+    console.log(
+      "Research Files API - Query research_files:",
+      JSON.stringify(researchFilesQuery)
+    );
+
+    files = await db
       .collection("research_files")
-      .find({ carId: carId })
+      .find(researchFilesQuery)
       .toArray();
+
+    // If no files found, try the research collection with the same query
+    if (files.length === 0) {
+      console.log(
+        "Research Files API - No files found in research_files, trying research collection"
+      );
+      files = await db
+        .collection("research")
+        .find(researchFilesQuery)
+        .toArray();
+
+      // Log sample from research collection if found
+      if (files.length > 0) {
+        console.log(
+          "Research Files API - Sample Document from research collection:",
+          JSON.stringify(files[0], null, 2)
+        );
+      }
+    }
 
     console.log("Research Files API - Query Results:", {
       filesFound: files.length,
-      carId,
-      query: { carId },
-      fileIds: files.map((f) => f._id),
+      carId: carObjectId.toString(),
+      fileIds: files.map((f) => f._id.toString()),
+      sampleFile:
+        files.length > 0
+          ? {
+              _id: files[0]._id.toString(),
+              carId: files[0].carId?.toString(),
+              metadata: files[0].metadata,
+            }
+          : null,
     });
 
     // Process files and generate URLs
-    const signedUrls = files.length > 0 ? await generateSignedUrls(files) : [];
+    const processedFiles = files.map((file) => ({
+      ...file,
+      _id: file._id.toString(),
+      carId: file.carId
+        ? typeof file.carId === "object"
+          ? file.carId.toString()
+          : file.carId
+        : carId,
+      metadata: {
+        ...file.metadata,
+        carId: file.metadata?.carId
+          ? typeof file.metadata.carId === "object"
+            ? file.metadata.carId.toString()
+            : file.metadata.carId
+          : undefined,
+      },
+    }));
 
-    const response = {
-      totalFiles: files.length,
-      hasUrls: signedUrls.length > 0,
-      files: signedUrls || [], // Ensure we always return an array
-    };
-
-    console.log("Research Files API - Response prepared:", {
-      totalFiles: files.length,
-      hasUrls: signedUrls.length > 0,
-      filesArrayLength: signedUrls?.length || 0,
+    return NextResponse.json({
+      files: processedFiles || [], // Ensure we always return an array
     });
-
-    return NextResponse.json(response);
   } catch (error) {
     console.error("Research Files API - Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -117,12 +150,36 @@ async function generateSignedUrls(files: any[]) {
   return Promise.all(
     files.map(async (file) => {
       try {
+        console.log("Research Files API - Generating URL for file:", {
+          fileId: file._id.toString(),
+          s3Key: file.s3Key,
+          hasS3Key: !!file.s3Key,
+          awsRegion: process.env.AWS_REGION,
+          awsBucketConfigured: !!process.env.AWS_BUCKET_NAME,
+        });
+
+        if (!file.s3Key) {
+          console.error(
+            "Research Files API - Missing S3 key for file:",
+            file._id.toString()
+          );
+          return {
+            ...file,
+            _id: file._id.toString(),
+            url: null,
+            error: "Missing S3 key",
+          };
+        }
+
         const url = await generatePresignedDownloadUrl(file.s3Key);
+
         console.log("Research Files API - Generated URL for file:", {
           fileId: file._id.toString(),
           s3Key: file.s3Key,
           urlGenerated: !!url,
+          urlLength: url?.length,
         });
+
         return {
           ...file,
           _id: file._id.toString(),
@@ -133,8 +190,16 @@ async function generateSignedUrls(files: any[]) {
           fileId: file._id.toString(),
           s3Key: file.s3Key,
           error: error instanceof Error ? error.message : "Unknown error",
+          stack: error instanceof Error ? error.stack : undefined,
         });
-        throw error;
+
+        return {
+          ...file,
+          _id: file._id.toString(),
+          url: null,
+          error:
+            error instanceof Error ? error.message : "Failed to generate URL",
+        };
       }
     })
   );

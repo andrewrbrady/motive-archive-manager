@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
 import { Loader2, Plus, Sparkles, Pencil, Trash2 } from "lucide-react";
@@ -287,7 +287,11 @@ interface CarFormData {
 }
 
 export default function CarPage() {
-  const { id } = useParams() as { id: string };
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<string>("gallery");
+  const { id } = params as { id: string };
   const [car, setCar] = useState<ExtendedCar | null>(null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -316,7 +320,6 @@ export default function CarPage() {
     status: "pending",
   });
   const [additionalContext, setAdditionalContext] = useState("");
-  const router = useRouter();
 
   type NestedFields =
     | "engine"
@@ -591,6 +594,24 @@ export default function CarPage() {
 
     fetchCar();
   }, [id]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    } else if (window.location.hash) {
+      const hashTab = window.location.hash.slice(1); // Remove the # symbol
+      setActiveTab(hashTab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    // Update URL with the new tab value
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set("tab", value);
+    window.history.pushState({}, "", newUrl.toString());
+  };
 
   // Helper function to convert ExtendedCar to CarFormData
   const toCarFormData = (car: ExtendedCar): CarFormData => {
@@ -1302,8 +1323,13 @@ export default function CarPage() {
             title={`${car.year} ${car.make} ${car.model}`}
             className="mb-6"
           />
+          {car.vin && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              VIN: {car.vin}
+            </p>
+          )}
 
-          <Tabs defaultValue="gallery" className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="mb-6">
               <TabsTrigger value="gallery">Image Gallery</TabsTrigger>
               <TabsTrigger value="specs">Specifications</TabsTrigger>

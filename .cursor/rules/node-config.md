@@ -1,0 +1,29 @@
+description: Rules for Node.js configuration and build processes
+pattern: ["**/*.ts", "**/*.tsx", "package.json", "next.config.js"]
+
+When working with Node.js in this project:
+
+1. Always use Node 20 from Homebrew on macOS with the correct PATH:
+
+   ```bash
+   export PATH="/opt/homebrew/opt/node@20/bin:$PATH"
+   ```
+
+2. For development:
+
+   ```bash
+   npm run dev
+   ```
+
+3. For production builds:
+
+   ```bash
+   npm run build
+   ```
+
+4. Always run a build before deploying to git
+
+5. Ensure Homebrew is properly configured:
+   ```bash
+   export PATH="/opt/homebrew/bin:$PATH"
+   ```
