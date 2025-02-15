@@ -9,7 +9,7 @@ import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
-import SortSelector from "@/components/ui/SortSelector";
+import SortSelector from "../../components/ui/SortSelector";
 import { Car, Client } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Link from "next/link";
