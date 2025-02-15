@@ -38,7 +38,11 @@ export async function POST(request: Request) {
     }
 
     // Create a new car document
-    const result = await db.collection("cars").insertOne(body);
+    const result = await db.collection("cars").insertOne({
+      ...body,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     const car = await db.collection("cars").findOne({ _id: result.insertedId });
 
     console.log("Created car:", JSON.stringify(car, null, 2));
@@ -95,19 +99,50 @@ export async function GET(request: Request) {
       const clientId = searchParams.get("clientId");
       console.log("Filtering by client ID:", clientId);
 
+      // Log sample cars to understand client data structure
+      const sampleCars = await db.collection("cars").find().limit(5).toArray();
+      console.log(
+        "Sample cars client data:",
+        sampleCars.map((car) => ({
+          _id: car._id,
+          clientFields: {
+            client: car.client,
+            clientId: car.clientId,
+            clientInfo: car.clientInfo,
+            clientRef: car.clientRef,
+            owner_id: car.owner_id,
+            owner: car.owner,
+          },
+        }))
+      );
+
+      // Build query to match both ObjectId and string representations
+      const queries: { [key: string]: string | ObjectId }[] = [
+        { client: clientId }, // String match
+        { clientId: clientId },
+        { owner_id: clientId },
+        { owner: clientId },
+      ];
+
       try {
         const clientObjectId = new ObjectId(clientId);
-        query.$or = [
+        // Add ObjectId matches
+        queries.push(
           { client: clientObjectId },
           { clientId: clientObjectId },
           { "clientInfo._id": clientObjectId },
           { clientRef: clientObjectId },
-        ];
+          { owner_id: clientObjectId },
+          { owner: clientObjectId },
+          { "owner._id": clientObjectId }
+        );
       } catch (error) {
         console.error("Invalid ObjectId format:", error);
-        // If the ID is invalid, return no results
-        query.client = null;
+        // Continue with string-based queries if ObjectId is invalid
       }
+
+      query.$or = queries;
+      console.log("Client filter query:", JSON.stringify(query.$or, null, 2));
     }
 
     // Handle engine features filter
@@ -147,9 +182,14 @@ export async function GET(request: Request) {
         sortDirection as (typeof validSortDirections)[number]
       );
 
+    // For "Recently Added" sorting, use _id as a fallback since it contains a timestamp
     const sortQuery = isValidSort
-      ? { [sortField]: sortOptions[sortDirection as keyof typeof sortOptions] }
-      : { createdAt: -1 as const };
+      ? sortField === "createdAt"
+        ? { _id: sortOptions[sortDirection as keyof typeof sortOptions] }
+        : {
+            [sortField]: sortOptions[sortDirection as keyof typeof sortOptions],
+          }
+      : { _id: -1 as const };
 
     console.log("Final sort query:", sortQuery);
 
