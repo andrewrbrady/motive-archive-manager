@@ -8,7 +8,7 @@ export default function Loading() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-[#111111]">
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-row items-center gap-4">
         <div
           className={`transition-opacity duration-500 ${
             isAnimating ? "opacity-50" : "opacity-100"
@@ -16,7 +16,7 @@ export default function Loading() {
         >
           <MotiveLogo
             variant="animated"
-            className="w-32 h-32"
+            className="w-16 h-16"
             onAnimationEnd={() => setIsAnimating(false)}
           />
         </div>

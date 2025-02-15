@@ -13,32 +13,27 @@ export function MotiveLogo({
   onAnimationEnd,
 }: MotiveLogoProps) {
   const baseClasses = "w-24 h-24";
-  const animatedClasses =
-    variant === "animated"
-      ? "transition-all duration-1000 ease-in-out animate-in fade-in-0"
-      : "";
+  const animatedClasses = variant === "animated" ? "animate-fade-in" : "";
 
   return (
     <svg
-      className={cn(baseClasses, className)}
+      className={cn(baseClasses, animatedClasses, className)}
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 400.37 400.37"
       onAnimationEnd={onAnimationEnd}
     >
       <g
         className={cn(
-          variant === "animated"
-            ? "opacity-[0.15] dark:opacity-[0.1] transition-opacity duration-1000"
-            : "opacity-[0.15] dark:opacity-[0.1]"
+          "opacity-[0.15] dark:opacity-[0.1]",
+          variant === "animated" && "transition-opacity duration-1000"
         )}
       >
         <path d="M396.84,199.95c0,108.74-88.15,196.89-196.89,196.89-108.74,0-196.9-88.15-196.9-196.89,0-108.74,88.15-196.89,196.9-196.89,108.74,0,196.89,88.15,196.89,196.89" />
       </g>
       <g
         className={cn(
-          variant === "animated"
-            ? "opacity-[0.25] dark:opacity-[0.15] transition-opacity duration-1000"
-            : "opacity-[0.25] dark:opacity-[0.15]"
+          "opacity-[0.25] dark:opacity-[0.15]",
+          variant === "animated" && "transition-opacity duration-1000"
         )}
       >
         <path d="M255.86,162.84l62.48,137.71,5.54.03-68.1-150.08-68.69,150.08h5.61s18.64-40.64,18.64-40.64h49.57s1.07,2.32,1.07,2.32h-49.14,0s-.06,0-.06,0l-17.56,38.32,4.02-.02,15.67-33.85h49.13s.98,2.13.98,2.13h-47.72s-.05,0-.05,0l-14.47,31.74,3.21-.03,12.98-28.22h47.65s1.42,3.09,1.42,3.09h-47.14s-11.54,25.17-11.54,25.17h2.89s10.35-22.46,10.35-22.46h46.68s1.42,3.1,1.42,3.1h-45.95s-8.82,19.36-8.82,19.36h2.51s7.79-16.84,7.79-16.84h45.62s1.6,3.48,1.6,3.48h-44.6s-6.16,13.36-6.16,13.36h2.13s5.18-11.23,5.18-11.23h44.42s1.96,4.26,1.96,4.26h-43.5s-3.2,6.97-3.2,6.97h1.74s2.4-5.23,2.4-5.23h43.37s2.4,5.23,2.4,5.23h1.91s-25.89-56.55-25.89-56.55l-4.99,10.88h-4.75s9.61-20.84,9.61-20.84l30.5,66.51h2.12s-32.51-71.39-32.51-71.39l-11.85,25.72h-4.17s16.02-34.62,16.02-34.62l36.76,80.29h2.52s-39.28-87.06-39.28-87.06l-18.86,41.39h-3.43s22.19-48.13,22.19-48.13l43.32,93.86,2.96-.03-46.01-101.17-25.45,55.47h-3.35s28.63-62.25,28.63-62.25l49.17,107.91,3.63.02-52.69-116.11-32.1,70.43h-3.23s35.48-76.65,35.48-76.65l55.5,122.32h4.46s-59.99-132.21-59.99-132.21l-39.67,86.54h-2.5s42.21-92.06,42.21-92.06ZM255.44,248l3.17,6.9h-6.33s3.15-6.9,3.15-6.9Z" />
