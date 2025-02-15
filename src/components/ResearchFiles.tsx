@@ -550,6 +550,16 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                       Search Results
                     </h3>
                   </div>
+                  {searchAnswer && (
+                    <div className="mb-2 p-2 rounded bg-zinc-800/75 text-sm">
+                      <div className="font-medium text-zinc-200 mb-1">
+                        Answer
+                      </div>
+                      <div className="text-zinc-400 whitespace-pre-wrap">
+                        {searchAnswer}
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     {searchResults.map((result, index) => (
                       <div
