@@ -18,10 +18,8 @@ interface CarFiltersSectionProps {
     minYear: string;
     maxYear: string;
     clientId: string;
-    engineFeatures: string;
     minPrice: string;
     maxPrice: string;
-    status: string;
   };
   makes: string[];
   clients: Client[];
@@ -88,8 +86,6 @@ export default function CarFiltersSection({
       maxYear: "",
       minPrice: "",
       maxPrice: "",
-      status: "",
-      engineFeatures: "",
       clientId: "",
     };
     setFilters(emptyFilters);
@@ -111,106 +107,79 @@ export default function CarFiltersSection({
       hasActiveFilters={hasActiveFilters}
       onClearFilters={clearFilters}
     >
-      <FilterItem>
-        <FilterLabel>Make</FilterLabel>
-        <FilterSelect
-          name="make"
-          value={filters.make}
-          onChange={(e) => handleFilterChange("make", e.target.value)}
-        >
-          <option value="">Any Make</option>
-          {makes.map((make) => (
-            <option key={make} value={make}>
-              {make}
-            </option>
-          ))}
-        </FilterSelect>
-      </FilterItem>
+      <div className="flex flex-row gap-6 items-end">
+        <FilterItem className="w-72">
+          <FilterLabel>Client</FilterLabel>
+          <FilterSelect
+            name="clientId"
+            value={filters.clientId}
+            onChange={(e) => handleFilterChange("clientId", e.target.value)}
+          >
+            <option value="">Any Client</option>
+            {clients.map((client) => (
+              <option key={client._id} value={client._id}>
+                {client.name}
+              </option>
+            ))}
+          </FilterSelect>
+        </FilterItem>
 
-      <FilterItem>
-        <FilterLabel>Year Range</FilterLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <FilterInput
-            type="number"
-            name="minYear"
-            placeholder="Min"
-            value={filters.minYear}
-            onChange={(e) => handleFilterChange("minYear", e.target.value)}
-          />
-          <FilterInput
-            type="number"
-            name="maxYear"
-            placeholder="Max"
-            value={filters.maxYear}
-            onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-          />
-        </div>
-      </FilterItem>
+        <FilterItem className="w-56">
+          <FilterLabel>Make</FilterLabel>
+          <FilterSelect
+            name="make"
+            value={filters.make}
+            onChange={(e) => handleFilterChange("make", e.target.value)}
+          >
+            <option value="">Any Make</option>
+            {makes.map((make) => (
+              <option key={make} value={make}>
+                {make}
+              </option>
+            ))}
+          </FilterSelect>
+        </FilterItem>
 
-      <FilterItem>
-        <FilterLabel>Price Range</FilterLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <FilterInput
-            type="number"
-            name="minPrice"
-            placeholder="Min"
-            value={filters.minPrice}
-            onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-          />
-          <FilterInput
-            type="number"
-            name="maxPrice"
-            placeholder="Max"
-            value={filters.maxPrice}
-            onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
-          />
-        </div>
-      </FilterItem>
+        <FilterItem className="w-80">
+          <FilterLabel>Year Range</FilterLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <FilterInput
+              type="number"
+              name="minYear"
+              placeholder="Min"
+              value={filters.minYear}
+              onChange={(e) => handleFilterChange("minYear", e.target.value)}
+            />
+            <FilterInput
+              type="number"
+              name="maxYear"
+              placeholder="Max"
+              value={filters.maxYear}
+              onChange={(e) => handleFilterChange("maxYear", e.target.value)}
+            />
+          </div>
+        </FilterItem>
 
-      <FilterItem>
-        <FilterLabel>Client</FilterLabel>
-        <FilterSelect
-          name="clientId"
-          value={filters.clientId}
-          onChange={(e) => handleFilterChange("clientId", e.target.value)}
-        >
-          <option value="">Any Client</option>
-          {clients.map((client) => (
-            <option key={client._id} value={client._id}>
-              {client.name}
-            </option>
-          ))}
-        </FilterSelect>
-      </FilterItem>
-
-      <FilterItem>
-        <FilterLabel>Engine Features</FilterLabel>
-        <FilterSelect
-          name="engineFeatures"
-          value={filters.engineFeatures}
-          onChange={(e) => handleFilterChange("engineFeatures", e.target.value)}
-        >
-          <option value="">Any Type</option>
-          <option value="turbo">Turbo</option>
-          <option value="supercharged">Supercharged</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="electric">Electric</option>
-        </FilterSelect>
-      </FilterItem>
-
-      <FilterItem>
-        <FilterLabel>Status</FilterLabel>
-        <FilterSelect
-          name="status"
-          value={filters.status}
-          onChange={(e) => handleFilterChange("status", e.target.value)}
-        >
-          <option value="">Any Status</option>
-          <option value="available">Available</option>
-          <option value="sold">Sold</option>
-          <option value="pending">Pending</option>
-        </FilterSelect>
-      </FilterItem>
+        <FilterItem className="w-80">
+          <FilterLabel>Price Range</FilterLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <FilterInput
+              type="number"
+              name="minPrice"
+              placeholder="Min"
+              value={filters.minPrice}
+              onChange={(e) => handleFilterChange("minPrice", e.target.value)}
+            />
+            <FilterInput
+              type="number"
+              name="maxPrice"
+              placeholder="Max"
+              value={filters.maxPrice}
+              onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
+            />
+          </div>
+        </FilterItem>
+      </div>
     </FilterSection>
   );
 }

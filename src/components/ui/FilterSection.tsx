@@ -14,11 +14,7 @@ export function FilterSection({
 }: FilterSectionProps) {
   return (
     <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800">
-      <div className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {children}
-        </div>
-      </div>
+      <div className="p-4">{children}</div>
       {hasActiveFilters && (
         <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-2 flex justify-end">
           <button
@@ -35,8 +31,14 @@ export function FilterSection({
   );
 }
 
-export function FilterItem({ children }: { children: React.ReactNode }) {
-  return <div className="space-y-0.5">{children}</div>;
+export function FilterItem({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={`space-y-0.5 ${className}`}>{children}</div>;
 }
 
 export function FilterLabel({ children }: { children: React.ReactNode }) {
