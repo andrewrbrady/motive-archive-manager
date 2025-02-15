@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { Car } from "@/models/Car";
 import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
 
@@ -65,14 +66,64 @@ export async function GET(request: Request) {
 
     // Build query based on search parameters
     const query: any = {};
-    if (searchParams.get("make")) query.make = searchParams.get("make");
-    if (searchParams.get("model")) query.model = searchParams.get("model");
-    if (searchParams.get("year"))
-      query.year = parseInt(searchParams.get("year")!);
-    if (searchParams.get("status")) query.status = searchParams.get("status");
+
+    // Handle make filter
+    if (searchParams.get("make")) {
+      query.make = searchParams.get("make");
+    }
+
+    // Handle year range filter
+    const minYear = searchParams.get("minYear");
+    const maxYear = searchParams.get("maxYear");
+    if (minYear || maxYear) {
+      query.year = {};
+      if (minYear) query.year.$gte = parseInt(minYear);
+      if (maxYear) query.year.$lte = parseInt(maxYear);
+    }
+
+    // Handle price range filter
+    const minPrice = searchParams.get("minPrice");
+    const maxPrice = searchParams.get("maxPrice");
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseInt(minPrice);
+      if (maxPrice) query.price.$lte = parseInt(maxPrice);
+    }
+
+    // Handle client filter
+    if (searchParams.get("clientId")) {
+      const clientId = searchParams.get("clientId");
+      console.log("Filtering by client ID:", clientId);
+
+      try {
+        const clientObjectId = new ObjectId(clientId);
+        query.$or = [
+          { client: clientObjectId },
+          { clientId: clientObjectId },
+          { "clientInfo._id": clientObjectId },
+          { clientRef: clientObjectId },
+        ];
+      } catch (error) {
+        console.error("Invalid ObjectId format:", error);
+        // If the ID is invalid, return no results
+        query.client = null;
+      }
+    }
+
+    // Handle engine features filter
+    if (searchParams.get("engineFeatures")) {
+      query.engineFeatures = searchParams.get("engineFeatures");
+    }
+
+    // Handle status filter
+    if (searchParams.get("status")) {
+      query.status = searchParams.get("status");
+    }
 
     // Get total count for pagination
     const total = await db.collection("cars").countDocuments(query);
+
+    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
 
     // Get cars with pagination
     const cars = await db
@@ -82,6 +133,16 @@ export async function GET(request: Request) {
       .skip(skip)
       .limit(pageSize)
       .toArray();
+
+    console.log(`Found ${cars.length} cars for query`);
+    if (cars.length === 0) {
+      // Log a sample car to see the structure
+      const sampleCar = await db.collection("cars").findOne({});
+      console.log("Sample car client structure:", {
+        client: sampleCar?.client,
+        clientInfo: sampleCar?.clientInfo,
+      });
+    }
 
     return NextResponse.json({
       cars,
