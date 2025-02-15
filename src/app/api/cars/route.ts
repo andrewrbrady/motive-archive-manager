@@ -145,16 +145,6 @@ export async function GET(request: Request) {
       console.log("Client filter query:", JSON.stringify(query.$or, null, 2));
     }
 
-    // Handle engine features filter
-    if (searchParams.get("engineFeatures")) {
-      query.engineFeatures = searchParams.get("engineFeatures");
-    }
-
-    // Handle status filter
-    if (searchParams.get("status")) {
-      query.status = searchParams.get("status");
-    }
-
     // Get total count for pagination
     const total = await db.collection("cars").countDocuments(query);
 

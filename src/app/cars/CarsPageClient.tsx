@@ -9,6 +9,7 @@ import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
+import SortSelector from "@/components/ui/SortSelector";
 import { Car, Client } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Link from "next/link";
@@ -27,10 +28,9 @@ interface CarsPageClientProps {
     minYear?: string;
     maxYear?: string;
     clientId?: string;
-    engineFeatures?: string;
     minPrice?: string;
     maxPrice?: string;
-    status?: string;
+    sort?: string;
   };
   makes: Make[];
   clients: Client[];
@@ -63,6 +63,7 @@ export default function CarsPageClient({
         <div className="space-y-6">
           <PageTitle title="Cars Collection" count={totalPages * pageSize}>
             <div className="flex items-center gap-4 ml-auto">
+              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
               <PageSizeSelector
                 currentPageSize={pageSize}
                 options={[12, 24, 48, 96]}
@@ -92,10 +93,8 @@ export default function CarsPageClient({
               minYear: filters.minYear || "",
               maxYear: filters.maxYear || "",
               clientId: filters.clientId || "",
-              engineFeatures: filters.engineFeatures || "",
               minPrice: filters.minPrice || "",
               maxPrice: filters.maxPrice || "",
-              status: filters.status || "",
             }}
             makes={makes.map((make) => make.name)}
             clients={clients}

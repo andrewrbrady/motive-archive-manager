@@ -19,10 +19,8 @@ interface FilterParams {
   minYear?: string;
   maxYear?: string;
   clientId?: string;
-  engineFeatures?: string;
   minPrice?: string;
   maxPrice?: string;
-  status?: string;
   sort?: string;
 }
 
@@ -84,16 +82,14 @@ export default async function CarsPage({
     const view = (resolvedParams.view?.toString() || "grid") as "grid" | "list";
     const isEditMode = resolvedParams.edit === "true";
 
-    const filters: FilterParams = {
+    const filters = {
       make: resolvedParams.make?.toString(),
       minYear: resolvedParams.minYear?.toString(),
       maxYear: resolvedParams.maxYear?.toString(),
       clientId: resolvedParams.clientId?.toString(),
-      engineFeatures: resolvedParams.engineFeatures?.toString(),
       minPrice: resolvedParams.minPrice?.toString(),
       maxPrice: resolvedParams.maxPrice?.toString(),
-      status: resolvedParams.status?.toString(),
-      sort: resolvedParams.sort?.toString() || "createdAt_desc",
+      sort: resolvedParams.sort?.toString(),
     };
 
     // Clean up undefined values
