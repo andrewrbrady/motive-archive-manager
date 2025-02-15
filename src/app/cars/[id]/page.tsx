@@ -1323,11 +1323,6 @@ export default function CarPage() {
             title={`${car.year} ${car.make} ${car.model}`}
             className="mb-6"
           />
-          {car.vin && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              VIN: {car.vin}
-            </p>
-          )}
 
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="mb-6">
