@@ -52,6 +52,8 @@ export async function POST(request: Request) {
       size: file.size,
       createdAt: new Date(),
       updatedAt: new Date(),
+      content, // Store content immediately to avoid S3 fetch later
+      processingStatus: "pending",
     });
 
     console.log("Saved file metadata to MongoDB:", {
@@ -61,13 +63,32 @@ export async function POST(request: Request) {
       size: file.size,
     });
 
-    // Prepare content for searching
-    await prepareResearchContent(
+    // Trigger content preparation in the background
+    prepareResearchContent(
       content,
       carId,
       fileDoc.insertedId.toString(),
       file.name
-    );
+    )
+      .then(() => {
+        // Update processing status when complete
+        db.collection("research_files").updateOne(
+          { _id: fileDoc.insertedId },
+          { $set: { processingStatus: "completed" } }
+        );
+      })
+      .catch((error) => {
+        console.error("Error in background content preparation:", error);
+        db.collection("research_files").updateOne(
+          { _id: fileDoc.insertedId },
+          {
+            $set: {
+              processingStatus: "failed",
+              processingError: error.message,
+            },
+          }
+        );
+      });
 
     return NextResponse.json({
       _id: fileDoc.insertedId,

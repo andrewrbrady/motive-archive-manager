@@ -1,5 +1,7 @@
-description: Styling guidelines for the project
-pattern: ["**/*.tsx", "**/*.css", "tailwind.config.ts"]
+---
+description: Stylig guidelines for the project
+globs: **/*.tsx, **/*.css, tailwind.config.ts
+---
 references: ["@file:docs/STYLING.md"]
 
 Styling Guidelines for this project:

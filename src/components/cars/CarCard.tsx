@@ -186,7 +186,13 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       <div className="p-4">
         <h3 className="text-lg font-semibold text-text-primary">
           {car.year} {car.make} {car.model}
+          <span className="ml-1 text-text-secondary">
+            {car.manufacturing?.series || "Base"}
+          </span>
         </h3>
+        <p className="text-sm text-text-secondary mt-1">
+          {car.manufacturing?.trim || "Standard"}
+        </p>
         <div className="mt-2 space-y-1">
           {car.price && (
             <p className="text-sm text-text-secondary">

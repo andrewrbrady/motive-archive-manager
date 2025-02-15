@@ -33,6 +33,8 @@ interface ResearchFile {
   createdAt: string;
   updatedAt: string;
   content?: string;
+  processingStatus?: "pending" | "completed" | "failed";
+  processingError?: string;
 }
 
 interface ResearchFilesProps {
@@ -145,6 +147,20 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }
   };
 
+  const batchProcess = async <T,>(
+    items: T[],
+    batchSize: number,
+    processor: (item: T) => Promise<any>
+  ) => {
+    const results = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(processor));
+      results.push(...batchResults);
+    }
+    return results;
+  };
+
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
@@ -153,7 +169,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     setUploadProgress({});
 
     try {
-      const uploadPromises = selectedFiles.map(async (file) => {
+      const processFile = async (file: File) => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("carId", carId);
@@ -182,44 +198,37 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
           }));
 
           const data = await response.json();
-          return data;
+
+          // Update files list immediately for this successful upload
+          setFiles((prev) => [...prev, data]);
+
+          return { success: true, data };
         } catch (error) {
           console.error(`Error uploading ${file.name}:`, error);
           setUploadProgress((prev) => ({
             ...prev,
             [file.name]: 0,
           }));
-          throw error;
+          return {
+            success: false,
+            error: error instanceof Error ? error : new Error("Upload failed"),
+          };
         }
-      });
+      };
 
-      const results = await Promise.allSettled(uploadPromises);
-
-      // Process successful uploads
-      const successfulUploads = results
-        .filter(
-          (result): result is PromiseFulfilledResult<any> =>
-            result.status === "fulfilled"
-        )
-        .map((result) => result.value);
-
-      if (successfulUploads.length > 0) {
-        setFiles((prev) => [...prev, ...successfulUploads]);
-      }
+      // Process files in batches of 5
+      const results = await batchProcess(
+        Array.from(selectedFiles),
+        5,
+        processFile
+      );
 
       // Process failures
-      const failures = results
-        .filter(
-          (result): result is PromiseRejectedResult =>
-            result.status === "rejected"
-        )
-        .map((result) => result.reason);
+      const failures = results.filter((result) => !result.success);
 
       if (failures.length > 0) {
         const errorMessage = failures
-          .map((error) =>
-            error instanceof Error ? error.message : "Upload failed"
-          )
+          .map((failure) => failure.error?.message || "Upload failed")
           .join(", ");
         setError(`Some files failed to upload: ${errorMessage}`);
       }
@@ -237,6 +246,36 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
       setTimeout(() => setUploadProgress({}), 2000);
     }
   };
+
+  // Add polling for processing status
+  useEffect(() => {
+    const processingFiles = files.filter(
+      (f) => f.processingStatus === "pending"
+    );
+    if (processingFiles.length === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/cars/${carId}/research`);
+        if (!response.ok) throw new Error("Failed to fetch research files");
+        const data = await response.json();
+        setFiles(data.files || []);
+
+        // Stop polling if no more pending files
+        if (
+          !(data.files || []).some(
+            (f: ResearchFile) => f.processingStatus === "pending"
+          )
+        ) {
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error("Error polling file status:", error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [files, carId]);
 
   const handleDelete = async (fileId: string) => {
     try {
@@ -583,6 +622,48 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                 </span>
               </label>
             </div>
+
+            {selectedFiles.length > 0 && (
+              <div className="mt-1.5 flex flex-col max-h-32">
+                <div className="text-xs text-zinc-400 px-1">
+                  Selected files:
+                </div>
+                <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 mt-1">
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between gap-2 text-sm px-1 py-0.5 hover:bg-zinc-800/50"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <FileText className="h-3 w-3 text-zinc-400 flex-shrink-0" />
+                        <span className="truncate text-zinc-300">
+                          {file.name}
+                        </span>
+                      </div>
+                      <span className="text-xs text-zinc-500 flex-shrink-0">
+                        {formatFileSize(file.size)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end mt-1 pt-1 border-t border-zinc-800">
+                  <Button
+                    size="sm"
+                    onClick={handleUpload}
+                    disabled={uploading}
+                    className="h-6 px-2"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Upload className="h-3 w-3 mr-1" />
+                    )}
+                    Upload {selectedFiles.length} file
+                    {selectedFiles.length !== 1 ? "s" : ""}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Files and Search Results */}
@@ -712,28 +793,37 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                 </div>
               ) : (
                 <>
-                  {files.map((file, index) => (
+                  {files.map((file) => (
                     <div
                       key={file._id}
-                      className={`group py-1.5 px-2 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 ${
+                      className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 px-4 -mx-4 rounded ${
                         selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
-                      } ${
-                        selectedIndex === index
-                          ? "bg-zinc-800/75 ring-[0.5px] ring-zinc-700/50"
-                          : ""
                       }`}
-                      onClick={() => {
-                        setSelectedIndex(index);
-                        handleFileClick(file);
-                      }}
+                      onClick={() => handleFileClick(file)}
                     >
-                      <div className="flex gap-2 min-w-0 flex-1">
-                        <FileText className="h-4 w-4 mt-0.5 text-zinc-400 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <span className="font-medium text-sm text-zinc-200 hover:text-zinc-100 block truncate">
-                            {truncateFilename(file.filename)}
-                          </span>
-                          <div className="text-xs text-zinc-500">
+                      <div className="flex gap-4 min-w-0 flex-1">
+                        <FileText className="h-5 w-5 mt-0.5 text-zinc-400 flex-shrink-0" />
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-zinc-100 hover:text-zinc-300 block truncate">
+                              {truncateFilename(file.filename)}
+                            </span>
+                            {file.processingStatus === "pending" && (
+                              <span className="text-xs text-zinc-500">
+                                <Loader2 className="h-3 w-3 animate-spin inline-block mr-1" />
+                                Processing
+                              </span>
+                            )}
+                            {file.processingStatus === "failed" && (
+                              <span
+                                className="text-xs text-red-400"
+                                title={file.processingError}
+                              >
+                                Processing failed
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-zinc-400">
                             {formatFileSize(file.size)} •{" "}
                             {formatDistanceToNow(new Date(file.createdAt), {
                               addSuffix: true,
@@ -748,9 +838,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                           e.stopPropagation();
                           handleDelete(file._id);
                         }}
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}

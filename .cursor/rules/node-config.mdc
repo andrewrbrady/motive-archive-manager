@@ -1,6 +1,7 @@
+---
 description: Rules for Node.js configuration and build processes
-pattern: ["**/*.ts", "**/*.tsx", "package.json", "next.config.js"]
-
+globs: **/*.ts, **/*.tsx, package.json, next.config.js
+---
 When working with Node.js in this project:
 
 1. Always use Node 20 from Homebrew on macOS with the correct PATH:
