@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { FileText, Trash2, Upload, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { FileText, Trash2, Upload, Loader2, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import MarkdownViewer from "./MarkdownViewer";
 import { ModelSelector, ModelType } from "@/components/ModelSelector";
+import MarkdownEditor from "./MarkdownEditor";
 
 interface ResearchFile {
   _id: string;
@@ -15,6 +16,7 @@ interface ResearchFile {
   url: string;
   createdAt: string;
   updatedAt: string;
+  content?: string;
 }
 
 interface ResearchFilesProps {
@@ -50,6 +52,15 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchAnswer, setSearchAnswer] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelType>("gpt-4o-mini");
+  const [isEditing, setIsEditing] = useState(false);
+  const [fileListBounce, setFileListBounce] = useState<"top" | "bottom" | null>(
+    null
+  );
+  const [contentBounce, setContentBounce] = useState<"top" | "bottom" | null>(
+    null
+  );
+  const fileListBounceTimeout = useRef<NodeJS.Timeout>();
+  const contentBounceTimeout = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     fetchFiles();
@@ -236,7 +247,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
       if (!response.ok) throw new Error("Failed to fetch file content");
       const content = await response.text();
       setMarkdownContent(content);
-      setSelectedFile(file);
+      setSelectedFile({ ...file, content });
+      setIsEditing(false);
     } catch (error) {
       console.error("Error loading markdown content:", error);
       setError("Failed to load file content");
@@ -245,6 +257,12 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     } finally {
       setIsLoadingContent(false);
     }
+  };
+
+  const handleContentSave = async (newContent: string) => {
+    if (!selectedFile) return;
+    setMarkdownContent(newContent);
+    setSelectedFile({ ...selectedFile, content: newContent });
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -277,196 +295,205 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }
   };
 
+  const handleBounce = (
+    element: HTMLDivElement,
+    setBounce: (value: "top" | "bottom" | null) => void,
+    timeoutRef: React.MutableRefObject<NodeJS.Timeout | undefined>
+  ) => {
+    const isAtTop = element.scrollTop === 0;
+    const isAtBottom =
+      Math.abs(
+        element.scrollHeight - element.scrollTop - element.clientHeight
+      ) < 1;
+
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
+    }
+
+    // Reset bounce state when not at boundaries
+    if (!isAtTop && !isAtBottom) {
+      setBounce(null);
+      return;
+    }
+
+    // Set bounce state based on position
+    if (isAtTop) {
+      setBounce("top");
+    } else if (isAtBottom) {
+      setBounce("bottom");
+    }
+
+    // Clear bounce state after animation
+    timeoutRef.current = setTimeout(() => {
+      setBounce(null);
+      timeoutRef.current = undefined;
+    }, 150);
+  };
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (fileListBounceTimeout.current) {
+        clearTimeout(fileListBounceTimeout.current);
+      }
+      if (contentBounceTimeout.current) {
+        clearTimeout(contentBounceTimeout.current);
+      }
+    };
+  }, []);
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border-primary">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold leading-none tracking-tight text-text-primary">
-                  Search Research
-                </h3>
+    <div className="h-[calc(100vh-20rem)] flex flex-col overflow-hidden overscroll-none">
+      <div className="flex-1 grid grid-cols-2 min-h-0 divide-x divide-zinc-800">
+        {/* Left Column */}
+        <div className="flex flex-col min-h-0">
+          {/* Search and Upload Section */}
+          <div className="flex-none px-1.5 py-0.5 border-b border-zinc-800 bg-background">
+            <div className="flex gap-1 mb-0.5">
+              <div className="flex-1">
+                <form onSubmit={handleSearch} className="flex gap-1">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search research files..."
+                    className="w-full bg-background text-text-primary border border-border-primary rounded-md px-1.5 py-0.5 text-sm placeholder:text-text-tertiary"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="h-6 px-1.5"
+                  >
+                    {isSearching ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Search"
+                    )}
+                  </Button>
+                </form>
               </div>
-              <form onSubmit={handleSearch} className="space-y-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search research files..."
-                  className="w-full bg-background text-text-primary border border-border-primary rounded-md px-3 py-2 placeholder:text-text-tertiary"
-                />
-                <ModelSelector
-                  value={selectedModel}
-                  onChange={setSelectedModel}
-                  className="pt-2"
-                />
-                <Button
-                  type="submit"
-                  disabled={isSearching || !searchQuery.trim()}
-                  className="w-full"
-                >
-                  {isSearching ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    "Search"
-                  )}
-                </Button>
-              </form>
+              <ModelSelector
+                value={selectedModel}
+                onChange={setSelectedModel}
+                className="w-28"
+              />
+            </div>
+
+            <div
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border border-dashed rounded-md p-0.5 text-center transition-colors ${
+                isDragging
+                  ? "border-zinc-500 bg-zinc-800/50"
+                  : "border-zinc-800 hover:border-zinc-700"
+              }`}
+            >
+              <input
+                type="file"
+                id="file"
+                multiple
+                onChange={handleFileSelect}
+                accept=".md"
+                className="hidden"
+              />
+              <label
+                htmlFor="file"
+                className="flex items-center justify-center gap-1 cursor-pointer text-sm"
+              >
+                <Upload className="h-3 w-3 text-zinc-400" />
+                <span className="text-zinc-400">
+                  <span className="font-medium text-zinc-300">
+                    Drop files or click
+                  </span>{" "}
+                  (.md)
+                </span>
+              </label>
             </div>
           </div>
 
-          {searchResults.length > 0 && (
-            <div className="rounded-lg border border-border-primary">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold leading-none tracking-tight text-text-primary mb-4">
-                  Search Results
-                </h3>
+          {/* Files and Search Results */}
+          <div
+            className={`flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none transition-transform duration-200 ${
+              fileListBounce === "top"
+                ? "translate-y-[10px]"
+                : fileListBounce === "bottom"
+                ? "-translate-y-[10px]"
+                : ""
+            }`}
+            onScroll={(e) => {
+              handleBounce(
+                e.currentTarget,
+                setFileListBounce,
+                fileListBounceTimeout
+              );
+            }}
+            onWheel={(e) => {
+              const element = e.currentTarget;
+              const isAtTop = element.scrollTop === 0;
+              const isAtBottom =
+                Math.abs(
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight
+                ) < 1;
 
-                {searchAnswer && (
-                  <div className="mb-6 p-4 bg-background-secondary rounded-lg">
-                    <h4 className="text-sm font-medium text-text-secondary mb-2">
-                      AI-Generated Answer:
-                    </h4>
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      {searchAnswer.split("\n").map((paragraph, index) => (
-                        <p key={index} className="text-text-primary">
-                          {paragraph}
+              if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
+                e.preventDefault();
+              }
+            }}
+          >
+            {error && (
+              <div className="mx-2 mt-1.5 rounded border border-red-900/50 bg-red-900/10 p-1 text-sm text-red-400">
+                {error}
+              </div>
+            )}
+
+            {searchResults.length > 0 && (
+              <div className="border-b border-zinc-800">
+                <div className="p-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-medium text-zinc-300">
+                      Search Results
+                    </h3>
+                  </div>
+                  <div className="space-y-1">
+                    {searchResults.map((result, index) => (
+                      <div
+                        key={`${result.metadata.fileId}-${index}`}
+                        className="p-1.5 rounded bg-zinc-800/50 hover:bg-zinc-800 transition-colors cursor-pointer text-sm"
+                        onClick={() => {
+                          const file = files.find(
+                            (f) => f._id === result.metadata.fileId
+                          );
+                          if (file) handleFileClick(file);
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="font-medium text-zinc-200">
+                            {result.metadata.fileName}
+                          </span>
+                          <span className="text-xs text-zinc-500">
+                            {result.metadata.matchType}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 line-clamp-2">
+                          {result.content}
                         </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  {searchResults.map((result, index) => (
-                    <div
-                      key={`${result.metadata.fileId}-${index}`}
-                      className="p-4 rounded-lg bg-background-secondary hover:bg-background-tertiary transition-colors cursor-pointer"
-                      onClick={() => {
-                        const file = files.find(
-                          (f) => f._id === result.metadata.fileId
-                        );
-                        if (file) handleFileClick(file);
-                      }}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-text-primary">
-                          {result.metadata.fileName}
-                        </span>
-                        <span className="text-xs text-text-tertiary">
-                          Match: {result.metadata.matchType}
-                        </span>
-                      </div>
-                      <p className="text-sm text-text-secondary line-clamp-3">
-                        {result.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-zinc-800">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold leading-none tracking-tight text-zinc-100">
-                  Upload Research Files
-                </h3>
-              </div>
-              <div
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  isDragging
-                    ? "border-zinc-500 bg-zinc-800/50"
-                    : "border-zinc-800 hover:border-zinc-700"
-                }`}
-              >
-                <input
-                  type="file"
-                  id="file"
-                  multiple
-                  onChange={handleFileSelect}
-                  accept=".md"
-                  className="hidden"
-                />
-                <label
-                  htmlFor="file"
-                  className="flex flex-col items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Upload className="h-8 w-8 text-zinc-400" />
-                  <div className="text-zinc-400">
-                    <span className="font-medium text-zinc-300">
-                      Drop files here or click to upload
-                    </span>
-                    <p className="text-sm mt-1">
-                      Supports markdown (.md) files only
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              {selectedFiles.length > 0 && (
-                <div className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    {selectedFiles.map((file) => (
-                      <div key={file.name} className="text-sm text-zinc-400">
-                        <div className="flex items-center justify-between mb-1">
-                          <span>{file.name}</span>
-                          <span>{uploadProgress[file.name] || 0}%</span>
-                        </div>
-                        <div className="w-full bg-zinc-800 rounded-full h-1">
-                          <div
-                            className="bg-zinc-400 h-1 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${uploadProgress[file.name] || 0}%`,
-                            }}
-                          />
-                        </div>
                       </div>
                     ))}
                   </div>
-                  <Button
-                    onClick={handleUpload}
-                    disabled={uploading}
-                    variant="secondary"
-                    className="w-full !bg-zinc-800 hover:!bg-zinc-700 !text-zinc-100 !border-transparent"
-                  >
-                    {uploading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Upload className="h-4 w-4 animate-spin" />
-                        Uploading...
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center gap-2">
-                        <Upload className="h-4 w-4" />
-                        Upload {selectedFiles.length} File
-                        {selectedFiles.length > 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </Button>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
 
-          {error && (
-            <div className="rounded-lg border border-red-900/50 bg-red-900/10 p-4 text-red-400">
-              {error}
-            </div>
-          )}
-
-          <div className="rounded-lg border border-zinc-800">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold leading-none tracking-tight text-zinc-100">
+            <div className="divide-y divide-zinc-800">
+              <div className="px-2 py-1 sticky top-0 bg-background z-10 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-zinc-300">
                   Research Files
                 </h3>
                 {files.length > 0 && (
@@ -475,116 +502,159 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     size="sm"
                     onClick={handleDeleteAll}
                     disabled={isDeletingAll}
-                    className="text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
+                    className="h-6 text-xs text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
                   >
                     {isDeletingAll ? (
-                      <span className="flex items-center gap-2">
-                        <Trash2 className="h-4 w-4 animate-spin" />
-                        Deleting...
-                      </span>
+                      <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <span className="flex items-center gap-2">
-                        <Trash2 className="h-4 w-4" />
-                        Delete All
-                      </span>
+                      <Trash2 className="h-3 w-3" />
                     )}
                   </Button>
                 )}
               </div>
-              <div className="divide-y divide-zinc-800">
-                {isLoadingFiles ? (
-                  <div className="py-8 text-center text-zinc-400">
-                    <div className="animate-pulse space-y-4">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex items-center space-x-4">
-                          <div className="h-5 w-5 bg-zinc-800 rounded" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-4 bg-zinc-800 rounded w-3/4" />
-                            <div className="h-3 bg-zinc-800 rounded w-1/2" />
-                          </div>
+
+              {isLoadingFiles ? (
+                <div className="p-2">
+                  <div className="animate-pulse space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-center space-x-4">
+                        <div className="h-4 w-4 bg-zinc-800 rounded" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-3 bg-zinc-800 rounded w-3/4" />
+                          <div className="h-2 bg-zinc-800 rounded w-1/2" />
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {files.map((file) => (
-                      <div
-                        key={file._id}
-                        className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 px-4 -mx-4 rounded ${
-                          selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
-                        }`}
-                        onClick={() => handleFileClick(file)}
-                      >
-                        <div className="flex gap-4 min-w-0 flex-1">
-                          <FileText className="h-5 w-5 mt-0.5 text-zinc-400 flex-shrink-0" />
-                          <div className="space-y-1 min-w-0">
-                            <span className="font-medium text-zinc-100 hover:text-zinc-300 block truncate">
-                              {truncateFilename(file.filename)}
-                            </span>
-                            <div className="text-sm text-zinc-400">
-                              {formatFileSize(file.size)} •{" "}
-                              {formatDistanceToNow(new Date(file.createdAt), {
-                                addSuffix: true,
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(file._id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     ))}
-                    {files.length === 0 && (
-                      <div className="py-8 text-center text-zinc-400">
-                        <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                        <p>No research files uploaded yet</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {files.map((file) => (
+                    <div
+                      key={file._id}
+                      className={`group py-1.5 px-2 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 ${
+                        selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
+                      }`}
+                      onClick={() => handleFileClick(file)}
+                    >
+                      <div className="flex gap-2 min-w-0 flex-1">
+                        <FileText className="h-4 w-4 mt-0.5 text-zinc-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="font-medium text-sm text-zinc-200 hover:text-zinc-100 block truncate">
+                            {truncateFilename(file.filename)}
+                          </span>
+                          <div className="text-xs text-zinc-500">
+                            {formatFileSize(file.size)} •{" "}
+                            {formatDistanceToNow(new Date(file.createdAt), {
+                              addSuffix: true,
+                            })}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(file._id);
+                        }}
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {files.length === 0 && (
+                    <div className="py-3 text-center text-zinc-500 text-sm">
+                      <FileText className="h-8 w-8 mx-auto mb-1 opacity-20" />
+                      <p>No research files uploaded yet</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="min-h-[600px]">
-          {isLoadingContent ? (
-            <div className="rounded-lg border border-zinc-800 h-full">
-              <div className="p-4 border-b border-zinc-800">
-                <div className="h-6 bg-zinc-800 rounded w-1/3 animate-pulse" />
+        {/* Right Column - Content Viewer */}
+        <div className="min-h-0 flex flex-col">
+          {selectedFile ? (
+            isLoadingContent ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-6 h-6 animate-spin" />
               </div>
-              <div className="p-6">
-                <div className="space-y-4 animate-pulse">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="h-4 bg-zinc-800 rounded w-full" />
-                      <div className="h-4 bg-zinc-800 rounded w-5/6" />
-                      <div className="h-4 bg-zinc-800 rounded w-4/6" />
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0">
+                {isEditing ? (
+                  <MarkdownEditor
+                    content={selectedFile.content || ""}
+                    filename={selectedFile.filename}
+                    fileId={selectedFile._id}
+                    carId={carId}
+                    lastModified={selectedFile.updatedAt}
+                    onSave={handleContentSave}
+                  />
+                ) : (
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex-none flex items-center justify-between px-2 py-1 border-b border-zinc-800">
+                      <h3 className="text-sm font-medium text-zinc-100">
+                        {selectedFile.filename}
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        className="h-6 text-xs"
+                      >
+                        <Edit2 className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
                     </div>
-                  ))}
-                </div>
+                    <div
+                      className={`flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none transition-transform duration-200 ${
+                        contentBounce === "top"
+                          ? "translate-y-[10px]"
+                          : contentBounce === "bottom"
+                          ? "-translate-y-[10px]"
+                          : ""
+                      }`}
+                      onScroll={(e) => {
+                        handleBounce(
+                          e.currentTarget,
+                          setContentBounce,
+                          contentBounceTimeout
+                        );
+                      }}
+                      onWheel={(e) => {
+                        const element = e.currentTarget;
+                        const isAtTop = element.scrollTop === 0;
+                        const isAtBottom =
+                          Math.abs(
+                            element.scrollHeight -
+                              element.scrollTop -
+                              element.clientHeight
+                          ) < 1;
+
+                        if (
+                          (isAtTop && e.deltaY < 0) ||
+                          (isAtBottom && e.deltaY > 0)
+                        ) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      <MarkdownViewer
+                        content={markdownContent}
+                        filename={selectedFile.filename}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ) : selectedFile ? (
-            <MarkdownViewer
-              content={markdownContent}
-              filename={selectedFile.filename}
-            />
+            )
           ) : (
-            <div className="rounded-lg border border-zinc-800 h-full flex items-center justify-center">
-              <div className="text-center text-zinc-400">
-                <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>Select a file to view its contents</p>
-              </div>
+            <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+              Select a file to view its content
             </div>
           )}
         </div>

@@ -13,42 +13,73 @@ export async function GET(
   try {
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get("fileId");
+    const carId = params.id;
 
-    if (!fileId) {
+    if (!fileId || !carId) {
       return NextResponse.json(
-        { error: "File ID is required" },
+        { error: "File ID and Car ID are required" },
         { status: 400 }
       );
     }
 
-    // Get the file from MongoDB
     const { db } = await connectToDatabase();
     const file = await db
       .collection("research_files")
-      .findOne({ _id: new ObjectId(fileId) });
+      .findOne({ _id: new ObjectId(fileId), carId });
 
     if (!file) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
-    // Get the S3 URL
-    const url = await generatePresignedDownloadUrl(file.s3Key);
-
-    // Fetch the content
-    const response = await fetch(url);
-    const content = await response.text();
-
-    // Return the content with appropriate headers
-    return new NextResponse(content, {
-      headers: {
-        "Content-Type": "text/markdown",
-        "Cache-Control": "s-maxage=3600",
-      },
+    return new NextResponse(file.content, {
+      headers: { "Content-Type": "text/plain" },
     });
   } catch (error) {
     console.error("Error fetching file content:", error);
     return NextResponse.json(
       { error: "Failed to fetch file content" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const carId = params.id;
+    const { fileId, content } = await request.json();
+
+    if (!fileId || !carId || content === undefined) {
+      return NextResponse.json(
+        { error: "File ID, Car ID, and content are required" },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+
+    // Update the file content
+    const result = await db.collection("research_files").updateOne(
+      { _id: new ObjectId(fileId), carId },
+      {
+        $set: {
+          content,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "File not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error updating file content:", error);
+    return NextResponse.json(
+      { error: "Failed to update file content" },
       { status: 500 }
     );
   }
