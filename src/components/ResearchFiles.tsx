@@ -61,6 +61,10 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   );
   const fileListBounceTimeout = useRef<NodeJS.Timeout>();
   const contentBounceTimeout = useRef<NodeJS.Timeout>();
+  const [isVimMode, setIsVimMode] = useState(true);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const fileListRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchFiles();
@@ -332,6 +336,85 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }, 150);
   };
 
+  const handleFileListKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!isVimMode) return;
+
+      switch (e.key.toLowerCase()) {
+        case "j":
+          e.preventDefault();
+          if (selectedIndex < files.length - 1) {
+            setSelectedIndex(selectedIndex + 1);
+          }
+          break;
+        case "k":
+          e.preventDefault();
+          if (selectedIndex > 0) {
+            setSelectedIndex(selectedIndex - 1);
+          }
+          break;
+        case "arrowright":
+        case "l":
+          e.preventDefault();
+          if (selectedIndex >= 0 && selectedIndex < files.length) {
+            if (
+              !selectedFile ||
+              selectedFile._id !== files[selectedIndex]._id
+            ) {
+              handleFileClick(files[selectedIndex]);
+            }
+            viewerRef.current?.focus();
+          }
+          break;
+        case "enter":
+          e.preventDefault();
+          if (selectedIndex >= 0 && selectedIndex < files.length) {
+            handleFileClick(files[selectedIndex]);
+          }
+          break;
+        case "g":
+          if (e.shiftKey) {
+            e.preventDefault();
+            setSelectedIndex(files.length - 1);
+          } else {
+            e.preventDefault();
+            setSelectedIndex(0);
+          }
+          break;
+        case "escape":
+          setIsVimMode(true);
+          break;
+        case "i":
+          setIsVimMode(false);
+          break;
+      }
+    },
+    [files, selectedIndex, isVimMode, selectedFile]
+  );
+
+  useEffect(() => {
+    // Auto-select first file when files load
+    if (files.length > 0 && selectedIndex === -1) {
+      setSelectedIndex(0);
+    }
+  }, [files]);
+
+  useEffect(() => {
+    // Scroll selected item into view when using keyboard navigation
+    if (selectedIndex >= 0 && fileListRef.current) {
+      const selectedElement = fileListRef.current.children[
+        selectedIndex
+      ] as HTMLElement;
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [selectedIndex]);
+
+  const focusFileList = useCallback(() => {
+    fileListRef.current?.focus();
+  }, []);
+
   // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
@@ -350,8 +433,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
         {/* Left Column */}
         <div className="flex flex-col min-h-0">
           {/* Search and Upload Section */}
-          <div className="flex-none px-1.5 py-0.5 border-b border-zinc-800 bg-background">
-            <div className="flex gap-1 mb-0.5">
+          <div className="flex-none px-1.5 py-0.5 border-b border-zinc-800 bg-background z-20">
+            <div className="flex gap-1 mb-0.5 relative">
               <div className="flex-1">
                 <form onSubmit={handleSearch} className="flex gap-1">
                   <input
@@ -365,7 +448,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     type="submit"
                     size="sm"
                     disabled={isSearching || !searchQuery.trim()}
-                    className="h-6 px-1.5"
+                    className="h-6 px-1.5 shrink-0"
                   >
                     {isSearching ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -375,11 +458,13 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   </Button>
                 </form>
               </div>
-              <ModelSelector
-                value={selectedModel}
-                onChange={setSelectedModel}
-                className="w-28"
-              />
+              <div className="shrink-0">
+                <ModelSelector
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  className="w-28"
+                />
+              </div>
             </div>
 
             <div
@@ -418,7 +503,11 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
           {/* Files and Search Results */}
           <div
-            className={`flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none transition-transform duration-200 ${
+            ref={fileListRef}
+            tabIndex={0}
+            onFocus={() => setIsVimMode(true)}
+            onKeyDown={handleFileListKeyDown}
+            className={`flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none transition-transform duration-200 focus:outline-none focus:ring-[0.5px] focus:ring-zinc-700/50 ${
               fileListBounce === "top"
                 ? "translate-y-[10px]"
                 : fileListBounce === "bottom"
@@ -529,13 +618,20 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                 </div>
               ) : (
                 <>
-                  {files.map((file) => (
+                  {files.map((file, index) => (
                     <div
                       key={file._id}
                       className={`group py-1.5 px-2 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 ${
                         selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
+                      } ${
+                        selectedIndex === index
+                          ? "bg-zinc-800/75 ring-[0.5px] ring-zinc-700/50"
+                          : ""
                       }`}
-                      onClick={() => handleFileClick(file)}
+                      onClick={() => {
+                        setSelectedIndex(index);
+                        handleFileClick(file);
+                      }}
                     >
                       <div className="flex gap-2 min-w-0 flex-1">
                         <FileText className="h-4 w-4 mt-0.5 text-zinc-400 flex-shrink-0" />
@@ -596,58 +692,31 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   />
                 ) : (
                   <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex-none flex items-center justify-between px-2 py-1 border-b border-zinc-800">
-                      <h3 className="text-sm font-medium text-zinc-100">
+                    <div className="flex-none px-2 py-1 border-b border-zinc-800 bg-background z-10 flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-zinc-100 truncate">
                         {selectedFile.filename}
                       </h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsEditing(true)}
-                        className="h-6 text-xs"
-                      >
-                        <Edit2 className="h-3 w-3 mr-1" />
-                        Edit
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-zinc-400">
+                          {isVimMode ? "VIM" : "-- INSERT --"}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsEditing(true)}
+                          className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                        >
+                          <Edit2 className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
                     </div>
-                    <div
-                      className={`flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none transition-transform duration-200 ${
-                        contentBounce === "top"
-                          ? "translate-y-[10px]"
-                          : contentBounce === "bottom"
-                          ? "-translate-y-[10px]"
-                          : ""
-                      }`}
-                      onScroll={(e) => {
-                        handleBounce(
-                          e.currentTarget,
-                          setContentBounce,
-                          contentBounceTimeout
-                        );
-                      }}
-                      onWheel={(e) => {
-                        const element = e.currentTarget;
-                        const isAtTop = element.scrollTop === 0;
-                        const isAtBottom =
-                          Math.abs(
-                            element.scrollHeight -
-                              element.scrollTop -
-                              element.clientHeight
-                          ) < 1;
-
-                        if (
-                          (isAtTop && e.deltaY < 0) ||
-                          (isAtBottom && e.deltaY > 0)
-                        ) {
-                          e.preventDefault();
-                        }
-                      }}
-                    >
-                      <MarkdownViewer
-                        content={markdownContent}
-                        filename={selectedFile.filename}
-                      />
-                    </div>
+                    <MarkdownViewer
+                      ref={viewerRef}
+                      content={markdownContent}
+                      filename={selectedFile.filename}
+                      onFocusFileList={focusFileList}
+                    />
                   </div>
                 )}
               </div>

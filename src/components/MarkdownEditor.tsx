@@ -7,6 +7,8 @@ import { Eye, Edit2, Save, History, Loader2 } from "lucide-react";
 import MarkdownViewer from "./MarkdownViewer";
 import { debounce } from "lodash";
 import { formatDistanceToNow } from "date-fns";
+import * as monaco from "monaco-editor";
+import { initVimMode } from "monaco-vim";
 
 interface MarkdownEditorProps {
   content: string;
@@ -30,7 +32,12 @@ export default function MarkdownEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [bounce, setBounce] = useState<"top" | "bottom" | null>(null);
+  const [isVimMode, setIsVimMode] = useState(true);
+  const bounceTimeout = useRef<NodeJS.Timeout>();
   const editorRef = useRef<any>(null);
+  const vimModeRef = useRef<any>(null);
+  const statusBarRef = useRef<HTMLDivElement>(null);
 
   // Auto-save functionality
   const debouncedSave = useRef(
@@ -43,11 +50,67 @@ export default function MarkdownEditor({
   useEffect(() => {
     return () => {
       debouncedSave.cancel();
+      if (bounceTimeout.current) {
+        clearTimeout(bounceTimeout.current);
+      }
+      if (vimModeRef.current) {
+        vimModeRef.current.dispose();
+      }
     };
   }, [debouncedSave]);
 
+  useEffect(() => {
+    if (editorRef.current && statusBarRef.current) {
+      if (isVimMode && !vimModeRef.current) {
+        vimModeRef.current = initVimMode(
+          editorRef.current,
+          statusBarRef.current
+        );
+      } else if (!isVimMode && vimModeRef.current) {
+        vimModeRef.current.dispose();
+        vimModeRef.current = null;
+      }
+    }
+  }, [isVimMode, editorRef.current]);
+
+  const handleBounce = (element: HTMLDivElement) => {
+    const isAtTop = element.scrollTop === 0;
+    const isAtBottom =
+      Math.abs(
+        element.scrollHeight - element.scrollTop - element.clientHeight
+      ) < 1;
+
+    // Clear any existing timeout
+    if (bounceTimeout.current) {
+      clearTimeout(bounceTimeout.current);
+      bounceTimeout.current = undefined;
+    }
+
+    // Reset bounce state when not at boundaries
+    if (!isAtTop && !isAtBottom) {
+      setBounce(null);
+      return;
+    }
+
+    // Set bounce state based on position
+    if (isAtTop) {
+      setBounce("top");
+    } else if (isAtBottom) {
+      setBounce("bottom");
+    }
+
+    // Clear bounce state after animation
+    bounceTimeout.current = setTimeout(() => {
+      setBounce(null);
+      bounceTimeout.current = undefined;
+    }, 150);
+  };
+
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
+    if (isVimMode && statusBarRef.current) {
+      vimModeRef.current = initVimMode(editor, statusBarRef.current);
+    }
   };
 
   const handleContentChange = (value: string | undefined) => {
@@ -94,30 +157,40 @@ export default function MarkdownEditor({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-        <div>
-          <h3 className="text-lg font-semibold text-zinc-100">{filename}</h3>
-          <p className="text-sm text-zinc-400">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-none flex items-center justify-between px-2 py-1 border-b border-zinc-800 bg-background z-10">
+        <div className="min-w-0 flex-1 mr-4">
+          <h3 className="text-sm font-medium text-zinc-100 truncate">
+            {filename}
+          </h3>
+          <p className="text-xs text-zinc-400 truncate">
             Last modified: {formatDistanceToNow(new Date(lastModified))} ago
             {lastSaved && ` • Saved ${formatDistanceToNow(lastSaved)} ago`}
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsVimMode(!isVimMode)}
+            className="h-6 text-xs shrink-0"
+          >
+            {isVimMode ? "Vim: On" : "Vim: Off"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={togglePreview}
-            className="flex items-center"
+            className="h-6 text-xs shrink-0"
           >
             {isPreview ? (
               <>
-                <Edit2 className="w-4 h-4 mr-2" />
+                <Edit2 className="h-3 w-3 mr-1" />
                 Edit
               </>
             ) : (
               <>
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="h-3 w-3 mr-1" />
                 Preview
               </>
             )}
@@ -127,38 +200,79 @@ export default function MarkdownEditor({
             size="sm"
             onClick={handleManualSave}
             disabled={isSaving || !isDirty}
-            className="flex items-center"
+            className="h-6 text-xs shrink-0"
           >
             {isSaving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="h-3 w-3" />
             ) : (
-              <Save className="w-4 h-4 mr-2" />
+              <>
+                <Save className="h-3 w-3 mr-1" />
+                Save
+              </>
             )}
-            Save
           </Button>
         </div>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {isPreview ? (
-          <MarkdownViewer content={content} filename={filename} />
+          <div className="h-full overflow-hidden">
+            <div className="flex flex-col h-full">
+              <div
+                className={`flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none transition-transform duration-200 ${
+                  bounce === "top"
+                    ? "translate-y-[10px]"
+                    : bounce === "bottom"
+                    ? "-translate-y-[10px]"
+                    : ""
+                }`}
+                onScroll={(e) => handleBounce(e.currentTarget)}
+                onWheel={(e) => {
+                  const element = e.currentTarget;
+                  const isAtTop = element.scrollTop === 0;
+                  const isAtBottom =
+                    Math.abs(
+                      element.scrollHeight -
+                        element.scrollTop -
+                        element.clientHeight
+                    ) < 1;
+
+                  if (
+                    (isAtTop && e.deltaY < 0) ||
+                    (isAtBottom && e.deltaY > 0)
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <MarkdownViewer content={content} filename={filename} />
+              </div>
+            </div>
+          </div>
         ) : (
-          <Editor
-            height="100%"
-            defaultLanguage="markdown"
-            value={content}
-            onChange={handleContentChange}
-            onMount={handleEditorDidMount}
-            theme="vs-dark"
-            options={{
-              minimap: { enabled: false },
-              fontSize: 14,
-              wordWrap: "on",
-              lineNumbers: "on",
-              renderWhitespace: "boundary",
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-            }}
-          />
+          <>
+            <Editor
+              height="100%"
+              defaultLanguage="markdown"
+              value={content}
+              onChange={handleContentChange}
+              onMount={handleEditorDidMount}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                wordWrap: "on",
+                lineNumbers: "on",
+                renderWhitespace: "boundary",
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                cursorStyle: isVimMode ? "block" : "line",
+              }}
+            />
+            <div
+              ref={statusBarRef}
+              className="flex-none h-5 px-2 text-xs text-zinc-400 bg-zinc-900 border-t border-zinc-800"
+            />
+          </>
         )}
       </div>
     </div>
