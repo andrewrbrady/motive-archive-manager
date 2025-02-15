@@ -5,6 +5,10 @@ if (!process.env.MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
 
+if (!process.env.MONGODB_DB) {
+  throw new Error("Please add MONGODB_DB to .env.local");
+}
+
 // Parse the MongoDB URI to get direct connection details if SRV lookup fails
 function getDirectConnectionUri(uri: string): string {
   try {
@@ -35,6 +39,7 @@ function getDirectConnectionUri(uri: string): string {
 // Safely get the MongoDB URI from environment variables
 const uri = process.env.MONGODB_URI;
 const directUri = getDirectConnectionUri(uri);
+const dbName = process.env.MONGODB_DB || "motive_archive";
 
 // MongoDB client options
 const options: MongoClientOptions = {
@@ -87,7 +92,14 @@ export default clientPromise;
 
 export async function connectToDatabase() {
   try {
-    const db = (await clientPromise).db();
+    const client = await clientPromise;
+    const db = client.db(dbName);
+    console.log("Connected to database:", {
+      name: db.databaseName,
+      uri:
+        process.env.MONGODB_URI?.split("@")[1]?.split("/")[0] ||
+        "URI not found",
+    });
     return { db, client };
   } catch (error) {
     console.error("Failed to connect to database:", error);
