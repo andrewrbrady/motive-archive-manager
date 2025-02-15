@@ -125,11 +125,39 @@ export async function GET(request: Request) {
 
     console.log("MongoDB Query:", JSON.stringify(query, null, 2));
 
-    // Get cars with pagination
+    // Handle sorting
+    const sortParam = searchParams.get("sort") || "createdAt_desc";
+    console.log("Sorting with parameter:", sortParam);
+
+    const [sortField, sortDirection] = sortParam.split("_");
+    console.log("Sort field:", sortField, "Sort direction:", sortDirection);
+
+    const sortOptions = {
+      asc: 1 as const,
+      desc: -1 as const,
+    };
+
+    // Validate sort field and direction
+    const validSortFields = ["createdAt", "price", "year"] as const;
+    const validSortDirections = ["asc", "desc"] as const;
+
+    const isValidSort =
+      validSortFields.includes(sortField as (typeof validSortFields)[number]) &&
+      validSortDirections.includes(
+        sortDirection as (typeof validSortDirections)[number]
+      );
+
+    const sortQuery = isValidSort
+      ? { [sortField]: sortOptions[sortDirection as keyof typeof sortOptions] }
+      : { createdAt: -1 as const };
+
+    console.log("Final sort query:", sortQuery);
+
+    // Get cars with pagination and sorting
     const cars = await db
       .collection("cars")
       .find(query)
-      .sort({ createdAt: -1 })
+      .sort(sortQuery)
       .skip(skip)
       .limit(pageSize)
       .toArray();

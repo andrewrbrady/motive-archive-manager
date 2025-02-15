@@ -23,6 +23,7 @@ interface FilterParams {
   minPrice?: string;
   maxPrice?: string;
   status?: string;
+  sort?: string;
 }
 
 async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
@@ -92,6 +93,7 @@ export default async function CarsPage({
       minPrice: resolvedParams.minPrice?.toString(),
       maxPrice: resolvedParams.maxPrice?.toString(),
       status: resolvedParams.status?.toString(),
+      sort: resolvedParams.sort?.toString() || "createdAt_desc",
     };
 
     // Clean up undefined values
