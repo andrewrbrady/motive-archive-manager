@@ -77,7 +77,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
   useEffect(() => {
     fetchDeliverables();
-  }, [carId]);
+  }, [carId, fetchDeliverables]);
 
   const handleDelete = async (deliverableId: string) => {
     if (!confirm("Are you sure you want to delete this deliverable?")) {

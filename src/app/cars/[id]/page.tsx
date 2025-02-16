@@ -21,6 +21,7 @@ import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImageGalleryEnhanced } from "@/components/cars/ImageGalleryEnhanced";
 import type { Car as BaseCar, CarImage, Engine } from "@/types/car";
+import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 
 interface MeasurementValue {
   value: number | null;
@@ -1333,6 +1334,7 @@ export default function CarPage() {
               <TabsTrigger value="service">Service History</TabsTrigger>
               <TabsTrigger value="research">Research</TabsTrigger>
               <TabsTrigger value="article">Article</TabsTrigger>
+              <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
             </TabsList>
 
             <TabsContent value="gallery">
@@ -1410,6 +1412,10 @@ export default function CarPage() {
 
             <TabsContent value="article">
               <ArticleGenerator car={car} />
+            </TabsContent>
+
+            <TabsContent value="deliverables" className="mt-6">
+              <DeliverablesTab carId={params.id} />
             </TabsContent>
           </Tabs>
         </div>

@@ -1,14 +1,7 @@
-import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { useState } from "react";
+import { Deliverable } from "@/types/deliverable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,14 +9,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil } from "lucide-react";
 import {
-  Deliverable,
-  Platform,
-  DeliverableType,
-  DeliverableStatus,
-} from "@/types/deliverable";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { format } from "date-fns";
 import { toast } from "react-hot-toast";
+import { Pencil } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;

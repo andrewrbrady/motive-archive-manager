@@ -1,7 +1,7 @@
 // app/api/cars/route.ts
 import { NextResponse } from "next/server";
 import { Car } from "@/models/Car";
-import clientPromise from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +12,7 @@ export async function POST(request: Request) {
     console.log("Creating car with data:", JSON.stringify(body, null, 2));
 
     // Connect to the database
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    const { db } = await connectToDatabase();
 
     // Ensure dimensions are properly structured
     if (body.dimensions) {
@@ -59,8 +58,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     // Connect to the database
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    const { db } = await connectToDatabase();
 
     // Get query parameters
     const { searchParams } = new URL(request.url);

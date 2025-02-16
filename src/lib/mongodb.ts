@@ -88,7 +88,9 @@ if (process.env.NODE_ENV === "development") {
   });
 });
 
-export default clientPromise;
+// Export the clientPromise as the default export
+const mongoClientPromise = clientPromise;
+export default mongoClientPromise;
 
 export async function connectToDatabase() {
   try {
