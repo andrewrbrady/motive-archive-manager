@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Deliverable,
   Platform,
@@ -60,7 +60,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState<string>("");
 
-  const fetchDeliverables = async () => {
+  const fetchDeliverables = useCallback(async () => {
     try {
       const id = Array.isArray(carId) ? carId[0] : carId;
       const response = await fetch(`/api/cars/${id}/deliverables`);
@@ -73,11 +73,11 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [carId]);
 
   useEffect(() => {
     fetchDeliverables();
-  }, [carId, fetchDeliverables]);
+  }, [fetchDeliverables]);
 
   const handleDelete = async (deliverableId: string) => {
     if (!confirm("Are you sure you want to delete this deliverable?")) {

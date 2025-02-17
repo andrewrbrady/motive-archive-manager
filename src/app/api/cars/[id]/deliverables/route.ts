@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Deliverable } from "@/types/deliverable";
 
@@ -13,7 +13,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
     const carId = new ObjectId(params.id);
 
     // Get the car's deliverable references
@@ -44,7 +45,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
     const carId = new ObjectId(params.id);
     const data = await request.json();
 
@@ -84,7 +86,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
     const pathParts = request.url.split("/");
     const deliverableId = pathParts[pathParts.length - 1];
 
@@ -129,7 +132,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
     const carId = new ObjectId(params.id);
     const pathParts = request.url.split("/");
     const deliverableId = pathParts[pathParts.length - 1];
