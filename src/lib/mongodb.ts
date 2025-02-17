@@ -1,84 +1,40 @@
 // MongoDB configuration v1.0.5
-import { MongoClient, MongoClientOptions } from "mongodb";
+import mongoose from "mongoose";
 
 if (!process.env.MONGODB_URI) {
-  throw new Error("Please add your Mongo URI to .env.local");
+  throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
 }
 
-if (!process.env.MONGODB_DB) {
-  throw new Error("Please add MONGODB_DB to .env.local");
-}
-
-// Parse the MongoDB URI to get direct connection details if SRV lookup fails
-function getDirectConnectionUri(uri: string): string {
-  try {
-    if (!uri.includes("mongodb+srv://")) {
-      return uri; // Already a direct connection
-    }
-
-    const matches = uri.match(/mongodb\+srv:\/\/(.*?)@(.*?)\/(.*?)(\?.*)?$/);
-    if (!matches) return uri;
-
-    const [_, auth, host] = matches;
-    const baseHost = host.split(".").slice(1).join(".");
-    const shards = [
-      `${host.split(".")[0]}-shard-00-00.${baseHost}:27017`,
-      `${host.split(".")[0]}-shard-00-01.${baseHost}:27017`,
-      `${host.split(".")[0]}-shard-00-02.${baseHost}:27017`,
-    ];
-
-    return `mongodb://${auth}@${shards.join(",")}/?ssl=true&replicaSet=atlas-${
-      host.split("-")[0]
-    }&authSource=admin`;
-  } catch (error) {
-    console.error("Error converting SRV URI to direct:", error);
-    return uri;
-  }
-}
-
-// Safely get the MongoDB URI from environment variables
 const uri = process.env.MONGODB_URI;
-const directUri = getDirectConnectionUri(uri);
-const dbName = process.env.MONGODB_DB || "motive_archive";
-
-// MongoDB client options
-const options: MongoClientOptions = {
-  maxPoolSize: 10,
-  minPoolSize: 5,
-  maxIdleTimeMS: 60000,
-  connectTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
-  serverSelectionTimeoutMS: 30000,
-  retryWrites: true,
-  retryReads: true,
-  w: "majority",
-  directConnection: false,
+const options = {
+  bufferCommands: true,
+  dbName: "motive_archive",
+  autoCreate: true,
 };
 
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+let clientPromise: Promise<typeof mongoose>;
 
-// Development mode uses global variable to preserve connection across HMR
 if (process.env.NODE_ENV === "development") {
-  let globalWithMongo = global as typeof globalThis & {
-    _mongoClientPromise?: Promise<MongoClient>;
+  // In development mode, use a global variable so that the value
+  // is preserved across module reloads caused by HMR (Hot Module Replacement).
+  let globalWithMongoose = global as typeof globalThis & {
+    mongoose: Promise<typeof mongoose>;
   };
-
-  if (!globalWithMongo._mongoClientPromise) {
-    client = new MongoClient(uri, options);
-    globalWithMongo._mongoClientPromise = client.connect();
+  if (!globalWithMongoose.mongoose) {
+    globalWithMongoose.mongoose = mongoose.connect(uri, options);
   }
-  clientPromise = globalWithMongo._mongoClientPromise;
+  clientPromise = globalWithMongoose.mongoose;
 } else {
-  client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+  // In production mode, it's best to not use a global variable.
+  clientPromise = mongoose.connect(uri, options);
 }
 
 // Graceful shutdown handlers
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
   process.on(signal, async () => {
     try {
-      await client.close();
+      const client = await clientPromise;
+      await client.connection.close();
       console.log("MongoDB connection closed.");
       process.exit(0);
     } catch (err) {
@@ -88,23 +44,16 @@ if (process.env.NODE_ENV === "development") {
   });
 });
 
-// Export the clientPromise as the default export
-const mongoClientPromise = clientPromise;
-export default mongoClientPromise;
-
 export async function connectToDatabase() {
   try {
     const client = await clientPromise;
-    const db = client.db(dbName);
     console.log("Connected to database:", {
-      name: db.databaseName,
-      uri:
-        process.env.MONGODB_URI?.split("@")[1]?.split("/")[0] ||
-        "URI not found",
+      name: client.connection.name,
+      uri: client.connection.host,
     });
-    return { db, client };
+    return client;
   } catch (error) {
-    console.error("Failed to connect to database:", error);
+    console.error("Error connecting to database:", error);
     throw error;
   }
 }

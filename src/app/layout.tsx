@@ -1,8 +1,7 @@
 import "./globals.css";
-import "@/styles/theme.css";
 import { Metadata } from "next";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "Motive Archive",
@@ -29,7 +28,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-background text-text-primary antialiased">
+      <body className="min-h-screen bg-background antialiased">
         <ThemeProvider>{children}</ThemeProvider>
         <Toaster />
       </body>
