@@ -116,7 +116,10 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <label htmlFor="name" className="text-sm font-medium">
+        <label
+          htmlFor="name"
+          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+        >
           Name
         </label>
         <Input
@@ -124,11 +127,16 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           required
+          placeholder="Name"
+          className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"
         />
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium">
+        <label
+          htmlFor="email"
+          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+        >
           Email
         </label>
         <Input
@@ -137,20 +145,29 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           required
+          placeholder="Email"
+          className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"
         />
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="roles" className="text-sm font-medium">
+        <label
+          htmlFor="roles"
+          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+        >
           Role
         </label>
         <Select value={formData.roles?.[0]} onValueChange={handleRoleChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select role" />
+          <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+            <SelectValue placeholder="Select a role" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             {ROLES.map((role) => (
-              <SelectItem key={role} value={role}>
+              <SelectItem
+                key={role}
+                value={role}
+                className="!bg-white dark:!bg-[#1a1a1a] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+              >
                 {role.charAt(0).toUpperCase() + role.slice(1)}
               </SelectItem>
             ))}
@@ -159,19 +176,26 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="status" className="text-sm font-medium">
+        <label
+          htmlFor="status"
+          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+        >
           Status
         </label>
         <Select
           defaultValue={formData.status}
           onValueChange={handleStatusChange}
         >
-          <SelectTrigger>
+          <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <SelectValue placeholder="Select status" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             {STATUS_OPTIONS.map((status) => (
-              <SelectItem key={status} value={status}>
+              <SelectItem
+                key={status}
+                value={status}
+                className="!bg-white dark:!bg-[#1a1a1a] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+              >
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </SelectItem>
             ))}
@@ -180,16 +204,23 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="creativeRoles" className="text-sm font-medium">
+        <label
+          htmlFor="creativeRoles"
+          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+        >
           Creative Roles
         </label>
         <Select value="" onValueChange={handleCreativeRoleChange}>
-          <SelectTrigger>
+          <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <SelectValue placeholder="Add creative role" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             {CREATIVE_ROLES.map((role) => (
-              <SelectItem key={role} value={role}>
+              <SelectItem
+                key={role}
+                value={role}
+                className="!bg-white dark:!bg-[#1a1a1a] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+              >
                 {role
                   .split("_")
                   .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -203,7 +234,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
             {formData.creativeRoles.map((role) => (
               <span
                 key={role}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
               >
                 {role
                   .split("_")
@@ -211,7 +242,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
                   .join(" ")}
                 <button
                   type="button"
-                  className="ml-1 text-blue-600 hover:text-blue-800"
+                  className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                   onClick={() => removeCreativeRole(role)}
                 >
                   ×
@@ -223,10 +254,18 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       </div>
 
       <div className="flex justify-end space-x-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          className="border-gray-200 dark:border-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+        >
           Cancel
         </Button>
-        <Button type="submit">
+        <Button
+          type="submit"
+          className="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900"
+        >
           {user?._id ? "Update User" : "Create User"}
         </Button>
       </div>

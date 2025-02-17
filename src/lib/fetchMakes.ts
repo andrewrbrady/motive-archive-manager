@@ -1,5 +1,6 @@
 // lib/fetchMakes.ts
 import { connectToDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export interface Make {
   _id: string;
@@ -27,7 +28,7 @@ export async function fetchMakes() {
     console.log(`Successfully fetched ${makes.length} makes`);
 
     return makes.map((make) => ({
-      _id: make._id.toString(),
+      _id: make._id instanceof ObjectId ? make._id.toString() : make._id,
       name: make.name,
       country_of_origin: make.country_of_origin,
       founded: make.founded,

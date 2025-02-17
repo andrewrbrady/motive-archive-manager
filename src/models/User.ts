@@ -1,5 +1,9 @@
 "use strict";
 import mongoose, { Model, Document } from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+// Ensure database connection is established
+dbConnect().catch(console.error);
 
 export interface IUser extends Document {
   name: string;

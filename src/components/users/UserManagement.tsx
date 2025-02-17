@@ -102,15 +102,22 @@ export default function UserManagement() {
   };
 
   return (
-    <div>
-      <div className="mb-4 flex justify-end">
-        <Button onClick={handleCreateUser}>Add New User</Button>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold tracking-tight">Users</h2>
+        <Button
+          onClick={handleCreateUser}
+          variant="outline"
+          className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+        >
+          Add New User
+        </Button>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border-[1px] border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111]">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-b border-gray-200 dark:border-gray-800 hover:bg-transparent">
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Roles</TableHead>
@@ -123,33 +130,36 @@ export default function UserManagement() {
             {isLoading ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-4">
-                  Loading...
+                  <span className="text-muted-foreground">Loading...</span>
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-4">
-                  No users found
+                  <span className="text-muted-foreground">No users found</span>
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => (
-                <TableRow key={user._id}>
-                  <TableCell>{user.name}</TableCell>
+                <TableRow
+                  key={user._id}
+                  className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                >
+                  <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.roles.join(", ")}</TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         user.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-destructive/10 text-destructive"
                       }`}
                     >
                       {user.status}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right space-x-2">
@@ -157,6 +167,7 @@ export default function UserManagement() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditUser(user)}
+                      className="border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-foreground"
                     >
                       Edit
                     </Button>
@@ -164,6 +175,7 @@ export default function UserManagement() {
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDeleteUser(user._id)}
+                      className="hover:bg-destructive/90"
                     >
                       Delete
                     </Button>
@@ -176,9 +188,9 @@ export default function UserManagement() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800">
+          <DialogHeader className="border-b border-gray-200 dark:border-gray-800 pb-4">
+            <DialogTitle className="text-gray-900 dark:text-gray-100">
               {selectedUser ? "Edit User" : "Create New User"}
             </DialogTitle>
           </DialogHeader>
