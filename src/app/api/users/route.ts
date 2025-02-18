@@ -49,21 +49,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set default values if not provided
+    // Set default values and timestamps
+    const now = new Date();
     const userData = {
       ...data,
       roles: data.roles || ["viewer"],
       status: data.status || "active",
       creativeRoles: data.creativeRoles || [],
+      active: true,
+      permissions: data.permissions || ["read"],
+      profile: {
+        ...data.profile,
+        specialties: data.profile?.specialties || [],
+      },
+      created_at: now,
+      updated_at: now,
+      createdAt: now,
+      updatedAt: now,
     };
 
     console.log("Creating user with data:", userData);
-    const result = await db.collection("users").insertOne({
-      ...userData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const user = await User.findById(result.insertedId);
+    const result = await db.collection("users").insertOne(userData);
+
+    const user = await db
+      .collection("users")
+      .findOne({ _id: result.insertedId });
     console.log("User created successfully:", user);
 
     return NextResponse.json(user);
