@@ -1,8 +1,8 @@
-import { connectToDatabase } from "../lib/mongodb";
+import { getDatabase } from "../lib/mongodb";
 
 async function setupDeliverables() {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Create the deliverables collection
     await db.createCollection("deliverables");

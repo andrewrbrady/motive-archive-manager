@@ -1,5 +1,5 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { connectToDatabase } from "./mongodb";
+import { getDatabase } from "./mongodb";
 import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import { ModelType } from "@/components/ModelSelector";
@@ -74,7 +74,7 @@ async function keywordSearch(
   query: string,
   carId: string
 ): Promise<SearchResult[]> {
-  const { db } = await connectToDatabase();
+  const db = await getDatabase();
 
   // Create text index if it doesn't exist
   await db.collection("research_files").createIndex({ content: "text" });
@@ -117,7 +117,7 @@ async function semanticSearch(
   carId: string
 ): Promise<SearchResult[]> {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Generate query embedding with rate limiting
     const queryEmbedding = await callWithRateLimit(
@@ -307,7 +307,7 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
 // Helper function to regenerate embedding for a document
 async function regenerateEmbedding(doc: any): Promise<void> {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Check if document has content
     if (!doc.content) {
@@ -519,7 +519,7 @@ export async function hybridSearch(
   carId: string,
   model: ModelType = "gpt-4o-mini"
 ): Promise<{ results: SearchResult[]; answer?: string }> {
-  const { db } = await connectToDatabase();
+  const db = await getDatabase();
 
   try {
     console.log(`Performing hybrid search for car ${carId}`);
@@ -655,7 +655,7 @@ export async function prepareResearchContent(
   fileName: string
 ): Promise<void> {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Split content into chunks if it's large
     const chunks = chunkContent(content);
@@ -773,5 +773,67 @@ async function makeAPIRequest(
       console.error("OpenAI API Error:", error);
       throw error;
     }
+  }
+}
+
+async function getEmbeddings(text: string) {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error getting embeddings:", error);
+    throw error;
+  }
+}
+
+async function searchByEmbeddings(embedding: number[], limit: number = 5) {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error searching by embeddings:", error);
+    throw error;
+  }
+}
+
+async function searchByKeywords(keywords: string[], limit: number = 5) {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error searching by keywords:", error);
+    throw error;
+  }
+}
+
+async function searchByHybrid(query: string, limit: number = 5) {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error searching by hybrid:", error);
+    throw error;
+  }
+}
+
+export async function searchByContent(
+  content: string,
+  carId: string
+): Promise<SearchResult[]> {
+  const db = await getDatabase();
+  // ... existing code ...
+  return [];
+}
+
+export async function updateEmbeddings(
+  fileId: string,
+  content: string
+): Promise<void> {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error updating embeddings:", error);
+    throw error;
   }
 }

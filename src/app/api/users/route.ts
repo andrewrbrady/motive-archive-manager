@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/lib/mongodb";
 import { User } from "@/models/User";
 
 interface IUser {
@@ -22,10 +22,10 @@ interface IUser {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    await connectToDatabase();
-    const users = await User.find({}).sort({ created_at: -1 });
+    const db = await getDatabase();
+    const users = await db.collection("users").find().toArray();
     return NextResponse.json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -36,9 +36,9 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    await connectToDatabase();
+    const db = await getDatabase();
     const data = await request.json();
 
     // Validate required fields
@@ -58,7 +58,12 @@ export async function POST(request: Request) {
     };
 
     console.log("Creating user with data:", userData);
-    const user = await User.create(userData);
+    const result = await db.collection("users").insertOne({
+      ...userData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const user = await User.findById(result.insertedId);
     console.log("User created successfully:", user);
 
     return NextResponse.json(user);

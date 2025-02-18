@@ -1,9 +1,7 @@
 // Location: app/api/cars/[id]/images/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
-
-const uri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
-const client = new MongoClient(uri);
+import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
+import { getDatabase } from "@/lib/mongodb";
 
 interface ImageData {
   imageUrl: string;
@@ -24,17 +22,8 @@ interface Image {
 
 interface CarDocument {
   _id: ObjectId;
-  imageIds: ObjectId[];
-}
-
-async function connectToDatabase() {
-  try {
-    await client.connect();
-    console.log("Connected to MongoDB");
-  } catch (error) {
-    console.error("Failed to connect to MongoDB:", error);
-    throw error;
-  }
+  imageIds: string[];
+  updatedAt?: string;
 }
 
 export async function POST(
@@ -63,10 +52,9 @@ export async function POST(
     } = JSON.parse(imageData as string) as ImageData;
     console.log("Received image data:", { imageUrl, imageId });
 
-    await connectToDatabase();
-    const database = client.db("motive_archive");
-    const carsCollection = database.collection<CarDocument>("cars");
-    const imagesCollection = database.collection<Image>("images");
+    const db = await getDatabase();
+    const carsCollection = db.collection<CarDocument>("cars");
+    const imagesCollection = db.collection<Image>("images");
 
     // Create new image document
     const imageDoc = {
@@ -85,12 +73,14 @@ export async function POST(
     console.log("Created new image document:", imageDoc._id);
 
     // Update the car document with the new image ID
+    const updateDoc: UpdateFilter<CarDocument> = {
+      $push: { imageIds: imageDoc._id.toString() },
+      $set: { updatedAt: new Date().toISOString() },
+    };
+
     const result = await carsCollection.updateOne(
       { _id: new ObjectId(id) },
-      {
-        $push: { imageIds: imageDoc._id },
-        $set: { updatedAt: new Date().toISOString() },
-      }
+      updateDoc
     );
 
     console.log("MongoDB update result:", result);
@@ -151,7 +141,9 @@ export async function DELETE(
       );
     }
 
-    mongoClient = await MongoClient.connect(uri);
+    mongoClient = await MongoClient.connect(
+      process.env.MONGODB_URI || "mongodb://127.0.0.1:27017"
+    );
     const database = mongoClient.db("motive_archive");
     const imagesCollection = database.collection<Image>("images");
     const carsCollection = database.collection<CarDocument>("cars");
@@ -163,12 +155,14 @@ export async function DELETE(
     }
 
     // Remove the image ID from the car document
+    const pullDoc: UpdateFilter<CarDocument> = {
+      $pull: { imageIds: image._id.toString() },
+      $set: { updatedAt: new Date().toISOString() },
+    };
+
     const result = await carsCollection.updateOne(
       { _id: new ObjectId(id) },
-      {
-        $pull: { imageIds: image._id },
-        $set: { updatedAt: new Date().toISOString() },
-      }
+      pullDoc
     );
 
     if (result.matchedCount === 0) {

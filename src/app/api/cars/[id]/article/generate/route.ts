@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import type { ModelType } from "@/components/ModelSelector";
 
@@ -15,7 +15,7 @@ interface OutlinePoint {
 }
 
 interface ArticleState {
-  _id: ObjectId;
+  _id?: ObjectId;
   carId: string;
   outline: OutlinePoint[];
   workingDraft: string;
@@ -43,7 +43,7 @@ export async function POST(
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Get car details
     const car = await db
@@ -75,9 +75,8 @@ export async function POST(
         : "standard";
 
     // Get or create article state
-    let articleState = await db
-      .collection("article_states")
-      .findOne<ArticleState>({ carId });
+    const articleStates = db.collection<ArticleState>("article_states");
+    let articleState = await articleStates.findOne({ carId });
 
     if (!articleState) {
       // Start with outline generation
@@ -108,8 +107,7 @@ The outline should be extremely detailed and support an article of ${detailLevel
       const outlineResponse = await generateContent(outlinePrompt, model, 8000);
       const outline = parseOutlineToStructure(outlineResponse);
 
-      articleState = {
-        _id: new ObjectId(),
+      const newArticleState: Omit<ArticleState, "_id"> = {
         carId,
         outline,
         workingDraft: "",
@@ -120,7 +118,11 @@ The outline should be extremely detailed and support an article of ${detailLevel
         lastUpdated: new Date(),
       };
 
-      await db.collection("article_states").insertOne(articleState);
+      const result = await articleStates.insertOne(newArticleState);
+      articleState = {
+        _id: result.insertedId,
+        ...newArticleState,
+      };
     }
 
     // Handle different stages of article generation
@@ -193,9 +195,7 @@ ${JSON.stringify(car, null, 2)}`;
           articleState.stage = "revising";
         }
 
-        await db
-          .collection("article_states")
-          .updateOne({ carId }, { $set: articleState });
+        await articleStates.updateOne({ carId }, { $set: articleState });
 
         return NextResponse.json({
           point: {
@@ -258,7 +258,7 @@ ${researchContent}`;
         );
 
         // Clean up article state
-        await db.collection("article_states").deleteOne({ carId });
+        await articleStates.deleteOne({ carId });
 
         return NextResponse.json({
           article: revisedContent,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId, UpdateFilter } from "mongodb";
 
 interface Car {
   _id: ObjectId;
@@ -12,7 +12,7 @@ export async function PUT(
   { params }: { params: { id: string; deliverableId: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
     const deliverableId = params.deliverableId;
 
     const data = await request.json();
@@ -49,7 +49,7 @@ export async function DELETE(
   { params }: { params: { id: string; deliverableId: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
     const carId = new ObjectId(params.id);
     const deliverableId = params.deliverableId;
     const deliverableObjectId = new ObjectId(deliverableId);
@@ -66,13 +66,12 @@ export async function DELETE(
       );
     }
 
-    // Remove the reference from the car
-    await db
-      .collection<Car>("cars")
-      .updateOne(
-        { _id: carId },
-        { $pull: { deliverableIds: deliverableObjectId } }
-      );
+    // Remove the reference from the car with proper typing
+    const updateFilter: UpdateFilter<Car> = {
+      $pull: { deliverableIds: deliverableObjectId },
+    };
+
+    await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,6 +1,6 @@
 // MongoDB configuration v1.0.5
 import mongoose from "mongoose";
-import { MongoClient } from "mongodb";
+import { MongoClient, Db } from "mongodb";
 
 if (!process.env.MONGODB_URI) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
@@ -51,33 +51,38 @@ export async function dbConnect() {
   return cached.conn;
 }
 
+// For native MongoDB driver connection (used by API routes)
+let client: MongoClient;
+let clientPromise: Promise<MongoClient>;
+
+if (process.env.NODE_ENV === "development") {
+  // In development mode, use a global variable so that the value
+  // is preserved across module reloads caused by HMR (Hot Module Replacement).
+  let globalWithMongo = global as typeof globalThis & {
+    _mongoClientPromise?: Promise<MongoClient>;
+  };
+
+  if (!globalWithMongo._mongoClientPromise) {
+    client = new MongoClient(uri);
+    globalWithMongo._mongoClientPromise = client.connect();
+  }
+  clientPromise = globalWithMongo._mongoClientPromise;
+} else {
+  // In production mode, it's best to not use a global variable.
+  client = new MongoClient(uri);
+  clientPromise = client.connect();
+}
+
+export { clientPromise };
+
+// Helper function to get a typed database instance
+export async function getDatabase(): Promise<Db> {
+  const client = await clientPromise;
+  return client.db(process.env.MONGODB_DB || "motive_archive");
+}
+
 // Initialize Mongoose connection
 dbConnect().catch(console.error);
-
-// For native MongoDB client connection (used by direct collection access)
-if (!global._mongoClientPromise) {
-  const client = new MongoClient(uri);
-  global._mongoClientPromise = client.connect();
-}
-
-export const clientPromise = global._mongoClientPromise;
-
-export async function connectToDatabase() {
-  try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
-
-    console.log("Connected to database:", {
-      name: db.databaseName,
-      uri: client.options.hosts?.join(","),
-    });
-
-    return { client, db };
-  } catch (error) {
-    console.error("Error connecting to database:", error);
-    throw error;
-  }
-}
 
 // Graceful shutdown handlers
 ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {

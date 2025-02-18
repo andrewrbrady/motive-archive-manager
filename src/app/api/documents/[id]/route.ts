@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId, WithId, UpdateFilter } from "mongodb";
 
 interface CarDocument {
@@ -15,8 +15,7 @@ export async function GET(
 ) {
   const id = await Promise.resolve(params.id);
   try {
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    const db = await getDatabase();
     const receipt = await db
       .collection("documents")
       .findOne({ _id: new ObjectId(id) });
@@ -52,8 +51,7 @@ export async function DELETE(
     }
 
     const documentId = new ObjectId(id);
-    const client = await clientPromise;
-    const db = client.db("motive_archive");
+    const db = await getDatabase();
 
     // Get request body for carId
     const body = await request.json();
@@ -77,9 +75,8 @@ export async function DELETE(
       },
     };
 
-    await db
-      .collection<CarDocument>("cars")
-      .updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
+    const cars = db.collection<CarDocument>("cars");
+    await cars.updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
 
     // Delete the document
     const result = await db
@@ -98,10 +95,9 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Delete operation failed:", error);
-
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to delete document" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export async function DELETE(
@@ -7,7 +7,8 @@ export async function DELETE(
   { params }: { params: { id: string; sessionId: string } }
 ) {
   try {
-    const { id: carId, sessionId } = params;
+    const { id, sessionId } = params;
+    const carId = new ObjectId(id);
 
     if (!carId || !sessionId) {
       return NextResponse.json(
@@ -18,7 +19,7 @@ export async function DELETE(
 
     console.log("Deleting saved article:", { carId, sessionId });
 
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // First, find the document to verify we're deleting the correct one
     const articleToDelete = await db.collection("saved_articles").findOne({

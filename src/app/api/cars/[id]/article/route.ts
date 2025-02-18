@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { RateLimiter } from "limiter";
 import type { ModelType } from "@/types/models";
@@ -128,6 +128,11 @@ interface ArticleMetadata {
   sessionId: string;
 }
 
+// Extend Omit<Car, '_id'> to avoid the _id type conflict
+interface CarWithId extends Omit<Car, "_id"> {
+  _id: ObjectId;
+}
+
 async function makeAPIRequest(
   prompt: string,
   model: ModelType,
@@ -220,7 +225,7 @@ async function makeAPIRequest(
 }
 
 async function generateArticlePlan(
-  car: Car & { _id: ObjectId },
+  car: CarWithId,
   researchContent: string,
   model: ModelType,
   context?: string,
@@ -268,7 +273,7 @@ async function generateArticlePlan(
 
 async function generateDraft(
   plan: string,
-  car: any,
+  car: CarWithId,
   researchContent: string,
   model: ModelType,
   context?: string,
@@ -415,47 +420,83 @@ Please provide the complete revised version.`;
   );
 }
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = params.id;
+    const db = await getDatabase();
+
+    const article = await db
+      .collection<ArticleMetadata>("car_articles")
+      .findOne({ carId: id });
+
+    if (!article) {
+      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(article);
+  } catch (error) {
+    console.error("Error fetching article:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch article" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { model, stage, context, focus } = await request.json();
+    const body = await request.json();
+    const { model, stage, context, focus } = body;
     const carId = params.id;
 
-    // Initialize database connection first, outside of the streaming context
-    const { db } = await connectToDatabase();
-    console.log("[DEBUG] MongoDB Connection established");
+    if (!carId) {
+      return NextResponse.json(
+        { error: "Car ID is required" },
+        { status: 400 }
+      );
+    }
 
-    // Fetch and initialize car data before setting up the stream
-    console.log("[DEBUG] GET - Fetching car with ID:", carId);
-    const rawCar = await db
-      .collection("cars")
+    const db = await getDatabase();
+
+    // Get car details with proper typing
+    const carData = await db
+      .collection<CarWithId>("cars")
       .findOne({ _id: new ObjectId(carId) });
 
-    if (!rawCar) {
-      console.log("[DEBUG] Car not found:", carId);
-      throw new Error(`Car not found with ID: ${carId}`);
+    if (!carData) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
+
+    // Get research files
+    const researchFiles = await db
+      .collection("research_files")
+      .find({ carId })
+      .toArray();
 
     // Initialize the car with clientInfo upfront
     console.log("[DEBUG] Raw car data:", {
-      _id: rawCar._id.toString(),
-      hasClientInfo: "clientInfo" in rawCar,
-      keys: Object.keys(rawCar),
+      _id: carData._id.toString(),
+      hasClientInfo: "clientInfo" in carData,
+      keys: Object.keys(carData),
     });
 
-    const car = {
-      ...rawCar,
-      _id: rawCar._id,
-      clientInfo: rawCar.clientInfo || {
+    const car: CarWithId = {
+      ...carData,
+      _id: carData._id,
+      clientInfo: carData.clientInfo || {
         _id: "",
         name: "",
         email: "",
         phone: "",
         address: "",
       },
-    } as Car & { _id: ObjectId };
+    };
 
     // Ensure proper serialization of ObjectId in logs
     const serializedCar = {
@@ -535,7 +576,7 @@ export async function POST(
     (async () => {
       try {
         let metadata = await db
-          .collection("article_metadata")
+          .collection<ArticleMetadata>("article_metadata")
           .findOne({ carId });
 
         if (!metadata) {
@@ -544,7 +585,7 @@ export async function POST(
             carId,
             model,
             stages: [],
-            currentStage: stage,
+            currentStage: "planning",
             createdAt: new Date(),
             updatedAt: new Date(),
             isComplete: false,

@@ -1,5 +1,5 @@
 // lib/fetchMakes.ts
-import { connectToDatabase } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export interface Make {
@@ -16,7 +16,7 @@ export interface Make {
 
 export async function fetchMakes() {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     console.log("Fetching makes from MongoDB...");
     const makes = await db

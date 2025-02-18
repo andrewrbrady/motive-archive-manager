@@ -1,4 +1,4 @@
-import { connectToDatabase } from "../lib/mongodb";
+import { getDatabase } from "../lib/mongodb";
 import { ObjectId } from "mongodb";
 
 interface Car {
@@ -13,7 +13,7 @@ interface Deliverable {
 
 async function verifyDeliverables() {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
     console.log("Connected to database");
 
     // 1. Check all cars have deliverableIds array

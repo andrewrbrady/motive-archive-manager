@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
-    const cars = db.collection<Car>("cars");
+    const captions = db.collection("captions");
+    const cars = db.collection("cars");
 
     // Create the caption document
     const captionDoc: Caption = {
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
+    const captions = db.collection("captions");
 
     const result = await captions.findOneAndUpdate(
       { _id: new ObjectId(captionId) },
@@ -138,8 +138,8 @@ export async function DELETE(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
-    const cars = db.collection<Car>("cars");
+    const captions = db.collection("captions");
+    const cars = db.collection("cars");
 
     // Delete the caption
     const result = await captions.deleteOne({ _id: new ObjectId(captionId) });
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
 
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const captions = db.collection<Caption>("captions");
+    const captions = db.collection("captions");
 
     const results = await captions
       .find({ carId: new ObjectId(carId) })

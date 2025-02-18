@@ -1,51 +1,55 @@
 // app/api/cars/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { Car } from "@/models/Car";
-import { connectToDatabase } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    console.log("Creating car with data:", JSON.stringify(body, null, 2));
-
-    // Connect to the database
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
+    const data = await request.json();
+    console.log("Creating car with data:", JSON.stringify(data, null, 2));
 
     // Ensure dimensions are properly structured
-    if (body.dimensions) {
+    if (data.dimensions) {
       // Ensure GVWR has proper structure
-      if (body.dimensions.gvwr && typeof body.dimensions.gvwr === "object") {
-        body.dimensions.gvwr = {
-          value: body.dimensions.gvwr.value || null,
-          unit: body.dimensions.gvwr.unit || "lbs",
+      if (data.dimensions.gvwr && typeof data.dimensions.gvwr === "object") {
+        data.dimensions.gvwr = {
+          value: data.dimensions.gvwr.value || null,
+          unit: data.dimensions.gvwr.unit || "lbs",
         };
       }
 
       // Ensure weight has proper structure
       if (
-        body.dimensions.weight &&
-        typeof body.dimensions.weight === "object"
+        data.dimensions.weight &&
+        typeof data.dimensions.weight === "object"
       ) {
-        body.dimensions.weight = {
-          value: body.dimensions.weight.value || null,
-          unit: body.dimensions.weight.unit || "lbs",
+        data.dimensions.weight = {
+          value: data.dimensions.weight.value || null,
+          unit: data.dimensions.weight.unit || "lbs",
         };
       }
     }
 
     // Create a new car document
     const result = await db.collection("cars").insertOne({
-      ...body,
+      ...data,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
     const car = await db.collection("cars").findOne({ _id: result.insertedId });
 
     console.log("Created car:", JSON.stringify(car, null, 2));
-    return NextResponse.json(car, { status: 201 });
+    return NextResponse.json(
+      {
+        _id: result.insertedId,
+        ...data,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error creating car:", error);
     return NextResponse.json(
@@ -55,10 +59,9 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Connect to the database
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Get query parameters
     const { searchParams } = new URL(request.url);

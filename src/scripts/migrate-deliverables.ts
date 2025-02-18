@@ -1,4 +1,4 @@
-import { connectToDatabase } from "../lib/mongodb";
+import { getDatabase } from "../lib/mongodb";
 import { ObjectId, Db } from "mongodb";
 
 interface Deliverable {
@@ -12,7 +12,7 @@ interface DeliverablesByCarId {
 
 async function migrateDeliverables() {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
     console.log("Connected to database");
 
     // Get all deliverables

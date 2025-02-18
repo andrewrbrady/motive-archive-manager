@@ -1,22 +1,22 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   let lastError = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const { content, stage, metadata } = await request.json();
+      const { content, stage, sessionId } = await request.json();
       const carId = params.id;
 
-      if (!carId || !content || !stage || !metadata) {
+      if (!carId || !content || !stage || !sessionId) {
         return NextResponse.json(
           { error: "Missing required fields" },
           { status: 400 }
@@ -27,28 +27,34 @@ export async function POST(
         carId,
         stage,
         contentLength: content.length,
-        hasMetadata: !!metadata,
+        sessionId,
       });
 
-      const { db } = await connectToDatabase();
+      const db = await getDatabase();
 
-      // Save the article version
-      const result = await db.collection("saved_articles").insertOne({
-        carId,
-        content,
-        stage,
-        metadata,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      // Save the article state
+      const result = await db.collection("article_states").updateOne(
+        { carId, sessionId },
+        {
+          $set: {
+            content,
+            stage,
+            updatedAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
 
       console.log("Article saved successfully:", {
-        id: result.insertedId,
+        id: result.upsertedId || sessionId,
         stage,
         timestamp: new Date().toISOString(),
       });
 
-      return NextResponse.json({ success: true, id: result.insertedId });
+      return NextResponse.json({
+        success: true,
+        id: result.upsertedId || sessionId,
+      });
     } catch (error) {
       lastError = error;
       console.error(`Save attempt ${attempt + 1} failed:`, error);

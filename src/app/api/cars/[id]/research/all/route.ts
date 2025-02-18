@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/lib/mongodb";
 import { deleteFile } from "@/lib/s3";
 
 export const runtime = "nodejs";
@@ -10,12 +10,13 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { db } = await connectToDatabase();
+    const carId = params.id;
+    const db = await getDatabase();
 
     // Get all research files for this car
     const files = await db
       .collection("research_files")
-      .find({ carId: params.id })
+      .find({ carId: carId })
       .toArray();
 
     // Delete all files from S3
@@ -30,7 +31,7 @@ export async function DELETE(
     await Promise.all(deletePromises);
 
     // Delete all files from MongoDB
-    await db.collection("research_files").deleteMany({ carId: params.id });
+    await db.collection("research_files").deleteMany({ carId: carId });
 
     return NextResponse.json({ message: "All files deleted successfully" });
   } catch (error) {

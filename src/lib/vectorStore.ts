@@ -1,7 +1,8 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { Document } from "@langchain/core/documents";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { connectToDatabase } from "./mongodb";
+import { getDatabase } from "./mongodb";
+import { ObjectId } from "mongodb";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("Missing OpenAI API Key");
@@ -81,7 +82,7 @@ export async function vectorizeResearchFile(
     }
 
     // Get database connection
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Generate embeddings
     console.log("Generating embeddings...");
@@ -125,7 +126,7 @@ export async function searchResearchVectors(
     console.log(`\nSearching vectors for car ${carId}`);
     console.log(`Query: "${query}"`);
 
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Log collection stats
     const totalDocs = await db.collection(COLLECTION_NAME).countDocuments();
@@ -207,13 +208,44 @@ export async function searchResearchVectors(
 
 export async function deleteResearchVectors(fileId: string): Promise<void> {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
     await db.collection(COLLECTION_NAME).deleteMany({
       "metadata.fileId": fileId,
     });
     console.log(`Deleted vectors for file ${fileId}`);
   } catch (error) {
     console.error("Error deleting research vectors:", error);
+    throw error;
+  }
+}
+
+export async function addDocuments(documents: Document[]): Promise<void> {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error adding documents:", error);
+    throw error;
+  }
+}
+
+export async function searchDocuments(query: string): Promise<Document[]> {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+    return [];
+  } catch (error) {
+    console.error("Error searching documents:", error);
+    return [];
+  }
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  try {
+    const db = await getDatabase();
+    // ... existing code ...
+  } catch (error) {
+    console.error("Error deleting document:", error);
     throw error;
   }
 }

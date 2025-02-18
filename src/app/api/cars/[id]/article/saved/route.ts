@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const carId = params.id;
+    const carId = new ObjectId(params.id);
+    const db = await getDatabase();
 
     if (!carId) {
       return NextResponse.json(
@@ -14,9 +16,6 @@ export async function GET(
         { status: 400 }
       );
     }
-
-    // Connect to MongoDB
-    const { db } = await connectToDatabase();
 
     // Fetch all saved articles for this car
     const savedArticles = await db

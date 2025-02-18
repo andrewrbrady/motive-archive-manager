@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 import { User } from "@/models/User";
 
 interface IUser {
@@ -23,12 +24,14 @@ interface IUser {
 }
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await connectToDatabase();
-    const user = await User.findById(params.id);
+    const db = await getDatabase();
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(params.id) });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -45,11 +48,11 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await connectToDatabase();
+    const db = await getDatabase();
     const data = await request.json();
 
     // Validate required fields
@@ -60,35 +63,31 @@ export async function PUT(
       );
     }
 
-    const user = await User.findByIdAndUpdate(
-      params.id,
-      { ...data, updated_at: new Date() },
-      { new: true, runValidators: true }
+    const result = await db.collection("users").updateOne(
+      { _id: new ObjectId(params.id) },
+      {
+        $set: {
+          ...data,
+          updatedAt: new Date(),
+        },
+      }
     );
 
-    if (!user) {
+    if (result.matchedCount === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json(user);
+    const updatedUser = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(params.id) });
+
+    return NextResponse.json(updatedUser);
   } catch (error: any) {
     console.error("Error updating user:", error);
 
-    // Handle MongoDB duplicate key error
     if (error.code === 11000) {
       return NextResponse.json(
         { error: "Email already exists" },
-        { status: 400 }
-      );
-    }
-
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return NextResponse.json(
-        { error: validationErrors.join(", ") },
         { status: 400 }
       );
     }
@@ -101,18 +100,20 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await connectToDatabase();
-    const user = await User.findByIdAndDelete(params.id);
+    const db = await getDatabase();
+    const result = await db
+      .collection("users")
+      .deleteOne({ _id: new ObjectId(params.id) });
 
-    if (!user) {
+    if (result.deletedCount === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ message: "User deleted successfully" });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting user:", error);
     return NextResponse.json(

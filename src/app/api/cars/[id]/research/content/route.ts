@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION!,
@@ -12,16 +15,23 @@ const s3 = new S3Client({
 });
 
 export const maxDuration = 60;
-export const runtime = "nodejs";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const carId = searchParams.get("carId");
+
+    if (!carId) {
+      return NextResponse.json(
+        { error: "Car ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const db = await getDatabase();
+    console.log("Research Content API - MongoDB Connected");
+
     const fileId = searchParams.get("fileId");
-    const carId = params.id;
 
     console.log("Research Content API - Request Details:", {
       fileId,
@@ -35,9 +45,6 @@ export async function GET(
         { status: 400 }
       );
     }
-
-    const { db } = await connectToDatabase();
-    console.log("Research Content API - MongoDB Connected");
 
     // First try to find the file in research_files collection
     const query = {
@@ -165,7 +172,7 @@ export async function PUT(
       );
     }
 
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     // Update the file content
     const result = await db.collection("research_files").updateOne(

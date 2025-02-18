@@ -1,5 +1,5 @@
 // lib/fetchClients.ts
-import { connectToDatabase } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 
 export interface Client {
   _id: string;
@@ -13,7 +13,7 @@ export interface Client {
 
 export async function fetchClients() {
   try {
-    const { db } = await connectToDatabase();
+    const db = await getDatabase();
 
     const clients = await db
       .collection("clients")

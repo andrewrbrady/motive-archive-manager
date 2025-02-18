@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId, UpdateFilter } from "mongodb";
 import { Deliverable } from "@/types/deliverable";
 
 interface Car {
@@ -13,20 +13,19 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    const db = await getDatabase();
     const carId = new ObjectId(params.id);
 
     // Get the car's deliverable references
     const car = await db.collection<Car>("cars").findOne({ _id: carId });
-    if (!car || !car.deliverableIds) {
-      return NextResponse.json([]);
+    if (!car) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Fetch all referenced deliverables
+    // Get all deliverables for this car
     const deliverables = await db
       .collection("deliverables")
-      .find({ _id: { $in: car.deliverableIds } })
+      .find({ car_id: carId })
       .sort({ created_at: -1 })
       .toArray();
 
@@ -45,8 +44,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    const db = await getDatabase();
     const carId = new ObjectId(params.id);
     const data = await request.json();
 
@@ -60,13 +58,12 @@ export async function POST(
     // Insert the deliverable
     const result = await db.collection("deliverables").insertOne(deliverable);
 
-    // Update the car's deliverable references
-    await db
-      .collection<Car>("cars")
-      .updateOne(
-        { _id: carId },
-        { $push: { deliverableIds: result.insertedId } }
-      );
+    // Update the car's deliverable references with proper typing
+    const updateFilter: UpdateFilter<Car> = {
+      $push: { deliverableIds: result.insertedId },
+    };
+
+    await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
 
     return NextResponse.json({
       _id: result.insertedId,
@@ -86,8 +83,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    const db = await getDatabase();
     const pathParts = request.url.split("/");
     const deliverableId = pathParts[pathParts.length - 1];
 
@@ -132,8 +128,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
+    const db = await getDatabase();
     const carId = new ObjectId(params.id);
     const pathParts = request.url.split("/");
     const deliverableId = pathParts[pathParts.length - 1];
@@ -159,13 +154,12 @@ export async function DELETE(
       );
     }
 
-    // Remove the reference from the car
-    await db
-      .collection<Car>("cars")
-      .updateOne(
-        { _id: carId },
-        { $pull: { deliverableIds: deliverableObjectId } }
-      );
+    // Remove the reference from the car with proper typing
+    const updateFilter: UpdateFilter<Car> = {
+      $pull: { deliverableIds: deliverableObjectId },
+    };
+
+    await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
 
     return NextResponse.json({ success: true });
   } catch (error) {
