@@ -5,6 +5,7 @@ export type Platform =
   | "YouTube"
   | "TikTok"
   | "Facebook"
+  | "Bring a Trailer"
   | "Other";
 export type DeliverableType =
   | "feature"
@@ -43,7 +44,6 @@ export interface Deliverable {
 
   // Technical Details
   duration: number;
-  estimated_duration?: number;
   actual_duration?: number;
   aspect_ratio: string;
 
@@ -59,15 +59,10 @@ export interface Deliverable {
   music_track?: string;
   thumbnail_url?: string;
   tags: string[];
-  required_shots?: string[];
-
-  // Tracking & Metrics
-  feedback_notes?: FeedbackNote[];
   publishing_url?: string;
   metrics?: Metrics;
   assets_location?: string;
   priority_level?: number;
-  budget?: number;
 
   // Metadata
   created_at?: Date;

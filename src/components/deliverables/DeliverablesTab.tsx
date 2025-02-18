@@ -38,15 +38,14 @@ interface EditingCell {
   field: keyof Deliverable;
 }
 
-const EDITORS = [
-  "Andrew Brady",
-  "John Smith",
-  "Jane Doe",
-  "Mike Johnson",
-  "Sarah Wilson",
-] as const;
-
-type Editor = (typeof EDITORS)[number];
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
+}
 
 const formatDuration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
@@ -59,6 +58,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+  const [users, setUsers] = useState<User[]>([]);
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -78,6 +78,30 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   useEffect(() => {
     fetchDeliverables();
   }, [fetchDeliverables]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) {
+          throw new Error("Failed to fetch users");
+        }
+        const data = await response.json();
+        // Filter users to only include those with video_editor role
+        const editors = data.filter(
+          (user: User) =>
+            user.creativeRoles.includes("video_editor") &&
+            user.status !== "inactive"
+        );
+        setUsers(editors);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const handleDelete = async (deliverableId: string) => {
     if (!confirm("Are you sure you want to delete this deliverable?")) {
@@ -234,6 +258,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "YouTube", label: "YouTube" },
         { value: "TikTok", label: "TikTok" },
         { value: "Facebook", label: "Facebook" },
+        { value: "Bring a Trailer", label: "Bring a Trailer" },
         { value: "Other", label: "Other" },
       ];
     } else if (field === "type") {
@@ -252,7 +277,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "done", label: "Done" },
       ];
     } else if (field === "editor") {
-      options = EDITORS.map((editor) => ({ value: editor, label: editor }));
+      options = users.map((user) => ({ value: user.name, label: user.name }));
     }
 
     const currentOption = options.find((opt) => opt.value === value);
@@ -331,6 +356,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 <SelectItem value="YouTube">YouTube</SelectItem>
                 <SelectItem value="TikTok">TikTok</SelectItem>
                 <SelectItem value="Facebook">Facebook</SelectItem>
+                <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>

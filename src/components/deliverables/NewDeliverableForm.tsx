@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,15 @@ import {
 } from "@/types/deliverable";
 import { toast } from "react-hot-toast";
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
+}
+
 interface NewDeliverableFormProps {
   carId: string;
   onDeliverableCreated: () => void;
@@ -35,6 +44,7 @@ export default function NewDeliverableForm({
 }: NewDeliverableFormProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     platform: "" as Platform,
@@ -46,6 +56,30 @@ export default function NewDeliverableForm({
     edit_deadline: "",
     release_date: "",
   });
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) {
+          throw new Error("Failed to fetch users");
+        }
+        const data = await response.json();
+        // Filter users to only include those with video_editor role
+        const editors = data.filter(
+          (user: User) =>
+            user.creativeRoles.includes("video_editor") &&
+            user.status !== "inactive"
+        );
+        setUsers(editors);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +162,7 @@ export default function NewDeliverableForm({
                 <SelectItem value="YouTube">YouTube</SelectItem>
                 <SelectItem value="TikTok">TikTok</SelectItem>
                 <SelectItem value="Facebook">Facebook</SelectItem>
+                <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
                 <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -170,12 +205,22 @@ export default function NewDeliverableForm({
 
           <div className="space-y-2">
             <Label htmlFor="editor">Editor</Label>
-            <Input
-              id="editor"
+            <Select
               value={formData.editor}
-              onChange={(e) => handleChange("editor", e.target.value)}
+              onValueChange={(value) => handleChange("editor", value)}
               required
-            />
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select editor" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user._id} value={user.name}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
