@@ -62,8 +62,9 @@ const deliverableSchema = new mongoose.Schema(
     platform: {
       type: String,
       enum: [
-        "Instagram",
+        "Instagram Reels",
         "YouTube",
+        "YouTube Shorts",
         "TikTok",
         "Facebook",
         "Bring a Trailer",

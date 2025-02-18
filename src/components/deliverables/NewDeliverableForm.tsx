@@ -45,6 +45,7 @@ export default function NewDeliverableForm({
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     title: "",
     platform: "" as Platform,
@@ -65,13 +66,14 @@ export default function NewDeliverableForm({
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
-        // Filter users to only include those with video_editor role
+        setUsers(data);
+        // Initially filter for video editors
         const editors = data.filter(
           (user: User) =>
             user.creativeRoles.includes("video_editor") &&
             user.status !== "inactive"
         );
-        setUsers(editors);
+        setFilteredUsers(editors);
       } catch (error) {
         console.error("Error fetching users:", error);
         toast.error("Failed to fetch users");
@@ -80,6 +82,25 @@ export default function NewDeliverableForm({
 
     fetchUsers();
   }, []);
+
+  // Update filtered users when type changes
+  useEffect(() => {
+    if (formData.type === "photo_gallery") {
+      const photographers = users.filter(
+        (user) =>
+          user.creativeRoles.includes("photographer") &&
+          user.status !== "inactive"
+      );
+      setFilteredUsers(photographers);
+    } else {
+      const editors = users.filter(
+        (user) =>
+          user.creativeRoles.includes("video_editor") &&
+          user.status !== "inactive"
+      );
+      setFilteredUsers(editors);
+    }
+  }, [formData.type, users]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +142,11 @@ export default function NewDeliverableForm({
   };
 
   const handleChange = (field: string, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === "type" && value === "photo_gallery") {
+      setFormData((prev) => ({ ...prev, [field]: value, duration: 0 }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
   };
 
   return (
@@ -154,12 +179,13 @@ export default function NewDeliverableForm({
               onValueChange={(value) => handleChange("platform", value)}
               required
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Instagram">Instagram</SelectItem>
+                <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
                 <SelectItem value="YouTube">YouTube</SelectItem>
+                <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
                 <SelectItem value="TikTok">TikTok</SelectItem>
                 <SelectItem value="Facebook">Facebook</SelectItem>
                 <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
@@ -184,24 +210,27 @@ export default function NewDeliverableForm({
                 <SelectItem value="review">Review</SelectItem>
                 <SelectItem value="walkthrough">Walkthrough</SelectItem>
                 <SelectItem value="highlights">Highlights</SelectItem>
+                <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="duration">Duration (seconds)</Label>
-            <Input
-              id="duration"
-              type="number"
-              min="0"
-              value={formData.duration}
-              onChange={(e) =>
-                handleChange("duration", parseInt(e.target.value))
-              }
-              required
-            />
-          </div>
+          {formData.type !== "photo_gallery" && (
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duration (seconds)</Label>
+              <Input
+                id="duration"
+                type="number"
+                min="0"
+                value={formData.duration}
+                onChange={(e) =>
+                  handleChange("duration", parseInt(e.target.value))
+                }
+                required
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="editor">Editor</Label>
@@ -214,7 +243,7 @@ export default function NewDeliverableForm({
                 <SelectValue placeholder="Select editor" />
               </SelectTrigger>
               <SelectContent>
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <SelectItem key={user._id} value={user.name}>
                     {user.name}
                   </SelectItem>

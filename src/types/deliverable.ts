@@ -1,8 +1,9 @@
 import { ObjectId } from "mongodb";
 
 export type Platform =
-  | "Instagram"
+  | "Instagram Reels"
   | "YouTube"
+  | "YouTube Shorts"
   | "TikTok"
   | "Facebook"
   | "Bring a Trailer"
@@ -13,6 +14,7 @@ export type DeliverableType =
   | "review"
   | "walkthrough"
   | "highlights"
+  | "photo_gallery"
   | "other";
 export type DeliverableStatus = "not_started" | "in_progress" | "done";
 

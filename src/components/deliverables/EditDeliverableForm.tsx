@@ -53,6 +53,7 @@ export default function EditDeliverableForm({
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState("basic");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<Partial<Deliverable>>({
@@ -84,12 +85,17 @@ export default function EditDeliverableForm({
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
-        const editors = data.filter(
+        setUsers(data);
+        // Initially filter based on current type
+        const relevantUsers = data.filter(
           (user: User) =>
-            user.creativeRoles.includes("video_editor") &&
+            ((formData.type === "photo_gallery" &&
+              user.creativeRoles.includes("photographer")) ||
+              (formData.type !== "photo_gallery" &&
+                user.creativeRoles.includes("video_editor"))) &&
             user.status !== "inactive"
         );
-        setUsers(editors);
+        setFilteredUsers(relevantUsers);
       } catch (error) {
         console.error("Error fetching users:", error);
         toast.error("Failed to fetch users");
@@ -97,7 +103,26 @@ export default function EditDeliverableForm({
     };
 
     fetchUsers();
-  }, []);
+  }, [formData.type]);
+
+  // Update filtered users when type changes
+  useEffect(() => {
+    if (formData.type === "photo_gallery") {
+      const photographers = users.filter(
+        (user) =>
+          user.creativeRoles.includes("photographer") &&
+          user.status !== "inactive"
+      );
+      setFilteredUsers(photographers);
+    } else {
+      const editors = users.filter(
+        (user) =>
+          user.creativeRoles.includes("video_editor") &&
+          user.status !== "inactive"
+      );
+      setFilteredUsers(editors);
+    }
+  }, [formData.type, users]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -186,7 +211,11 @@ export default function EditDeliverableForm({
   };
 
   const handleChange = (field: string, value: string | number | string[]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === "type" && value === "photo_gallery") {
+      setFormData((prev) => ({ ...prev, [field]: value, duration: 0 }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
     // Clear error when field is updated
     if (errors[field]) {
       setErrors((prev) => {
@@ -272,13 +301,20 @@ export default function EditDeliverableForm({
                   onValueChange={(value) => handleChange("platform", value)}
                 >
                   <SelectTrigger
-                    className={errors.platform ? "border-red-500" : ""}
+                    className={`w-[180px] ${
+                      errors.platform ? "border-red-500" : ""
+                    }`}
                   >
                     <SelectValue placeholder="Select platform" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Instagram Reels">
+                      Instagram Reels
+                    </SelectItem>
                     <SelectItem value="YouTube">YouTube</SelectItem>
+                    <SelectItem value="YouTube Shorts">
+                      YouTube Shorts
+                    </SelectItem>
                     <SelectItem value="TikTok">TikTok</SelectItem>
                     <SelectItem value="Facebook">Facebook</SelectItem>
                     <SelectItem value="Bring a Trailer">
@@ -312,6 +348,7 @@ export default function EditDeliverableForm({
                     <SelectItem value="review">Review</SelectItem>
                     <SelectItem value="walkthrough">Walkthrough</SelectItem>
                     <SelectItem value="highlights">Highlights</SelectItem>
+                    <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -327,27 +364,29 @@ export default function EditDeliverableForm({
             <h3 className="text-lg font-semibold">Technical Details</h3>
             <Separator />
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="duration">
-                  Duration (seconds)
+              {formData.type !== "photo_gallery" && (
+                <div className="space-y-2">
+                  <Label htmlFor="duration">
+                    Duration (seconds)
+                    {errors.duration && (
+                      <span className="text-red-500 ml-1">*</span>
+                    )}
+                  </Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    min="0"
+                    value={formData.duration}
+                    onChange={(e) =>
+                      handleChange("duration", parseInt(e.target.value))
+                    }
+                    className={errors.duration ? "border-red-500" : ""}
+                  />
                   {errors.duration && (
-                    <span className="text-red-500 ml-1">*</span>
+                    <p className="text-red-500 text-sm">{errors.duration}</p>
                   )}
-                </Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="0"
-                  value={formData.duration}
-                  onChange={(e) =>
-                    handleChange("duration", parseInt(e.target.value))
-                  }
-                  className={errors.duration ? "border-red-500" : ""}
-                />
-                {errors.duration && (
-                  <p className="text-red-500 text-sm">{errors.duration}</p>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="actual_duration">
@@ -417,7 +456,7 @@ export default function EditDeliverableForm({
                     <SelectValue placeholder="Select editor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((user) => (
+                    {filteredUsers.map((user) => (
                       <SelectItem key={user._id} value={user.name}>
                         {user.name}
                       </SelectItem>

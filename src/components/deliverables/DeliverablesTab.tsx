@@ -59,6 +59,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -87,6 +88,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
+        setAllUsers(data);
         // Filter users to only include those with video_editor role
         const editors = data.filter(
           (user: User) =>
@@ -245,6 +247,21 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
   };
 
+  const getRelevantUsers = (deliverableType: string) => {
+    if (deliverableType === "photo_gallery") {
+      return allUsers.filter(
+        (user) =>
+          user.creativeRoles.includes("photographer") &&
+          user.status !== "inactive"
+      );
+    }
+    return allUsers.filter(
+      (user) =>
+        user.creativeRoles.includes("video_editor") &&
+        user.status !== "inactive"
+    );
+  };
+
   const renderPillCell = (
     deliverable: Deliverable,
     field: keyof Deliverable
@@ -254,8 +271,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     let options: { value: string; label: string }[] = [];
     if (field === "platform") {
       options = [
-        { value: "Instagram", label: "Instagram" },
+        { value: "Instagram Reels", label: "Instagram Reels" },
         { value: "YouTube", label: "YouTube" },
+        { value: "YouTube Shorts", label: "YouTube Shorts" },
         { value: "TikTok", label: "TikTok" },
         { value: "Facebook", label: "Facebook" },
         { value: "Bring a Trailer", label: "Bring a Trailer" },
@@ -268,6 +286,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "review", label: "Review" },
         { value: "walkthrough", label: "Walkthrough" },
         { value: "highlights", label: "Highlights" },
+        { value: "photo_gallery", label: "Photo Gallery" },
         { value: "other", label: "Other" },
       ];
     } else if (field === "status") {
@@ -277,7 +296,11 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "done", label: "Done" },
       ];
     } else if (field === "editor") {
-      options = users.map((user) => ({ value: user.name, label: user.name }));
+      const relevantUsers = getRelevantUsers(deliverable.type);
+      options = relevantUsers.map((user) => ({
+        value: user.name,
+        label: user.name,
+      }));
     }
 
     const currentOption = options.find((opt) => opt.value === value);
@@ -291,7 +314,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           handleFieldChange(deliverable, field, newValue);
         }}
       >
-        <SelectTrigger className="w-[140px] border border-zinc-200 dark:border-zinc-800 bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+        <SelectTrigger className="w-[180px] border border-zinc-200 dark:border-zinc-800 bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
           <SelectValue>{currentLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -318,7 +341,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               value={editValue}
               onValueChange={(value) => setEditValue(value)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -348,12 +371,13 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               value={editValue}
               onValueChange={(value) => setEditValue(value)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Instagram">Instagram</SelectItem>
+                <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
                 <SelectItem value="YouTube">YouTube</SelectItem>
+                <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
                 <SelectItem value="TikTok">TikTok</SelectItem>
                 <SelectItem value="Facebook">Facebook</SelectItem>
                 <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
@@ -381,7 +405,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               value={editValue}
               onValueChange={(value) => setEditValue(value)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -390,6 +414,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 <SelectItem value="review">Review</SelectItem>
                 <SelectItem value="walkthrough">Walkthrough</SelectItem>
                 <SelectItem value="highlights">Highlights</SelectItem>
+                <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -414,7 +439,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               type="date"
               value={new Date(editValue).toISOString().split("T")[0]}
               onChange={(e) => setEditValue(e.target.value)}
-              className="w-[140px]"
+              className="w-[180px]"
             />
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
               <Check className="h-4 w-4 text-green-500" />
@@ -438,7 +463,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               min="0"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="w-[140px]"
+              className="w-[180px]"
             />
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
               <Check className="h-4 w-4 text-green-500" />
@@ -459,7 +484,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           <Input
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="w-[140px]"
+            className="w-[180px]"
           />
           <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
             <Check className="h-4 w-4 text-green-500" />
@@ -494,7 +519,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           onClick={() => handleCellClick(deliverable, field)}
           className="cursor-pointer"
         >
-          {formatDuration(deliverable.duration)}
+          {deliverable.type === "photo_gallery"
+            ? "N/A"
+            : formatDuration(deliverable.duration)}
         </div>
       );
     }
