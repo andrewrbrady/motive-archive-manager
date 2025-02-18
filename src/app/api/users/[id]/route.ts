@@ -55,8 +55,11 @@ export async function PUT(
     const db = await getDatabase();
     const data = await request.json();
 
+    // Remove immutable fields from the update data
+    const { _id, created_at, createdAt, ...updateData } = data;
+
     // Validate required fields
-    if (!data.name || !data.email) {
+    if (!updateData.name || !updateData.email) {
       return NextResponse.json(
         { error: "Name and email are required" },
         { status: 400 }
@@ -67,7 +70,7 @@ export async function PUT(
       { _id: new ObjectId(params.id) },
       {
         $set: {
-          ...data,
+          ...updateData,
           updatedAt: new Date(),
         },
       }
@@ -82,16 +85,8 @@ export async function PUT(
       .findOne({ _id: new ObjectId(params.id) });
 
     return NextResponse.json(updatedUser);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating user:", error);
-
-    if (error.code === 11000) {
-      return NextResponse.json(
-        { error: "Email already exists" },
-        { status: 400 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to update user" },
       { status: 500 }
