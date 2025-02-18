@@ -1,17 +1,13 @@
 // MongoDB configuration v1.0.5
 import mongoose from "mongoose";
-import { MongoClient, Db } from "mongodb";
+import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
 if (!process.env.MONGODB_URI) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
 }
 
 const uri = process.env.MONGODB_URI;
-const options = {
-  bufferCommands: true,
-  dbName: "motive_archive",
-  autoCreate: true,
-};
+const options: MongoClientOptions = {};
 
 // Global is used here to maintain a cached connection across hot reloads
 // in development. This prevents connections growing exponentially
@@ -63,17 +59,21 @@ if (process.env.NODE_ENV === "development") {
   };
 
   if (!globalWithMongo._mongoClientPromise) {
-    client = new MongoClient(uri);
+    client = new MongoClient(uri, options);
     globalWithMongo._mongoClientPromise = client.connect();
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
   // In production mode, it's best to not use a global variable.
-  client = new MongoClient(uri);
+  client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
 
-export { clientPromise };
+export async function connectToDatabase() {
+  const client = await clientPromise;
+  const db = client.db("motive-archive");
+  return { client, db };
+}
 
 // Helper function to get a typed database instance
 export async function getDatabase(): Promise<Db> {

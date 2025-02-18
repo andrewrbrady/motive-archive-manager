@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
     const platform = searchParams.get("platform") || "";
+    const type = searchParams.get("type") || "";
     const editor = searchParams.get("editor") || "";
+    const carId = searchParams.get("car_id") || "";
+    const creativeRole = searchParams.get("creative_role") || "";
     const sortField = searchParams.get("sortField") || "edit_deadline";
     const sortDirection = searchParams.get("sortDirection") || "asc";
     const skip = (page - 1) * limit;
@@ -37,8 +40,45 @@ export async function GET(request: NextRequest) {
       searchQuery.platform = platform;
     }
 
-    if (editor) {
+    if (type) {
+      searchQuery.type = type;
+    }
+
+    if (editor && editor !== "all") {
       searchQuery.editor = editor;
+    }
+
+    if (carId) {
+      searchQuery.car_id = new ObjectId(carId);
+    }
+
+    if (creativeRole && creativeRole !== "all") {
+      // Get all users with the specified creative role
+      const users = await db
+        .collection("users")
+        .find({ creativeRoles: creativeRole, status: "active" })
+        .toArray();
+
+      // Get their names for the editor field
+      const editorNames = users.map((user) => user.name);
+
+      // Add editor names to the search query
+      if (editorNames.length > 0) {
+        // If an editor is already specified, we need to make sure it's in the list of valid editors
+        if (editor && editor !== "all") {
+          if (!editorNames.includes(editor)) {
+            // If the specified editor doesn't have the role, return no results
+            searchQuery.editor = null;
+          }
+          // Otherwise, keep the existing editor filter
+        } else {
+          // If no specific editor is selected, show deliverables from all editors with the role
+          searchQuery.editor = { $in: editorNames };
+        }
+      } else {
+        // If no users found with this role, return no results
+        searchQuery.editor = null;
+      }
     }
 
     // Get total count with search filter

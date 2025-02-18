@@ -1,13 +1,32 @@
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
+/* Base calendar container */
 .calendar-container {
   /* Calendar container styles */
   @apply rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4;
+  position: relative;
 }
 
 .deliverables-calendar {
   /* General calendar styles */
   @apply text-zinc-900 dark:text-zinc-100;
+  position: relative;
+}
+
+/* Calendar view containers */
+.rbc-calendar {
+  z-index: 0;
+}
+
+.rbc-month-view,
+.rbc-time-view {
+  z-index: 1;
+}
+
+/* Event container - lower z-index to ensure events stay below overlays */
+.rbc-event-content,
+.rbc-events-container {
+  z-index: 2;
 }
 
 /* Header styles */
@@ -56,27 +75,49 @@
 /* Event styles */
 .rbc-event {
   @apply shadow-sm transition-all duration-200;
+  position: relative;
+  z-index: 2 !important;
 }
 
 .rbc-event:hover {
   @apply shadow-md;
 }
 
-.not-started-event {
+.deadline-event {
+  @apply border-l-4;
+}
+
+.release-event {
+  @apply border-l-4 border-opacity-50;
+}
+
+.not-started-event.deadline-event {
   @apply border-red-600 dark:border-red-500;
 }
 
-.in-progress-event {
+.not-started-event.release-event {
+  @apply border-red-400 dark:border-red-300;
+}
+
+.in-progress-event.deadline-event {
   @apply border-amber-600 dark:border-amber-500;
 }
 
-.done-event {
+.in-progress-event.release-event {
+  @apply border-amber-400 dark:border-amber-300;
+}
+
+.done-event.deadline-event {
   @apply border-green-600 dark:border-green-500;
+}
+
+.done-event.release-event {
+  @apply border-green-400 dark:border-green-300;
 }
 
 /* Toolbar styles */
 .rbc-toolbar {
-  @apply mb-4 flex-wrap gap-2;
+  @apply mb-4 flex items-center justify-between gap-2;
 }
 
 .rbc-toolbar button {
@@ -92,7 +133,11 @@
 }
 
 .rbc-toolbar-label {
-  @apply text-lg font-semibold text-zinc-900 dark:text-zinc-100;
+  @apply text-lg font-semibold text-zinc-900 dark:text-zinc-100 flex-shrink-0;
+}
+
+.rbc-btn-group {
+  @apply flex items-center gap-1;
 }
 
 /* Time grid styles */
@@ -115,8 +160,82 @@
 /* Tooltip styles */
 .rbc-overlay {
   @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 text-sm;
+  position: fixed !important;
+  z-index: 9999 !important;
 }
 
 .rbc-overlay-header {
   @apply text-zinc-900 dark:text-zinc-100 font-medium mb-1 pb-1 border-b border-zinc-200 dark:border-zinc-800;
+}
+
+/* Ensure tooltips and modals are above calendar */
+.rbc-overlay {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+/* Override any dialog or hover card z-index */
+[data-radix-popper-content-wrapper] {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+[role="dialog"] {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+/* Portal container for overlays */
+#radix-portal {
+  position: fixed;
+  z-index: 9999;
+}
+
+/* Fullscreen styles */
+.calendar-container:fullscreen {
+  @apply bg-white dark:bg-zinc-950 p-6;
+}
+
+/* Ensure the calendar toolbar is visible in fullscreen */
+.fullscreen-calendar .rbc-toolbar {
+  @apply mt-0;
+}
+
+/* Adjust event sizes in fullscreen */
+.fullscreen-calendar .rbc-event {
+  @apply p-2 text-base;
+}
+
+/* Fullscreen dark mode specific overrides */
+.fullscreen-calendar.dark .rbc-header {
+  @apply bg-zinc-900 text-zinc-400 border-zinc-800;
+}
+
+.fullscreen-calendar.dark .rbc-month-view,
+.fullscreen-calendar.dark .rbc-time-view {
+  @apply border-zinc-800;
+}
+
+.fullscreen-calendar.dark .rbc-off-range-bg {
+  @apply bg-zinc-900/50;
+}
+
+.fullscreen-calendar.dark .rbc-today {
+  @apply bg-zinc-800/50;
+}
+
+.fullscreen-calendar.dark .rbc-toolbar button {
+  @apply bg-zinc-900 text-zinc-300 border-zinc-800;
+}
+
+.fullscreen-calendar.dark .rbc-toolbar button:hover {
+  @apply bg-zinc-800 text-zinc-100;
+}
+
+.fullscreen-calendar.dark .rbc-toolbar button.rbc-active {
+  @apply bg-zinc-800 text-zinc-100 border-zinc-700;
+}
+
+.fullscreen-calendar.dark .rbc-toolbar-label {
+  @apply text-zinc-100;
 }

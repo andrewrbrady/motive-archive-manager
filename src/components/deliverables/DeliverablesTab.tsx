@@ -28,6 +28,7 @@ import { Trash2, Check, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
+import BatchDeliverableForm from "./BatchDeliverableForm";
 
 interface DeliverablesTabProps {
   carId: string | string[];
@@ -540,10 +541,16 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Deliverables</h2>
-        <NewDeliverableForm
-          carId={Array.isArray(carId) ? carId[0] : carId}
-          onDeliverableCreated={fetchDeliverables}
-        />
+        <div className="flex gap-2">
+          <BatchDeliverableForm
+            carId={Array.isArray(carId) ? carId[0] : carId}
+            onDeliverableCreated={fetchDeliverables}
+          />
+          <NewDeliverableForm
+            carId={Array.isArray(carId) ? carId[0] : carId}
+            onDeliverableCreated={fetchDeliverables}
+          />
+        </div>
       </div>
 
       <div className="rounded-md border">

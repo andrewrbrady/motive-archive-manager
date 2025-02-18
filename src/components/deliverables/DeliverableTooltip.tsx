@@ -13,6 +13,7 @@ interface DeliverableTooltipProps {
   children: React.ReactNode;
   deliverable: Deliverable & {
     car?: { year: number; make: string; model: string };
+    isDeadline?: boolean;
   };
 }
 
@@ -57,9 +58,23 @@ export default function DeliverableTooltip({
             <div className="space-y-1">
               <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(new Date(deliverable.edit_deadline), "MMM d, yyyy")}
+                {deliverable.isDeadline ? (
+                  <>
+                    <span className="font-medium text-red-500 dark:text-red-400">
+                      Deadline:
+                    </span>{" "}
+                    {format(new Date(deliverable.edit_deadline), "MMM d, yyyy")}
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium text-green-500 dark:text-green-400">
+                      Release:
+                    </span>{" "}
+                    {format(new Date(deliverable.release_date), "MMM d, yyyy")}
+                  </>
+                )}
               </div>
-              {deliverable.type !== "photo_gallery" && (
+              {deliverable.type !== "Photo Gallery" && (
                 <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
                   <Clock className="mr-2 h-4 w-4" />
                   {formatDuration(deliverable.duration)} min

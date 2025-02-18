@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImageGalleryEnhanced } from "@/components/cars/ImageGalleryEnhanced";
 import type { Car as BaseCar, CarImage, Engine } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
+import EventsTab from "@/components/events/EventsTab";
 
 interface MeasurementValue {
   value: number | null;
@@ -1335,6 +1336,7 @@ export default function CarPage() {
               <TabsTrigger value="research">Research</TabsTrigger>
               <TabsTrigger value="article">Article</TabsTrigger>
               <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
             </TabsList>
 
             <TabsContent value="gallery">
@@ -1416,6 +1418,12 @@ export default function CarPage() {
 
             <TabsContent value="deliverables" className="mt-6">
               <DeliverablesTab carId={params.id} />
+            </TabsContent>
+
+            <TabsContent value="events" className="mt-6">
+              <EventsTab
+                carId={typeof params.id === "string" ? params.id : params.id[0]}
+              />
             </TabsContent>
           </Tabs>
         </div>

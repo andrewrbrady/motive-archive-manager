@@ -77,3 +77,51 @@ export interface Deliverable {
   created_at?: Date;
   updated_at?: Date;
 }
+
+export interface DeliverableTemplate {
+  title: string;
+  platform: Platform;
+  type: DeliverableType;
+  duration?: number;
+  aspect_ratio: string;
+}
+
+export interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
+
+// Predefined batch templates
+export const PREDEFINED_BATCHES: Record<string, BatchTemplate> = {
+  "Standard Car Package": {
+    name: "Standard Car Package",
+    templates: [
+      {
+        title: "White Room",
+        platform: "Instagram Reels",
+        type: "Video",
+        duration: 15,
+        aspect_ratio: "9:16",
+      },
+      {
+        title: "White Room",
+        platform: "YouTube Shorts",
+        type: "Video",
+        duration: 15,
+        aspect_ratio: "9:16",
+      },
+      {
+        title: "BaT Gallery",
+        platform: "Bring a Trailer",
+        type: "Photo Gallery",
+        aspect_ratio: "16:9",
+      },
+      {
+        title: "Highlights",
+        platform: "Instagram Post",
+        type: "Photo Gallery",
+        aspect_ratio: "1:1",
+      },
+    ],
+  },
+};

@@ -73,6 +73,12 @@ export default function Navbar({ className }: NavbarProps) {
                 Deliverables
               </Link>
               <Link
+                href="/events"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              >
+                Events
+              </Link>
+              <Link
                 href="/users"
                 className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >

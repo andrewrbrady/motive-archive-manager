@@ -10,7 +10,8 @@
     "lint": "next lint",
     "migrate:metadata": "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/migrate-image-metadata.ts",
     "test:mongodb": "ts-node scripts/test-mongodb.ts",
-    "migrate:cars": "ts-node scripts/migrate-to-atlas.ts"
+    "migrate:cars": "ts-node scripts/migrate-to-atlas.ts",
+    "init-batch-templates": "ts-node -r tsconfig-paths/register src/scripts/init-batch-templates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
