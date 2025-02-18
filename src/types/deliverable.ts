@@ -2,20 +2,27 @@ import { ObjectId } from "mongodb";
 
 export type Platform =
   | "Instagram Reels"
+  | "Instagram Post"
+  | "Instagram Story"
   | "YouTube"
   | "YouTube Shorts"
   | "TikTok"
   | "Facebook"
   | "Bring a Trailer"
   | "Other";
+
 export type DeliverableType =
+  | "Photo Gallery"
+  | "Video"
+  | "Mixed Gallery"
+  | "Video Gallery"
   | "feature"
   | "promo"
   | "review"
   | "walkthrough"
   | "highlights"
-  | "photo_gallery"
   | "other";
+
 export type DeliverableStatus = "not_started" | "in_progress" | "done";
 
 export interface FeedbackNote {

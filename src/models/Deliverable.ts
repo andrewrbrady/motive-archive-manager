@@ -9,6 +9,11 @@ import {
 // Ensure database connection is established
 dbConnect().catch(console.error);
 
+// Delete the existing model if it exists to ensure schema changes are picked up
+if (mongoose.models.Deliverable) {
+  delete mongoose.models.Deliverable;
+}
+
 export interface IDeliverable extends Document {
   car_id: mongoose.Types.ObjectId;
   title: string;
@@ -61,8 +66,11 @@ const deliverableSchema = new mongoose.Schema(
     },
     platform: {
       type: String,
+      required: true,
       enum: [
         "Instagram Reels",
+        "Instagram Post",
+        "Instagram Story",
         "YouTube",
         "YouTube Shorts",
         "TikTok",
@@ -70,19 +78,11 @@ const deliverableSchema = new mongoose.Schema(
         "Bring a Trailer",
         "Other",
       ],
-      required: true,
     },
     type: {
       type: String,
-      enum: [
-        "feature",
-        "promo",
-        "review",
-        "walkthrough",
-        "highlights",
-        "other",
-      ],
       required: true,
+      enum: ["Photo Gallery", "Video", "Mixed Gallery", "Video Gallery"],
     },
     duration: {
       type: Number,
@@ -180,9 +180,10 @@ deliverableSchema.virtual("daysUntilDeadline").get(function () {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 
-// Export the model using the singleton pattern
-const Deliverable =
-  mongoose.models.Deliverable ||
-  mongoose.model<IDeliverable>("Deliverable", deliverableSchema);
+// Create and export the model
+const Deliverable = mongoose.model<IDeliverable>(
+  "Deliverable",
+  deliverableSchema
+);
 
 export { Deliverable };

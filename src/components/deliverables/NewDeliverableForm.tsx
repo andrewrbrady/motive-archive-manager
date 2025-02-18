@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,9 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,25 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusIcon } from "@radix-ui/react-icons";
-import {
-  Platform,
-  DeliverableType,
-  DeliverableStatus,
-} from "@/types/deliverable";
+import { Plus } from "lucide-react";
 import { toast } from "react-hot-toast";
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  creativeRoles: string[];
-  status: string;
-}
+import { Platform, DeliverableType } from "@/types/deliverable";
 
 interface NewDeliverableFormProps {
-  carId: string;
+  carId?: string;
   onDeliverableCreated: () => void;
 }
 
@@ -42,77 +30,60 @@ export default function NewDeliverableForm({
   carId,
   onDeliverableCreated,
 }: NewDeliverableFormProps) {
-  const [open, setOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
-  const [formData, setFormData] = useState({
-    title: "",
-    platform: "" as Platform,
-    type: "" as DeliverableType,
-    duration: 0,
-    editor: "",
-    aspect_ratio: "16:9",
-    status: "not_started" as DeliverableStatus,
-    edit_deadline: "",
-    release_date: "",
-  });
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [title, setTitle] = useState("");
+  const [platform, setPlatform] = useState<Platform>();
+  const [type, setType] = useState<DeliverableType>();
+  const [duration, setDuration] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState("");
+  const [editor, setEditor] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [releaseDate, setReleaseDate] = useState("");
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await fetch("/api/users");
-        if (!response.ok) {
-          throw new Error("Failed to fetch users");
-        }
-        const data = await response.json();
-        setUsers(data);
-        // Initially filter for video editors
-        const editors = data.filter(
-          (user: User) =>
-            user.creativeRoles.includes("video_editor") &&
-            user.status !== "inactive"
-        );
-        setFilteredUsers(editors);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        toast.error("Failed to fetch users");
-      }
-    };
-
-    fetchUsers();
-  }, []);
-
-  // Update filtered users when type changes
-  useEffect(() => {
-    if (formData.type === "photo_gallery") {
-      const photographers = users.filter(
-        (user) =>
-          user.creativeRoles.includes("photographer") &&
-          user.status !== "inactive"
-      );
-      setFilteredUsers(photographers);
-    } else {
-      const editors = users.filter(
-        (user) =>
-          user.creativeRoles.includes("video_editor") &&
-          user.status !== "inactive"
-      );
-      setFilteredUsers(editors);
-    }
-  }, [formData.type, users]);
+  const resetForm = () => {
+    setTitle("");
+    setPlatform(undefined);
+    setType(undefined);
+    setDuration(0);
+    setAspectRatio("");
+    setEditor("");
+    setEditDeadline("");
+    setReleaseDate("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (
+      !title ||
+      !platform ||
+      !type ||
+      !editor ||
+      !editDeadline ||
+      !releaseDate
+    ) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
 
+    setIsLoading(true);
     try {
       const response = await fetch(`/api/cars/${carId}/deliverables`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          title,
+          platform,
+          type,
+          duration,
+          aspect_ratio: aspectRatio,
+          editor,
+          edit_deadline: new Date(editDeadline),
+          release_date: new Date(releaseDate),
+          car_id: carId,
+        }),
       });
 
       if (!response.ok) {
@@ -121,65 +92,51 @@ export default function NewDeliverableForm({
 
       toast.success("Deliverable created successfully");
       onDeliverableCreated();
-      setOpen(false);
-      setFormData({
-        title: "",
-        platform: "" as Platform,
-        type: "" as DeliverableType,
-        duration: 0,
-        editor: "",
-        aspect_ratio: "16:9",
-        status: "not_started",
-        edit_deadline: "",
-        release_date: "",
-      });
+      setIsOpen(false);
+      resetForm();
     } catch (error) {
       console.error("Error creating deliverable:", error);
       toast.error("Failed to create deliverable");
     } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleChange = (field: string, value: string | number) => {
-    if (field === "type" && value === "photo_gallery") {
-      setFormData((prev) => ({ ...prev, [field]: value, duration: 0 }));
-    } else {
-      setFormData((prev) => ({ ...prev, [field]: value }));
+      setIsLoading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button>
-          <PlusIcon className="mr-2 h-4 w-4" />
+          <Plus className="h-4 w-4 mr-2" />
           New Deliverable
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Deliverable</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <label htmlFor="title" className="text-sm font-medium">
+              Title
+            </label>
             <Input
               id="title"
-              value={formData.title}
-              onChange={(e) => handleChange("title", e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter title"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="platform">Platform</Label>
+            <label htmlFor="platform" className="text-sm font-medium">
+              Platform
+            </label>
             <Select
-              value={formData.platform}
-              onValueChange={(value) => handleChange("platform", value)}
-              required
+              value={platform}
+              onValueChange={(value: Platform) => setPlatform(value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
               <SelectContent>
@@ -195,11 +152,12 @@ export default function NewDeliverableForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
+            <label htmlFor="type" className="text-sm font-medium">
+              Type
+            </label>
             <Select
-              value={formData.type}
-              onValueChange={(value) => handleChange("type", value)}
-              required
+              value={type}
+              onValueChange={(value: DeliverableType) => setType(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select type" />
@@ -216,94 +174,87 @@ export default function NewDeliverableForm({
             </Select>
           </div>
 
-          {formData.type !== "photo_gallery" && (
-            <div className="space-y-2">
-              <Label htmlFor="duration">Duration (seconds)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min="0"
-                value={formData.duration}
-                onChange={(e) =>
-                  handleChange("duration", parseInt(e.target.value))
-                }
-                required
-              />
-            </div>
-          )}
-
           <div className="space-y-2">
-            <Label htmlFor="editor">Editor</Label>
-            <Select
-              value={formData.editor}
-              onValueChange={(value) => handleChange("editor", value)}
+            <label htmlFor="duration" className="text-sm font-medium">
+              Duration (seconds)
+            </label>
+            <Input
+              id="duration"
+              type="number"
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value))}
+              min={0}
               required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select editor" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredUsers.map((user) => (
-                  <SelectItem key={user._id} value={user.name}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="aspect_ratio">Aspect Ratio</Label>
-            <Select
-              value={formData.aspect_ratio}
-              onValueChange={(value) => handleChange("aspect_ratio", value)}
-              required
-            >
+            <label htmlFor="aspectRatio" className="text-sm font-medium">
+              Aspect Ratio
+            </label>
+            <Select value={aspectRatio} onValueChange={setAspectRatio}>
               <SelectTrigger>
                 <SelectValue placeholder="Select aspect ratio" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="16:9">16:9</SelectItem>
                 <SelectItem value="9:16">9:16</SelectItem>
-                <SelectItem value="4:3">4:3</SelectItem>
                 <SelectItem value="1:1">1:1</SelectItem>
+                <SelectItem value="4:3">4:3</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="edit_deadline">Edit Deadline</Label>
+            <label htmlFor="editor" className="text-sm font-medium">
+              Editor
+            </label>
             <Input
-              id="edit_deadline"
-              type="date"
-              value={formData.edit_deadline}
-              onChange={(e) => handleChange("edit_deadline", e.target.value)}
+              id="editor"
+              value={editor}
+              onChange={(e) => setEditor(e.target.value)}
+              placeholder="Enter editor name"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="release_date">Release Date</Label>
+            <label htmlFor="editDeadline" className="text-sm font-medium">
+              Edit Deadline
+            </label>
             <Input
-              id="release_date"
+              id="editDeadline"
               type="date"
-              value={formData.release_date}
-              onChange={(e) => handleChange("release_date", e.target.value)}
+              value={editDeadline}
+              onChange={(e) => setEditDeadline(e.target.value)}
               required
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="space-y-2">
+            <label htmlFor="releaseDate" className="text-sm font-medium">
+              Release Date
+            </label>
+            <Input
+              id="releaseDate"
+              type="date"
+              value={releaseDate}
+              onChange={(e) => setReleaseDate(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isSubmitting}
+              onClick={() => setIsOpen(false)}
+              disabled={isLoading}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Deliverable"}
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create"}
             </Button>
           </div>
         </form>

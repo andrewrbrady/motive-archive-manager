@@ -1,0 +1,122 @@
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+
+.calendar-container {
+  /* Calendar container styles */
+  @apply rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4;
+}
+
+.deliverables-calendar {
+  /* General calendar styles */
+  @apply text-zinc-900 dark:text-zinc-100;
+}
+
+/* Header styles */
+.rbc-header {
+  @apply bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-medium py-2 border-zinc-200 dark:border-zinc-800;
+}
+
+/* Month view styles */
+.rbc-month-view {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-month-row {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-day-bg + .rbc-day-bg {
+  @apply border-l border-zinc-200/50 dark:border-zinc-800/50;
+}
+
+.rbc-month-row + .rbc-month-row {
+  @apply border-t border-zinc-200/50 dark:border-zinc-800/50;
+}
+
+.rbc-day-bg {
+  @apply transition-colors;
+}
+
+.rbc-off-range-bg {
+  @apply bg-zinc-50/50 dark:bg-zinc-900/50;
+}
+
+.rbc-today {
+  @apply bg-zinc-100/50 dark:bg-zinc-800/50;
+}
+
+/* Date number styles */
+.rbc-date-cell {
+  @apply pt-2 pr-2 text-right;
+}
+
+.rbc-date-cell.rbc-now {
+  @apply font-medium;
+}
+
+/* Event styles */
+.rbc-event {
+  @apply shadow-sm transition-all duration-200;
+}
+
+.rbc-event:hover {
+  @apply shadow-md;
+}
+
+.not-started-event {
+  @apply border-red-600 dark:border-red-500;
+}
+
+.in-progress-event {
+  @apply border-amber-600 dark:border-amber-500;
+}
+
+.done-event {
+  @apply border-green-600 dark:border-green-500;
+}
+
+/* Toolbar styles */
+.rbc-toolbar {
+  @apply mb-4 flex-wrap gap-2;
+}
+
+.rbc-toolbar button {
+  @apply bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-1 text-sm font-medium transition-colors;
+}
+
+.rbc-toolbar button:hover {
+  @apply bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100;
+}
+
+.rbc-toolbar button.rbc-active {
+  @apply bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700;
+}
+
+.rbc-toolbar-label {
+  @apply text-lg font-semibold text-zinc-900 dark:text-zinc-100;
+}
+
+/* Time grid styles */
+.rbc-time-view {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-time-header {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-time-content {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-time-slot {
+  @apply text-zinc-600 dark:text-zinc-400;
+}
+
+/* Tooltip styles */
+.rbc-overlay {
+  @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 text-sm;
+}
+
+.rbc-overlay-header {
+  @apply text-zinc-900 dark:text-zinc-100 font-medium mb-1 pb-1 border-b border-zinc-200 dark:border-zinc-800;
+}

@@ -248,7 +248,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   };
 
   const getRelevantUsers = (deliverableType: string) => {
-    if (deliverableType === "photo_gallery") {
+    if (deliverableType === "Photo Gallery") {
       return allUsers.filter(
         (user) =>
           user.creativeRoles.includes("photographer") &&
@@ -272,6 +272,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     if (field === "platform") {
       options = [
         { value: "Instagram Reels", label: "Instagram Reels" },
+        { value: "Instagram Post", label: "Instagram Post" },
+        { value: "Instagram Story", label: "Instagram Story" },
         { value: "YouTube", label: "YouTube" },
         { value: "YouTube Shorts", label: "YouTube Shorts" },
         { value: "TikTok", label: "TikTok" },
@@ -281,13 +283,10 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       ];
     } else if (field === "type") {
       options = [
-        { value: "feature", label: "Feature" },
-        { value: "promo", label: "Promo" },
-        { value: "review", label: "Review" },
-        { value: "walkthrough", label: "Walkthrough" },
-        { value: "highlights", label: "Highlights" },
-        { value: "photo_gallery", label: "Photo Gallery" },
-        { value: "other", label: "Other" },
+        { value: "Photo Gallery", label: "Photo Gallery" },
+        { value: "Video", label: "Video" },
+        { value: "Mixed Gallery", label: "Mixed Gallery" },
+        { value: "Video Gallery", label: "Video Gallery" },
       ];
     } else if (field === "status") {
       options = [
@@ -296,8 +295,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "done", label: "Done" },
       ];
     } else if (field === "editor") {
-      const relevantUsers = getRelevantUsers(deliverable.type);
-      options = relevantUsers.map((user) => ({
+      options = getRelevantUsers(deliverable.type).map((user) => ({
         value: user.name,
         label: user.name,
       }));
@@ -376,6 +374,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
+                <SelectItem value="Instagram Post">Instagram Post</SelectItem>
+                <SelectItem value="Instagram Story">Instagram Story</SelectItem>
                 <SelectItem value="YouTube">YouTube</SelectItem>
                 <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
                 <SelectItem value="TikTok">TikTok</SelectItem>
@@ -409,13 +409,10 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="feature">Feature</SelectItem>
-                <SelectItem value="promo">Promo</SelectItem>
-                <SelectItem value="review">Review</SelectItem>
-                <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                <SelectItem value="highlights">Highlights</SelectItem>
-                <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="Photo Gallery">Photo Gallery</SelectItem>
+                <SelectItem value="Video">Video</SelectItem>
+                <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
+                <SelectItem value="Video Gallery">Video Gallery</SelectItem>
               </SelectContent>
             </Select>
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
@@ -502,7 +499,6 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
     if (field === "edit_deadline" || field === "release_date") {
       const date = new Date(deliverable[field]);
-      date.setDate(date.getDate() + 1);
       return (
         <div
           onClick={() => handleCellClick(deliverable, field)}
@@ -519,7 +515,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           onClick={() => handleCellClick(deliverable, field)}
           className="cursor-pointer"
         >
-          {deliverable.type === "photo_gallery"
+          {deliverable.type === "Photo Gallery"
             ? "N/A"
             : formatDuration(deliverable.duration)}
         </div>

@@ -66,6 +66,18 @@ export default function Navbar({ className }: NavbarProps) {
               >
                 Raw
               </Link>
+              <Link
+                href="/deliverables"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              >
+                Deliverables
+              </Link>
+              <Link
+                href="/users"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              >
+                Users
+              </Link>
             </div>
           </div>
           <div className="flex items-center space-x-6">

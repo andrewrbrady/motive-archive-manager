@@ -1,6 +1,14 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { Deliverable } from "@/types/deliverable";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -9,26 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { format } from "date-fns";
+import { Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Pencil, Info } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Deliverable, Platform, DeliverableType } from "@/types/deliverable";
+import { format } from "date-fns";
+
+interface EditDeliverableFormProps {
+  deliverable: Deliverable;
+  onDeliverableUpdated: () => void;
+}
 
 interface User {
   _id: string;
@@ -39,147 +36,75 @@ interface User {
   status: string;
 }
 
-interface EditDeliverableFormProps {
-  deliverable: Deliverable;
-  onDeliverableUpdated: () => void;
-}
-
-const ASPECT_RATIOS = ["16:9", "9:16", "4:3", "1:1"] as const;
-
 export default function EditDeliverableForm({
   deliverable,
   onDeliverableUpdated,
 }: EditDeliverableFormProps) {
-  const [open, setOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState("basic");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formData, setFormData] = useState<Partial<Deliverable>>({
-    title: deliverable.title,
-    description: deliverable.description,
-    platform: deliverable.platform,
-    type: deliverable.type,
-    duration: deliverable.duration,
-    actual_duration: deliverable.actual_duration,
-    editor: deliverable.editor,
-    aspect_ratio: deliverable.aspect_ratio,
-    status: deliverable.status,
-    edit_deadline: deliverable.edit_deadline,
-    release_date: deliverable.release_date,
-    target_audience: deliverable.target_audience,
-    music_track: deliverable.music_track,
-    thumbnail_url: deliverable.thumbnail_url,
-    tags: deliverable.tags || [],
-    publishing_url: deliverable.publishing_url,
-    assets_location: deliverable.assets_location,
-    priority_level: deliverable.priority_level,
-  });
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [creatives, setCreatives] = useState<User[]>([]);
+  const [title, setTitle] = useState(deliverable.title);
+  const [platform, setPlatform] = useState<Platform>(deliverable.platform);
+  const [type, setType] = useState<DeliverableType>(deliverable.type);
+  const [duration, setDuration] = useState(deliverable.duration);
+  const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
+  const [editor, setEditor] = useState(deliverable.editor);
+  const [editDeadline, setEditDeadline] = useState(
+    format(new Date(deliverable.edit_deadline), "yyyy-MM-dd")
+  );
+  const [releaseDate, setReleaseDate] = useState(
+    format(new Date(deliverable.release_date), "yyyy-MM-dd")
+  );
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchCreatives = async () => {
       try {
         const response = await fetch("/api/users");
-        if (!response.ok) {
-          throw new Error("Failed to fetch users");
+        if (response.ok) {
+          const data = await response.json();
+          setCreatives(
+            data.filter(
+              (user: User) =>
+                user.status === "active" && user.creativeRoles.length > 0
+            )
+          );
         }
-        const data = await response.json();
-        setUsers(data);
-        // Initially filter based on current type
-        const relevantUsers = data.filter(
-          (user: User) =>
-            ((formData.type === "photo_gallery" &&
-              user.creativeRoles.includes("photographer")) ||
-              (formData.type !== "photo_gallery" &&
-                user.creativeRoles.includes("video_editor"))) &&
-            user.status !== "inactive"
-        );
-        setFilteredUsers(relevantUsers);
       } catch (error) {
-        console.error("Error fetching users:", error);
-        toast.error("Failed to fetch users");
+        console.error("Error fetching creatives:", error);
       }
     };
 
-    fetchUsers();
-  }, [formData.type]);
-
-  // Update filtered users when type changes
-  useEffect(() => {
-    if (formData.type === "photo_gallery") {
-      const photographers = users.filter(
-        (user) =>
-          user.creativeRoles.includes("photographer") &&
-          user.status !== "inactive"
-      );
-      setFilteredUsers(photographers);
-    } else {
-      const editors = users.filter(
-        (user) =>
-          user.creativeRoles.includes("video_editor") &&
-          user.status !== "inactive"
-      );
-      setFilteredUsers(editors);
+    if (isOpen) {
+      fetchCreatives();
     }
-  }, [formData.type, users]);
+  }, [isOpen]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.title?.trim()) {
-      newErrors.title = "Title is required";
-    }
-
-    if (!formData.platform) {
-      newErrors.platform = "Platform is required";
-    }
-
-    if (!formData.type) {
-      newErrors.type = "Type is required";
-    }
-
-    if (!formData.duration || formData.duration < 0) {
-      newErrors.duration = "Valid duration is required";
-    }
-
-    if (!formData.editor) {
-      newErrors.editor = "Editor is required";
-    }
-
-    if (!formData.aspect_ratio) {
-      newErrors.aspect_ratio = "Aspect ratio is required";
-    }
-
-    if (!formData.edit_deadline) {
-      newErrors.edit_deadline = "Edit deadline is required";
-    }
-
-    if (!formData.release_date) {
-      newErrors.release_date = "Release date is required";
-    }
-
-    if (
-      formData.priority_level &&
-      (formData.priority_level < 1 || formData.priority_level > 5)
-    ) {
-      newErrors.priority_level = "Priority must be between 1 and 5";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const getRelevantCreatives = (deliverableType: DeliverableType) => {
+    return creatives.filter((user) => {
+      if (deliverableType === "Photo Gallery") {
+        return user.creativeRoles.includes("photographer");
+      }
+      return user.creativeRoles.includes("video_editor");
+    });
   };
+
+  const relevantCreatives = getRelevantCreatives(type);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      toast.error("Please fix the form errors");
+    if (
+      !title ||
+      !platform ||
+      !type ||
+      !editor ||
+      !editDeadline ||
+      !releaseDate
+    ) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    setIsSubmitting(true);
-
+    setIsLoading(true);
     try {
       const response = await fetch(
         `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
@@ -189,8 +114,20 @@ export default function EditDeliverableForm({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            ...formData,
-            updated_at: new Date(),
+            title,
+            platform,
+            type,
+            duration: type === "Photo Gallery" ? 0 : duration,
+            aspect_ratio: aspectRatio,
+            editor,
+            edit_deadline: format(
+              new Date(editDeadline),
+              "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"
+            ),
+            release_date: format(
+              new Date(releaseDate),
+              "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"
+            ),
           }),
         }
       );
@@ -201,473 +138,183 @@ export default function EditDeliverableForm({
 
       toast.success("Deliverable updated successfully");
       onDeliverableUpdated();
-      setOpen(false);
+      setIsOpen(false);
     } catch (error) {
       console.error("Error updating deliverable:", error);
       toast.error("Failed to update deliverable");
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
-  };
-
-  const handleChange = (field: string, value: string | number | string[]) => {
-    if (field === "type" && value === "photo_gallery") {
-      setFormData((prev) => ({ ...prev, [field]: value, duration: 0 }));
-    } else {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-    }
-    // Clear error when field is updated
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleTagsChange = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && e.currentTarget.value) {
-      e.preventDefault();
-      const newTag = e.currentTarget.value.trim();
-      if (newTag && !formData.tags?.includes(newTag)) {
-        handleChange("tags", [...(formData.tags || []), newTag]);
-      }
-      e.currentTarget.value = "";
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    handleChange(
-      "tags",
-      (formData.tags || []).filter((tag) => tag !== tagToRemove)
-    );
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm">
-          <Pencil className="h-4 w-4 mr-2" />
-          Edit
+          <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Deliverable</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Basic Information</h3>
-            <Separator />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">
-                  Title
-                  {errors.title && <span className="text-red-500 ml-1">*</span>}
-                </Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => handleChange("title", e.target.value)}
-                  className={errors.title ? "border-red-500" : ""}
-                />
-                {errors.title && (
-                  <p className="text-red-500 text-sm">{errors.title}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleChange("description", e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="platform">
-                  Platform
-                  {errors.platform && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Select
-                  value={formData.platform}
-                  onValueChange={(value) => handleChange("platform", value)}
-                >
-                  <SelectTrigger
-                    className={`w-[180px] ${
-                      errors.platform ? "border-red-500" : ""
-                    }`}
-                  >
-                    <SelectValue placeholder="Select platform" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Instagram Reels">
-                      Instagram Reels
-                    </SelectItem>
-                    <SelectItem value="YouTube">YouTube</SelectItem>
-                    <SelectItem value="YouTube Shorts">
-                      YouTube Shorts
-                    </SelectItem>
-                    <SelectItem value="TikTok">TikTok</SelectItem>
-                    <SelectItem value="Facebook">Facebook</SelectItem>
-                    <SelectItem value="Bring a Trailer">
-                      Bring a Trailer
-                    </SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.platform && (
-                  <p className="text-red-500 text-sm">{errors.platform}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="type">
-                  Type
-                  {errors.type && <span className="text-red-500 ml-1">*</span>}
-                </Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) => handleChange("type", value)}
-                >
-                  <SelectTrigger
-                    className={errors.type ? "border-red-500" : ""}
-                  >
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="feature">Feature</SelectItem>
-                    <SelectItem value="promo">Promo</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                    <SelectItem value="highlights">Highlights</SelectItem>
-                    <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.type && (
-                  <p className="text-red-500 text-sm">{errors.type}</p>
-                )}
-              </div>
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="title" className="text-sm font-medium">
+              Title
+            </label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter title"
+              required
+            />
           </div>
 
-          {/* Technical Details */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Technical Details</h3>
-            <Separator />
-            <div className="grid grid-cols-3 gap-4">
-              {formData.type !== "photo_gallery" && (
-                <div className="space-y-2">
-                  <Label htmlFor="duration">
-                    Duration (seconds)
-                    {errors.duration && (
-                      <span className="text-red-500 ml-1">*</span>
-                    )}
-                  </Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    min="0"
-                    value={formData.duration}
-                    onChange={(e) =>
-                      handleChange("duration", parseInt(e.target.value))
-                    }
-                    className={errors.duration ? "border-red-500" : ""}
-                  />
-                  {errors.duration && (
-                    <p className="text-red-500 text-sm">{errors.duration}</p>
-                  )}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="actual_duration">
-                  Actual Duration (seconds)
-                </Label>
-                <Input
-                  id="actual_duration"
-                  type="number"
-                  min="0"
-                  value={formData.actual_duration}
-                  onChange={(e) =>
-                    handleChange("actual_duration", parseInt(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="aspect_ratio">
-                  Aspect Ratio
-                  {errors.aspect_ratio && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Select
-                  value={formData.aspect_ratio}
-                  onValueChange={(value) => handleChange("aspect_ratio", value)}
-                >
-                  <SelectTrigger
-                    className={errors.aspect_ratio ? "border-red-500" : ""}
-                  >
-                    <SelectValue placeholder="Select aspect ratio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ASPECT_RATIOS.map((ratio) => (
-                      <SelectItem key={ratio} value={ratio}>
-                        {ratio}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.aspect_ratio && (
-                  <p className="text-red-500 text-sm">{errors.aspect_ratio}</p>
-                )}
-              </div>
-            </div>
+          <div className="space-y-2">
+            <label htmlFor="platform" className="text-sm font-medium">
+              Platform
+            </label>
+            <Select
+              value={platform}
+              onValueChange={(value: Platform) => setPlatform(value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
+                <SelectItem value="Instagram Post">Instagram Post</SelectItem>
+                <SelectItem value="Instagram Story">Instagram Story</SelectItem>
+                <SelectItem value="YouTube">YouTube</SelectItem>
+                <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
+                <SelectItem value="TikTok">TikTok</SelectItem>
+                <SelectItem value="Facebook">Facebook</SelectItem>
+                <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Production Details */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Production Details</h3>
-            <Separator />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="editor">
-                  Editor
-                  {errors.editor && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Select
-                  value={formData.editor}
-                  onValueChange={(value) => handleChange("editor", value)}
-                >
-                  <SelectTrigger
-                    className={errors.editor ? "border-red-500" : ""}
-                  >
-                    <SelectValue placeholder="Select editor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredUsers.map((user) => (
-                      <SelectItem key={user._id} value={user.name}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.editor && (
-                  <p className="text-red-500 text-sm">{errors.editor}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleChange("status", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="not_started">Not Started</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_deadline">
-                  Edit Deadline
-                  {errors.edit_deadline && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Input
-                  id="edit_deadline"
-                  type="date"
-                  value={
-                    formData.edit_deadline
-                      ? new Date(formData.edit_deadline)
-                          .toISOString()
-                          .split("T")[0]
-                      : ""
-                  }
-                  onChange={(e) =>
-                    handleChange("edit_deadline", e.target.value)
-                  }
-                  className={errors.edit_deadline ? "border-red-500" : ""}
-                />
-                {errors.edit_deadline && (
-                  <p className="text-red-500 text-sm">{errors.edit_deadline}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="release_date">
-                  Release Date
-                  {errors.release_date && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Input
-                  id="release_date"
-                  type="date"
-                  value={
-                    formData.release_date
-                      ? new Date(formData.release_date)
-                          .toISOString()
-                          .split("T")[0]
-                      : ""
-                  }
-                  onChange={(e) => handleChange("release_date", e.target.value)}
-                  className={errors.release_date ? "border-red-500" : ""}
-                />
-                {errors.release_date && (
-                  <p className="text-red-500 text-sm">{errors.release_date}</p>
-                )}
-              </div>
-            </div>
+          <div className="space-y-2">
+            <label htmlFor="type" className="text-sm font-medium">
+              Type
+            </label>
+            <Select
+              value={type}
+              onValueChange={(value: DeliverableType) => {
+                setType(value);
+                setEditor(""); // Reset editor when type changes
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Photo Gallery">Photo Gallery</SelectItem>
+                <SelectItem value="Video">Video</SelectItem>
+                <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
+                <SelectItem value="Video Gallery">Video Gallery</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Content Details */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Content Details</h3>
-            <Separator />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="target_audience">Target Audience</Label>
-                <Input
-                  id="target_audience"
-                  value={formData.target_audience}
-                  onChange={(e) =>
-                    handleChange("target_audience", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="music_track">Music Track</Label>
-                <Input
-                  id="music_track"
-                  value={formData.music_track}
-                  onChange={(e) => handleChange("music_track", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tags">
-                  Tags
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4 ml-1 inline" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Press Enter to add a tag</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </Label>
-                <Input
-                  id="tags"
-                  placeholder="Add a tag..."
-                  onKeyDown={handleTagsChange}
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {formData.tags?.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() => removeTag(tag)}
-                    >
-                      {tag} ×
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="thumbnail_url">Thumbnail URL</Label>
-                <Input
-                  id="thumbnail_url"
-                  value={formData.thumbnail_url}
-                  onChange={(e) =>
-                    handleChange("thumbnail_url", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="priority_level">
-                  Priority Level (1-5)
-                  {errors.priority_level && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </Label>
-                <Input
-                  id="priority_level"
-                  type="number"
-                  min="1"
-                  max="5"
-                  value={formData.priority_level}
-                  onChange={(e) =>
-                    handleChange("priority_level", parseInt(e.target.value))
-                  }
-                  className={errors.priority_level ? "border-red-500" : ""}
-                />
-                {errors.priority_level && (
-                  <p className="text-red-500 text-sm">
-                    {errors.priority_level}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="publishing_url">Publishing URL</Label>
-                <Input
-                  id="publishing_url"
-                  value={formData.publishing_url}
-                  onChange={(e) =>
-                    handleChange("publishing_url", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="assets_location">Assets Location</Label>
-                <Input
-                  id="assets_location"
-                  value={formData.assets_location}
-                  onChange={(e) =>
-                    handleChange("assets_location", e.target.value)
-                  }
-                />
-              </div>
-            </div>
+          <div className="space-y-2">
+            <label htmlFor="duration" className="text-sm font-medium">
+              Duration (seconds)
+            </label>
+            <Input
+              id="duration"
+              type="number"
+              value={type === "Photo Gallery" ? "N/A" : duration}
+              onChange={(e) => setDuration(parseInt(e.target.value))}
+              min={0}
+              required={type !== "Photo Gallery"}
+              disabled={type === "Photo Gallery"}
+              placeholder={type === "Photo Gallery" ? "N/A" : undefined}
+            />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="space-y-2">
+            <label htmlFor="aspectRatio" className="text-sm font-medium">
+              Aspect Ratio
+            </label>
+            <Select value={aspectRatio} onValueChange={setAspectRatio}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="16:9">16:9</SelectItem>
+                <SelectItem value="9:16">9:16</SelectItem>
+                <SelectItem value="1:1">1:1</SelectItem>
+                <SelectItem value="4:3">4:3</SelectItem>
+                <SelectItem value="4:5">4:5</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="editor" className="text-sm font-medium">
+              Creative
+            </label>
+            <Select
+              value={editor}
+              onValueChange={(value) => setEditor(value)}
+              disabled={!type}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={type ? "Select creative" : "Select type first"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {relevantCreatives.map((creative) => (
+                  <SelectItem key={creative._id} value={creative.name}>
+                    {creative.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="editDeadline" className="text-sm font-medium">
+              Edit Deadline
+            </label>
+            <Input
+              id="editDeadline"
+              type="date"
+              value={editDeadline}
+              onChange={(e) => setEditDeadline(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="releaseDate" className="text-sm font-medium">
+              Release Date
+            </label>
+            <Input
+              id="releaseDate"
+              type="date"
+              value={releaseDate}
+              onChange={(e) => setReleaseDate(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isSubmitting}
+              onClick={() => setIsOpen(false)}
+              disabled={isLoading}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : "Update Deliverable"}
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Updating..." : "Update"}
             </Button>
           </div>
         </form>
