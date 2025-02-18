@@ -7,6 +7,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { getApiUrl } from "@/lib/utils";
 import { Car } from "@/types/car";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { s3Client as s3 } from "@/lib/s3";
 
 // Configure Vercel runtime
 export const maxDuration = 60;
@@ -476,14 +478,74 @@ export async function POST(
     // Get research files
     const researchFiles = await db
       .collection("research_files")
-      .find({ carId })
+      .find({
+        $or: [
+          { carId: new ObjectId(carId) },
+          { carId: carId },
+          { "metadata.carId": new ObjectId(carId) },
+          { "metadata.carId": carId },
+        ],
+      })
       .toArray();
+
+    // Fetch content for each research file
+    const researchContent = await Promise.all(
+      researchFiles.map(async (file) => {
+        // First check if content is stored in MongoDB
+        if (file.content) {
+          return file.content;
+        }
+
+        // If no content in MongoDB and has S3 key, get from S3
+        if (file.s3Key) {
+          try {
+            const s3Response = await s3.send(
+              new GetObjectCommand({
+                Bucket: process.env.AWS_BUCKET_NAME!,
+                Key: file.s3Key,
+              })
+            );
+
+            if (!s3Response.Body) {
+              console.error("S3 response has no body for file:", file._id);
+              return "";
+            }
+
+            const content = await s3Response.Body.transformToString();
+
+            // Store content in MongoDB for future use
+            await db.collection("research_files").updateOne(
+              { _id: file._id },
+              {
+                $set: {
+                  content,
+                  updatedAt: new Date(),
+                },
+              }
+            );
+
+            return content;
+          } catch (error) {
+            console.error("Error fetching content from S3:", error);
+            return "";
+          }
+        }
+
+        return "";
+      })
+    );
+
+    const combinedResearchContent = researchContent
+      .filter(Boolean)
+      .join("\n\n---\n\n");
 
     // Initialize the car with clientInfo upfront
     console.log("[DEBUG] Raw car data:", {
       _id: carData._id.toString(),
       hasClientInfo: "clientInfo" in carData,
       keys: Object.keys(carData),
+      researchFilesCount: researchFiles.length,
+      researchContentLength: combinedResearchContent.length,
     });
 
     const car: CarWithId = {
@@ -600,7 +662,7 @@ export async function POST(
             case "planning":
               content = await generateArticlePlan(
                 car,
-                "",
+                combinedResearchContent,
                 model,
                 undefined,
                 focus,
@@ -615,7 +677,7 @@ export async function POST(
               content = await generateDraft(
                 plan,
                 car,
-                "",
+                combinedResearchContent,
                 model,
                 undefined,
                 focus,

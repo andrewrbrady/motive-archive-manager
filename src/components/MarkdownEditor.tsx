@@ -225,24 +225,35 @@ export default function MarkdownEditor({
                     ? "-translate-y-[10px]"
                     : ""
                 }`}
-                onScroll={(e) => handleBounce(e.currentTarget)}
-                onWheel={(e) => {
-                  const element = e.currentTarget;
-                  const isAtTop = element.scrollTop === 0;
-                  const isAtBottom =
-                    Math.abs(
-                      element.scrollHeight -
-                        element.scrollTop -
-                        element.clientHeight
-                    ) < 1;
+                ref={(el) => {
+                  if (el) {
+                    // Remove any existing listener first
+                    el.removeEventListener("wheel", () => {});
+                    // Add the non-passive wheel event listener
+                    el.addEventListener(
+                      "wheel",
+                      (e) => {
+                        const element = e.currentTarget as HTMLDivElement;
+                        const isAtTop = element.scrollTop === 0;
+                        const isAtBottom =
+                          Math.abs(
+                            element.scrollHeight -
+                              element.scrollTop -
+                              element.clientHeight
+                          ) < 1;
 
-                  if (
-                    (isAtTop && e.deltaY < 0) ||
-                    (isAtBottom && e.deltaY > 0)
-                  ) {
-                    e.preventDefault();
+                        if (
+                          (isAtTop && e.deltaY < 0) ||
+                          (isAtBottom && e.deltaY > 0)
+                        ) {
+                          e.preventDefault();
+                        }
+                      },
+                      { passive: false }
+                    );
                   }
                 }}
+                onScroll={(e) => handleBounce(e.currentTarget)}
               >
                 <MarkdownViewer content={content} filename={filename} />
               </div>

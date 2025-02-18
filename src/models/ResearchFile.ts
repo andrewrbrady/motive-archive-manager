@@ -39,6 +39,7 @@ const ResearchFile =
       },
       {
         timestamps: true,
+        collection: "research_files",
       }
     )
   );

@@ -33,13 +33,20 @@ export async function GET(
     const carId = params.id;
     const db = await getDatabase();
 
-    // Get all research files for this car
+    // Get all research files for this car, handling both string and ObjectId carIds
     const files = await db
       .collection("research_files")
-      .find({ carId })
+      .find({
+        $or: [
+          { carId: new ObjectId(carId) },
+          { carId: carId },
+          { "metadata.carId": new ObjectId(carId) },
+          { "metadata.carId": carId },
+        ],
+      })
       .toArray();
 
-    return NextResponse.json(files);
+    return NextResponse.json({ files });
   } catch (error) {
     console.error("Error fetching research files:", error);
     return NextResponse.json(

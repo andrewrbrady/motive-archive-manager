@@ -19,32 +19,77 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const carId = searchParams.get("carId");
+    const fileId = searchParams.get("fileId");
+    const carId =
+      searchParams.get("carId") ||
+      request.url.split("/cars/")[1]?.split("/")[0];
 
-    if (!carId) {
+    console.log("Research Content API - Detailed Debug Info:", {
+      requestUrl: request.url,
+      fileId,
+      carId,
+      searchParams: Object.fromEntries(searchParams.entries()),
+      headers: Object.fromEntries(request.headers.entries()),
+    });
+
+    // Early validation logging
+    if (!fileId || !carId) {
+      console.error("Research Content API - Missing IDs Debug:", {
+        fileId: fileId || "missing",
+        carId: carId || "missing",
+        urlParts: request.url.split("/"),
+        searchParamsRaw: searchParams.toString(),
+      });
+    }
+
+    // ObjectId validation logging
+    let fileObjectId, carObjectId;
+    try {
+      fileObjectId = new ObjectId(fileId);
+      carObjectId = new ObjectId(carId);
+      console.log("Research Content API - ObjectId Validation:", {
+        fileIdValid: true,
+        carIdValid: true,
+        fileObjectId: fileObjectId.toString(),
+        carObjectId: carObjectId.toString(),
+      });
+    } catch (error) {
+      console.error("Research Content API - ObjectId Validation Error:", {
+        fileId,
+        carId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+
+    if (!fileId || !carId) {
+      console.error("Research Content API - Missing required IDs:", {
+        fileId,
+        carId,
+      });
       return NextResponse.json(
-        { error: "Car ID is required" },
+        { error: "File ID and Car ID are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate ObjectIds
+    try {
+      new ObjectId(fileId);
+      new ObjectId(carId);
+    } catch (error) {
+      console.error("Research Content API - Invalid ObjectId:", {
+        fileId,
+        carId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      return NextResponse.json(
+        { error: "Invalid File ID or Car ID format" },
         { status: 400 }
       );
     }
 
     const db = await getDatabase();
     console.log("Research Content API - MongoDB Connected");
-
-    const fileId = searchParams.get("fileId");
-
-    console.log("Research Content API - Request Details:", {
-      fileId,
-      carId,
-      url: request.url,
-    });
-
-    if (!fileId || !carId) {
-      return NextResponse.json(
-        { error: "File ID and Car ID are required" },
-        { status: 400 }
-      );
-    }
 
     // First try to find the file in research_files collection
     const query = {
@@ -57,17 +102,73 @@ export async function GET(request: NextRequest) {
       ],
     };
 
-    console.log("Research Content API - Query:", JSON.stringify(query));
+    console.log("Research Content API - Database Query:", {
+      collection: "research_files",
+      query: {
+        _id: query._id.toString(),
+        $or: query.$or.map((condition) => {
+          if (condition.carId) {
+            return { carId: condition.carId.toString() };
+          }
+          return { "metadata.carId": condition["metadata.carId"].toString() };
+        }),
+      },
+      dbName: db.databaseName,
+    });
+
+    // List all collections
+    const collections = await db.listCollections().toArray();
+    console.log(
+      "Research Content API - Available collections:",
+      collections.map((c) => c.name)
+    );
+
+    // Check if collections exist
+    const researchFilesExists = collections.some(
+      (c) => c.name === "research_files"
+    );
+    const researchExists = collections.some((c) => c.name === "research");
+    console.log("Research Content API - Collection Check:", {
+      researchFilesExists,
+      researchExists,
+    });
 
     const file = await db.collection("research_files").findOne(query);
+    console.log("Research Content API - Initial query result:", {
+      found: !!file,
+      fileDetails: file
+        ? {
+            id: file._id.toString(),
+            carId: file.carId.toString(),
+            filename: file.filename,
+            hasContent: !!file.content,
+            hasS3Key: !!file.s3Key,
+            s3Key: file.s3Key,
+          }
+        : null,
+    });
 
-    if (!file) {
+    let researchFile = file;
+    if (!researchFile) {
       console.log(
         "Research Content API - File not found in research_files, trying research collection"
       );
       // Try research collection if not found
-      const file = await db.collection("research").findOne(query);
-      if (!file) {
+      researchFile = await db.collection("research").findOne(query);
+      console.log("Research Content API - Fallback query result:", {
+        found: !!researchFile,
+        fileDetails: researchFile
+          ? {
+              id: researchFile._id.toString(),
+              carId: researchFile.carId.toString(),
+              filename: researchFile.filename,
+              hasContent: !!researchFile.content,
+              hasS3Key: !!researchFile.s3Key,
+              s3Key: researchFile.s3Key,
+            }
+          : null,
+      });
+      if (!researchFile) {
         console.error(
           "Research Content API - File not found in either collection"
         );
@@ -76,23 +177,23 @@ export async function GET(request: NextRequest) {
     }
 
     console.log("Research Content API - File found:", {
-      id: file._id.toString(),
-      filename: file.filename,
-      hasContent: !!file.content,
-      hasS3Key: !!file.s3Key,
-      s3Key: file.s3Key,
+      id: researchFile._id.toString(),
+      filename: researchFile.filename,
+      hasContent: !!researchFile.content,
+      hasS3Key: !!researchFile.s3Key,
+      s3Key: researchFile.s3Key,
     });
 
     // First check if content is stored in MongoDB
-    if (file.content) {
+    if (researchFile.content) {
       console.log("Research Content API - Returning content from MongoDB");
-      return new NextResponse(file.content, {
+      return new NextResponse(researchFile.content, {
         headers: { "Content-Type": "text/plain" },
       });
     }
 
     // If no content in MongoDB, get from S3
-    if (!file.s3Key) {
+    if (!researchFile.s3Key) {
       console.error("Research Content API - File has no content and no S3 key");
       return NextResponse.json(
         { error: "File content not found" },
@@ -103,13 +204,13 @@ export async function GET(request: NextRequest) {
     try {
       console.log("Research Content API - Fetching from S3:", {
         bucket: process.env.AWS_BUCKET_NAME,
-        key: file.s3Key,
+        key: researchFile.s3Key,
       });
 
       const s3Response = await s3.send(
         new GetObjectCommand({
           Bucket: process.env.AWS_BUCKET_NAME!,
-          Key: file.s3Key,
+          Key: researchFile.s3Key,
         })
       );
 
@@ -128,7 +229,7 @@ export async function GET(request: NextRequest) {
       await db
         .collection("research_files")
         .updateOne(
-          { _id: file._id },
+          { _id: researchFile._id },
           { $set: { content, updatedAt: new Date() } }
         );
 
@@ -175,18 +276,36 @@ export async function PUT(
     const db = await getDatabase();
 
     // Update the file content
-    const result = await db.collection("research_files").updateOne(
-      { _id: new ObjectId(fileId), carId },
-      {
+    const query = {
+      _id: new ObjectId(fileId),
+      $or: [
+        { carId: new ObjectId(carId) },
+        { carId: carId },
+        { "metadata.carId": new ObjectId(carId) },
+        { "metadata.carId": carId },
+      ],
+    };
+
+    // First try research_files collection
+    const result = await db.collection("research_files").updateOne(query, {
+      $set: {
+        content,
+        updatedAt: new Date(),
+      },
+    });
+
+    if (result.matchedCount === 0) {
+      // Try the research collection if not found in research_files
+      const researchResult = await db.collection("research").updateOne(query, {
         $set: {
           content,
           updatedAt: new Date(),
         },
-      }
-    );
+      });
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+      if (researchResult.matchedCount === 0) {
+        return NextResponse.json({ error: "File not found" }, { status: 404 });
+      }
     }
 
     return NextResponse.json({ success: true });

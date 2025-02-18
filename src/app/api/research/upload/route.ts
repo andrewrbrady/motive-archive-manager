@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Create research file document
     const result = await db.collection("research_files").insertOne({
-      carId,
+      carId: new ObjectId(carId.toString()),
       content,
       filename,
       fileType,
