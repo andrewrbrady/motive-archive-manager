@@ -113,33 +113,28 @@ export default function EventsCalendar({
   }, [events, view]);
 
   const getEventStyle = (event: Event) => {
-    let backgroundColor = "#f3f4f6";
-    let borderColor = "#d1d5db";
-    let color = "#374151";
+    let backgroundColor = "#374151"; // Default gray (zinc-700)
 
     switch (event.status) {
       case EventStatus.NOT_STARTED:
-        backgroundColor = "#f3f4f6";
-        borderColor = "#d1d5db";
-        color = "#374151";
+        backgroundColor = "#374151"; // zinc-700
         break;
       case EventStatus.IN_PROGRESS:
-        backgroundColor = "#dbeafe";
-        borderColor = "#93c5fd";
-        color = "#1e40af";
+        backgroundColor = "#2563eb"; // blue-600
         break;
       case EventStatus.COMPLETED:
-        backgroundColor = "#dcfce7";
-        borderColor = "#86efac";
-        color = "#166534";
+        backgroundColor = "#059669"; // emerald-600
         break;
     }
 
     return {
       style: {
         backgroundColor,
-        borderColor,
-        color,
+        color: "#ffffff",
+        border: "none",
+        borderRadius: "4px",
+        padding: "2px 4px",
+        opacity: 0.9,
       },
     };
   };
@@ -350,8 +345,8 @@ export default function EventsCalendar({
       <div
         ref={calendarRef}
         className={cn(
-          "relative w-full",
-          isFullscreen ? "h-screen" : "h-[700px]",
+          "relative w-full mb-8",
+          isFullscreen ? "h-screen" : "h-[900px]",
           "bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
         )}
       >
@@ -362,7 +357,11 @@ export default function EventsCalendar({
           endAccessor={(event: any) => event.end}
           eventPropGetter={getEventStyle}
           dayPropGetter={dayPropGetter}
-          views={["month", "week", "day"]}
+          views={{
+            month: true,
+            week: true,
+            day: true,
+          }}
           view={view}
           date={date}
           onView={(newView: View) => setView(newView)}
@@ -371,7 +370,7 @@ export default function EventsCalendar({
           max={new Date(0, 0, 0, 20, 0, 0)}
           components={components}
           className={cn(
-            "events-calendar",
+            "events-calendar h-full",
             isFullscreen && "fullscreen-calendar",
             "dark:dark"
           )}
@@ -385,6 +384,25 @@ export default function EventsCalendar({
           resizableAccessor={() => true}
           step={30}
           timeslots={2}
+          length={30}
+          showMultiDayTimes={true}
+          dayLayoutAlgorithm="no-overlap"
+          formats={{
+            agendaDateFormat: "MMM d, yyyy",
+            agendaTimeFormat: "h:mm a",
+            agendaTimeRangeFormat: ({ start, end }) => {
+              if (start.getDate() === end.getDate()) {
+                return `${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
+              }
+              return `${format(start, "MMM d, h:mm a")} - ${format(
+                end,
+                "MMM d, h:mm a"
+              )}`;
+            },
+          }}
+          messages={{
+            showMore: (total) => `+${total} more`,
+          }}
         />
       </div>
 

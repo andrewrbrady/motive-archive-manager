@@ -39,9 +39,11 @@ const EVENT_TYPE_COLORS: Record<EventType, string> = {
   [EventType.AUCTION_END]: "#10B981", // Emerald
   [EventType.INSPECTION]: "#3B82F6", // Blue
   [EventType.DETAIL]: "#8B5CF6", // Purple
-  [EventType.CATALOG]: "#EC4899", // Pink
-  [EventType.PICKUP]: "#6366F1", // Indigo
-  [EventType.DELIVERY]: "#14B8A6", // Teal
+  [EventType.PRODUCTION]: "#EC4899", // Pink
+  [EventType.POST_PRODUCTION]: "#6366F1", // Indigo
+  [EventType.MARKETING]: "#14B8A6", // Teal
+  [EventType.PICKUP]: "#F43F5E", // Rose
+  [EventType.DELIVERY]: "#0EA5E9", // Sky
   [EventType.OTHER]: "#6B7280", // Gray
 };
 

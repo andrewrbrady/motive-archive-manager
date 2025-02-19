@@ -1,0 +1,252 @@
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+
+/* Calendar container */
+.events-calendar {
+  @apply text-zinc-900 dark:text-zinc-100;
+  position: relative;
+}
+
+/* Month view optimizations */
+.events-calendar .rbc-month-view {
+  @apply border-zinc-100 dark:border-zinc-800;
+  border-radius: 4px;
+  border-width: 1px;
+}
+
+/* Cell borders */
+.events-calendar .rbc-month-row + .rbc-month-row {
+  @apply border-t border-zinc-200 dark:border-zinc-800;
+}
+
+.events-calendar .rbc-day-bg + .rbc-day-bg {
+  @apply border-l border-zinc-200 dark:border-zinc-800;
+}
+
+/* Header fixes */
+.events-calendar .rbc-month-header {
+  display: flex !important;
+  height: 32px !important;
+  @apply border-b border-zinc-200 dark:border-zinc-800;
+}
+
+.events-calendar .rbc-month-header .rbc-header {
+  padding: 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium;
+  font-size: 0.75rem;
+  border: none;
+}
+
+.events-calendar .rbc-month-header .rbc-header + .rbc-header {
+  @apply border-l border-zinc-100 dark:border-zinc-800/50;
+}
+
+/* Off-range day styling */
+.events-calendar .rbc-off-range-bg {
+  @apply bg-zinc-100/50 dark:bg-zinc-900/25;
+}
+
+/* Today cell styling */
+.events-calendar .rbc-today {
+  @apply bg-blue-50/25 dark:bg-blue-900/10;
+}
+
+/* Row fix */
+.events-calendar .rbc-row {
+  display: flex !important;
+  flex: 0 !important;
+  -webkit-box-flex: 0 !important;
+  -ms-flex: 0 !important;
+}
+
+/* Agenda view optimizations */
+.events-calendar .rbc-agenda-view {
+  @apply bg-white dark:bg-[#111111] border-zinc-200 dark:border-zinc-800;
+}
+
+.events-calendar .rbc-agenda-table {
+  @apply border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111111];
+}
+
+.events-calendar .rbc-agenda-table thead {
+  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium border-zinc-200 dark:border-zinc-800;
+}
+
+.events-calendar .rbc-agenda-table tbody {
+  @apply bg-white dark:bg-[#111111];
+}
+
+.events-calendar .rbc-agenda-table th,
+.events-calendar .rbc-agenda-table td {
+  @apply border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100;
+  padding: 8px;
+}
+
+.events-calendar .rbc-agenda-date-cell {
+  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium;
+}
+
+.events-calendar .rbc-agenda-time-cell {
+  @apply text-zinc-700 dark:text-zinc-300 bg-white dark:bg-[#111111];
+}
+
+.events-calendar .rbc-agenda-event-cell {
+  @apply font-medium bg-white dark:bg-[#111111];
+}
+
+.events-calendar .rbc-agenda-content {
+  @apply bg-white dark:bg-[#111111];
+}
+
+.events-calendar .rbc-agenda-empty {
+  @apply bg-white dark:bg-[#111111] text-zinc-500 dark:text-zinc-400;
+}
+
+.events-calendar .rbc-agenda-view .rbc-header {
+  @apply bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800;
+}
+
+.events-calendar .rbc-agenda-view table.rbc-agenda-table {
+  @apply border-separate border-spacing-0;
+}
+
+.events-calendar .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  @apply border-t border-zinc-200 dark:border-zinc-800;
+}
+
+.events-calendar .rbc-agenda-view table.rbc-agenda-table tbody > tr:hover td {
+  @apply bg-zinc-50 dark:bg-zinc-900;
+}
+
+/* Event display optimizations */
+.events-calendar .rbc-event {
+  @apply shadow-sm transition-all duration-200;
+  min-height: 22px !important;
+  margin: 0 0 2px 0 !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  border: none !important;
+  color: white !important;
+  opacity: 0.9 !important;
+}
+
+.events-calendar .rbc-event:hover {
+  filter: brightness(105%);
+  opacity: 1 !important;
+}
+
+.events-calendar .rbc-event:active {
+  filter: brightness(95%);
+}
+
+.events-calendar .rbc-event-content {
+  padding: 2px 4px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 20px !important;
+  font-weight: 500;
+}
+
+/* Selected event styling */
+.events-calendar .rbc-selected {
+  filter: brightness(105%);
+  opacity: 1 !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Month row height optimization */
+.events-calendar .rbc-month-row {
+  min-height: 160px;
+}
+
+.events-calendar .rbc-row-content {
+  margin-top: 4px;
+}
+
+/* Date cell optimization */
+.events-calendar .rbc-date-cell {
+  padding: 1px 2px;
+  font-size: 0.75rem;
+}
+
+/* More link optimization */
+.events-calendar .rbc-show-more {
+  font-size: 0.75rem;
+  padding: 0 2px;
+  margin: 0;
+  height: 18px;
+  line-height: 18px;
+  background-color: transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  @apply text-zinc-700 dark:text-zinc-300;
+}
+
+/* Toolbar styles */
+.events-calendar .rbc-toolbar {
+  @apply mb-4 flex items-center justify-between gap-2;
+  margin-bottom: 8px;
+}
+
+.events-calendar .rbc-toolbar button {
+  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-md transition-colors;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+}
+
+.events-calendar .rbc-toolbar button:hover {
+  @apply bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100;
+}
+
+.events-calendar .rbc-toolbar button.rbc-active {
+  @apply bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700;
+}
+
+/* Fullscreen optimizations */
+.fullscreen-calendar .rbc-month-row {
+  min-height: 240px;
+}
+
+.fullscreen-calendar .rbc-event {
+  min-height: 24px !important;
+  font-size: 0.875rem !important;
+  padding: 2px 4px !important;
+  margin: 0 0 2px 0 !important;
+}
+
+.fullscreen-calendar .rbc-event-content {
+  height: 22px !important;
+}
+
+/* Increase row segment height */
+.events-calendar .rbc-row-segment {
+  padding: 0 2px;
+}
+
+/* Adjust row content spacing */
+.events-calendar .rbc-row-content {
+  margin-top: 2px;
+}
+
+.events-calendar .rbc-row-segment .rbc-event-content {
+  height: 20px !important;
+}
+
+/* Compact event rows */
+.events-calendar .rbc-row {
+  margin: 0 !important;
+}
+
+.events-calendar .rbc-event-row {
+  margin-bottom: 1px !important;
+}
