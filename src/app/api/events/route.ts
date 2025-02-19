@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { EventModel } from "@/models/Event";
+import { Event } from "@/types/event";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,7 +31,18 @@ export async function GET(request: NextRequest) {
     }
 
     const events = await eventModel.findAll(query);
-    return NextResponse.json(events);
+    const transformedEvents: Event[] = events.map((event: any) => ({
+      id: event._id.toString(),
+      car_id: event.car_id,
+      description: event.description || "",
+      type: event.type,
+      status: event.status,
+      start: event.scheduled_date,
+      end: event.end_date,
+      assignee: event.assignee || "",
+      isAllDay: event.is_all_day || false,
+    }));
+    return NextResponse.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching all events:", error);
     return NextResponse.json(
@@ -48,7 +60,18 @@ export async function GET_upcoming(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
 
     const events = await eventModel.getUpcomingEvents(limit);
-    return NextResponse.json(events);
+    const transformedEvents: Event[] = events.map((event: any) => ({
+      id: event._id.toString(),
+      car_id: event.car_id,
+      description: event.description || "",
+      type: event.type,
+      status: event.status,
+      start: event.scheduled_date,
+      end: event.end_date,
+      assignee: event.assignee || "",
+      isAllDay: event.is_all_day || false,
+    }));
+    return NextResponse.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching upcoming events:", error);
     return NextResponse.json(

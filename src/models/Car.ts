@@ -61,6 +61,12 @@ const Car =
           enum: ["available", "sold", "pending"],
           default: "available",
         },
+        eventIds: [
+          {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Event",
+          },
+        ],
         dimensions: {
           wheelbase: {
             value: Number,

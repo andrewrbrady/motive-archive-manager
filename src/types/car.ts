@@ -113,6 +113,7 @@ export interface Car {
   };
   engine: Engine;
   imageIds?: string[];
+  eventIds?: string[];
   horsepower?: number;
   // New fields
   safety?: SafetyFeatures;

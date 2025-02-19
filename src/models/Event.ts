@@ -6,6 +6,9 @@ interface DbEvent extends Omit<Event, "id"> {
   car_id: string;
   created_at: Date;
   updated_at: Date;
+  scheduled_date: string;
+  end_date?: string;
+  is_all_day?: boolean;
 }
 
 export class EventModel {
@@ -44,10 +47,13 @@ export class EventModel {
   }
 
   async findByCarId(carId: string) {
-    return await this.collection
+    console.log("Finding events for car ID:", carId); // Debug log
+    const events = await this.collection
       .find({ car_id: carId })
       .sort({ scheduled_date: 1 })
       .toArray();
+    console.log("Found events:", events); // Debug log
+    return events;
   }
 
   async findAll(query: Partial<DbEvent> = {}): Promise<DbEvent[]> {
@@ -60,7 +66,7 @@ export class EventModel {
   async update(id: ObjectId, updates: Partial<Omit<DbEvent, "_id">>) {
     const result = await this.collection.updateOne(
       { _id: id },
-      { $set: updates }
+      { $set: { ...updates, updated_at: new Date() } }
     );
     return result.matchedCount > 0;
   }

@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useSearchParams, useRouter } from "next/navigation";
+import EventBatchTemplates from "./EventBatchTemplates";
 
 interface NewEvent {
   type: EventType;
@@ -37,8 +39,9 @@ interface NewEvent {
 }
 
 export default function EventsTab({ carId }: { carId: string }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [events, setEvents] = useState<Event[]>([]);
-  const [view, setView] = useState<"list" | "calendar">("list");
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingEvent, setIsAddingEvent] = useState(false);
   const [newEvent, setNewEvent] = useState<NewEvent>({
@@ -51,22 +54,47 @@ export default function EventsTab({ carId }: { carId: string }) {
     isAllDay: false,
   });
 
+  // Get the view from URL params or default to "list"
+  const view = searchParams.get("view") || "list";
+
+  const updateViewInUrl = (newView: string) => {
+    // Create a new URLSearchParams object from the current params
+    const params = new URLSearchParams(searchParams.toString());
+    // Update or add the view parameter
+    params.set("view", newView);
+    // Update the URL without refreshing the page
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
+
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching events for car:", carId); // Debug log
       const response = await fetch(`/api/cars/${carId}/events`);
-      if (!response.ok) throw new Error("Failed to fetch events");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error response:", errorData); // Debug log
+        throw new Error("Failed to fetch events");
+      }
+
       const data = await response.json();
+      console.log("Received events data:", data); // Debug log
+
       // Transform the data to match our Event interface
       const transformedEvents: Event[] = data.map((event: any) => ({
-        id: event._id.toString(),
+        id: event.id,
+        car_id: event.car_id,
         description: event.description || "",
         type: event.type,
         status: event.status,
-        start: event.scheduled_date,
-        end: event.end_date,
+        start: event.start,
+        end: event.end,
         assignee: event.assignee || "",
+        isAllDay: event.isAllDay || false,
       }));
+
+      console.log("Transformed events:", transformedEvents); // Debug log
       setEvents(transformedEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -183,92 +211,94 @@ export default function EventsTab({ carId }: { carId: string }) {
 
   return (
     <div className="space-y-4">
-      <Tabs
-        value={view}
-        onValueChange={(value: "list" | "calendar") => setView(value)}
-        className="w-full"
-      >
+      <Tabs value={view} onValueChange={updateViewInUrl} className="w-full">
         <div className="flex justify-between items-center">
           <TabsList>
             <TabsTrigger value="list">List View</TabsTrigger>
             <TabsTrigger value="calendar">Calendar View</TabsTrigger>
           </TabsList>
 
-          <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Event
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Event</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Event Type</Label>
-                  <Select
-                    value={newEvent.type}
-                    onValueChange={(value) =>
-                      setNewEvent({ ...newEvent, type: value as EventType })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(EventType).map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type.replace(/_/g, " ")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div className="flex gap-2">
+            <EventBatchTemplates carId={carId} onEventsCreated={fetchEvents} />
+            <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Event
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Event</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Event Type</Label>
+                    <Select
+                      value={newEvent.type}
+                      onValueChange={(value) =>
+                        setNewEvent({ ...newEvent, type: value as EventType })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(EventType).map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type.replace(/_/g, " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Textarea
+                      value={newEvent.description}
+                      onChange={(e) =>
+                        setNewEvent({
+                          ...newEvent,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Start Date</Label>
+                    <Input
+                      type="datetime-local"
+                      value={newEvent.start}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, start: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>End Date (Optional)</Label>
+                    <Input
+                      type="datetime-local"
+                      value={newEvent.end}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, end: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Assignee</Label>
+                    <Input
+                      value={newEvent.assignee}
+                      onChange={(e) =>
+                        setNewEvent({ ...newEvent, assignee: e.target.value })
+                      }
+                      placeholder="Enter assignee name"
+                    />
+                  </div>
+                  <Button onClick={handleAddEvent}>Create Event</Button>
                 </div>
-                <div>
-                  <Label>Description</Label>
-                  <Textarea
-                    value={newEvent.description}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, description: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Start Date</Label>
-                  <Input
-                    type="datetime-local"
-                    value={newEvent.start}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, start: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>End Date (Optional)</Label>
-                  <Input
-                    type="datetime-local"
-                    value={newEvent.end}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, end: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Assignee</Label>
-                  <Input
-                    value={newEvent.assignee}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, assignee: e.target.value })
-                    }
-                    placeholder="Enter assignee name"
-                  />
-                </div>
-                <Button onClick={handleAddEvent}>Create Event</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <TabsContent value="list" className="mt-6">
@@ -276,6 +306,7 @@ export default function EventsTab({ carId }: { carId: string }) {
             events={events}
             onUpdateEvent={handleUpdateEvent}
             onDeleteEvent={handleDeleteEvent}
+            onEventUpdated={fetchEvents}
           />
         </TabsContent>
         <TabsContent value="calendar" className="mt-6">

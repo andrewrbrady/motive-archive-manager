@@ -27,8 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
+import "./calendar.css";
 
 interface EventsCalendarProps {
   events: Event[];
@@ -87,65 +87,61 @@ export default function EventsCalendar({
   };
 
   const calendarEvents = useMemo(() => {
-    return events.map((event) => ({
-      id: event.id,
-      title: formatEventType(event.type),
-      start: new Date(event.start),
-      end: event.end ? new Date(event.end) : new Date(event.start),
-      resource: event,
-      allDay: event.isAllDay || view === "month",
-    }));
+    return events.map((event) => {
+      const startDate = new Date(event.start);
+      // For single-date events, set end to end of the same day for display
+      const endDate = event.end
+        ? new Date(event.end)
+        : new Date(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate(),
+            23,
+            59,
+            59
+          );
+
+      return {
+        id: event.id,
+        title: formatEventType(event.type),
+        start: startDate,
+        end: endDate,
+        resource: event,
+        allDay: event.isAllDay || view === "month",
+      };
+    });
   }, [events, view]);
 
   const getEventStyle = (event: Event) => {
-    const baseStyle = {
-      className: cn(
-        "rounded-md border px-2 py-1 text-sm font-medium shadow-sm transition-colors",
-        "hover:opacity-90"
-      ),
-      style: {
-        backgroundColor: "#fff",
-        borderColor: "#e5e7eb",
-        color: "#374151",
-        height: "auto",
-        minHeight: "2.5rem",
-      },
-    };
+    let backgroundColor = "#f3f4f6";
+    let borderColor = "#d1d5db";
+    let color = "#374151";
 
     switch (event.status) {
       case EventStatus.NOT_STARTED:
-        return {
-          ...baseStyle,
-          style: {
-            ...baseStyle.style,
-            backgroundColor: "#f3f4f6",
-            borderColor: "#d1d5db",
-            color: "#374151",
-          },
-        };
+        backgroundColor = "#f3f4f6";
+        borderColor = "#d1d5db";
+        color = "#374151";
+        break;
       case EventStatus.IN_PROGRESS:
-        return {
-          ...baseStyle,
-          style: {
-            ...baseStyle.style,
-            backgroundColor: "#dbeafe",
-            borderColor: "#93c5fd",
-            color: "#1e40af",
-          },
-        };
+        backgroundColor = "#dbeafe";
+        borderColor = "#93c5fd";
+        color = "#1e40af";
+        break;
       case EventStatus.COMPLETED:
-        return {
-          ...baseStyle,
-          style: {
-            ...baseStyle.style,
-            backgroundColor: "#dcfce7",
-            borderColor: "#86efac",
-            color: "#166534",
-          },
-        };
-      default:
-        return baseStyle;
+        backgroundColor = "#dcfce7";
+        borderColor = "#86efac";
+        color = "#166534";
+        break;
     }
+
+    return {
+      style: {
+        backgroundColor,
+        borderColor,
+        color,
+      },
+    };
   };
 
   const dayPropGetter = (date: Date) => {
@@ -167,7 +163,7 @@ export default function EventsCalendar({
     event: ({ event }: any) => (
       <EventTooltip event={event.resource}>
         <div className="h-full w-full">
-          <div className="line-clamp-2 text-sm font-medium">
+          <div className="truncate text-xs leading-none">
             {formatEventType(event.resource.type)}
           </div>
         </div>
@@ -228,12 +224,23 @@ export default function EventsCalendar({
     },
   };
 
-  const handleEventDrop = async ({ event, start, end }: any) => {
+  const handleEventDrop = async ({ event, start }: any) => {
     try {
-      const updates = {
+      // Always update the start date
+      const updates: Partial<Event> = {
         start: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-        end: format(end || start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
       };
+
+      // Only include end date if the original event actually had one
+      if (event.resource.end) {
+        // Calculate the new end date by maintaining the same duration
+        const originalStart = new Date(event.resource.start);
+        const originalEnd = new Date(event.resource.end);
+        const duration = originalEnd.getTime() - originalStart.getTime();
+        const newEnd = new Date(start.getTime() + duration);
+        updates.end = format(newEnd, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+      }
+
       await onUpdateEvent(event.id, updates);
     } catch (error) {
       console.error("Error updating event:", error);
@@ -242,9 +249,9 @@ export default function EventsCalendar({
 
   const handleEventResize = async ({ event, start, end }: any) => {
     try {
-      const updates = {
+      const updates: Partial<Event> = {
         start: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-        end: format(end, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+        end: format(end, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), // Resize always sets an end date
       };
       await onUpdateEvent(event.id, updates);
     } catch (error) {
@@ -253,11 +260,17 @@ export default function EventsCalendar({
   };
 
   const handleSelectEvent = (event: CalendarEvent) => {
+    // Format dates to ISO string but trim off milliseconds and timezone
+    const formattedStart = format(event.start, "yyyy-MM-dd'T'HH:mm");
+    const formattedEnd = event.resource.end
+      ? format(new Date(event.resource.end), "yyyy-MM-dd'T'HH:mm")
+      : undefined;
+
     setSelectedEvent({
       ...event.resource,
       tempDescription: event.resource.description,
-      tempStart: event.resource.start,
-      tempEnd: event.resource.end,
+      tempStart: formattedStart,
+      tempEnd: formattedEnd,
       tempAssignee: event.resource.assignee,
       tempType: event.resource.type,
     });
@@ -385,7 +398,11 @@ export default function EventsCalendar({
               <div>
                 <Label>Event Type</Label>
                 <Select
-                  value={selectedEvent.tempType}
+                  value={
+                    selectedEvent.tempType ||
+                    selectedEvent.type ||
+                    EventType.CUSTOM
+                  }
                   onValueChange={(value) =>
                     setSelectedEvent({
                       ...selectedEvent,
@@ -393,12 +410,12 @@ export default function EventsCalendar({
                     })
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.values(EventType).map((type) => (
-                      <SelectItem key={type} value={type}>
+                      <SelectItem key={type} value={type || EventType.CUSTOM}>
                         {formatEventType(type)}
                       </SelectItem>
                     ))}

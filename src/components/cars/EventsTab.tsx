@@ -1,32 +1,13 @@
 import { useState, useEffect } from "react";
 import { Event, EventStatus, EventType } from "@/types/event";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { format } from "date-fns";
 import { toast } from "sonner";
+import EventsCalendar from "@/components/events/EventsCalendar";
+import ListView from "@/components/events/ListView";
+import EventBatchTemplates from "@/components/events/EventBatchTemplates";
+import EventBatchManager from "@/components/events/EventBatchManager";
+import CreateEventButton from "@/components/events/CreateEventButton";
+import { Button } from "@/components/ui/button";
+import { CalendarDays } from "lucide-react";
 
 interface EventsTabProps {
   carId: string;
@@ -34,191 +15,127 @@ interface EventsTabProps {
 
 export default function EventsTab({ carId }: EventsTabProps) {
   const [events, setEvents] = useState<Event[]>([]);
-  const [isAddingEvent, setIsAddingEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    type: EventType.CUSTOM,
-    title: "",
-    description: "",
-    scheduled_date: "",
-    status: EventStatus.SCHEDULED,
-    is_milestone: false,
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [view, setView] = useState("list");
 
   const fetchEvents = async () => {
     try {
+      setIsLoading(true);
+      console.log("Fetching events for car:", carId);
       const response = await fetch(`/api/cars/${carId}/events`);
-      if (!response.ok) throw new Error("Failed to fetch events");
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error response:", errorData);
+        throw new Error("Failed to fetch events");
+      }
+
       const data = await response.json();
+      console.log("Received events data:", data);
       setEvents(data);
     } catch (error) {
-      toast.error("Failed to load events");
+      console.error("Error fetching events:", error);
+      toast.error("Failed to fetch events");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchEvents();
+    if (carId) {
+      fetchEvents();
+    }
   }, [carId]);
 
-  const handleAddEvent = async () => {
-    try {
-      const response = await fetch(`/api/cars/${carId}/events`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newEvent),
-      });
-
-      if (!response.ok) throw new Error("Failed to create event");
-
-      await fetchEvents();
-      setIsAddingEvent(false);
-      setNewEvent({
-        type: EventType.CUSTOM,
-        title: "",
-        description: "",
-        scheduled_date: "",
-        status: EventStatus.SCHEDULED,
-        is_milestone: false,
-      });
-      toast.success("Event added successfully");
-    } catch (error) {
-      toast.error("Failed to add event");
-    }
-  };
-
-  const handleUpdateStatus = async (
+  const handleUpdateEvent = async (
     eventId: string,
-    newStatus: EventStatus
+    updates: Partial<Event>
   ) => {
     try {
       const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
       });
 
-      if (!response.ok) throw new Error("Failed to update event");
+      if (!response.ok) {
+        throw new Error("Failed to update event");
+      }
 
       await fetchEvents();
-      toast.success("Event status updated");
+      toast.success("Event updated successfully");
     } catch (error) {
-      toast.error("Failed to update event status");
+      console.error("Error updating event:", error);
+      toast.error("Failed to update event");
     }
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete event");
+      }
+
+      await fetchEvents();
+      toast.success("Event deleted successfully");
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast.error("Failed to delete event");
+    }
+  };
+
+  if (isLoading) {
+    return <div>Loading events...</div>;
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Events</h2>
-        <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
-          <DialogTrigger asChild>
-            <Button>Add Event</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Event</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Event Type</Label>
-                <Select
-                  value={newEvent.type}
-                  onValueChange={(value) =>
-                    setNewEvent({ ...newEvent, type: value as EventType })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(EventType).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Title</Label>
-                <Input
-                  value={newEvent.title}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, title: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Input
-                  value={newEvent.description}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, description: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Label>Scheduled Date</Label>
-                <Input
-                  type="datetime-local"
-                  value={newEvent.scheduled_date}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, scheduled_date: e.target.value })
-                  }
-                />
-              </div>
-              <Button onClick={handleAddEvent}>Add Event</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={view === "list" ? "default" : "outline"}
+              onClick={() => setView("list")}
+            >
+              List View
+            </Button>
+            <Button
+              variant={view === "calendar" ? "default" : "outline"}
+              onClick={() => setView("calendar")}
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Calendar View
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 border-l pl-4">
+            <EventBatchManager />
+            <EventBatchTemplates carId={carId} onEventsCreated={fetchEvents} />
+            <CreateEventButton carId={carId} onEventCreated={fetchEvents} />
+          </div>
+        </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Type</TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Scheduled Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {events.map((event) => (
-            <TableRow key={event._id.toString()}>
-              <TableCell>{event.type.replace(/_/g, " ")}</TableCell>
-              <TableCell>{event.title}</TableCell>
-              <TableCell>{event.description}</TableCell>
-              <TableCell>
-                {format(new Date(event.scheduled_date), "PPp")}
-              </TableCell>
-              <TableCell>{event.status}</TableCell>
-              <TableCell>
-                <Select
-                  value={event.status}
-                  onValueChange={(value) =>
-                    handleUpdateStatus(
-                      event._id.toString(),
-                      value as EventStatus
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(EventStatus).map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {view === "list" ? (
+        <ListView
+          events={events}
+          onUpdateEvent={handleUpdateEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onEventUpdated={fetchEvents}
+        />
+      ) : (
+        <EventsCalendar
+          events={events}
+          onUpdateEvent={handleUpdateEvent}
+          onDeleteEvent={handleDeleteEvent}
+        />
+      )}
     </div>
   );
 }

@@ -1,28 +1,33 @@
 import { ObjectId } from "mongodb";
 
 export enum EventType {
-  DETAIL = "DETAIL",
-  MAINTENANCE = "MAINTENANCE",
-  CATALOG = "CATALOG",
-  DELIVERY = "DELIVERY",
-  PICKUP = "PICKUP",
+  AUCTION_SUBMISSION = "AUCTION_SUBMISSION",
+  AUCTION_LISTING = "AUCTION_LISTING",
+  AUCTION_END = "AUCTION_END",
   INSPECTION = "INSPECTION",
-  CUSTOM = "CUSTOM",
+  DETAIL = "DETAIL",
+  CATALOG = "CATALOG",
+  PICKUP = "PICKUP",
+  DELIVERY = "DELIVERY",
+  OTHER = "OTHER",
 }
 
 export enum EventStatus {
-  NOT_STARTED = "not_started",
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
+  NOT_STARTED = "NOT_STARTED",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
 }
 
 export interface Event {
   id: string;
-  description: string;
+  car_id: string;
   type: EventType;
+  description: string;
   status: EventStatus;
   start: string;
   end?: string;
-  assignee?: string;
   isAllDay?: boolean;
+  assignee?: string;
+  createdAt: string;
+  updatedAt: string;
 }

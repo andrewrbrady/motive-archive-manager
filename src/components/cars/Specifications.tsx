@@ -1097,6 +1097,29 @@ const Specifications = ({
             </span>
           </div>
         )}
+
+        {/* Description */}
+        <div className="flex flex-col px-3 py-2">
+          <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            Description
+          </span>
+          <div className="w-full">
+            {isEditMode ? (
+              <textarea
+                value={localSpecs.description ?? car.description ?? ""}
+                onChange={(e) =>
+                  handleInputChange("description", e.target.value)
+                }
+                className="w-full h-32 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                placeholder="Enter car description..."
+              />
+            ) : (
+              <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                {car.description || "No description available"}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

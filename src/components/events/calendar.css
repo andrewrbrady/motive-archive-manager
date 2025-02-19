@@ -1,1 +1,109 @@
- 
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+
+/* Calendar container */
+.events-calendar {
+  @apply text-zinc-900 dark:text-zinc-100;
+  position: relative;
+}
+
+/* Month view optimizations */
+.events-calendar .rbc-month-view {
+  @apply border-zinc-200 dark:border-zinc-800;
+  border-radius: 4px;
+}
+
+/* Optimize header row height */
+.events-calendar .rbc-row.rbc-month-header {
+  height: 24px;
+  min-height: 24px;
+}
+
+.events-calendar .rbc-header {
+  @apply bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-medium border-zinc-200 dark:border-zinc-800;
+  padding: 2px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+}
+
+/* Optimize event display */
+.events-calendar .rbc-event {
+  @apply shadow-sm transition-all duration-200;
+  min-height: 18px !important;
+  margin: 0 !important;
+  padding: 1px 3px !important;
+  border-radius: 2px;
+  font-size: 0.7rem !important;
+  line-height: 1.1 !important;
+  border-width: 1px;
+}
+
+.events-calendar .rbc-event-content {
+  padding: 0 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 16px !important;
+}
+
+/* Month row height optimization */
+.events-calendar .rbc-month-row {
+  min-height: 80px;
+}
+
+.events-calendar .rbc-row-content {
+  margin-top: 0;
+}
+
+/* Date cell optimization */
+.events-calendar .rbc-date-cell {
+  padding: 1px 2px;
+  font-size: 0.75rem;
+}
+
+/* More link optimization */
+.events-calendar .rbc-show-more {
+  font-size: 0.7rem;
+  padding: 0 2px;
+  margin: 0;
+  height: 18px;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Toolbar styles */
+.events-calendar .rbc-toolbar {
+  @apply mb-4 flex items-center justify-between gap-2;
+  margin-bottom: 8px;
+}
+
+.events-calendar .rbc-toolbar button {
+  @apply bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-1 text-sm font-medium transition-colors;
+}
+
+.events-calendar .rbc-toolbar button:hover {
+  @apply bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100;
+}
+
+.events-calendar .rbc-toolbar button.rbc-active {
+  @apply bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700;
+}
+
+/* Fullscreen optimizations */
+.fullscreen-calendar .rbc-month-row {
+  min-height: 120px;
+}
+
+.fullscreen-calendar .rbc-event {
+  min-height: 22px !important;
+  font-size: 0.8125rem !important;
+  padding: 2px 6px !important;
+}
+
+.fullscreen-calendar .rbc-event-content {
+  height: 20px !important;
+}

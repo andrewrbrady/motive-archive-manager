@@ -19,14 +19,24 @@ import {
 import { Event, EventStatus, EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pencil, Save, Trash2, X } from "lucide-react";
+import { Pencil, Save, Trash2, X, CheckSquare, Square } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
-interface ListViewProps {
+export interface ListViewProps {
   events: Event[];
   onUpdateEvent: (eventId: string, updates: Partial<Event>) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
+  onEventUpdated: () => void;
+}
+
+interface Car {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
 }
 
 interface EditingEvent extends Event {
@@ -36,14 +46,52 @@ interface EditingEvent extends Event {
   tempEnd?: string;
   tempAssignee?: string;
   tempType?: EventType;
+  car?: Car;
 }
 
 export default function ListView({
   events,
   onUpdateEvent,
   onDeleteEvent,
+  onEventUpdated,
 }: ListViewProps) {
   const [editingEvents, setEditingEvents] = useState<EditingEvent[]>(events);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+
+  // Initialize editingEvents when events prop changes
+  useEffect(() => {
+    setEditingEvents(events);
+  }, [events]);
+
+  useEffect(() => {
+    if (events.length === 0) return;
+
+    const fetchCarInfo = async () => {
+      const updatedEvents = await Promise.all(
+        events.map(async (event) => {
+          try {
+            const carId = event.car_id;
+            if (!carId) {
+              console.error("No car_id found for event:", event);
+              return event;
+            }
+
+            const response = await fetch(`/api/cars/${carId}`);
+            if (!response.ok) throw new Error("Failed to fetch car");
+            const car = await response.json();
+            return { ...event, car };
+          } catch (error) {
+            console.error("Error fetching car:", error);
+            return event;
+          }
+        })
+      );
+      setEditingEvents(updatedEvents);
+    };
+
+    fetchCarInfo();
+  }, [events]);
 
   const formatEventType = (type: string) => {
     return type
@@ -176,168 +224,317 @@ export default function ListView({
     );
   };
 
+  const handleStatusChange = async (event: Event, newStatus: EventStatus) => {
+    try {
+      const response = await fetch(
+        `/api/cars/${event.car_id}/events/${event.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...event, status: newStatus }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update event status");
+      }
+
+      toast.success("Event status updated successfully");
+      onEventUpdated();
+    } catch (error) {
+      console.error("Error updating event status:", error);
+      toast.error("Failed to update event status");
+    }
+  };
+
+  const toggleBatchMode = () => {
+    setIsBatchMode(!isBatchMode);
+    setSelectedEvents([]);
+  };
+
+  const toggleEventSelection = (eventId: string) => {
+    setSelectedEvents((prev) =>
+      prev.includes(eventId)
+        ? prev.filter((id) => id !== eventId)
+        : [...prev, eventId]
+    );
+  };
+
+  const toggleAllEvents = () => {
+    if (selectedEvents.length === events.length) {
+      setSelectedEvents([]);
+    } else {
+      setSelectedEvents(events.map((event) => event.id));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedEvents.length === 0) {
+      toast.error("No events selected");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${selectedEvents.length} events?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      // Delete all selected events
+      await Promise.all(
+        selectedEvents.map((eventId) => onDeleteEvent(eventId))
+      );
+
+      toast.success(`Successfully deleted ${selectedEvents.length} events`);
+      setSelectedEvents([]);
+      onEventUpdated();
+    } catch (error) {
+      console.error("Error deleting events:", error);
+      toast.error("Failed to delete some events");
+    }
+  };
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Type</TableHead>
-          <TableHead>Description</TableHead>
-          <TableHead>Start Date</TableHead>
-          <TableHead>End Date</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Assignee</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {editingEvents.map((event) => (
-          <TableRow key={event.id}>
-            <TableCell>
-              {event.isEditing ? (
-                <Select
-                  value={event.tempType}
-                  onValueChange={(value) =>
-                    updateTempField(event.id, "tempType", value)
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="flex gap-2">
+          <Button
+            variant={isBatchMode ? "default" : "outline"}
+            onClick={toggleBatchMode}
+          >
+            {isBatchMode ? "Exit Batch Mode" : "Batch Delete"}
+          </Button>
+          {isBatchMode && (
+            <>
+              <Button variant="outline" onClick={toggleAllEvents}>
+                {selectedEvents.length === events.length ? (
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                ) : (
+                  <Square className="w-4 h-4 mr-2" />
+                )}
+                Select All
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleBatchDelete}
+                disabled={selectedEvents.length === 0}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Selected ({selectedEvents.length})
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {isBatchMode && (
+              <TableHead className="w-[50px]">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAllEvents}
+                  className="p-0"
+                >
+                  {selectedEvents.length === events.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </Button>
+              </TableHead>
+            )}
+            <TableHead>Type</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead>Start Date</TableHead>
+            <TableHead>End Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Assignee</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {editingEvents.map((event) => (
+            <TableRow key={event.id}>
+              {isBatchMode && (
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleEventSelection(event.id)}
+                    className="p-0"
+                  >
+                    {selectedEvents.includes(event.id) ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TableCell>
+              )}
+              <TableCell>
+                {event.isEditing ? (
+                  <Select
+                    value={event.tempType}
+                    onValueChange={(value) =>
+                      updateTempField(event.id, "tempType", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(EventType).map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {formatEventType(type)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  formatEventType(event.type)
+                )}
+              </TableCell>
+              <TableCell>
+                {event.isEditing ? (
+                  <Input
+                    value={event.tempDescription}
+                    onChange={(e) =>
+                      updateTempField(
+                        event.id,
+                        "tempDescription",
+                        e.target.value
+                      )
+                    }
+                  />
+                ) : (
+                  event.description
+                )}
+              </TableCell>
+              <TableCell>
+                {event.isEditing ? (
+                  <Input
+                    type="datetime-local"
+                    value={event.tempStart?.slice(0, 16)}
+                    onChange={(e) =>
+                      updateTempField(event.id, "tempStart", e.target.value)
+                    }
+                  />
+                ) : (
+                  formatDate(event.start)
+                )}
+              </TableCell>
+              <TableCell>
+                {event.isEditing ? (
+                  <Input
+                    type="datetime-local"
+                    value={event.tempEnd?.slice(0, 16)}
+                    onChange={(e) =>
+                      updateTempField(event.id, "tempEnd", e.target.value)
+                    }
+                  />
+                ) : (
+                  formatDate(event.end)
+                )}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    event.status === EventStatus.COMPLETED
+                      ? "default"
+                      : event.status === EventStatus.IN_PROGRESS
+                      ? "secondary"
+                      : "outline"
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(EventType).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {formatEventType(type)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                formatEventType(event.type)
-              )}
-            </TableCell>
-            <TableCell>
-              {event.isEditing ? (
-                <Input
-                  value={event.tempDescription}
-                  onChange={(e) =>
-                    updateTempField(event.id, "tempDescription", e.target.value)
-                  }
-                />
-              ) : (
-                event.description
-              )}
-            </TableCell>
-            <TableCell>
-              {event.isEditing ? (
-                <Input
-                  type="datetime-local"
-                  value={event.tempStart?.slice(0, 16)}
-                  onChange={(e) =>
-                    updateTempField(event.id, "tempStart", e.target.value)
-                  }
-                />
-              ) : (
-                formatDate(event.start)
-              )}
-            </TableCell>
-            <TableCell>
-              {event.isEditing ? (
-                <Input
-                  type="datetime-local"
-                  value={event.tempEnd?.slice(0, 16)}
-                  onChange={(e) =>
-                    updateTempField(event.id, "tempEnd", e.target.value)
-                  }
-                />
-              ) : (
-                formatDate(event.end)
-              )}
-            </TableCell>
-            <TableCell>
-              <Select
-                value={event.status}
-                onValueChange={(value) =>
-                  onUpdateEvent(event.id, {
-                    status: value as EventStatus,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(EventStatus).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status
-                        .split("_")
-                        .map(
-                          (word) => word.charAt(0).toUpperCase() + word.slice(1)
-                        )
-                        .join(" ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell>
-              {event.isEditing ? (
-                <Input
-                  value={event.tempAssignee}
-                  onChange={(e) =>
-                    updateTempField(event.id, "tempAssignee", e.target.value)
-                  }
-                  placeholder="Enter assignee"
-                />
-              ) : (
-                event.assignee || "Unassigned"
-              )}
-            </TableCell>
-            <TableCell>
-              <div className="flex gap-2">
+                  {event.status}
+                </Badge>
+              </TableCell>
+              <TableCell>
                 {event.isEditing ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => saveEditing(event.id)}
-                      className="text-green-500 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/20"
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => cancelEditing(event.id)}
-                      className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/20"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </>
+                  <Input
+                    value={event.tempAssignee}
+                    onChange={(e) =>
+                      updateTempField(event.id, "tempAssignee", e.target.value)
+                    }
+                    placeholder="Enter assignee"
+                  />
                 ) : (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => startEditing(event.id)}
-                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/20"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(event.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </>
+                  event.assignee || "Unassigned"
                 )}
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-2">
+                  {event.isEditing ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => saveEditing(event.id)}
+                        className="text-green-500 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/20"
+                      >
+                        <Save className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => cancelEditing(event.id)}
+                        className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/20"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => startEditing(event.id)}
+                        className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(event.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                  {event.status !== EventStatus.COMPLETED && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleStatusChange(
+                          event,
+                          event.status === EventStatus.NOT_STARTED
+                            ? EventStatus.IN_PROGRESS
+                            : EventStatus.COMPLETED
+                        )
+                      }
+                    >
+                      {event.status === EventStatus.NOT_STARTED
+                        ? "Start"
+                        : "Complete"}
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
