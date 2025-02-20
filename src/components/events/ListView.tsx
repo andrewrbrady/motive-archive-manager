@@ -73,7 +73,7 @@ export default function ListView({
         const existingEvent = prevEditingEvents.find((e) => e.id === event.id);
         return {
           ...event,
-          car: existingEvent?.car || event.car,
+          car: existingEvent?.car,
           assignees: event.assignees || existingEvent?.assignees || [],
         };
       })

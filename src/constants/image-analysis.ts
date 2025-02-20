@@ -10,11 +10,8 @@ export const IMAGE_ANALYSIS_CONFIG = {
     - DO NOT SPECULATE about the vehicle's condition
     - DO NOT suggest anything about the vehicle's history or condition
     - DO NOT mention that there is no damage or rust unless explicitly observed
-    - Keep descriptions brief and focused
     - Use concise, technical language
     - Focus on key visible features only
-    - Describe primary design elements only
-    - Include critical condition details only
     - Limit description to 250 characters
   `.trim(),
 

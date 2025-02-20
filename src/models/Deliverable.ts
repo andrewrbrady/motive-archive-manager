@@ -45,6 +45,7 @@ export interface IDeliverable extends Document {
   priority_level?: number;
   created_at: Date;
   updated_at: Date;
+  toPublicJSON(): Record<string, any>;
 }
 
 const deliverableSchema = new mongoose.Schema(

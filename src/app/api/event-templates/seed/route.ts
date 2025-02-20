@@ -21,7 +21,7 @@ const DEFAULT_TEMPLATES = {
         daysUntilEnd: 2,
       },
       {
-        type: EventType.CATALOG,
+        type: EventType.PRODUCTION,
         description: "Photo/video shoot for listing",
         daysFromStart: 3,
         hasEndDate: true,

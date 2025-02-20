@@ -34,6 +34,7 @@ interface DeliverableTemplateGanttProps {
     index: number,
     updates: Partial<DeliverableTemplate>
   ) => void;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
 const PLATFORM_COLORS: Record<Platform, string> = {
@@ -63,6 +64,7 @@ const getPillContent = (
 export default function DeliverableTemplateGantt({
   template,
   onTemplateUpdate,
+  onReorder,
 }: DeliverableTemplateGanttProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);

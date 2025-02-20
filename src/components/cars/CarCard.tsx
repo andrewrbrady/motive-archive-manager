@@ -4,15 +4,10 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Car } from "@/types/car";
+import { Car, CarImage as CarImageType } from "@/types/car";
 import { Trash2, Loader2 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
-
-interface CarImage {
-  _id: string;
-  url: string;
-}
 
 interface CarCardProps {
   car: Car;
@@ -31,7 +26,10 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     hasImages: Boolean(car.images?.length),
   });
 
-  const [primaryImage, setPrimaryImage] = useState<CarImage | null>(null);
+  const [primaryImage, setPrimaryImage] = useState<Pick<
+    CarImageType,
+    "id" | "url"
+  > | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,7 +44,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       if (car.images?.[0]?.url) {
         console.log("CarCard: Using direct image URL");
         setPrimaryImage({
-          _id: car.images[0].id || car.images[0]._id,
+          id: car.images[0].id,
           url: `${car.images[0].url}/public`,
         });
         setLoading(false);
@@ -83,7 +81,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
 
         if (data && data[0]) {
           setPrimaryImage({
-            _id: data[0].imageId,
+            id: data[0].imageId,
             url: `${data[0].url}/public`,
           });
         } else {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { Deliverable } from "@/models/Deliverable";
+import { Deliverable, IDeliverable } from "@/models/Deliverable";
 import { dbConnect } from "@/lib/mongodb";
 
 export async function GET(request: NextRequest) {
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     // Get paginated, filtered, and sorted deliverables
     const deliverables = await db
-      .collection<Deliverable>("deliverables")
+      .collection<IDeliverable>("deliverables")
       .find(searchQuery)
       .sort(sortObject)
       .skip(skip)

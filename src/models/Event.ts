@@ -130,6 +130,21 @@ export class EventModel {
   }
 
   async updateStatus(id: ObjectId, status: EventStatus): Promise<boolean> {
-    return this.update(id, { status });
+    const result = await this.collection.updateOne(
+      { _id: id },
+      { $set: { status, updated_at: new Date() } }
+    );
+    return result.modifiedCount > 0;
+  }
+
+  async getUpcomingEvents(limit: number = 10) {
+    const now = new Date();
+    return await this.collection
+      .find({
+        scheduled_date: { $gte: now.toISOString() },
+      })
+      .sort({ scheduled_date: 1 })
+      .limit(limit)
+      .toArray();
   }
 }

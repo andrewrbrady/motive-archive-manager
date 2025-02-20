@@ -67,11 +67,13 @@ export async function POST(
       type: data.type,
       description: data.description || "",
       status: data.status || EventStatus.NOT_STARTED,
-      start: data.start, // Required by DbEvent
-      scheduled_date: data.start, // Used in database
-      end_date: data.end, // Used in database
+      start: data.start,
+      scheduled_date: data.start,
+      end_date: data.end,
       is_all_day: data.isAllDay || false,
       assignees: data.assignees || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     console.log("Transformed event data:", event); // Debug log
@@ -93,7 +95,7 @@ export async function POST(
       type: event.type,
       description: event.description,
       status: event.status,
-      start: event.start,
+      start: event.scheduled_date,
       end: event.end_date,
       isAllDay: event.is_all_day,
       assignees: event.assignees,
@@ -101,7 +103,10 @@ export async function POST(
   } catch (error) {
     console.error("Error creating event:", error);
     return NextResponse.json(
-      { error: "Failed to create event" },
+      {
+        error: "Failed to create event",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -113,34 +118,31 @@ export async function PUT(
 ) {
   try {
     const db = await getDatabase();
-    const eventModel = new EventModel(db);
-    const pathParts = request.url.split("/");
-    const eventId = pathParts[pathParts.length - 1];
-
-    if (!eventId) {
-      return NextResponse.json(
-        { error: "Event ID is required" },
-        { status: 400 }
-      );
-    }
-
+    const eventId = new ObjectId(params.id);
     const data = await request.json();
-    const { _id, car_id, created_at, ...updateData } = data;
+    const eventModel = new EventModel(db);
 
-    const success = await eventModel.update(new ObjectId(eventId), {
-      ...updateData,
-      updated_at: new Date(),
-    });
+    // Update event with new data
+    const updates = {
+      type: data.type,
+      description: data.description,
+      status: data.status,
+      scheduled_date: data.start,
+      end_date: data.end,
+      is_all_day: data.isAllDay,
+      assignees: data.assignees,
+    };
 
-    if (!success) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
+    await eventModel.update(eventId, updates);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating event:", error);
     return NextResponse.json(
-      { error: "Failed to update event" },
+      {
+        error: "Failed to update event",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -152,39 +154,19 @@ export async function DELETE(
 ) {
   try {
     const db = await getDatabase();
+    const eventId = new ObjectId(params.id);
     const eventModel = new EventModel(db);
-    const carId = new ObjectId(params.id);
-    const pathParts = request.url.split("/");
-    const eventId = pathParts[pathParts.length - 1];
 
-    if (!eventId) {
-      return NextResponse.json(
-        { error: "Event ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const eventObjectId = new ObjectId(eventId);
-
-    // Remove the event
-    const success = await eventModel.delete(eventObjectId);
-
-    if (!success) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
-
-    // Remove the event ID from the car's eventIds array
-    const updateFilter: UpdateFilter<Car> = {
-      $pull: { eventIds: eventObjectId },
-    };
-
-    await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
+    await eventModel.delete(eventId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting event:", error);
     return NextResponse.json(
-      { error: "Failed to delete event" },
+      {
+        error: "Failed to delete event",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
