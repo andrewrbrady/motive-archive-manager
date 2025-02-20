@@ -216,6 +216,14 @@ export default function EditDeliverableForm({
                 <SelectItem value="Video">Video</SelectItem>
                 <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
                 <SelectItem value="Video Gallery">Video Gallery</SelectItem>
+                <SelectItem value="feature">Feature</SelectItem>
+                <SelectItem value="promo">Promo</SelectItem>
+                <SelectItem value="review">Review</SelectItem>
+                <SelectItem value="walkthrough">Walkthrough</SelectItem>
+                <SelectItem value="highlights">Highlights</SelectItem>
+                <SelectItem value="Marketing Email">Marketing Email</SelectItem>
+                <SelectItem value="Blog">Blog</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>

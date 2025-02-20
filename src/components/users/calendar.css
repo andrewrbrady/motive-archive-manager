@@ -1,5 +1,167 @@
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
+/* Base calendar container */
+.calendar-container {
+  @apply rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4;
+  position: relative;
+}
+
+.deliverables-calendar {
+  /* General calendar styles */
+  @apply text-zinc-900 dark:text-zinc-100;
+  position: relative;
+}
+
+/* Calendar view containers */
+.rbc-calendar {
+  position: relative;
+}
+
+/* Controls and UI layer */
+.calendar-container > div:first-child {
+  position: relative;
+  z-index: 1000;
+}
+
+/* Popover layer - highest z-index */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* Calendar layers */
+.rbc-month-view,
+.rbc-time-view {
+  position: relative;
+  z-index: 1;
+}
+
+.rbc-month-header {
+  position: relative;
+  z-index: 2;
+}
+
+.rbc-header {
+  position: relative;
+  z-index: 2;
+}
+
+.rbc-toolbar {
+  position: relative;
+  z-index: 3;
+}
+
+/* Event layers */
+.rbc-events-container {
+  position: relative;
+  z-index: 4;
+}
+
+.rbc-event {
+  position: relative;
+  z-index: 5;
+}
+
+/* Override any absolute positioning that might interfere */
+.rbc-overlay {
+  z-index: 1000;
+}
+
+.rbc-overlay-header {
+  z-index: 1001;
+}
+
+/* Ensure proper stacking for time-view elements */
+.rbc-time-content {
+  position: relative;
+  z-index: 1;
+}
+
+.rbc-time-header {
+  position: relative;
+  z-index: 2;
+}
+
+/* Ensure tooltips and popovers are always on top */
+[role="tooltip"],
+[role="dialog"] {
+  z-index: 9999;
+}
+
+/* Month view styles */
+.rbc-month-view {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-month-row {
+  @apply border-zinc-200/50 dark:border-zinc-800;
+}
+
+.rbc-day-bg + .rbc-day-bg {
+  @apply border-l border-zinc-200/50 dark:border-zinc-800/50;
+}
+
+.rbc-month-row + .rbc-month-row {
+  @apply border-t border-zinc-200/50 dark:border-zinc-800/50;
+}
+
+.rbc-day-bg {
+  @apply transition-colors;
+}
+
+.rbc-off-range-bg {
+  @apply bg-zinc-50/50 dark:bg-zinc-900/50;
+}
+
+.rbc-today {
+  @apply bg-zinc-100/50 dark:bg-zinc-800/50;
+}
+
+/* Date number styles */
+.rbc-date-cell {
+  @apply pt-2 pr-2 text-right;
+}
+
+.rbc-date-cell.rbc-now {
+  @apply font-medium;
+}
+
+/* Event styles */
+.rbc-event:hover {
+  @apply shadow-md;
+}
+
+.deadline-event {
+  @apply border-l-4;
+}
+
+.release-event {
+  @apply border-l-4 border-opacity-50;
+}
+
+.not-started-event.deadline-event {
+  @apply border-red-600 dark:border-red-500;
+}
+
+.not-started-event.release-event {
+  @apply border-red-400 dark:border-red-300;
+}
+
+.in-progress-event.deadline-event {
+  @apply border-amber-600 dark:border-amber-500;
+}
+
+.in-progress-event.release-event {
+  @apply border-amber-400 dark:border-amber-300;
+}
+
+.done-event.deadline-event {
+  @apply border-emerald-600 dark:border-emerald-500;
+}
+
+.done-event.release-event {
+  @apply border-emerald-400 dark:border-emerald-300;
+}
+
 /* Calendar container */
 .events-calendar {
   @apply text-zinc-900 dark:text-zinc-100;
@@ -192,8 +354,19 @@
 
 /* Toolbar styles */
 .events-calendar .rbc-toolbar {
-  @apply mb-4 flex items-center justify-between gap-2;
+  @apply mb-4 flex items-center justify-between gap-4;
   margin-bottom: 8px;
+  position: relative;
+  z-index: 40;
+}
+
+.events-calendar .rbc-toolbar-label {
+  @apply text-base font-medium flex-none;
+  padding: 0 8px;
+}
+
+.events-calendar .rbc-btn-group {
+  @apply flex items-center gap-1;
 }
 
 .events-calendar .rbc-toolbar button {

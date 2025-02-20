@@ -146,7 +146,14 @@ export default function UserManagement() {
                   key={user._id}
                   className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
                 >
-                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <a
+                      href={`/users/${user._id}`}
+                      className="text-primary hover:underline cursor-pointer"
+                    >
+                      {user.name}
+                    </a>
+                  </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

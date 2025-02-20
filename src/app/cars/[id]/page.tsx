@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
-import { Loader2, Plus, Sparkles, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Sparkles, Pencil, Trash2, Check } from "lucide-react";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -1342,9 +1342,25 @@ export default function CarPage() {
             </TabsList>
 
             <TabsContent value="gallery">
-              {car.images && car.images.length > 0 ? (
-                <ImageGalleryEnhanced images={car.images} />
-              ) : (
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setIsEditMode(!isEditMode)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400"
+                  >
+                    {isEditMode ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Done
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="w-4 h-4" />
+                        Edit Gallery
+                      </>
+                    )}
+                  </button>
+                </div>
                 <ImageUploadWithContext
                   images={car.images || []}
                   isEditMode={isEditMode}
@@ -1354,12 +1370,12 @@ export default function CarPage() {
                   uploadProgress={uploadProgress}
                   setUploadProgress={setUploadProgress}
                   showMetadata={true}
-                  showFilters={false}
+                  showFilters={true}
                   title={`${car.year} ${car.make} ${car.model}`}
                   onContextChange={setAdditionalContext}
                   carId={car._id}
                 />
-              )}
+              </div>
             </TabsContent>
 
             <TabsContent value="specs">

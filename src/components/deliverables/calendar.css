@@ -182,7 +182,17 @@
 
 [role="dialog"] {
   position: fixed !important;
+  z-index: 50 !important;
+}
+
+/* Calendar popover specific styles */
+.calendar-popover,
+[data-radix-popper-content-wrapper] [role="dialog"] {
   z-index: 9999 !important;
+  position: relative !important;
+  background: var(--background);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 /* Portal container for overlays */

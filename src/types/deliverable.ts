@@ -21,6 +21,8 @@ export type DeliverableType =
   | "review"
   | "walkthrough"
   | "highlights"
+  | "Marketing Email"
+  | "Blog"
   | "other";
 
 export type DeliverableStatus = "not_started" | "in_progress" | "done";
@@ -84,6 +86,9 @@ export interface DeliverableTemplate {
   type: DeliverableType;
   duration?: number;
   aspect_ratio: string;
+  daysFromStart: number;
+  daysUntilDeadline: number;
+  daysUntilRelease: number;
 }
 
 export interface BatchTemplate {
@@ -102,6 +107,9 @@ export const PREDEFINED_BATCHES: Record<string, BatchTemplate> = {
         type: "Video",
         duration: 15,
         aspect_ratio: "9:16",
+        daysFromStart: 0,
+        daysUntilDeadline: 7,
+        daysUntilRelease: 9,
       },
       {
         title: "White Room",
@@ -109,18 +117,27 @@ export const PREDEFINED_BATCHES: Record<string, BatchTemplate> = {
         type: "Video",
         duration: 15,
         aspect_ratio: "9:16",
+        daysFromStart: 0,
+        daysUntilDeadline: 7,
+        daysUntilRelease: 9,
       },
       {
         title: "BaT Gallery",
         platform: "Bring a Trailer",
         type: "Photo Gallery",
         aspect_ratio: "16:9",
+        daysFromStart: 2,
+        daysUntilDeadline: 5,
+        daysUntilRelease: 7,
       },
       {
         title: "Highlights",
         platform: "Instagram Post",
         type: "Photo Gallery",
         aspect_ratio: "1:1",
+        daysFromStart: 2,
+        daysUntilDeadline: 5,
+        daysUntilRelease: 7,
       },
     ],
   },

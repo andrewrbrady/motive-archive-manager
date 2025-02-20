@@ -169,36 +169,30 @@ export async function DELETE(
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Delete the image document
+    // Delete the image document from MongoDB
     await imagesCollection.deleteOne({ _id: image._id });
 
-    // If deleteFromStorage is true, delete from Cloudflare
-    if (deleteFromStorage && image.cloudflareId) {
-      try {
-        const response = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
-            },
-          }
-        );
+    // Return success early to update UI state
+    const response = NextResponse.json({ success: true });
 
-        if (!response.ok) {
-          console.error(
-            "Failed to delete image from Cloudflare:",
-            await response.text()
-          );
-          // Don't return error here, just log it since we already removed from DB
+    // If deleteFromStorage is true, delete from Cloudflare after response is sent
+    if (deleteFromStorage && image.cloudflareId) {
+      // Delete from Cloudflare in the background
+      fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+          },
         }
-      } catch (error) {
+      ).catch((error) => {
         console.error("Error deleting from Cloudflare:", error);
-        // Don't return error here, just log it since we already removed from DB
-      }
+        // Log error but don't affect response
+      });
     }
 
-    return NextResponse.json({ success: true });
+    return response;
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(

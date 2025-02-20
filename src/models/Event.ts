@@ -1,4 +1,4 @@
-import { Collection, Db, ObjectId } from "mongodb";
+import { Collection, Db, ObjectId, Filter } from "mongodb";
 import { Event, EventStatus, EventType } from "@/types/event";
 
 interface DbEvent extends Omit<Event, "id"> {
@@ -9,7 +9,20 @@ interface DbEvent extends Omit<Event, "id"> {
   scheduled_date: string;
   end_date?: string;
   is_all_day?: boolean;
+  assignees: string[];
 }
+
+type EventQuery = {
+  type?: EventType;
+  status?: EventStatus;
+  assignees?: string | { $in: string[] };
+  scheduled_date?:
+    | string
+    | {
+        $gte?: string;
+        $lte?: string;
+      };
+};
 
 export class EventModel {
   private collection: Collection<DbEvent>;
@@ -33,12 +46,15 @@ export class EventModel {
   }
 
   async create(event: Omit<DbEvent, "_id" | "created_at" | "updated_at">) {
-    const result = await this.collection.insertOne({
+    const now = new Date();
+    const newEvent = {
       ...event,
-      _id: new ObjectId(),
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
+      created_at: now,
+      updated_at: now,
+      assignees: event.assignees || [],
+    };
+
+    const result = await this.collection.insertOne(newEvent as DbEvent);
     return result.insertedId;
   }
 
@@ -56,19 +72,56 @@ export class EventModel {
     return events;
   }
 
-  async findAll(query: Partial<DbEvent> = {}): Promise<DbEvent[]> {
-    return this.collection
-      .find(query)
-      .sort({ scheduled_date: 1, created_at: -1 })
-      .toArray();
+  async findAll(query: EventQuery = {}) {
+    const filter: Filter<DbEvent> = {};
+
+    // Add type filter
+    if (query.type) {
+      filter.type = query.type;
+    }
+
+    // Add status filter
+    if (query.status) {
+      filter.status = query.status;
+    }
+
+    // Add assignee filter
+    if (query.assignees) {
+      if (typeof query.assignees === "string") {
+        filter.assignees = { $in: [query.assignees] };
+      } else {
+        filter.assignees = query.assignees;
+      }
+    }
+
+    // Add date filters
+    if (query.scheduled_date) {
+      if (typeof query.scheduled_date === "string") {
+        filter.scheduled_date = query.scheduled_date;
+      } else {
+        filter.scheduled_date = {};
+        if (query.scheduled_date.$gte) {
+          filter.scheduled_date.$gte = query.scheduled_date.$gte;
+        }
+        if (query.scheduled_date.$lte) {
+          filter.scheduled_date.$lte = query.scheduled_date.$lte;
+        }
+      }
+    }
+
+    return this.collection.find(filter).sort({ scheduled_date: 1 }).toArray();
   }
 
-  async update(id: ObjectId, updates: Partial<Omit<DbEvent, "_id">>) {
+  async update(id: ObjectId, updates: Partial<DbEvent>) {
+    if ("assignees" in updates && !Array.isArray(updates.assignees)) {
+      updates.assignees = [];
+    }
+
     const result = await this.collection.updateOne(
       { _id: id },
       { $set: { ...updates, updated_at: new Date() } }
     );
-    return result.matchedCount > 0;
+    return result.modifiedCount > 0;
   }
 
   async delete(id: ObjectId) {

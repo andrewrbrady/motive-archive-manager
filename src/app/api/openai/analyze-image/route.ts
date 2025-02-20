@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
 
 // Set maximum execution time to 60 seconds
 export const maxDuration = 60;
@@ -204,8 +205,11 @@ export async function POST(request: NextRequest) {
     const publicImageUrl = `${imageUrl}/public`;
 
     // Build context-aware prompt
-    let prompt =
-      "Analyze this car image and provide the following details in JSON format:";
+    let prompt = IMAGE_ANALYSIS_CONFIG.basePrompt;
+
+    // Add style guide
+    prompt +=
+      "\n\nStyle Guide for Descriptions:\n" + IMAGE_ANALYSIS_CONFIG.styleGuide;
 
     if (vehicleInfo) {
       prompt += `\n\nThis is a ${vehicleInfo.make} ${vehicleInfo.model}`;
@@ -221,7 +225,7 @@ export async function POST(request: NextRequest) {
       "Provide:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image, focusing on visible features and condition)";
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [
         {
           role: "user",

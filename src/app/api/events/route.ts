@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
     if (searchParams.has("type")) {
       query.type = searchParams.get("type");
     }
+    if (searchParams.has("assignee")) {
+      query.assignees = searchParams.get("assignee");
+    }
     if (searchParams.has("from")) {
       query.scheduled_date = {
         ...query.scheduled_date,
@@ -39,8 +42,10 @@ export async function GET(request: NextRequest) {
       status: event.status,
       start: event.scheduled_date,
       end: event.end_date,
-      assignee: event.assignee || "",
+      assignees: event.assignees || [],
       isAllDay: event.is_all_day || false,
+      createdAt: event.created_at.toISOString(),
+      updatedAt: event.updated_at.toISOString(),
     }));
     return NextResponse.json(transformedEvents);
   } catch (error) {

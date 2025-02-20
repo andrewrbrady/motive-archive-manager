@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 export interface ListViewProps {
   events: Event[];
@@ -39,14 +40,18 @@ interface Car {
   year: number;
 }
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
+}
+
 interface EditingEvent extends Event {
   isEditing?: boolean;
-  tempDescription?: string;
-  tempStart?: string;
-  tempEnd?: string;
-  tempAssignee?: string;
-  tempType?: EventType;
-  car?: Car;
+  car?: Car | undefined;
 }
 
 export default function ListView({
@@ -56,21 +61,51 @@ export default function ListView({
   onEventUpdated,
 }: ListViewProps) {
   const [editingEvents, setEditingEvents] = useState<EditingEvent[]>(events);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
-  // Initialize editingEvents when events prop changes
+  // Update useEffect to preserve more state when syncing events
   useEffect(() => {
-    setEditingEvents(events);
+    setEditingEvents((prevEditingEvents) =>
+      events.map((event) => {
+        const existingEvent = prevEditingEvents.find((e) => e.id === event.id);
+        return {
+          ...event,
+          car: existingEvent?.car || event.car,
+          assignees: event.assignees || existingEvent?.assignees || [],
+        };
+      })
+    );
   }, [events]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) throw new Error("Failed to fetch users");
+        const data = await response.json();
+        setUsers(data.filter((user: User) => user.status === "active"));
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   useEffect(() => {
     if (events.length === 0) return;
 
     const fetchCarInfo = async () => {
       const updatedEvents = await Promise.all(
-        events.map(async (event) => {
+        editingEvents.map(async (event) => {
           try {
+            // Only fetch car info if we don't already have it
+            if (event.car) return event;
+
             const carId = event.car_id;
             if (!carId) {
               console.error("No car_id found for event:", event);
@@ -80,7 +115,11 @@ export default function ListView({
             const response = await fetch(`/api/cars/${carId}`);
             if (!response.ok) throw new Error("Failed to fetch car");
             const car = await response.json();
-            return { ...event, car };
+            return {
+              ...event,
+              car,
+              assignees: event.assignees || [],
+            };
           } catch (error) {
             console.error("Error fetching car:", error);
             return event;
@@ -103,7 +142,7 @@ export default function ListView({
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return "-";
     try {
-      return format(new Date(dateString), "PPp");
+      return format(new Date(dateString), "PP");
     } catch (error) {
       console.error("Invalid date:", dateString);
       return "-";
@@ -121,107 +160,92 @@ export default function ListView({
     }
   };
 
-  const startEditing = (eventId: string) => {
-    setEditingEvents((prev) =>
-      prev.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              isEditing: true,
-              tempDescription: event.description,
-              tempStart: event.start,
-              tempEnd: event.end,
-              tempAssignee: event.assignee,
-              tempType: event.type,
-            }
-          : event
-      )
-    );
+  const toggleEditMode = () => {
+    if (isEditMode) {
+      // When exiting edit mode, save all changes
+      editingEvents.forEach(async (editedEvent) => {
+        const originalEvent = events.find((e) => e.id === editedEvent.id);
+        if (!originalEvent) return;
+
+        const updates: Partial<Event> = {};
+        if (editedEvent.description !== originalEvent.description) {
+          updates.description = editedEvent.description;
+        }
+        if (editedEvent.start !== originalEvent.start) {
+          updates.start = editedEvent.start;
+        }
+        if (editedEvent.end !== originalEvent.end) {
+          updates.end = editedEvent.end;
+        }
+        if (editedEvent.type !== originalEvent.type) {
+          updates.type = editedEvent.type;
+        }
+
+        // Ensure both arrays are properly initialized
+        const editedAssignees = Array.isArray(editedEvent.assignees)
+          ? editedEvent.assignees
+          : [];
+        const originalAssignees = Array.isArray(originalEvent.assignees)
+          ? originalEvent.assignees
+          : [];
+
+        if (
+          JSON.stringify(editedAssignees) !== JSON.stringify(originalAssignees)
+        ) {
+          updates.assignees = editedAssignees;
+        }
+
+        console.log("Saving updates for event:", editedEvent.id, updates);
+        if (Object.keys(updates).length > 0) {
+          try {
+            await onUpdateEvent(editedEvent.id, updates);
+            console.log("Successfully updated event:", editedEvent.id);
+          } catch (error) {
+            console.error("Error updating event:", error);
+          }
+        }
+      });
+      // Reset to original events
+      setEditingEvents(events);
+    }
+    setIsEditMode(!isEditMode);
   };
 
-  const cancelEditing = (eventId: string) => {
-    setEditingEvents((prev) =>
-      prev.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              isEditing: false,
-              tempDescription: undefined,
-              tempStart: undefined,
-              tempEnd: undefined,
-              tempAssignee: undefined,
-              tempType: undefined,
-            }
-          : event
-      )
-    );
-  };
-
-  const saveEditing = async (eventId: string) => {
-    const event = editingEvents.find((e) => e.id === eventId);
-    if (!event) return;
-
+  const updateEventField = async (
+    eventId: string,
+    field: keyof Event,
+    value: any
+  ) => {
     try {
-      const updates: Partial<Event> = {};
-      if (
-        event.tempDescription !== undefined &&
-        event.tempDescription !== event.description
-      ) {
-        updates.description = event.tempDescription;
-      }
-      if (event.tempStart !== undefined && event.tempStart !== event.start) {
-        updates.start = event.tempStart;
-      }
-      if (event.tempEnd !== undefined && event.tempEnd !== event.end) {
-        updates.end = event.tempEnd;
-      }
-      if (
-        event.tempAssignee !== undefined &&
-        event.tempAssignee !== event.assignee
-      ) {
-        updates.assignee = event.tempAssignee;
-      }
-      if (event.tempType !== undefined && event.tempType !== event.type) {
-        updates.type = event.tempType;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await onUpdateEvent(eventId, updates);
-        toast.success("Event updated successfully");
-      }
-
-      setEditingEvents((prev) =>
-        prev.map((e) =>
-          e.id === eventId
+      // Optimistically update the UI
+      setEditingEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event.id === eventId
             ? {
-                ...e,
-                ...updates,
-                isEditing: false,
-                tempDescription: undefined,
-                tempStart: undefined,
-                tempEnd: undefined,
-                tempAssignee: undefined,
-                tempType: undefined,
+                ...event,
+                [field]: field === "assignees" ? [...value] : value,
               }
-            : e
+            : event
         )
       );
+
+      // Call the update function
+      await onUpdateEvent(eventId, { [field]: value });
     } catch (error) {
+      console.error("Error updating event:", error);
+      // If there's an error, revert the optimistic update
+      setEditingEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event.id === eventId
+            ? {
+                ...event,
+                [field]: events.find((e) => e.id === eventId)?.[field],
+              }
+            : event
+        )
+      );
       toast.error("Failed to update event");
     }
-  };
-
-  const updateTempField = (eventId: string, field: string, value: any) => {
-    setEditingEvents((prev) =>
-      prev.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              [field]: value,
-            }
-          : event
-      )
-    );
   };
 
   const handleStatusChange = async (event: Event, newStatus: EventStatus) => {
@@ -330,6 +354,23 @@ export default function ListView({
             </>
           )}
         </div>
+        <Button
+          variant={isEditMode ? "default" : "outline"}
+          onClick={toggleEditMode}
+          className="ml-2"
+        >
+          {isEditMode ? (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save All
+            </>
+          ) : (
+            <>
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit All
+            </>
+          )}
+        </Button>
       </div>
 
       <Table>
@@ -356,8 +397,8 @@ export default function ListView({
             <TableHead>Start Date</TableHead>
             <TableHead>End Date</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Assignee</TableHead>
-            <TableHead>Actions</TableHead>
+            <TableHead>Assignees</TableHead>
+            {isEditMode && <TableHead>Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -380,14 +421,14 @@ export default function ListView({
                 </TableCell>
               )}
               <TableCell>
-                {event.isEditing ? (
+                {isEditMode ? (
                   <Select
-                    value={event.tempType}
+                    value={event.type}
                     onValueChange={(value) =>
-                      updateTempField(event.id, "tempType", value)
+                      updateEventField(event.id, "type", value)
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -403,15 +444,11 @@ export default function ListView({
                 )}
               </TableCell>
               <TableCell>
-                {event.isEditing ? (
+                {isEditMode ? (
                   <Input
-                    value={event.tempDescription}
+                    value={event.description || ""}
                     onChange={(e) =>
-                      updateTempField(
-                        event.id,
-                        "tempDescription",
-                        e.target.value
-                      )
+                      updateEventField(event.id, "description", e.target.value)
                     }
                   />
                 ) : (
@@ -419,12 +456,12 @@ export default function ListView({
                 )}
               </TableCell>
               <TableCell>
-                {event.isEditing ? (
+                {isEditMode ? (
                   <Input
-                    type="datetime-local"
-                    value={event.tempStart?.slice(0, 16)}
+                    type="date"
+                    value={event.start?.split("T")[0] || ""}
                     onChange={(e) =>
-                      updateTempField(event.id, "tempStart", e.target.value)
+                      updateEventField(event.id, "start", e.target.value)
                     }
                   />
                 ) : (
@@ -432,12 +469,12 @@ export default function ListView({
                 )}
               </TableCell>
               <TableCell>
-                {event.isEditing ? (
+                {isEditMode ? (
                   <Input
-                    type="datetime-local"
-                    value={event.tempEnd?.slice(0, 16)}
+                    type="date"
+                    value={event.end?.split("T")[0] || ""}
                     onChange={(e) =>
-                      updateTempField(event.id, "tempEnd", e.target.value)
+                      updateEventField(event.id, "end", e.target.value)
                     }
                   />
                 ) : (
@@ -457,80 +494,64 @@ export default function ListView({
                   {event.status}
                 </Badge>
               </TableCell>
-              <TableCell>
-                {event.isEditing ? (
-                  <Input
-                    value={event.tempAssignee}
-                    onChange={(e) =>
-                      updateTempField(event.id, "tempAssignee", e.target.value)
-                    }
-                    placeholder="Enter assignee"
-                  />
+              <TableCell className="min-w-[200px]">
+                {isEditMode ? (
+                  <div className="relative">
+                    <MultiSelect
+                      value={event.assignees || []}
+                      onChange={(values) => {
+                        updateEventField(event.id, "assignees", values);
+                      }}
+                      options={users.map((user) => ({
+                        value: user.name,
+                        label: user.name,
+                      }))}
+                      placeholder="Select assignees"
+                      className="z-[9999]"
+                      menuPortalTarget={document.body}
+                      styles={{
+                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                      }}
+                    />
+                  </div>
+                ) : event.assignees?.length > 0 ? (
+                  event.assignees.join(", ")
                 ) : (
-                  event.assignee || "Unassigned"
+                  "Unassigned"
                 )}
               </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  {event.isEditing ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => saveEditing(event.id)}
-                        className="text-green-500 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/20"
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => cancelEditing(event.id)}
-                        className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/20"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => startEditing(event.id)}
-                        className="text-blue-500 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/20"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(event.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                  {event.status !== EventStatus.COMPLETED && (
+              {isEditMode && (
+                <TableCell>
+                  <div className="flex gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        handleStatusChange(
-                          event,
-                          event.status === EventStatus.NOT_STARTED
-                            ? EventStatus.IN_PROGRESS
-                            : EventStatus.COMPLETED
-                        )
-                      }
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(event.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
                     >
-                      {event.status === EventStatus.NOT_STARTED
-                        ? "Start"
-                        : "Complete"}
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              </TableCell>
+                    {event.status !== EventStatus.COMPLETED && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleStatusChange(
+                            event,
+                            event.status === EventStatus.NOT_STARTED
+                              ? EventStatus.IN_PROGRESS
+                              : EventStatus.COMPLETED
+                          )
+                        }
+                      >
+                        {event.status === EventStatus.NOT_STARTED
+                          ? "Start"
+                          : "Complete"}
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

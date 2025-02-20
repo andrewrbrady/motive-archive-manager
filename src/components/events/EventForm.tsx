@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { EventType, EventStatus } from "@/types/event";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
+import { MultiSelect } from "@/components/ui/multi-select";
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
+}
 
 const eventFormSchema = z.object({
   type: z.nativeEnum(EventType),
@@ -32,7 +42,7 @@ const eventFormSchema = z.object({
   start: z.string(),
   end: z.string().optional(),
   isAllDay: z.boolean().default(false),
-  assignee: z.string().optional(),
+  assignees: z.array(z.string()).default([]),
 });
 
 type EventFormData = z.infer<typeof eventFormSchema>;
@@ -45,6 +55,7 @@ interface EventFormProps {
 
 export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
 
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventFormSchema),
@@ -53,33 +64,48 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
       description: "",
       status: EventStatus.NOT_STARTED,
       start: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      end: "",
       isAllDay: false,
+      assignees: [],
     },
   });
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) throw new Error("Failed to fetch users");
+        const data = await response.json();
+        setUsers(data.filter((user: User) => user.status === "active"));
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const onSubmit = async (data: EventFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(
-        `/api/cars/${carId}/events${event ? `/${event.id}` : ""}`,
-        {
-          method: event ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        }
-      );
+      const response = await fetch(`/api/cars/${carId}/events`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...data,
+          car_id: carId,
+        }),
+      });
 
-      if (!response.ok) {
-        throw new Error("Failed to save event");
-      }
-
-      toast.success(`Event ${event ? "updated" : "created"} successfully`);
+      if (!response.ok) throw new Error("Failed to create event");
+      toast.success("Event created successfully");
       onSuccess();
     } catch (error) {
-      console.error("Error saving event:", error);
-      toast.error(`Failed to ${event ? "update" : "create"} event`);
+      console.error("Error creating event:", error);
+      toast.error("Failed to create event");
     } finally {
       setIsSubmitting(false);
     }
@@ -103,7 +129,7 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
                 <SelectContent>
                   {Object.values(EventType).map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type}
+                      {type.replace(/_/g, " ")}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -120,7 +146,7 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea {...field} />
+                <Textarea {...field} placeholder="Event description" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -148,24 +174,6 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
                 </SelectContent>
               </Select>
               <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="isAllDay"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel>All Day Event</FormLabel>
-              </div>
             </FormItem>
           )}
         />
@@ -200,20 +208,46 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
 
         <FormField
           control={form.control}
-          name="assignee"
+          name="assignees"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Assignee (Optional)</FormLabel>
+              <FormLabel>Assignees</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <MultiSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={users.map((user) => ({
+                    value: user.name,
+                    label: user.name,
+                  }))}
+                  placeholder="Select assignees"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
+        <FormField
+          control={form.control}
+          name="isAllDay"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>All Day Event</FormLabel>
+              </div>
+            </FormItem>
+          )}
+        />
+
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : event ? "Update Event" : "Create Event"}
+          {isSubmitting ? "Creating..." : "Create Event"}
         </Button>
       </form>
     </Form>

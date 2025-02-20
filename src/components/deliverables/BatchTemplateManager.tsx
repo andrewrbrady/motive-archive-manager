@@ -25,9 +25,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Settings2, Pencil, Copy } from "lucide-react";
-import { toast } from "react-hot-toast";
+import {
+  Trash2,
+  Plus,
+  Settings2,
+  Pencil,
+  Copy,
+  GripVertical,
+} from "lucide-react";
+import { toast } from "sonner";
 import { BatchTemplate, DeliverableTemplate } from "@/types/deliverable";
+import DeliverableTemplateGantt from "./DeliverableTemplateGantt";
 
 export default function BatchTemplateManager() {
   const [isOpen, setIsOpen] = useState(false);
@@ -167,6 +175,9 @@ export default function BatchTemplateManager() {
           type: "Video",
           duration: 15,
           aspect_ratio: "9:16",
+          daysFromStart: 0,
+          daysUntilDeadline: 7,
+          daysUntilRelease: 9,
         },
       ],
     }));
@@ -194,6 +205,54 @@ export default function BatchTemplateManager() {
     }));
   };
 
+  const handleTemplateUpdate = (
+    index: number,
+    updates: Partial<DeliverableTemplate>
+  ) => {
+    setNewTemplate((prev) => ({
+      ...prev,
+      templates: prev.templates.map((template, i) =>
+        i === index ? { ...template, ...updates } : template
+      ),
+    }));
+  };
+
+  const handleReorder = (fromIndex: number, toIndex: number) => {
+    setNewTemplate((prev) => {
+      const newTemplates = [...prev.templates];
+      const [movedTemplate] = newTemplates.splice(fromIndex, 1);
+      newTemplates.splice(toIndex, 0, movedTemplate);
+      return { ...prev, templates: newTemplates };
+    });
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData("text/plain", index.toString());
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const element = e.currentTarget as HTMLElement;
+    element.style.transform = "translateY(2px)";
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    const element = e.currentTarget as HTMLElement;
+    element.style.transform = "";
+  };
+
+  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+    e.preventDefault();
+    const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+    if (fromIndex !== toIndex) {
+      handleReorder(fromIndex, toIndex);
+    }
+    const element = e.currentTarget as HTMLElement;
+    element.style.transform = "";
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -202,46 +261,60 @@ export default function BatchTemplateManager() {
           Manage Batch Templates
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-[90vw] w-full max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>
-            {editingTemplate ? "Edit Template" : "Manage Batch Templates"}
-          </DialogTitle>
+          <DialogTitle>Manage Batch Templates</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 flex-1 overflow-y-auto">
           {/* Create/Edit template section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">
-              {editingTemplate ? "Edit Template" : "Create New Template"}
-            </h3>
+            <div className="flex justify-between items-center sticky top-0 bg-background z-10 py-2">
+              <h3 className="text-lg font-medium">
+                {editingTemplate
+                  ? `Editing "${editingTemplate}"`
+                  : "Create New Template"}
+              </h3>
+              {editingTemplate && (
+                <Button variant="outline" onClick={cancelEditing}>
+                  Cancel Editing
+                </Button>
+              )}
+            </div>
             <div className="space-y-2">
               <Input
                 placeholder="Template Name"
                 value={newTemplate.name}
                 onChange={(e) =>
-                  setNewTemplate((prev) => ({ ...prev, name: e.target.value }))
+                  setNewTemplate((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
                 }
+                className="max-w-md"
               />
 
               <div className="space-y-4">
                 {newTemplate.templates.map((template, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <Input
-                      placeholder="Title"
-                      value={template.title}
-                      onChange={(e) =>
-                        updateDeliverable(index, "title", e.target.value)
-                      }
-                      className="flex-1"
-                    />
+                  <div
+                    key={index}
+                    className="grid grid-cols-[auto_200px_1fr_140px_140px_120px_120px_auto] gap-3 items-start p-3 rounded-lg border bg-card transition-all"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <div className="cursor-move opacity-50 hover:opacity-100 mt-2">
+                      <GripVertical className="h-4 w-4" />
+                    </div>
                     <Select
                       value={template.platform}
                       onValueChange={(value) =>
                         updateDeliverable(index, "platform", value)
                       }
                     >
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -251,33 +324,54 @@ export default function BatchTemplateManager() {
                         <SelectItem value="Instagram Post">
                           Instagram Post
                         </SelectItem>
+                        <SelectItem value="Instagram Story">
+                          Instagram Story
+                        </SelectItem>
                         <SelectItem value="YouTube">YouTube</SelectItem>
                         <SelectItem value="YouTube Shorts">
                           YouTube Shorts
                         </SelectItem>
                         <SelectItem value="TikTok">TikTok</SelectItem>
+                        <SelectItem value="Facebook">Facebook</SelectItem>
                         <SelectItem value="Bring a Trailer">
                           Bring a Trailer
                         </SelectItem>
+                        <SelectItem value="Marketing Email">
+                          Marketing Email
+                        </SelectItem>
+                        <SelectItem value="Blog">Blog</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
+                    <Input
+                      placeholder="Title"
+                      value={template.title}
+                      onChange={(e) =>
+                        updateDeliverable(index, "title", e.target.value)
+                      }
+                    />
                     <Select
                       value={template.type}
                       onValueChange={(value) =>
                         updateDeliverable(index, "type", value)
                       }
                     >
-                      <SelectTrigger className="w-[160px]">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Video">Video</SelectItem>
                         <SelectItem value="Photo Gallery">
                           Photo Gallery
                         </SelectItem>
+                        <SelectItem value="Video">Video</SelectItem>
                         <SelectItem value="Mixed Gallery">
                           Mixed Gallery
                         </SelectItem>
+                        <SelectItem value="Video Gallery">
+                          Video Gallery
+                        </SelectItem>
+                        <SelectItem value="Text">Text</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                     {template.type === "Video" && (
@@ -292,9 +386,32 @@ export default function BatchTemplateManager() {
                             parseInt(e.target.value)
                           )
                         }
-                        className="w-[100px]"
                       />
                     )}
+                    <Input
+                      type="number"
+                      placeholder="Days to Deadline"
+                      value={template.daysUntilDeadline}
+                      onChange={(e) =>
+                        updateDeliverable(
+                          index,
+                          "daysUntilDeadline",
+                          e.target.value === "" ? 0 : parseInt(e.target.value)
+                        )
+                      }
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Days to Release"
+                      value={template.daysUntilRelease}
+                      onChange={(e) =>
+                        updateDeliverable(
+                          index,
+                          "daysUntilRelease",
+                          e.target.value === "" ? 0 : parseInt(e.target.value)
+                        )
+                      }
+                    />
                     <Button
                       variant="ghost"
                       size="sm"
@@ -311,16 +428,24 @@ export default function BatchTemplateManager() {
                   Add Deliverable
                 </Button>
               </div>
-            </div>
 
-            <div className="flex gap-2">
-              <Button onClick={saveTemplate}>
-                {editingTemplate ? "Update Template" : "Save Template"}
-              </Button>
-              {editingTemplate && (
-                <Button variant="outline" onClick={cancelEditing}>
-                  Cancel Editing
-                </Button>
+              {newTemplate.templates.length > 0 && (
+                <div className="space-y-4">
+                  <div className="mt-8">
+                    <h4 className="text-sm font-medium mb-2">
+                      Timeline Preview
+                    </h4>
+                    <DeliverableTemplateGantt
+                      template={newTemplate}
+                      onTemplateUpdate={handleTemplateUpdate}
+                      onReorder={handleReorder}
+                    />
+                  </div>
+
+                  <Button onClick={saveTemplate}>
+                    {editingTemplate ? "Update Template" : "Save Template"}
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -332,7 +457,7 @@ export default function BatchTemplateManager() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Template Name</TableHead>
+                    <TableHead className="w-[200px]">Template Name</TableHead>
                     <TableHead>Deliverables</TableHead>
                     <TableHead className="w-[140px]">Actions</TableHead>
                   </TableRow>

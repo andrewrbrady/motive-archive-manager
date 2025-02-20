@@ -64,7 +64,7 @@ interface Image {
 interface ImageGalleryProps {
   images: Image[];
   isEditMode: boolean;
-  onRemoveImage: (indices: number[]) => void;
+  onRemoveImage: (indices: number[], deleteFromStorage?: boolean) => void;
   onImagesChange: (files: FileList) => void;
   uploading: boolean;
   uploadProgress: UploadProgress[];
@@ -76,6 +76,7 @@ interface ImageGalleryProps {
   rowsPerPage?: number;
   contextInput?: React.ReactNode;
   carId: string;
+  onImageProgress?: (progress: UploadProgress) => void;
 }
 
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
@@ -100,6 +101,7 @@ export function ImageGallery({
   rowsPerPage = 3,
   contextInput,
   carId,
+  onImageProgress,
 }: ImageGalleryProps) {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -125,6 +127,9 @@ export function ImageGallery({
   const [isDeleting, setIsDeleting] = useState(false);
   const maxSelection = 10;
   const itemsPerPage = thumbnailsPerRow * rowsPerPage;
+  const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>(
+    {}
+  );
 
   // Update effect to handle transition from no images to having images
   useEffect(() => {
@@ -161,70 +166,47 @@ export function ImageGallery({
     }
   }, [isEditMode]);
 
-  // Extract available filter values from images
-  const availableFilters = images.reduce(
-    (acc, image) => {
-      if (image.metadata.angle && !acc.angles.includes(image.metadata.angle)) {
-        acc.angles.push(image.metadata.angle);
-      }
-      if (
-        image.metadata.movement &&
-        !acc.movements.includes(image.metadata.movement)
-      ) {
-        acc.movements.push(image.metadata.movement);
-      }
-      if (image.metadata.tod && !acc.tods.includes(image.metadata.tod)) {
-        acc.tods.push(image.metadata.tod);
-      }
-      if (image.metadata.view && !acc.views.includes(image.metadata.view)) {
-        acc.views.push(image.metadata.view);
-      }
-      if (image.metadata.side && !acc.sides.includes(image.metadata.side)) {
-        acc.sides.push(image.metadata.side);
-      }
-      return acc;
-    },
-    {
-      angles: [] as string[],
-      movements: [] as string[],
-      tods: [] as string[],
-      views: [] as string[],
-      sides: [] as string[],
-    }
-  );
+  // Extract available filter values from all images, not just filtered ones
+  const allAvailableFilters = React.useMemo(() => {
+    const filterSet = {
+      angles: new Set<string>(),
+      movements: new Set<string>(),
+      tods: new Set<string>(),
+      views: new Set<string>(),
+      sides: new Set<string>(),
+    };
 
-  // Sort filter values alphabetically
-  Object.keys(availableFilters).forEach((key) => {
-    availableFilters[key as keyof typeof availableFilters].sort();
-  });
+    images.forEach((image) => {
+      const { metadata } = image;
+      if (metadata.angle?.trim()) filterSet.angles.add(metadata.angle.trim());
+      if (metadata.movement?.trim())
+        filterSet.movements.add(metadata.movement.trim());
+      if (metadata.tod?.trim()) filterSet.tods.add(metadata.tod.trim());
+      if (metadata.view?.trim()) filterSet.views.add(metadata.view.trim());
+      if (metadata.side?.trim()) filterSet.sides.add(metadata.side.trim());
+    });
+
+    return {
+      angles: Array.from(filterSet.angles),
+      movements: Array.from(filterSet.movements),
+      tods: Array.from(filterSet.tods),
+      views: Array.from(filterSet.views),
+      sides: Array.from(filterSet.sides),
+    };
+  }, [images]);
 
   // Filter images based on selected filters
   const filteredImages = images.filter((image) => {
-    const result = Object.entries(filters).every(([key, value]) => {
+    return Object.entries(filters).every(([key, value]) => {
       if (!value) return true;
       const imageValue = image.metadata[key as keyof typeof image.metadata];
-      const matches = imageValue === value;
-      console.log(`Filtering image ${image.filename}:`, {
-        filterKey: key,
-        filterValue: value,
-        imageValue,
-        matches,
-      });
-      return matches;
+      if (typeof imageValue !== "string") return false;
+      if (typeof value !== "string") return false;
+      return imageValue.trim() === value.trim();
     });
-    return result;
   });
 
   const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
-
-  // Log filter state changes
-  useEffect(() => {
-    console.log("Filter state changed:", {
-      activeFilters: filters,
-      totalImages: images.length,
-      filteredCount: filteredImages.length,
-    });
-  }, [filters, images.length, filteredImages.length]);
 
   // Reset mainIndex and currentPage when filtered results change
   useEffect(() => {
@@ -237,6 +219,16 @@ export function ImageGallery({
       setCurrentPage(Math.min(currentPage, newPage));
     }
   }, [filteredImages.length, mainIndex, currentPage, itemsPerPage]);
+
+  const handleFilterChange = (
+    key: keyof ImageMetadata,
+    value: string | undefined
+  ) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value === prev[key] ? undefined : value,
+    }));
+  };
 
   const handlePageChange = useCallback(
     (newPage: number) => {
@@ -301,17 +293,40 @@ export function ImageGallery({
     }
   }, [onRemoveImage, selectedImages]);
 
-  const handleDeleteAll = useCallback(async () => {
-    if (onRemoveImage && images.length > 0) {
-      try {
-        setIsDeleting(true);
-        await onRemoveImage(images.map((_, index) => index));
-      } finally {
-        setIsDeleting(false);
-        setShowDeleteAllConfirm(false);
-      }
+  const handleDeleteAll = async () => {
+    setShowDeleteAllConfirm(false);
+    const indices = Array.from({ length: images.length }, (_, i) => i);
+
+    // Update progress to indicate deletion starting
+    onImageProgress?.({
+      fileName: "all-images",
+      progress: 0,
+      status: "uploading",
+      currentStep: `Deleting all images`,
+    });
+
+    try {
+      // Delete all images at once
+      await onRemoveImage(indices, true);
+
+      // Update progress after successful deletion
+      onImageProgress?.({
+        fileName: "all-images",
+        progress: 100,
+        status: "complete",
+        currentStep: "All images deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting images:", error);
+      onImageProgress?.({
+        fileName: "all-images",
+        progress: 0,
+        status: "error",
+        error: "Failed to delete images",
+        currentStep: "Deletion failed",
+      });
     }
-  }, [onRemoveImage, images]);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -414,6 +429,24 @@ export function ImageGallery({
         handleImageSelect(index);
       }
     }
+  };
+
+  const handleImageError = (imageUrl: string) => {
+    setImageErrors((prev) => ({ ...prev, [imageUrl]: true }));
+  };
+
+  // Filter out images that have errored
+  const displayImages = filteredImages.filter(
+    (image) => !imageErrors[image.url]
+  );
+
+  const getImageUrl = (url: string, variant?: string) => {
+    // Remove /public if it exists at the end
+    const baseUrl = url.replace(/\/public$/, "");
+    if (variant) {
+      return `${baseUrl}/${variant}`;
+    }
+    return `${baseUrl}/public`;
   };
 
   if (!images || images.length === 0 || filteredImages.length === 0) {
@@ -537,8 +570,8 @@ export function ImageGallery({
       {showFilters && (
         <ImageFilterControls
           filters={filters}
-          onFilterChange={setFilters}
-          availableFilters={availableFilters}
+          onFilterChange={handleFilterChange}
+          availableFilters={allAvailableFilters}
         />
       )}
       <div className="flex gap-6">
@@ -554,18 +587,18 @@ export function ImageGallery({
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
-              {filteredImages[mainIndex] && (
+              {displayImages[mainIndex] && (
                 <>
                   {!mainImageLoaded && (
                     <ImageSkeleton aspectRatio={aspectRatio} />
                   )}
                   <Image
-                    key={`${filteredImages[mainIndex].id}-${isEditMode}`}
-                    src={`${filteredImages[mainIndex].url}/public`}
+                    key={`${displayImages[mainIndex].id}-${isEditMode}`}
+                    src={getImageUrl(displayImages[mainIndex].url)}
                     alt={
                       title
                         ? `${title} - View ${mainIndex + 1}`
-                        : `View ${mainIndex + 1} of ${filteredImages.length}`
+                        : `View ${mainIndex + 1} of ${displayImages.length}`
                     }
                     className={cn(
                       "object-cover transition-opacity duration-300",
@@ -577,6 +610,9 @@ export function ImageGallery({
                     onLoadingComplete={() => {
                       setMainImageLoaded(true);
                     }}
+                    onError={() =>
+                      handleImageError(displayImages[mainIndex].url)
+                    }
                   />
                 </>
               )}
@@ -618,7 +654,7 @@ export function ImageGallery({
                     </span>
                   </div>
                   <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-                    {filteredImages[mainIndex]?.metadata?.angle || "N/A"}
+                    {displayImages[mainIndex]?.metadata?.angle || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
@@ -629,7 +665,7 @@ export function ImageGallery({
                     </span>
                   </div>
                   <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-                    {filteredImages[mainIndex]?.metadata?.view || "N/A"}
+                    {displayImages[mainIndex]?.metadata?.view || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
@@ -640,7 +676,7 @@ export function ImageGallery({
                     </span>
                   </div>
                   <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-                    {filteredImages[mainIndex]?.metadata?.tod || "N/A"}
+                    {displayImages[mainIndex]?.metadata?.tod || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
@@ -651,13 +687,13 @@ export function ImageGallery({
                     </span>
                   </div>
                   <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-                    {filteredImages[mainIndex]?.metadata?.movement || "N/A"}
+                    {displayImages[mainIndex]?.metadata?.movement || "N/A"}
                   </span>
                 </div>
               </div>
-              {filteredImages[mainIndex]?.metadata?.description && (
+              {displayImages[mainIndex]?.metadata?.description && (
                 <div className="mt-2 text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-800 pt-2">
-                  {filteredImages[mainIndex].metadata.description}
+                  {displayImages[mainIndex].metadata.description}
                 </div>
               )}
             </div>
@@ -670,7 +706,7 @@ export function ImageGallery({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    const currentPageImages = filteredImages
+                    const currentPageImages = displayImages
                       .slice(
                         (currentPage - 1) * itemsPerPage,
                         currentPage * itemsPerPage
@@ -759,7 +795,7 @@ export function ImageGallery({
           )}
 
           <div className="grid grid-cols-3 gap-2">
-            {filteredImages
+            {displayImages
               .slice(
                 (currentPage - 1) * itemsPerPage,
                 currentPage * itemsPerPage
@@ -771,21 +807,18 @@ export function ImageGallery({
                 return (
                   <div
                     key={index}
-                    className="relative group cursor-pointer"
-                    onClick={(e) => {
-                      if (isEditMode) {
-                        handleImageSelect(actualIndex);
-                      } else {
-                        handleThumbnailClick(actualIndex);
-                      }
-                    }}
+                    className={cn(
+                      "relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200",
+                      isEditMode && "hover:opacity-90"
+                    )}
                     style={{ aspectRatio }}
                   >
                     <Image
-                      src={`${image.url.replace("/public", "")}/width=200`}
-                      alt={`Image ${actualIndex + 1}`}
+                      src={getImageUrl(image.url, "width=200")}
+                      alt={image.metadata.description || ""}
+                      fill
                       className={cn(
-                        "w-full h-full object-cover rounded-lg transition-all duration-300",
+                        "object-cover transition-all duration-300",
                         isMainVisible && actualIndex === mainIndex
                           ? ""
                           : "opacity-75 dark:opacity-60",
@@ -793,9 +826,8 @@ export function ImageGallery({
                           ? "ring-2 ring-red-500 dark:ring-red-500"
                           : ""
                       )}
-                      fill
-                      sizes="100vw"
-                      priority
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      onError={() => handleImageError(image.url)}
                     />
                     {isEditMode && (
                       <div
@@ -853,8 +885,8 @@ export function ImageGallery({
             <X className="w-6 h-6" />
           </button>
           <Image
-            src={`${filteredImages[modalIndex].url}/public`}
-            alt={`Full size view ${modalIndex + 1} of ${filteredImages.length}`}
+            src={getImageUrl(displayImages[modalIndex].url)}
+            alt={`Full size view ${modalIndex + 1} of ${displayImages.length}`}
             className="max-w-full max-h-[90vh] object-contain"
             fill
             sizes="100vw"

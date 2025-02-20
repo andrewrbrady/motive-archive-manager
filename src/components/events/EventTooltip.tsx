@@ -49,7 +49,9 @@ export default function EventTooltip({ children, event }: EventTooltipProps) {
             <div className="space-y-2">
               <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
                 <User className="mr-2 h-4 w-4" />
-                {event.assignee || "Unassigned"}
+                {event.assignees?.length > 0
+                  ? event.assignees.join(", ")
+                  : "Unassigned"}
               </div>
             </div>
 

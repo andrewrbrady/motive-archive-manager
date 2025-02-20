@@ -29,6 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import "./calendar.css";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface EventsCalendarProps {
   events: Event[];
@@ -49,8 +50,17 @@ interface EditingEvent extends Event {
   tempDescription?: string;
   tempStart?: string;
   tempEnd?: string;
-  tempAssignee?: string;
+  tempAssignees?: string[];
   tempType?: EventType;
+}
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
 }
 
 const locales = {
@@ -78,6 +88,23 @@ export default function EventsCalendar({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EditingEvent | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) throw new Error("Failed to fetch users");
+        const data = await response.json();
+        setUsers(data.filter((user: User) => user.status === "active"));
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const formatEventType = (type: string) => {
     return type
@@ -167,26 +194,31 @@ export default function EventsCalendar({
     toolbar: (toolbarProps: any) => {
       return (
         <div className="rbc-toolbar">
-          <span className="rbc-btn-group">
-            <button
-              type="button"
-              onClick={() => toolbarProps.onNavigate("PREV")}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              onClick={() => toolbarProps.onNavigate("TODAY")}
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => toolbarProps.onNavigate("NEXT")}
-            >
-              Next
-            </button>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rbc-btn-group">
+              <button
+                type="button"
+                onClick={() => toolbarProps.onNavigate("PREV")}
+                className="px-3"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => toolbarProps.onNavigate("TODAY")}
+                className="px-3"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => toolbarProps.onNavigate("NEXT")}
+                className="px-3"
+              >
+                Next
+              </button>
+            </span>
+          </div>
           <span className="rbc-toolbar-label">{toolbarProps.label}</span>
           <div className="flex items-center gap-2">
             <span className="rbc-btn-group">
@@ -195,7 +227,10 @@ export default function EventsCalendar({
                   key={name}
                   type="button"
                   onClick={() => toolbarProps.onView(name)}
-                  className={cn(toolbarProps.view === name && "rbc-active")}
+                  className={cn(
+                    "px-3",
+                    toolbarProps.view === name && "rbc-active"
+                  )}
                 >
                   {name}
                 </button>
@@ -266,7 +301,7 @@ export default function EventsCalendar({
       tempDescription: event.resource.description,
       tempStart: formattedStart,
       tempEnd: formattedEnd,
-      tempAssignee: event.resource.assignee,
+      tempAssignees: event.resource.assignees,
       tempType: event.resource.type,
     });
     setIsEditModalOpen(true);
@@ -286,8 +321,8 @@ export default function EventsCalendar({
       if (selectedEvent.tempEnd !== selectedEvent.end) {
         updates.end = selectedEvent.tempEnd;
       }
-      if (selectedEvent.tempAssignee !== selectedEvent.assignee) {
-        updates.assignee = selectedEvent.tempAssignee;
+      if (selectedEvent.tempAssignees !== selectedEvent.assignees) {
+        updates.assignees = selectedEvent.tempAssignees;
       }
       if (selectedEvent.tempType !== selectedEvent.type) {
         updates.type = selectedEvent.tempType;
@@ -361,6 +396,7 @@ export default function EventsCalendar({
             month: true,
             week: true,
             day: true,
+            agenda: true,
           }}
           view={view}
           date={date}
@@ -399,6 +435,17 @@ export default function EventsCalendar({
                 "MMM d, h:mm a"
               )}`;
             },
+            monthHeaderFormat: "MMMM yyyy",
+            dayHeaderFormat: "EEE MMM d",
+            dayRangeHeaderFormat: ({ start, end }) => {
+              if (start.getMonth() === end.getMonth()) {
+                return `${format(start, "MMMM d")} - ${format(end, "d, yyyy")}`;
+              }
+              return `${format(start, "MMMM d")} - ${format(
+                end,
+                "MMMM d, yyyy"
+              )}`;
+            },
           }}
           messages={{
             showMore: (total) => `+${total} more`,
@@ -419,7 +466,7 @@ export default function EventsCalendar({
                   value={
                     selectedEvent.tempType ||
                     selectedEvent.type ||
-                    EventType.CUSTOM
+                    EventType.OTHER
                   }
                   onValueChange={(value) =>
                     setSelectedEvent({
@@ -428,13 +475,13 @@ export default function EventsCalendar({
                     })
                   }
                 >
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.values(EventType).map((type) => (
-                      <SelectItem key={type} value={type || EventType.CUSTOM}>
-                        {formatEventType(type)}
+                      <SelectItem key={type} value={type}>
+                        {type.replace(/_/g, " ")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -479,16 +526,24 @@ export default function EventsCalendar({
                 />
               </div>
               <div>
-                <Label>Assignee</Label>
-                <Input
-                  value={selectedEvent.tempAssignee}
-                  onChange={(e) =>
+                <Label>Assignees</Label>
+                <MultiSelect
+                  value={selectedEvent.tempAssignees || []}
+                  onChange={(values) =>
                     setSelectedEvent({
                       ...selectedEvent,
-                      tempAssignee: e.target.value,
+                      tempAssignees: values,
                     })
                   }
-                  placeholder="Enter assignee"
+                  options={users.map((user) => ({
+                    value: user.name,
+                    label: user.name,
+                  }))}
+                  placeholder="Select assignees"
+                  menuPortalTarget={document.body}
+                  styles={{
+                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                  }}
                 />
               </div>
               <div className="flex justify-between">

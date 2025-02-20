@@ -6,12 +6,14 @@ export const IMAGE_ANALYSIS_CONFIG = {
   // Style guide for descriptions
   styleGuide: `
     When describing the vehicle:
+    - DO NOT USE subjective adjectives like "sporty", "sleek", "aggressive", "smooth"
+    - DO NOT SPECULATE about the vehicle's condition
+    - DO NOT suggest anything about the vehicle's history or condition
+    - DO NOT mention that there is no damage or rust unless explicitly observed
     - Keep descriptions brief and focused
     - Use concise, technical language
     - Focus on key visible features only
-    - Avoid subjective adjectives like "sporty", "sleek", "aggressive"
     - Describe primary design elements only
-    - Note significant modifications if present
     - Include critical condition details only
     - Limit description to 250 characters
   `.trim(),

@@ -8,7 +8,7 @@ export async function GET() {
     const cars = await db
       .collection("cars")
       .find({})
-      .project({ _id: 1, make: 1, model: 1, year: 1 })
+      .project({ _id: 1, make: 1, model: 1, year: 1, images: 1, imageIds: 1 })
       .sort({ make: 1, model: 1, year: -1 })
       .toArray();
 

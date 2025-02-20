@@ -40,30 +40,58 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFile = async (file: File): Promise<UploadResponse> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("metadata", JSON.stringify(metadata));
-    if (carId) {
-      formData.append("carId", carId);
-    }
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("metadata", JSON.stringify(metadata));
+      if (carId) {
+        formData.append("carId", carId);
+      }
 
-    onImageProgress?.({
-      fileName: file.name,
-      progress: 0,
-      status: "uploading",
+      onImageProgress?.({
+        fileName: file.name,
+        progress: 0,
+        status: "uploading",
+      });
+
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          // Scale progress to 0-75% during upload
+          const uploadProgress = Math.round((event.loaded * 75) / event.total);
+          onImageProgress?.({
+            fileName: file.name,
+            progress: uploadProgress,
+            status: "uploading",
+          });
+        }
+      });
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve({
+              imageUrl: response.imageUrl,
+              metadata: response.metadata,
+            });
+          } catch (error) {
+            reject(new Error("Failed to parse upload response"));
+          }
+        } else {
+          reject(new Error("Upload failed"));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Upload failed"));
+      };
+
+      xhr.open("POST", "/api/cloudflare/images");
+      xhr.send(formData);
     });
-
-    const response = await fetch("/api/cloudflare/images", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to upload image");
-    }
-
-    const data = await response.json();
-    return { imageUrl: data.imageUrl, metadata: data.metadata };
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,9 +117,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         firstFile
       );
 
+      // Update progress to 75% when starting analysis
       onImageProgress?.({
         fileName: firstFile.name,
-        progress: 50,
+        progress: 75,
         status: "analyzing",
         imageUrl,
       });
@@ -114,6 +143,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
         const { analysis } = await response.json();
 
+        // Update to 100% only after analysis is complete
         onImageProgress?.({
           fileName: firstFile.name,
           progress: 100,
@@ -148,7 +178,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
                 onImageProgress?.({
                   fileName: file.name,
-                  progress: 50,
+                  progress: 75,
                   status: "analyzing",
                   imageUrl,
                 });
@@ -187,7 +217,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   console.error("Error analyzing image:", error);
                   onImageProgress?.({
                     fileName: file.name,
-                    progress: 100,
+                    progress: 85,
                     status: "complete",
                     imageUrl,
                     metadata: uploadMetadata,
@@ -217,7 +247,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         console.error("Error analyzing first image:", error);
         onImageProgress?.({
           fileName: firstFile.name,
-          progress: 100,
+          progress: 85,
           status: "complete",
           imageUrl,
           metadata: uploadMetadata,

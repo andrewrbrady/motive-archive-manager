@@ -16,9 +16,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { BatchTemplate } from "@/types/deliverable";
-import { addDays } from "date-fns";
+import { addDays, format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import "react-day-picker/dist/style.css";
 
 interface BatchDeliverableFormProps {
   carId: string;
@@ -31,6 +40,7 @@ export default function BatchDeliverableForm({
 }: BatchDeliverableFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date>(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [templates, setTemplates] = useState<Record<string, BatchTemplate>>({});
 
@@ -62,14 +72,19 @@ export default function BatchDeliverableForm({
 
     try {
       const batch = templates[selectedBatch];
-      const baseDate = new Date();
 
       // Create all deliverables in the batch
       const promises = batch.templates.map((template) => {
         const deliverableData = {
           ...template,
-          edit_deadline: addDays(baseDate, 7).toISOString(), // One week from now
-          release_date: addDays(baseDate, 9).toISOString(), // One week + 2 days from now
+          edit_deadline: addDays(
+            startDate,
+            template.daysUntilDeadline
+          ).toISOString(),
+          release_date: addDays(
+            startDate,
+            template.daysUntilRelease
+          ).toISOString(),
           editor: "", // Will be assigned later
           status: "not_started",
           tags: [],
@@ -124,6 +139,41 @@ export default function BatchDeliverableForm({
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Start Date</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "PPP") : "Select a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0 z-50"
+                align="start"
+                sideOffset={4}
+                side="bottom"
+              >
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={(date) => date && setStartDate(date)}
+                  initialFocus
+                  className="rounded-md border"
+                  disabled={(date) =>
+                    date < new Date(new Date().setHours(0, 0, 0, 0))
+                  }
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {selectedBatch && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium">
@@ -134,6 +184,21 @@ export default function BatchDeliverableForm({
                   <li key={index} className="text-sm">
                     {template.title} - {template.platform} ({template.type}
                     {template.duration ? ` - ${template.duration}s` : ""})
+                    <div className="ml-6 text-xs text-muted-foreground">
+                      Deadline: Day {template.daysUntilDeadline} (
+                      {format(
+                        addDays(startDate, template.daysUntilDeadline),
+                        "PP"
+                      )}
+                      )
+                      <br />
+                      Release: Day {template.daysUntilRelease} (
+                      {format(
+                        addDays(startDate, template.daysUntilRelease),
+                        "PP"
+                      )}
+                      )
+                    </div>
                   </li>
                 ))}
               </ul>

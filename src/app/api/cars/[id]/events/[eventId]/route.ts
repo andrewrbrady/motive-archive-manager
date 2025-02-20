@@ -39,11 +39,16 @@ export async function PUT(
     const data = await request.json();
     const { _id, car_id, created_at, start, end, ...updateData } = data;
 
-    // Map start/end to scheduled_date/end_date
+    // Map start/end to scheduled_date/end_date and ensure assignees is an array
     const mappedUpdates = {
       ...updateData,
       ...(start && { scheduled_date: start }),
       ...(end && { end_date: end }),
+      ...(updateData.assignees && {
+        assignees: Array.isArray(updateData.assignees)
+          ? updateData.assignees
+          : [],
+      }),
       updated_at: new Date(),
     };
 

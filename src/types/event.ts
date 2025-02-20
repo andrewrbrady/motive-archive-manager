@@ -29,7 +29,7 @@ export interface Event {
   start: string;
   end?: string;
   isAllDay?: boolean;
-  assignee?: string;
+  assignees: string[];
   createdAt: string;
   updatedAt: string;
 }

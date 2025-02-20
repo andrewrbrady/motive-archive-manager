@@ -333,7 +333,18 @@ export default function DeliverablesCalendar() {
               type="button"
               onClick={() => toolbarProps.onNavigate("PREV")}
             >
-              Previous
+              Previous Month
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const newDate = new Date(date);
+                newDate.setDate(date.getDate() - 7);
+                toolbarProps.onNavigate("DATE", newDate);
+              }}
+              className="px-2"
+            >
+              Previous Week
             </button>
             <button
               type="button"
@@ -343,9 +354,20 @@ export default function DeliverablesCalendar() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                const newDate = new Date(date);
+                newDate.setDate(date.getDate() + 7);
+                toolbarProps.onNavigate("DATE", newDate);
+              }}
+              className="px-2"
+            >
+              Next Week
+            </button>
+            <button
+              type="button"
               onClick={() => toolbarProps.onNavigate("NEXT")}
             >
-              Next
+              Next Month
             </button>
           </span>
           <span className="rbc-toolbar-label">{toolbarProps.label}</span>

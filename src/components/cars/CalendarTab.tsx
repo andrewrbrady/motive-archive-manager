@@ -5,6 +5,7 @@ import {
   Calendar,
   dateFnsLocalizer,
   View,
+  Views,
   Components,
   EventProps,
 } from "react-big-calendar";
@@ -29,7 +30,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import EventTooltip from "../events/EventTooltip";
-import DeliverableTooltip from "./DeliverableTooltip";
+import DeliverableTooltip from "../deliverables/DeliverableTooltip";
 import "./calendar.css";
 import {
   DropdownMenu,
@@ -38,6 +39,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import InfiniteMonthView from "./InfiniteMonthView";
 
 // Create DnD Calendar
 const DragAndDropCalendar = withDragAndDrop(Calendar);
@@ -73,7 +75,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [view, setView] = useState<View>("month");
+  const [view, setView] = useState<View>("month" as View);
   const [date, setDate] = useState(new Date());
   const [showEvents, setShowEvents] = useState(true);
   const [showDeliverables, setShowDeliverables] = useState(true);
@@ -118,6 +120,8 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       setIsLoading(true);
       await Promise.all([fetchEvents(), fetchDeliverables()]);
       setIsLoading(false);
+      // Ensure we navigate to today's date after loading data
+      setDate(new Date());
     };
     fetchData();
   }, [carId]);
@@ -324,7 +328,20 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
     setDeliverableEventFilters([...deliverableEventCategories]);
   }, [uniqueEventTypes, uniqueDeliverableTypes, uniqueDeliverablePlatforms]);
 
-  // Update the toolbar component with new eye icons
+  // Add type for valid views
+  const handleViewChange = (newView: View) => {
+    setView(newView);
+  };
+
+  type ViewType = "month" | "week" | "work_week" | "agenda";
+
+  interface ToolbarProps {
+    view: View;
+    label: string;
+    onView: (view: View) => void;
+    onNavigate: (action: "PREV" | "NEXT" | "TODAY") => void;
+  }
+
   const components: Components<CalendarEvent, object> = {
     event: ({ event }: EventProps<CalendarEvent>) => {
       if (event.type === "event") {
@@ -345,394 +362,80 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
         );
       }
     },
-    toolbar: (toolbarProps: any) => (
-      <div className="rbc-toolbar mb-4">
-        <span className="rbc-btn-group">
+    toolbar: (toolbarProps: ToolbarProps) => (
+      <div className="rbc-toolbar">
+        <div className="rbc-btn-group">
           <button
             type="button"
             onClick={() => toolbarProps.onNavigate("PREV")}
-            className="flex items-center justify-center"
+            className="flex items-center justify-center px-3 py-1"
+            title="Previous"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={() => toolbarProps.onNavigate("TODAY")}
+            className="flex items-center justify-center px-3 py-1"
+            title="Today"
           >
             Today
           </button>
           <button
             type="button"
             onClick={() => toolbarProps.onNavigate("NEXT")}
-            className="flex items-center justify-center"
+            className="flex items-center justify-center px-3 py-1"
+            title="Next"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
-        </span>
-        <span className="rbc-toolbar-label">{toolbarProps.label}</span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 inline-flex items-center justify-center"
-            onClick={() => setShowEvents(!showEvents)}
-            title={showEvents ? "Hide Events" : "Show Events"}
-          >
-            {showEvents ? (
-              <Eye className="h-4 w-4 text-blue-500" />
-            ) : (
-              <EyeOff className="h-4 w-4" />
+        </div>
+        <div className="rbc-toolbar-label">{toolbarProps.label}</div>
+        <div className="rbc-btn-group">
+          <button
+            type="button"
+            onClick={() => toolbarProps.onView("month" as View)}
+            className={cn(
+              "flex items-center justify-center px-3 py-1",
+              (toolbarProps.view as string) === "month" && "rbc-active"
             )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 inline-flex items-center justify-center"
-            onClick={() => setShowDeliverables(!showDeliverables)}
-            title={showDeliverables ? "Hide Deliverables" : "Show Deliverables"}
+            title="Month view"
           >
-            {showDeliverables ? (
-              <Eye className="h-4 w-4 text-amber-500" />
-            ) : (
-              <EyeOff className="h-4 w-4" />
+            <CalendarIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => toolbarProps.onView("week" as View)}
+            className={cn(
+              "flex items-center justify-center px-3 py-1",
+              (toolbarProps.view as string) === "week" && "rbc-active"
             )}
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0 inline-flex items-center justify-center relative"
-              >
-                <Filter className="h-4 w-4" />
-                {(eventTypeFilters.length > 0 ||
-                  deliverableEventFilters.length > 0 ||
-                  deliverablePlatformFilters.length > 0 ||
-                  deliverableTypeFilters.length > 0) && (
-                  <span className="absolute -top-1.5 -right-1.5 text-[10px] bg-blue-500 text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-                    {eventTypeFilters.length +
-                      deliverableEventFilters.length +
-                      deliverablePlatformFilters.length +
-                      deliverableTypeFilters.length}
-                  </span>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <div className="px-2 py-1.5 text-sm font-semibold flex justify-between items-center">
-                Event Types
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const allShown =
-                      eventTypeFilters.length === uniqueEventTypes.length;
-                    setEventTypeFilters(allShown ? [] : [...uniqueEventTypes]);
-                  }}
-                  className="h-6 w-6 p-0"
-                  title={
-                    eventTypeFilters.length === uniqueEventTypes.length
-                      ? "Hide All"
-                      : "Show All"
-                  }
-                >
-                  {eventTypeFilters.length === uniqueEventTypes.length ? (
-                    <Eye className="h-4 w-4" />
-                  ) : (
-                    <EyeOff className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {uniqueEventTypes.map((type) => (
-                <div
-                  key={type}
-                  className="flex items-center justify-between px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  <span className="text-sm">
-                    {type
-                      .replace(/_/g, " ")
-                      .toLowerCase()
-                      .replace(/\b\w/g, (l) => l.toUpperCase())}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEventTypeFilters((prev) =>
-                        prev.includes(type)
-                          ? prev.filter((t) => t !== type)
-                          : [...prev, type]
-                      );
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={eventTypeFilters.includes(type) ? "Hide" : "Show"}
-                  >
-                    {eventTypeFilters.includes(type) ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              ))}
-
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1.5 text-sm font-semibold flex justify-between items-center">
-                Deliverable Types
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const allShown =
-                      deliverableTypeFilters.length ===
-                      uniqueDeliverableTypes.length;
-                    if (allShown) {
-                      setDeliverableTypeFilters([]);
-                      setDeliverablePlatformFilters([]);
-                      setDeliverableEventFilters([]);
-                    } else {
-                      setDeliverableTypeFilters([...uniqueDeliverableTypes]);
-                      setDeliverablePlatformFilters([
-                        ...uniqueDeliverablePlatforms,
-                      ]);
-                      setDeliverableEventFilters([
-                        ...deliverableEventCategories,
-                      ]);
-                    }
-                  }}
-                  className="h-6 w-6 p-0"
-                  title={
-                    deliverableTypeFilters.length ===
-                    uniqueDeliverableTypes.length
-                      ? "Hide All"
-                      : "Show All"
-                  }
-                >
-                  {deliverableTypeFilters.length ===
-                  uniqueDeliverableTypes.length ? (
-                    <Eye className="h-4 w-4" />
-                  ) : (
-                    <EyeOff className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {uniqueDeliverableTypes.map((type) => (
-                <div
-                  key={type}
-                  className="flex items-center justify-between px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  <span className="text-sm">{type}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDeliverableTypeFilters((prev) => {
-                        const newFilters = prev.includes(type)
-                          ? prev.filter((t) => t !== type)
-                          : [...prev, type];
-                        if (newFilters.length === 0) {
-                          setDeliverablePlatformFilters([]);
-                          setDeliverableEventFilters([]);
-                        }
-                        return newFilters;
-                      });
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={
-                      deliverableTypeFilters.includes(type) ? "Hide" : "Show"
-                    }
-                  >
-                    {deliverableTypeFilters.includes(type) ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              ))}
-
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1.5 text-sm font-semibold flex justify-between items-center">
-                Deliverable Platforms
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const allShown =
-                      deliverablePlatformFilters.length ===
-                      uniqueDeliverablePlatforms.length;
-                    setDeliverablePlatformFilters(
-                      allShown ? [] : [...uniqueDeliverablePlatforms]
-                    );
-                    if (allShown) {
-                      setDeliverableTypeFilters([]);
-                      setDeliverableEventFilters([]);
-                    }
-                  }}
-                  className="h-6 w-6 p-0"
-                  title={
-                    deliverablePlatformFilters.length ===
-                    uniqueDeliverablePlatforms.length
-                      ? "Hide All"
-                      : "Show All"
-                  }
-                >
-                  {deliverablePlatformFilters.length ===
-                  uniqueDeliverablePlatforms.length ? (
-                    <Eye className="h-4 w-4" />
-                  ) : (
-                    <EyeOff className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {uniqueDeliverablePlatforms.map((platform) => (
-                <div
-                  key={platform}
-                  className="flex items-center justify-between px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  <span className="text-sm">{platform}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDeliverablePlatformFilters((prev) => {
-                        const newFilters = prev.includes(platform)
-                          ? prev.filter((p) => p !== platform)
-                          : [...prev, platform];
-                        if (newFilters.length === 0) {
-                          setDeliverableTypeFilters([]);
-                          setDeliverableEventFilters([]);
-                        }
-                        return newFilters;
-                      });
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={
-                      deliverablePlatformFilters.includes(platform)
-                        ? "Hide"
-                        : "Show"
-                    }
-                  >
-                    {deliverablePlatformFilters.includes(platform) ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              ))}
-
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1.5 text-sm font-semibold flex justify-between items-center">
-                Event Categories
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const allShown =
-                      deliverableEventFilters.length ===
-                      deliverableEventCategories.length;
-                    setDeliverableEventFilters(
-                      allShown ? [] : [...deliverableEventCategories]
-                    );
-                    if (allShown && deliverableTypeFilters.length > 0) {
-                      setDeliverableTypeFilters([]);
-                      setDeliverablePlatformFilters([]);
-                    }
-                  }}
-                  className="h-6 w-6 p-0"
-                  title={
-                    deliverableEventFilters.length ===
-                    deliverableEventCategories.length
-                      ? "Hide All"
-                      : "Show All"
-                  }
-                >
-                  {deliverableEventFilters.length ===
-                  deliverableEventCategories.length ? (
-                    <Eye className="h-4 w-4" />
-                  ) : (
-                    <EyeOff className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {deliverableEventCategories.map((type) => (
-                <div
-                  key={type}
-                  className="flex items-center justify-between px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  <span className="text-sm">
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDeliverableEventFilters((prev) => {
-                        const newFilters = prev.includes(type)
-                          ? prev.filter((t) => t !== type)
-                          : [...prev, type];
-                        if (
-                          newFilters.length === 0 &&
-                          deliverableTypeFilters.length > 0
-                        ) {
-                          setDeliverableTypeFilters([]);
-                          setDeliverablePlatformFilters([]);
-                        }
-                        return newFilters;
-                      });
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={
-                      deliverableEventFilters.includes(type) ? "Hide" : "Show"
-                    }
-                  >
-                    {deliverableEventFilters.includes(type) ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <span className="rbc-btn-group">
-            <button
-              type="button"
-              onClick={() => toolbarProps.onView("month")}
-              className={cn(
-                "flex items-center justify-center px-3 py-1",
-                toolbarProps.view === "month" && "rbc-active"
-              )}
-              title="Month view"
-            >
-              <CalendarIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => toolbarProps.onView("agenda")}
-              className={cn(
-                "flex items-center justify-center px-3 py-1",
-                toolbarProps.view === "agenda" && "rbc-active"
-              )}
-              title="List view"
-            >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              className="flex items-center justify-center px-3 py-1"
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </button>
-          </span>
+            title="Week view"
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => toolbarProps.onView("work_week" as View)}
+            className={cn(
+              "flex items-center justify-center px-3 py-1",
+              (toolbarProps.view as string) === "work_week" && "rbc-active"
+            )}
+            title="Work Week view"
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => toolbarProps.onView("agenda" as View)}
+            className={cn(
+              "flex items-center justify-center px-3 py-1",
+              (toolbarProps.view as string) === "agenda" && "rbc-active"
+            )}
+            title="List view"
+          >
+            <List className="h-4 w-4" />
+          </button>
         </div>
       </div>
     ),
@@ -936,12 +639,14 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
         endAccessor={(event: CalendarEvent) => event.end}
         eventPropGetter={getEventStyle}
         views={{
-          month: true,
-          agenda: true,
+          [Views.MONTH]: true,
+          [Views.WEEK]: true,
+          [Views.WORK_WEEK]: true,
+          [Views.AGENDA]: true,
         }}
         view={view}
         date={date}
-        onView={(newView: View) => setView(newView)}
+        onView={handleViewChange}
         onNavigate={(newDate: Date) => setDate(newDate)}
         min={new Date(0, 0, 0, 8, 0, 0)}
         max={new Date(0, 0, 0, 20, 0, 0)}
@@ -958,11 +663,11 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
         resizableAccessor={() => true}
         showMultiDayTimes
         popup
-        step={60}
-        timeslots={1}
         length={30}
-        defaultView="month"
+        defaultView={view}
         dayLayoutAlgorithm="no-overlap"
+        scrollToTime={new Date(0, 0, 0, 8, 0, 0)}
+        longPressThreshold={10}
         formats={{
           agendaDateFormat: "MMM d, yyyy",
           agendaTimeFormat: "h:mm a",

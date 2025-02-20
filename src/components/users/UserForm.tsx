@@ -37,6 +37,10 @@ const CREATIVE_ROLES = [
   "sound_engineer",
   "graphic_designer",
   "storyboard_artist",
+  "detailer",
+  "writer",
+  "marketing",
+  "mechanic",
 ];
 const STATUS_OPTIONS = ["active", "inactive", "suspended"];
 

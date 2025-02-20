@@ -27,13 +27,23 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useSearchParams, useRouter } from "next/navigation";
 import EventBatchTemplates from "./EventBatchTemplates";
+import { MultiSelect } from "@/components/ui/multi-select";
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
+}
 
 interface NewEvent {
   type: EventType;
   description: string;
   start: string;
   end?: string;
-  assignee: string;
+  assignees: string[];
   status: EventStatus;
   isAllDay: boolean;
 }
@@ -44,24 +54,33 @@ export default function EventsTab({ carId }: { carId: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingEvent, setIsAddingEvent] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
   const [newEvent, setNewEvent] = useState<NewEvent>({
     type: EventType.DETAIL,
     description: "",
     start: "",
     end: "",
-    assignee: "",
+    assignees: [],
     status: EventStatus.NOT_STARTED,
     isAllDay: false,
   });
 
   // Get the view from URL params or default to "list"
-  const view = searchParams.get("view") || "list";
+  const urlView = searchParams.get("view");
+  const view = urlView === "grid" ? "calendar" : urlView || "list";
 
   const updateViewInUrl = (newView: string) => {
     // Create a new URLSearchParams object from the current params
     const params = new URLSearchParams(searchParams.toString());
     // Update or add the view parameter
     params.set("view", newView);
+    // Keep other existing parameters
+    const existingParams = Array.from(searchParams.entries()).filter(
+      ([key]) => key !== "view"
+    );
+    existingParams.forEach(([key, value]) => {
+      params.set(key, value);
+    });
     // Update the URL without refreshing the page
     router.push(`?${params.toString()}`, { scroll: false });
   };
@@ -90,8 +109,10 @@ export default function EventsTab({ carId }: { carId: string }) {
         status: event.status,
         start: event.start,
         end: event.end,
-        assignee: event.assignee || "",
+        assignees: event.assignees || [],
         isAllDay: event.isAllDay || false,
+        createdAt: event.createdAt,
+        updatedAt: event.updatedAt,
       }));
 
       console.log("Transformed events:", transformedEvents); // Debug log
@@ -107,6 +128,22 @@ export default function EventsTab({ carId }: { carId: string }) {
   useEffect(() => {
     fetchEvents();
   }, [carId]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) throw new Error("Failed to fetch users");
+        const data = await response.json();
+        setUsers(data.filter((user: User) => user.status === "active"));
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const handleUpdateEvent = async (
     eventId: string,
@@ -179,7 +216,7 @@ export default function EventsTab({ carId }: { carId: string }) {
           description: newEvent.description,
           scheduled_date: newEvent.start,
           end_date: newEvent.end,
-          assignee: newEvent.assignee,
+          assignees: newEvent.assignees,
           status: newEvent.status,
           is_all_day: newEvent.isAllDay,
           car_id: carId,
@@ -194,7 +231,7 @@ export default function EventsTab({ carId }: { carId: string }) {
         description: "",
         start: "",
         end: "",
-        assignee: "",
+        assignees: [],
         status: EventStatus.NOT_STARTED,
         isAllDay: false,
       });
@@ -285,14 +322,42 @@ export default function EventsTab({ carId }: { carId: string }) {
                     />
                   </div>
                   <div>
-                    <Label>Assignee</Label>
-                    <Input
-                      value={newEvent.assignee}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, assignee: e.target.value })
-                      }
-                      placeholder="Enter assignee name"
+                    <Label>Assignees</Label>
+                    <MultiSelect
+                      value={newEvent.assignees}
+                      onChange={(values) => {
+                        console.log("Selected assignees:", values); // Debug log
+                        setNewEvent({ ...newEvent, assignees: values });
+                      }}
+                      options={users.map((user) => ({
+                        value: user.name,
+                        label: user.name,
+                      }))}
+                      placeholder="Select assignees"
                     />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={newEvent.status}
+                      onValueChange={(value) =>
+                        setNewEvent({
+                          ...newEvent,
+                          status: value as EventStatus,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(EventStatus).map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status.replace(/_/g, " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Button onClick={handleAddEvent}>Create Event</Button>
                 </div>

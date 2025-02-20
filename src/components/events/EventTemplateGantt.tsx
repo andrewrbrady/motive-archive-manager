@@ -191,7 +191,7 @@ export default function EventTemplateGantt({
                         ? "border-primary/50"
                         : "border-muted-foreground/20"
                     )}
-                    style={{ left: `${i * dayWidth}px` }}
+                    style={{ left: `${i * dayWidth + dayWidth / 2}px` }}
                   >
                     <div className="text-xs text-muted-foreground -ml-3 bg-background px-1 rounded">
                       Day {i}
@@ -208,7 +208,7 @@ export default function EventTemplateGantt({
                       ? event.daysUntilEnd || 1
                       : 1;
                     const width = duration * dayWidth;
-                    const left = event.daysFromStart * dayWidth;
+                    const left = event.daysFromStart * dayWidth + dayWidth / 2;
 
                     return (
                       <Tooltip key={index}>
@@ -236,18 +236,18 @@ export default function EventTemplateGantt({
                           >
                             <div
                               className={cn(
-                                "rounded-md p-2 text-white text-sm transition-all",
+                                "rounded-md text-white text-sm transition-all",
                                 "hover:ring-2 hover:ring-offset-2 hover:ring-offset-background",
                                 "active:ring-2 active:ring-offset-2 active:ring-offset-background",
                                 "ring-[var(--event-color)] flex items-center gap-2",
-                                dragOverIndex === index && "scale-[1.02]"
+                                dragOverIndex === index && "scale-[1.02]",
+                                "px-2 h-7"
                               )}
                               style={
                                 {
                                   backgroundColor:
                                     EVENT_TYPE_COLORS[event.type],
                                   width: "100%",
-                                  height: "28px",
                                   "--event-color":
                                     EVENT_TYPE_COLORS[event.type],
                                 } as React.CSSProperties

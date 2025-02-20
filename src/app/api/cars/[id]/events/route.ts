@@ -25,13 +25,13 @@ export async function GET(
     // Transform the events to match the Event interface
     const transformedEvents = events.map((event) => ({
       id: event._id.toString(),
-      car_id: carId, // Ensure car_id is set correctly
+      car_id: carId,
       description: event.description || "",
       type: event.type,
       status: event.status || EventStatus.NOT_STARTED,
       start: event.scheduled_date,
       end: event.end_date,
-      assignee: event.assignee || "",
+      assignees: event.assignees || [],
       isAllDay: event.is_all_day || false,
     }));
 
@@ -71,7 +71,7 @@ export async function POST(
       scheduled_date: data.start, // Used in database
       end_date: data.end, // Used in database
       is_all_day: data.isAllDay || false,
-      assignee: data.assignee || "",
+      assignees: data.assignees || [],
     };
 
     console.log("Transformed event data:", event); // Debug log
@@ -96,7 +96,7 @@ export async function POST(
       start: event.start,
       end: event.end_date,
       isAllDay: event.is_all_day,
-      assignee: event.assignee,
+      assignees: event.assignees,
     });
   } catch (error) {
     console.error("Error creating event:", error);

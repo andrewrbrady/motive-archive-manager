@@ -169,6 +169,8 @@ export default function NewDeliverableForm({
                 <SelectItem value="walkthrough">Walkthrough</SelectItem>
                 <SelectItem value="highlights">Highlights</SelectItem>
                 <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
+                <SelectItem value="Marketing Email">Marketing Email</SelectItem>
+                <SelectItem value="Blog">Blog</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>

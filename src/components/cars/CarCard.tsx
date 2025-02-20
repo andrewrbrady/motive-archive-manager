@@ -16,7 +16,7 @@ interface CarImage {
 
 interface CarCardProps {
   car: Car;
-  currentSearchParams: string;
+  currentSearchParams?: string;
 }
 
 export default function CarCard({ car, currentSearchParams }: CarCardProps) {
@@ -26,7 +26,9 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     make: car.make,
     model: car.model,
     imageIds: car.imageIds,
+    images: car.images,
     hasImageIds: Boolean(car.imageIds?.length),
+    hasImages: Boolean(car.images?.length),
   });
 
   const [primaryImage, setPrimaryImage] = useState<CarImage | null>(null);
@@ -40,6 +42,18 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       setPrimaryImage(null);
       setLoading(true);
 
+      // First check if we have direct images array
+      if (car.images?.[0]?.url) {
+        console.log("CarCard: Using direct image URL");
+        setPrimaryImage({
+          _id: car.images[0].id || car.images[0]._id,
+          url: `${car.images[0].url}/public`,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Fall back to imageIds if no direct images
       if (!car.imageIds?.[0]) {
         console.log("CarCard: No image IDs available");
         setLoading(false);
@@ -83,7 +97,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     };
 
     fetchPrimaryImage();
-  }, [car._id, car.imageIds]);
+  }, [car._id, car.imageIds, car.images]);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation

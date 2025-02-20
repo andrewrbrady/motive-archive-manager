@@ -113,6 +113,7 @@ export interface Car {
   };
   engine: Engine;
   imageIds?: string[];
+  images?: CarImage[];
   eventIds?: string[];
   horsepower?: number;
   // New fields

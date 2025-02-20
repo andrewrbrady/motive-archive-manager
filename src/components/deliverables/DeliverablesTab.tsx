@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Trash2, Check, X } from "lucide-react";
+import { Trash2, Check, X, CheckSquare, Square } from "lucide-react";
 import { toast } from "react-hot-toast";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
@@ -61,6 +61,10 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [editValue, setEditValue] = useState<string>("");
   const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectedDeliverables, setSelectedDeliverables] = useState<string[]>(
+    []
+  );
+  const [isBatchMode, setIsBatchMode] = useState(false);
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -129,6 +133,54 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     } catch (error) {
       console.error("Error deleting deliverable:", error);
       toast.error("Failed to delete deliverable");
+    }
+  };
+
+  const toggleBatchMode = () => {
+    setIsBatchMode(!isBatchMode);
+    setSelectedDeliverables([]);
+  };
+
+  const toggleDeliverableSelection = (id: string) => {
+    setSelectedDeliverables((prev) =>
+      prev.includes(id) ? prev.filter((dId) => dId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAllDeliverables = () => {
+    if (selectedDeliverables.length === deliverables.length) {
+      setSelectedDeliverables([]);
+    } else {
+      setSelectedDeliverables(deliverables.map((d) => d._id?.toString() || ""));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedDeliverables.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedDeliverables.length} deliverables?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await Promise.all(
+        selectedDeliverables.map((id) =>
+          fetch(`/api/cars/${carId}/deliverables/${id}`, {
+            method: "DELETE",
+          })
+        )
+      );
+
+      toast.success(`Deleted ${selectedDeliverables.length} deliverables`);
+
+      setSelectedDeliverables([]);
+      setIsBatchMode(false);
+      fetchDeliverables();
+    } catch (error) {
+      console.error("Error deleting deliverables:", error);
+      toast.error("Failed to delete deliverables");
     }
   };
 
@@ -542,14 +594,34 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Deliverables</h2>
         <div className="flex gap-2">
-          <BatchDeliverableForm
-            carId={Array.isArray(carId) ? carId[0] : carId}
-            onDeliverableCreated={fetchDeliverables}
-          />
-          <NewDeliverableForm
-            carId={Array.isArray(carId) ? carId[0] : carId}
-            onDeliverableCreated={fetchDeliverables}
-          />
+          {isBatchMode ? (
+            <>
+              <Button
+                variant="destructive"
+                onClick={handleBatchDelete}
+                disabled={selectedDeliverables.length === 0}
+              >
+                Delete Selected ({selectedDeliverables.length})
+              </Button>
+              <Button variant="outline" onClick={toggleBatchMode}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={toggleBatchMode}>
+                Batch Delete
+              </Button>
+              <BatchDeliverableForm
+                carId={Array.isArray(carId) ? carId[0] : carId}
+                onDeliverableCreated={fetchDeliverables}
+              />
+              <NewDeliverableForm
+                carId={Array.isArray(carId) ? carId[0] : carId}
+                onDeliverableCreated={fetchDeliverables}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -557,6 +629,22 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              {isBatchMode && (
+                <TableHead className="w-[50px]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleAllDeliverables}
+                    className="p-0"
+                  >
+                    {selectedDeliverables.length === deliverables.length ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TableHead>
+              )}
               <TableHead>Title</TableHead>
               <TableHead>Platform</TableHead>
               <TableHead>Type</TableHead>
@@ -571,19 +659,47 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell
+                  colSpan={isBatchMode ? 10 : 9}
+                  className="text-center py-8"
+                >
                   Loading deliverables...
                 </TableCell>
               </TableRow>
             ) : deliverables.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell
+                  colSpan={isBatchMode ? 10 : 9}
+                  className="text-center py-8"
+                >
                   No deliverables found. Create your first one!
                 </TableCell>
               </TableRow>
             ) : (
               deliverables.map((deliverable) => (
                 <TableRow key={deliverable._id?.toString()}>
+                  {isBatchMode && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          toggleDeliverableSelection(
+                            deliverable._id?.toString() || ""
+                          )
+                        }
+                        className="p-0"
+                      >
+                        {selectedDeliverables.includes(
+                          deliverable._id?.toString() || ""
+                        ) ? (
+                          <CheckSquare className="h-4 w-4" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  )}
                   <TableCell>{renderCell(deliverable, "title")}</TableCell>
                   <TableCell>{renderCell(deliverable, "platform")}</TableCell>
                   <TableCell>{renderCell(deliverable, "type")}</TableCell>
@@ -598,20 +714,24 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end items-center gap-2">
-                      <EditDeliverableForm
-                        deliverable={deliverable}
-                        onDeliverableUpdated={fetchDeliverables}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          handleDelete(deliverable._id?.toString() || "")
-                        }
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!isBatchMode && (
+                        <>
+                          <EditDeliverableForm
+                            deliverable={deliverable}
+                            onDeliverableUpdated={fetchDeliverables}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleDelete(deliverable._id?.toString() || "")
+                            }
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
