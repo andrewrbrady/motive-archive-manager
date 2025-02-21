@@ -241,7 +241,16 @@ interface CarFormData {
   make: string;
   model: string;
   year: number;
-  price: number | null;
+  price: {
+    listPrice: number | null;
+    soldPrice?: number | null;
+    priceHistory: Array<{
+      type: "list" | "sold";
+      price: number | null;
+      date: string;
+      notes?: string;
+    }>;
+  };
   mileage: MeasurementValue;
   color: string;
   interior_color: string;
@@ -304,6 +313,7 @@ export default function CarPage() {
   const [car, setCar] = useState<ExtendedCar | null>(null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSpecsEditMode, setIsSpecsEditMode] = useState(false);
   const [isSpecsSaving, setIsSpecsSaving] = useState(false);
@@ -520,88 +530,43 @@ export default function CarPage() {
   }, [isEditMode, id]);
 
   useEffect(() => {
-    const fetchCar = async () => {
+    const fetchCarData = async () => {
       try {
-        const response = await fetch(`/api/cars/${id}`);
-        const apiData: ApiCarResponse = await response.json();
+        setLoading(true);
+        setError(null);
 
-        // Transform the API response to match our UI requirements
-        const carData: ExtendedCar = {
-          _id: apiData._id || id,
-          make: apiData.make || "",
-          model: apiData.model || "",
-          year: apiData.year || new Date().getFullYear(),
-          price:
-            typeof apiData.price === "string"
-              ? parseFloat(apiData.price)
-              : apiData.price || 0,
-          mileage: apiData.mileage || { value: 0, unit: "mi" },
-          color: apiData.color || "",
-          interior_color: apiData.interior_color || "",
-          vin: apiData.vin || "",
-          status: apiData.status || "available",
-          condition: apiData.condition || "",
-          location: apiData.location || "",
-          description: apiData.description || "",
-          type: apiData.type || "",
-          client: apiData.client || "",
-          clientInfo: apiData.clientInfo || null,
-          // Preserve engine data exactly as received
-          engine: {
-            type: apiData.engine?.type || "Unknown",
-            displacement: apiData.engine?.displacement || {
-              value: 0,
-              unit: "L",
-            },
-            power: apiData.engine?.power || { hp: 0, kW: 0, ps: 0 },
-            torque: apiData.engine?.torque || { "lb-ft": 0, Nm: 0 },
-            features: apiData.engine?.features || [],
-            configuration: apiData.engine?.configuration,
-            cylinders: apiData.engine?.cylinders,
-            fuelType: apiData.engine?.fuelType,
-            manufacturer: apiData.engine?.manufacturer,
-          },
-          // Preserve manufacturing data
-          manufacturing: apiData.manufacturing || {},
-          // Preserve dimensions data
-          dimensions: apiData.dimensions || {},
-          // Preserve safety data
-          safety: apiData.safety || {},
-          // Preserve doors
-          doors: apiData.doors,
-          // Preserve interior features
-          interior_features: apiData.interior_features || {
-            seats: 0,
-            upholstery: "",
-          },
-          // Preserve transmission
-          transmission: apiData.transmission || { type: "" },
-          // Preserve performance data
-          performance: apiData.performance || {
-            "0_to_60_mph": null,
-            top_speed: null,
-          },
-          // Preserve AI analysis
-          aiAnalysis: apiData.aiAnalysis || {},
-          // Images
-          imageIds: apiData.images?.map((img) => img.id) || [],
-          images: apiData.images || [],
-        };
-
-        setCar(carData);
-        setLoading(false);
+        // Fetch car data
+        const carResponse = await fetch(`/api/cars/${id}`);
+        if (!carResponse.ok) {
+          throw new Error(`Failed to fetch car: ${carResponse.statusText}`);
+        }
+        const carData = await carResponse.json();
+        if (!carData) {
+          throw new Error("No car data received");
+        }
 
         // Fetch documents
         const docsResponse = await fetch(`/api/cars/${id}/documents`);
-        const docsData = await docsResponse.json();
-        setDocuments(docsData);
-      } catch (error) {
-        console.error("Error fetching car:", error);
+        if (!docsResponse.ok) {
+          console.error("Failed to fetch documents:", docsResponse.statusText);
+          // Don't throw here, just log the error as documents are not critical
+        } else {
+          const docsData = await docsResponse.json();
+          setDocuments(docsData);
+        }
+
+        setCar(carData);
+      } catch (err) {
+        console.error("Error fetching car data:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchCar();
+    if (id) {
+      fetchCarData();
+    }
   }, [id]);
 
   useEffect(() => {
@@ -628,7 +593,11 @@ export default function CarPage() {
       make: car.make || "",
       model: car.model || "",
       year: car.year || 0,
-      price: typeof car.price === "string" ? parseFloat(car.price) : car.price,
+      price: {
+        listPrice: car.price?.listPrice ?? null,
+        soldPrice: car.price?.soldPrice ?? null,
+        priceHistory: car.price?.priceHistory ?? [],
+      },
       mileage: car.mileage || { value: null, unit: "mi" },
       color: car.color || "",
       interior_color: car.interior_color || "",
@@ -640,39 +609,20 @@ export default function CarPage() {
       type: car.type || "",
       client: car.client || undefined,
       engine: {
-        type: car.engine?.type || "",
-        displacement: car.engine?.displacement || { value: null, unit: "L" },
-        power: car.engine?.power || { hp: 0, kW: 0, ps: 0 },
-        torque: car.engine?.torque || { "lb-ft": 0, Nm: 0 },
-        features: car.engine?.features || [],
+        type: car.engine?.type,
+        displacement: car.engine?.displacement,
+        power: car.engine?.power,
+        torque: car.engine?.torque,
+        features: car.engine?.features,
       },
-      dimensions: {
-        length: car.dimensions?.length || { value: null, unit: "in" },
-        width: car.dimensions?.width || { value: null, unit: "in" },
-        height: car.dimensions?.height || { value: null, unit: "in" },
-        wheelbase: car.dimensions?.wheelbase || { value: null, unit: "in" },
-        weight: car.dimensions?.weight || { value: null, unit: "lbs" },
-        gvwr: car.dimensions?.gvwr || { value: null, unit: "lbs" },
-        trackWidth: car.dimensions?.trackWidth || { value: null, unit: "in" },
-      },
-      manufacturing: {
-        series: car.manufacturing?.series || "",
-        trim: car.manufacturing?.trim || "",
-        bodyClass: car.manufacturing?.bodyClass || "",
-        plant: {
-          city: car.manufacturing?.plant?.city || "",
-          country: car.manufacturing?.plant?.country || "",
-          company: car.manufacturing?.plant?.company || "",
-        },
-      },
-      doors: car.doors || null,
+      dimensions: car.dimensions,
+      manufacturing: car.manufacturing,
+      doors: car.doors ?? null,
       interior_features: {
-        seats: car.interior_features?.seats || null,
-        upholstery: car.interior_features?.upholstery || "",
+        seats: car.interior_features?.seats ?? null,
+        upholstery: car.interior_features?.upholstery,
       },
-      transmission: {
-        type: car.transmission?.type || "",
-      },
+      transmission: car.transmission,
     };
   };
 
@@ -1307,18 +1257,25 @@ export default function CarPage() {
   };
 
   if (loading) {
-    return <CarPageSkeleton />;
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">
+          <CarPageSkeleton />
+        </main>
+      </div>
+    );
   }
 
-  if (!car) {
+  if (error || !car) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            Car not found
+        <main className="container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded">
+            {error || "Car not found"}
           </div>
-        </div>
+        </main>
       </div>
     );
   }

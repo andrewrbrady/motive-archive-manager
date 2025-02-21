@@ -10,7 +10,25 @@ const Car =
         make: String,
         model: String,
         year: Number,
-        price: Number,
+        price: {
+          listPrice: Number,
+          soldPrice: Number,
+          priceHistory: [
+            {
+              type: {
+                type: String,
+                enum: ["list", "sold"],
+                required: true,
+              },
+              price: Number,
+              date: {
+                type: Date,
+                default: Date.now,
+              },
+              notes: String,
+            },
+          ],
+        },
         mileage: {
           value: Number,
           unit: {

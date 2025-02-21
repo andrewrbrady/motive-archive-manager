@@ -9,6 +9,40 @@ if (!MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
 
+interface StandardizedCar {
+  _id: string;
+  price: {
+    listPrice: number | null;
+    soldPrice?: number | null;
+    priceHistory: Array<{
+      type: "list" | "sold";
+      price: number | null;
+      date: string;
+      notes?: string;
+    }>;
+  };
+  year: number;
+  mileage: {
+    value: number;
+    unit: string;
+  };
+  status: string;
+  imageIds: string[];
+  images: Array<{
+    _id: string;
+    car_id: string;
+    [key: string]: any;
+  }>;
+  client: string | null;
+  clientInfo: {
+    _id: string;
+    [key: string]: any;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: any;
+}
+
 interface Car {
   _id: ObjectId;
   documents: string[];
@@ -76,9 +110,11 @@ export async function GET(
     client = await getMongoClient();
     const db = client.db(DB_NAME);
 
-    console.error(`[DEBUG] GET - Fetching car with ID: ${id}`);
+    // Log the request for debugging
+    console.log("Fetching car with ID:", id);
+
     // Use aggregation to populate images
-    const car = (await db
+    const car = await db
       .collection("cars")
       .aggregate([
         { $match: { _id: objectId } },
@@ -91,66 +127,104 @@ export async function GET(
           },
         },
       ])
-      .next()) as Car | null;
+      .next();
+
+    // Log raw data for debugging
+    console.log("Raw car data:", car);
 
     if (!car) {
-      console.error(`[DEBUG] GET - Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    console.error("[DEBUG] GET - Initial car data:", {
-      _id: car._id.toString(),
-      client: car.client ? car.client.toString() : undefined,
-      clientInfo: car.clientInfo || {
-        _id: "",
-        name: "",
-        email: "",
-        phone: "",
-        address: {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          country: "",
+    try {
+      // Basic car data with defensive checks
+      const standardizedCar: StandardizedCar = {
+        ...car,
+        _id: car._id?.toString() || "unknown",
+        price: {
+          listPrice:
+            typeof car.price === "object"
+              ? car.price.listPrice
+              : typeof car.price === "string"
+              ? parseFloat(car.price)
+              : typeof car.price === "number"
+              ? car.price
+              : null,
+          soldPrice: typeof car.price === "object" ? car.price.soldPrice : null,
+          priceHistory:
+            typeof car.price === "object" ? car.price.priceHistory : [],
         },
-        businessType: "",
-      },
-    });
+        year:
+          typeof car.year === "string"
+            ? parseInt(car.year, 10)
+            : car.year || new Date().getFullYear(),
+        mileage: car.mileage
+          ? {
+              value:
+                typeof car.mileage.value === "string"
+                  ? parseFloat(car.mileage.value)
+                  : car.mileage.value || 0,
+              unit: car.mileage.unit || "mi",
+            }
+          : { value: 0, unit: "mi" },
+        status: car.status || "available",
+        imageIds: [],
+        images: [],
+        client: null,
+        clientInfo: null,
+        createdAt: "",
+        updatedAt: "",
+      };
 
-    // If the car has a client field, populate the client information
-    if (car.client && ObjectId.isValid(car.client)) {
-      console.error(
-        `[DEBUG] GET - Fetching client info for car ${id}, client ID: ${car.client}`
-      );
-      const clientDoc = await db.collection("clients").findOne({
-        _id: new ObjectId(car.client.toString()),
-      });
-
-      if (clientDoc) {
-        car.clientInfo = {
-          _id: clientDoc._id.toString(),
-          name: clientDoc.name || "",
-          email: clientDoc.email || "",
-          phone: clientDoc.phone || "",
-          address: {
-            street: "",
-            city: "",
-            state: "",
-            zipCode: "",
-            country: "",
-          },
-          businessType: clientDoc.businessType || "",
-        };
-        console.error(
-          "[DEBUG] GET - Updated car with client info:",
-          car.clientInfo
-        );
+      // Handle arrays with defensive checks
+      if (Array.isArray(car.imageIds)) {
+        standardizedCar.imageIds = car.imageIds
+          .filter((id) => id != null)
+          .map((id) => id?.toString() || "");
       }
-    }
 
-    return NextResponse.json(car);
+      if (Array.isArray(car.images)) {
+        standardizedCar.images = car.images
+          .filter((img) => img != null)
+          .map((img) => ({
+            ...img,
+            _id: img._id?.toString() || "",
+            car_id: img.car_id?.toString() || "",
+          }));
+      }
+
+      // Handle client info with defensive checks
+      standardizedCar.client = car.client?.toString() || null;
+      standardizedCar.clientInfo = car.clientInfo
+        ? {
+            ...car.clientInfo,
+            _id: car.clientInfo._id?.toString() || "",
+          }
+        : null;
+
+      // Handle dates with defensive checks
+      standardizedCar.createdAt =
+        car.createdAt instanceof Date
+          ? car.createdAt.toISOString()
+          : car.createdAt || new Date().toISOString();
+      standardizedCar.updatedAt =
+        car.updatedAt instanceof Date
+          ? car.updatedAt.toISOString()
+          : car.updatedAt || new Date().toISOString();
+
+      // Log standardized data for debugging
+      console.log("Standardized car data:", standardizedCar);
+
+      return NextResponse.json(standardizedCar);
+    } catch (error) {
+      console.error("Error standardizing car data:", error);
+      return NextResponse.json(
+        { error: "Failed to process car data" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error("[DEBUG] GET - Error fetching car:", error);
+    console.error("Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });
   } finally {
     if (client) {

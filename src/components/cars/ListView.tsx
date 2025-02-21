@@ -171,9 +171,11 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
                 </span>
               </td>
               <td className="w-[12%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
-                {typeof car.price === "number"
-                  ? `$${car.price.toLocaleString()}`
-                  : car.price}
+                {car.price &&
+                typeof car.price === "object" &&
+                car.price.listPrice
+                  ? `$${car.price.listPrice.toLocaleString()}`
+                  : "Price on request"}
               </td>
               <td className="w-[12%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
                 {car.mileage && car.mileage.value !== null
@@ -181,9 +183,9 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
                   : "-"}
               </td>
               <td className="w-[8%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
-                {typeof car.horsepower === "number"
-                  ? car.horsepower.toLocaleString()
-                  : car.horsepower || "-"}
+                {car.engine?.power?.hp
+                  ? `${car.engine.power.hp.toLocaleString()} hp`
+                  : "-"}
               </td>
               <td className="w-[10%] py-2 px-3 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
                 {car.color}

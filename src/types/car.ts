@@ -88,21 +88,57 @@ export interface CarImage {
   updatedAt: string;
 }
 
+export interface PriceHistory {
+  listPrice: number | null; // Current or most recent listing price
+  soldPrice?: number | null; // Final sale price if sold
+  priceHistory: Array<{
+    type: "list" | "sold";
+    price: number | null;
+    date: string;
+    notes?: string;
+  }>;
+}
+
 export interface Car {
-  _id?: string;
+  _id: string;
   make: string;
   model: string;
-  year: number;
-  price: number;
-  mileage: MeasurementValue;
-  color: string;
-  interior_color: string;
-  vin: string;
+  year: number | null;
+  price: PriceHistory;
+  mileage: {
+    value: number;
+    unit: string;
+  };
+  color?: string;
+  interior_color?: string;
+  vin?: string;
   status: "available" | "sold" | "pending";
-  condition: string;
-  location: string;
-  description: string;
-  type: string;
+  condition?: string;
+  location?: string;
+  description?: string;
+  type?: string;
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+    configuration?: string;
+    cylinders?: number;
+    fuelType?: string;
+    manufacturer?: string;
+    fuel_capacity?: number;
+  };
   client?: string;
   clientInfo?: {
     _id: string;
@@ -118,33 +154,56 @@ export interface Car {
     };
     businessType: string;
   };
-  engine: Engine;
-  imageIds?: string[];
-  images?: CarImage[];
-  eventIds?: string[];
-  horsepower?: number;
-  // New fields
-  safety?: SafetyFeatures;
-  dimensions?: Dimensions;
-  manufacturing?: Manufacturing;
+  manufacturing?: {
+    plant?: {
+      city?: string;
+      country?: string;
+      company?: string;
+    };
+    series?: string;
+    trim?: string;
+    bodyClass?: string;
+    body_style?: string;
+    completion_date?: string;
+    delivery_date?: string;
+  };
+  dimensions?: {
+    length?: { value: number; unit: string };
+    width?: { value: number; unit: string };
+    height?: { value: number; unit: string };
+    wheelbase?: { value: number; unit: string };
+    trackWidth?: { value: number; unit: string };
+    weight?: { value: number; unit: string };
+    gvwr?: { value: number; unit: string };
+  };
+  safety?: Record<string, any>;
   doors?: number;
-  seats?: number;
+  interior_features?: {
+    seats?: number;
+    upholstery?: string;
+    features?: string[];
+  };
   transmission?: {
-    type?: string;
+    type: string;
     speeds?: number;
   };
-  driveType?: string;
-  categories?: string[];
-  marketingHighlights?: string[];
-  aiAnalysis?: {
-    [key: string]: {
-      value: string;
-      confidence: "confirmed" | "inferred" | "suggested";
-      source: string;
-    };
+  performance?: {
+    "0_to_60_mph"?: { value: number; unit: string };
+    top_speed?: { value: number; unit: string };
   };
-  createdAt?: Date;
-  updatedAt?: Date;
+  hasArticle?: boolean;
+  lastArticleUpdate?: string;
+  listing_page?: string;
+  has_reserve?: boolean;
+  documents?: string[];
+  research_entries?: any[];
+  imageIds: string[];
+  images?: CarImage[];
+  captionIds?: string[];
+  eventIds?: string[];
+  deliverableIds?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Client {

@@ -4,6 +4,40 @@ import { Car } from "@/models/Car";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+interface StandardizedCar {
+  _id: string;
+  price: {
+    listPrice: number | null;
+    soldPrice?: number | null;
+    priceHistory: Array<{
+      type: "list" | "sold";
+      price: number | null;
+      date: string;
+      notes?: string;
+    }>;
+  };
+  year: number;
+  mileage: {
+    value: number;
+    unit: string;
+  };
+  status: string;
+  imageIds: string[];
+  images: Array<{
+    _id: string;
+    car_id: string;
+    [key: string]: any;
+  }>;
+  client: string | null;
+  clientInfo: {
+    _id: string;
+    [key: string]: any;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: any;
+}
+
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
@@ -62,22 +96,20 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const db = await getDatabase();
+    const searchParams = request.nextUrl.searchParams;
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "48");
     const skip = (page - 1) * pageSize;
 
-    // Build query based on search parameters
+    // Build query based on filters
     const query: any = {};
 
-    // Handle make filter
-    if (searchParams.get("make")) {
-      query.make = searchParams.get("make");
-    }
+    // Add make filter
+    const make = searchParams.get("make");
+    if (make) query.make = make;
 
-    // Handle year range filter
+    // Add year range filter
     const minYear = searchParams.get("minYear");
     const maxYear = searchParams.get("maxYear");
     if (minYear || maxYear) {
@@ -86,125 +118,153 @@ export async function GET(request: NextRequest) {
       if (maxYear) query.year.$lte = parseInt(maxYear);
     }
 
-    // Handle price range filter
+    // Add price range filter
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = parseInt(minPrice);
-      if (maxPrice) query.price.$lte = parseInt(maxPrice);
+      query["price.listPrice"] = {};
+      if (minPrice) query["price.listPrice"].$gte = parseFloat(minPrice);
+      if (maxPrice) query["price.listPrice"].$lte = parseFloat(maxPrice);
     }
 
-    // Handle client filter
-    if (searchParams.get("clientId")) {
-      const clientId = searchParams.get("clientId");
-      console.log("Filtering by client ID:", clientId);
-
-      // Log sample cars to understand client data structure
-      const sampleCars = await db.collection("cars").find().limit(5).toArray();
-      console.log(
-        "Sample cars client data:",
-        sampleCars.map((car) => ({
-          _id: car._id,
-          clientFields: {
-            client: car.client,
-            clientId: car.clientId,
-            clientInfo: car.clientInfo,
-            clientRef: car.clientRef,
-            owner_id: car.owner_id,
-            owner: car.owner,
-          },
-        }))
-      );
-
-      // Build query to match both ObjectId and string representations
-      const queries: { [key: string]: string | ObjectId }[] = [
-        { client: clientId }, // String match
-        { clientId: clientId },
-        { owner_id: clientId },
-        { owner: clientId },
-      ];
-
-      try {
-        const clientObjectId = new ObjectId(clientId);
-        // Add ObjectId matches
-        queries.push(
-          { client: clientObjectId },
-          { clientId: clientObjectId },
-          { "clientInfo._id": clientObjectId },
-          { clientRef: clientObjectId },
-          { owner_id: clientObjectId },
-          { owner: clientObjectId },
-          { "owner._id": clientObjectId }
-        );
-      } catch (error) {
-        console.error("Invalid ObjectId format:", error);
-        // Continue with string-based queries if ObjectId is invalid
-      }
-
-      query.$or = queries;
-      console.log("Client filter query:", JSON.stringify(query.$or, null, 2));
+    // Add client filter
+    const clientId = searchParams.get("clientId");
+    if (clientId) {
+      query.client = clientId;
     }
 
     // Get total count for pagination
     const total = await db.collection("cars").countDocuments(query);
 
-    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
-
-    // Handle sorting
+    // Add sorting
     const sortParam = searchParams.get("sort") || "createdAt_desc";
-    console.log("Sorting with parameter:", sortParam);
-
     const [sortField, sortDirection] = sortParam.split("_");
-    console.log("Sort field:", sortField, "Sort direction:", sortDirection);
-
-    const sortOptions = {
-      asc: 1 as const,
-      desc: -1 as const,
+    const sortOptions = { asc: 1, desc: -1 };
+    const sortQuery = {
+      [sortField === "createdAt" ? "_id" : sortField]:
+        sortOptions[sortDirection as keyof typeof sortOptions] || -1,
     };
 
-    // Validate sort field and direction
-    const validSortFields = ["createdAt", "price", "year"] as const;
-    const validSortDirections = ["asc", "desc"] as const;
-
-    const isValidSort =
-      validSortFields.includes(sortField as (typeof validSortFields)[number]) &&
-      validSortDirections.includes(
-        sortDirection as (typeof validSortDirections)[number]
-      );
-
-    // For "Recently Added" sorting, use _id as a fallback since it contains a timestamp
-    const sortQuery = isValidSort
-      ? sortField === "createdAt"
-        ? { _id: sortOptions[sortDirection as keyof typeof sortOptions] }
-        : {
-            [sortField]: sortOptions[sortDirection as keyof typeof sortOptions],
-          }
-      : { _id: -1 as const };
-
-    console.log("Final sort query:", sortQuery);
-
-    // Get cars with pagination and sorting
+    // Fetch cars with aggregation to include images
     const cars = await db
       .collection("cars")
-      .find(query)
-      .sort(sortQuery)
-      .skip(skip)
-      .limit(pageSize)
+      .aggregate([
+        { $match: query },
+        {
+          $lookup: {
+            from: "images",
+            localField: "imageIds",
+            foreignField: "_id",
+            as: "images",
+          },
+        },
+        { $sort: sortQuery },
+        { $skip: skip },
+        { $limit: pageSize },
+      ])
       .toArray();
 
-    console.log(`Found ${cars.length} cars for query`);
-    if (cars.length === 0) {
-      // Log a sample car to see the structure
-      const sampleCar = await db.collection("cars").findOne({});
-      console.log("Sample car client structure:", {
-        client: sampleCar?.client,
-        clientInfo: sampleCar?.clientInfo,
-      });
-    }
+    // Log the raw data for debugging
+    console.log("Raw cars data sample:", cars[0]);
+
+    // Standardize the response format with defensive checks
+    const standardizedCars = cars
+      .map((car) => {
+        try {
+          if (!car) {
+            console.warn("Encountered null or undefined car in results");
+            return null;
+          }
+
+          // Basic car data with defensive checks
+          const standardizedCar: StandardizedCar = {
+            ...car,
+            _id: car._id?.toString() || "unknown",
+            price: {
+              listPrice:
+                typeof car.price === "object"
+                  ? car.price.listPrice
+                  : typeof car.price === "string"
+                  ? parseFloat(car.price)
+                  : typeof car.price === "number"
+                  ? car.price
+                  : null,
+              soldPrice:
+                typeof car.price === "object" ? car.price.soldPrice : null,
+              priceHistory:
+                typeof car.price === "object" ? car.price.priceHistory : [],
+            },
+            year:
+              typeof car.year === "string"
+                ? parseInt(car.year, 10)
+                : car.year || new Date().getFullYear(),
+            mileage: car.mileage
+              ? {
+                  value:
+                    typeof car.mileage.value === "string"
+                      ? parseFloat(car.mileage.value)
+                      : car.mileage.value || 0,
+                  unit: car.mileage.unit || "mi",
+                }
+              : { value: 0, unit: "mi" },
+            status: car.status || "available",
+            imageIds: [],
+            images: [],
+            client: null,
+            clientInfo: null,
+            createdAt: "",
+            updatedAt: "",
+          };
+
+          // Handle arrays with defensive checks
+          if (Array.isArray(car.imageIds)) {
+            standardizedCar.imageIds = car.imageIds
+              .filter((id) => id != null)
+              .map((id) => id?.toString() || "");
+          }
+
+          if (Array.isArray(car.images)) {
+            standardizedCar.images = car.images
+              .filter((img) => img != null)
+              .map((img) => ({
+                ...img,
+                _id: img._id?.toString() || "",
+                car_id: img.car_id?.toString() || "",
+              }));
+          }
+
+          // Handle client info with defensive checks
+          standardizedCar.client = car.client?.toString() || null;
+          standardizedCar.clientInfo = car.clientInfo
+            ? {
+                ...car.clientInfo,
+                _id: car.clientInfo._id?.toString() || "",
+              }
+            : null;
+
+          // Handle dates with defensive checks
+          standardizedCar.createdAt =
+            car.createdAt instanceof Date
+              ? car.createdAt.toISOString()
+              : car.createdAt || new Date().toISOString();
+          standardizedCar.updatedAt =
+            car.updatedAt instanceof Date
+              ? car.updatedAt.toISOString()
+              : car.updatedAt || new Date().toISOString();
+
+          return standardizedCar;
+        } catch (error) {
+          console.error("Error processing car:", error, "Car data:", car);
+          return null;
+        }
+      })
+      .filter(Boolean); // Remove any null entries
+
+    // Log the standardized data for debugging
+    console.log("Standardized cars sample:", standardizedCars[0]);
 
     return NextResponse.json({
-      cars,
+      cars: standardizedCars,
       total,
       page,
       totalPages: Math.ceil(total / pageSize),

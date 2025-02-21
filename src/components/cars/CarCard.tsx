@@ -208,10 +208,14 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
         <div className="mt-2 space-y-1">
           {car.price && (
             <p className="text-sm text-text-secondary">
-              $
-              {typeof car.price === "number"
-                ? car.price.toLocaleString()
-                : car.price}
+              {car.price.listPrice !== null
+                ? `$${car.price.listPrice.toLocaleString()}`
+                : "Price on request"}
+              {car.status === "sold" && car.price.soldPrice && (
+                <span className="ml-2 text-accent-success">
+                  (Sold: ${car.price.soldPrice.toLocaleString()})
+                </span>
+              )}
             </p>
           )}
           {car.mileage && (

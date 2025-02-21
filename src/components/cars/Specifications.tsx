@@ -14,7 +14,16 @@ interface CarData {
   make: string;
   model: string;
   year: number;
-  price: string | number | null;
+  price: {
+    listPrice: number | null;
+    soldPrice?: number | null;
+    priceHistory: Array<{
+      type: "list" | "sold";
+      price: number | null;
+      date: string;
+      notes?: string;
+    }>;
+  };
   mileage?: MeasurementValue;
   color?: string | null;
   interior_color?: string;
@@ -628,30 +637,67 @@ const Specifications = ({
 
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            Price
+            List Price
           </span>
           <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="number"
-                value={localSpecs.price || car.price || ""}
+                value={
+                  localSpecs.price?.listPrice ?? car.price?.listPrice ?? ""
+                }
                 onChange={(e) =>
-                  handleInputChange(
-                    "price",
-                    e.target.value ? parseFloat(e.target.value) : ""
-                  )
+                  handleInputChange("price", {
+                    ...car.price,
+                    listPrice: e.target.value
+                      ? parseFloat(e.target.value)
+                      : null,
+                  })
                 }
                 className="w-28 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
               />
-            ) : car.price ? (
-              `$${car.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
-            ) : car.price === 0 ? (
-              "$0"
+            ) : car.price?.listPrice ? (
+              `$${car.price.listPrice
+                .toString()
+                .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
             ) : (
-              ""
+              "Price on request"
             )}
           </span>
         </div>
+
+        {car.status === "sold" && (
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Sold Price
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              {isEditMode ? (
+                <input
+                  type="number"
+                  value={
+                    localSpecs.price?.soldPrice ?? car.price?.soldPrice ?? ""
+                  }
+                  onChange={(e) =>
+                    handleInputChange("price", {
+                      ...car.price,
+                      soldPrice: e.target.value
+                        ? parseFloat(e.target.value)
+                        : null,
+                    })
+                  }
+                  className="w-28 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                />
+              ) : car.price?.soldPrice ? (
+                `$${car.price.soldPrice
+                  .toString()
+                  .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
+              ) : (
+                "Not recorded"
+              )}
+            </span>
+          </div>
+        )}
 
         {/* Engine Info */}
         {car.engine && (

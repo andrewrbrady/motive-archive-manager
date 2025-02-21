@@ -82,7 +82,16 @@ export interface CarFormData {
   make: string;
   model: string;
   year: number;
-  price: number;
+  price: {
+    listPrice: number | null;
+    soldPrice?: number | null;
+    priceHistory: Array<{
+      type: "list" | "sold";
+      price: number | null;
+      date: string;
+      notes?: string;
+    }>;
+  };
   mileage: MeasurementValue;
   color: string;
   horsepower: number;
@@ -130,7 +139,11 @@ export default function CarEntryForm({
     make: "",
     model: "",
     year: new Date().getFullYear(),
-    price: 0,
+    price: {
+      listPrice: null,
+      soldPrice: null,
+      priceHistory: [],
+    },
     mileage: { value: 0, unit: "mi" },
     color: "",
     horsepower: 0,
@@ -792,9 +805,12 @@ export default function CarEntryForm({
               <label className={labelClasses}>Price</label>
               <input
                 type="number"
-                value={formData.price}
+                value={formData.price.listPrice || ""}
                 onChange={(e) =>
-                  handleChange("price", parseInt(e.target.value))
+                  handleChange("price", {
+                    ...formData.price,
+                    listPrice: parseInt(e.target.value) || null,
+                  })
                 }
                 className={inputClasses}
                 required
