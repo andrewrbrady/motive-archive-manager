@@ -109,7 +109,14 @@ export interface Car {
     name: string;
     email: string;
     phone: string;
-    address: string;
+    address: {
+      street: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
+    businessType: string;
   };
   engine: Engine;
   imageIds?: string[];
@@ -145,7 +152,35 @@ export interface Client {
   name: string;
   email: string;
   phone: string;
-  address: string;
-  documents: string[];
-  cars: string[];
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  socialMedia: {
+    instagram: string;
+    website?: string;
+  };
+  businessType: string;
+  status: "active" | "inactive";
+  primaryContactId?: string;
+  documents: Array<{
+    _id: string;
+    type: string;
+    title: string;
+    fileName: string;
+    uploadDate: Date;
+  }>;
+  cars: Array<{
+    _id: string;
+    make: string;
+    model: string;
+    year: number;
+    vin?: string;
+    status: string;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
 }

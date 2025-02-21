@@ -3,11 +3,13 @@ import { getDatabase } from "@/lib/mongodb";
 import { EventModel } from "@/models/Event";
 import { Event } from "@/types/event";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const db = await getDatabase();
     const eventModel = new EventModel(db);
-    const searchParams = new URL(request.url).searchParams;
+    const searchParams = request.nextUrl.searchParams;
 
     // Parse query parameters
     const query: any = {};

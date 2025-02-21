@@ -3,8 +3,10 @@ import { Metadata } from "next";
 import { fetchMakes } from "@/lib/fetchMakes";
 import { fetchClients } from "@/lib/fetchClients";
 import { Car } from "@/types/car";
+import { Client } from "@/types/contact";
 import CarsPageClient from "./CarsPageClient";
 import { headers } from "next/headers";
+import { Make } from "@/lib/fetchMakes";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -111,6 +113,21 @@ export default async function CarsPage({
         fetchClients(),
       ]);
 
+    // Convert MongoDB ObjectId to string for client-side rendering
+    const formattedClients = clients.map((client) => ({
+      ...client,
+      _id: client._id.toString(),
+      primaryContactId: client.primaryContactId?.toString(),
+      documents: client.documents?.map((doc) => ({
+        ...doc,
+        _id: doc._id.toString(),
+      })),
+      cars: client.cars?.map((car) => ({
+        ...car,
+        _id: car._id.toString(),
+      })),
+    }));
+
     return (
       <CarsPageClient
         cars={cars}
@@ -121,7 +138,7 @@ export default async function CarsPage({
         isEditMode={isEditMode}
         filters={filters}
         makes={makes}
-        clients={clients}
+        clients={formattedClients}
       />
     );
   } catch (error) {

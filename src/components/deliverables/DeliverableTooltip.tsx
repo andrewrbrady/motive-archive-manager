@@ -29,6 +29,18 @@ export default function DeliverableTooltip({
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
+  // Helper function to safely format dates
+  const safeFormat = (date: any): string => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "N/A";
+      return format(d, "MMM d, yyyy");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "N/A";
+    }
+  };
+
   return (
     <HoverCard>
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
@@ -68,20 +80,14 @@ export default function DeliverableTooltip({
                       <span className="font-medium text-red-500 dark:text-red-400">
                         Deadline:
                       </span>{" "}
-                      {format(
-                        new Date(deliverable.edit_deadline),
-                        "MMM d, yyyy"
-                      )}
+                      {safeFormat(deliverable.edit_deadline)}
                     </>
                   ) : (
                     <>
                       <span className="font-medium text-green-500 dark:text-green-400">
                         Release:
                       </span>{" "}
-                      {format(
-                        new Date(deliverable.release_date),
-                        "MMM d, yyyy"
-                      )}
+                      {safeFormat(deliverable.release_date)}
                     </>
                   )}
                 </div>

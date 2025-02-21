@@ -2,22 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Car } from "@/types/car";
+import { Client } from "@/types/contact";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-
-interface Client {
-  _id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  documents: string[];
-  cars: string[];
-  instagram?: string;
-}
 
 interface MeasurementValue {
   value: number | null;
@@ -191,10 +181,11 @@ export default function CarEntryForm({
           throw new Error(`Failed to fetch clients: ${response.statusText}`);
         }
         const data = await response.json();
-        console.log("Fetched clients:", data); // For debugging
-        setClients(data);
+        console.log("Fetched clients:", data);
+        setClients(data.clients || []);
       } catch (error) {
         console.error("Error fetching clients:", error);
+        toast.error("Failed to fetch clients");
       }
     };
     fetchClients();
@@ -926,7 +917,10 @@ export default function CarEntryForm({
               >
                 <option value="">Select client</option>
                 {clients.map((client) => (
-                  <option key={client._id} value={client._id}>
+                  <option
+                    key={client._id.toString()}
+                    value={client._id.toString()}
+                  >
                     {client.name}
                   </option>
                 ))}

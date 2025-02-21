@@ -177,7 +177,6 @@ export default function BatchTemplateManager() {
           aspect_ratio: "9:16",
           daysFromStart: 0,
           daysUntilDeadline: 7,
-          daysUntilRelease: 9,
         },
       ],
     }));
@@ -195,7 +194,7 @@ export default function BatchTemplateManager() {
   const updateDeliverable = (
     index: number,
     field: keyof DeliverableTemplate,
-    value: string | number
+    value: string | number | undefined
   ) => {
     setNewTemplate((prev) => ({
       ...prev,
@@ -403,12 +402,14 @@ export default function BatchTemplateManager() {
                     <Input
                       type="number"
                       placeholder="Days to Release"
-                      value={template.daysUntilRelease}
+                      value={template.daysUntilRelease ?? ""}
                       onChange={(e) =>
                         updateDeliverable(
                           index,
                           "daysUntilRelease",
-                          e.target.value === "" ? 0 : parseInt(e.target.value)
+                          e.target.value === ""
+                            ? undefined
+                            : parseInt(e.target.value)
                         )
                       }
                     />

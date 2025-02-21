@@ -556,7 +556,14 @@ export async function POST(
         name: "",
         email: "",
         phone: "",
-        address: "",
+        address: {
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          country: "",
+        },
+        businessType: "",
       },
     };
 
@@ -597,7 +604,29 @@ export async function POST(
             name: clientInfo.name || "",
             email: clientInfo.email || "",
             phone: clientInfo.phone || "",
-            address: clientInfo.address || "",
+            address: {
+              street:
+                (clientInfo.address && typeof clientInfo.address === "object"
+                  ? clientInfo.address.street
+                  : "") || "",
+              city:
+                (clientInfo.address && typeof clientInfo.address === "object"
+                  ? clientInfo.address.city
+                  : "") || "",
+              state:
+                (clientInfo.address && typeof clientInfo.address === "object"
+                  ? clientInfo.address.state
+                  : "") || "",
+              zipCode:
+                (clientInfo.address && typeof clientInfo.address === "object"
+                  ? clientInfo.address.zipCode
+                  : "") || "",
+              country:
+                (clientInfo.address && typeof clientInfo.address === "object"
+                  ? clientInfo.address.country
+                  : "") || "",
+            },
+            businessType: clientInfo.businessType || "",
           };
 
           console.log(

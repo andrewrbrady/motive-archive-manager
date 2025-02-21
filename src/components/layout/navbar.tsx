@@ -84,6 +84,12 @@ export default function Navbar({ className }: NavbarProps) {
               >
                 Users
               </Link>
+              <Link
+                href="/clients"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              >
+                Clients
+              </Link>
             </div>
           </div>
           <div className="flex items-center space-x-6">

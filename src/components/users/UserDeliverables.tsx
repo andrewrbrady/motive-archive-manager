@@ -130,6 +130,22 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
       .join(" ");
   };
 
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return "No date set";
+
+    try {
+      const date = new Date(dateString);
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        return "Invalid date";
+      }
+      return format(date, "MMM d, yyyy");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Invalid date";
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -275,16 +291,10 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {format(
-                        new Date(deliverable.edit_deadline),
-                        "MMM d, yyyy"
-                      )}
+                      {formatDate(deliverable.edit_deadline)}
                     </TableCell>
                     <TableCell>
-                      {format(
-                        new Date(deliverable.release_date),
-                        "MMM d, yyyy"
-                      )}
+                      {formatDate(deliverable.release_date)}
                     </TableCell>
                   </TableRow>
                 ))}

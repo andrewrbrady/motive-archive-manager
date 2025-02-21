@@ -388,11 +388,11 @@ const Specifications = ({
           throw new Error(`Failed to fetch clients: ${response.statusText}`);
         }
         const data = await response.json();
-        setClients(data);
+        setClients(data.clients || []); // Extract the clients array from the response
 
         // If we have a client ID but no clientInfo, find and set the client name
-        if (car.client && !car.clientInfo && data.length > 0) {
-          const clientMatch = data.find((c) => c._id === car.client);
+        if (car.client && !car.clientInfo && data.clients?.length > 0) {
+          const clientMatch = data.clients.find((c) => c._id === car.client);
           if (clientMatch) {
             setLocalSpecs((prev) => ({
               ...prev,

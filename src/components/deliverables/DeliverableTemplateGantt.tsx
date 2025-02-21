@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { DeliverableType, Platform } from "@/types/deliverable";
+import { DeliverableTemplate, BatchTemplate } from "@/types/deliverable";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,31 +13,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { GripVertical, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface DeliverableTemplate {
-  title: string;
-  platform: Platform;
-  type: DeliverableType;
-  duration?: number;
-  aspect_ratio: string;
-  daysUntilDeadline: number;
-  daysUntilRelease: number;
-}
-
-interface BatchTemplate {
-  name: string;
-  templates: DeliverableTemplate[];
-}
-
-interface DeliverableTemplateGanttProps {
-  template: BatchTemplate;
-  onTemplateUpdate: (
-    index: number,
-    updates: Partial<DeliverableTemplate>
-  ) => void;
-  onReorder?: (fromIndex: number, toIndex: number) => void;
-}
-
-const PLATFORM_COLORS: Record<Platform, string> = {
+const PLATFORM_COLORS: Record<string, string> = {
   "Instagram Reels": "#2563eb",
   "Instagram Post": "#3b82f6",
   "Instagram Story": "#60a5fa",
@@ -60,6 +36,15 @@ const getPillContent = (
   }
   return `Release - ${deliverable.platform}`;
 };
+
+interface DeliverableTemplateGanttProps {
+  template: BatchTemplate;
+  onTemplateUpdate: (
+    index: number,
+    updates: Partial<DeliverableTemplate>
+  ) => void;
+  onReorder: (fromIndex: number, toIndex: number) => void;
+}
 
 export default function DeliverableTemplateGantt({
   template,

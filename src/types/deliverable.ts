@@ -63,7 +63,7 @@ export interface Deliverable {
   status: DeliverableStatus;
   edit_dates: Date[];
   edit_deadline: Date;
-  release_date: Date;
+  release_date?: Date;
 
   // Content Details
   target_audience?: string;
@@ -88,7 +88,7 @@ export interface DeliverableTemplate {
   aspect_ratio: string;
   daysFromStart: number;
   daysUntilDeadline: number;
-  daysUntilRelease: number;
+  daysUntilRelease?: number;
 }
 
 export interface BatchTemplate {

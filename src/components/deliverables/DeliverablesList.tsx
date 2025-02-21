@@ -493,10 +493,14 @@ export default function DeliverablesList() {
                     </span>
                   </TableCell>
                   <TableCell className="py-2">
-                    {format(new Date(deliverable.edit_deadline), "MM/dd/yy")}
+                    {deliverable.edit_deadline
+                      ? format(new Date(deliverable.edit_deadline), "MM/dd/yy")
+                      : "N/A"}
                   </TableCell>
                   <TableCell className="py-2">
-                    {format(new Date(deliverable.release_date), "MM/dd/yy")}
+                    {deliverable.release_date
+                      ? format(new Date(deliverable.release_date), "MM/dd/yy")
+                      : "N/A"}
                   </TableCell>
                   <TableCell className="py-2">
                     <div className="flex justify-end items-center gap-2">

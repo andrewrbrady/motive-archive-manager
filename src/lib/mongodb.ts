@@ -9,6 +9,9 @@ if (!process.env.MONGODB_URI) {
 const uri = process.env.MONGODB_URI;
 const options: MongoClientOptions = {};
 
+// Get database name from environment or use default
+const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+
 // Global is used here to maintain a cached connection across hot reloads
 // in development. This prevents connections growing exponentially
 // during API Route usage.
@@ -71,14 +74,15 @@ if (process.env.NODE_ENV === "development") {
 
 export async function connectToDatabase() {
   const client = await clientPromise;
-  const db = client.db("motive-archive");
+  const db = client.db(DB_NAME);
+  console.log("Connected to database:", db.databaseName);
   return { client, db };
 }
 
 // Helper function to get a typed database instance
 export async function getDatabase(): Promise<Db> {
   const client = await clientPromise;
-  return client.db(process.env.MONGODB_DB || "motive_archive");
+  return client.db(DB_NAME);
 }
 
 // Initialize Mongoose connection

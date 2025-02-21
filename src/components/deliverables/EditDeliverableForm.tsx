@@ -49,11 +49,24 @@ export default function EditDeliverableForm({
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
   const [editor, setEditor] = useState(deliverable.editor);
+
+  // Helper function to safely format dates
+  const safeFormatDate = (date: any): string => {
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+      return format(d, "yyyy-MM-dd");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "";
+    }
+  };
+
   const [editDeadline, setEditDeadline] = useState(
-    format(new Date(deliverable.edit_deadline), "yyyy-MM-dd")
+    safeFormatDate(deliverable.edit_deadline)
   );
   const [releaseDate, setReleaseDate] = useState(
-    format(new Date(deliverable.release_date), "yyyy-MM-dd")
+    safeFormatDate(deliverable.release_date)
   );
 
   useEffect(() => {
@@ -120,14 +133,8 @@ export default function EditDeliverableForm({
             duration: type === "Photo Gallery" ? 0 : duration,
             aspect_ratio: aspectRatio,
             editor,
-            edit_deadline: format(
-              new Date(editDeadline),
-              "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"
-            ),
-            release_date: format(
-              new Date(releaseDate),
-              "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"
-            ),
+            edit_deadline: new Date(editDeadline).toISOString(),
+            release_date: new Date(releaseDate).toISOString(),
           }),
         }
       );

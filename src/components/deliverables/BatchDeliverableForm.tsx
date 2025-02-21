@@ -62,9 +62,46 @@ export default function BatchDeliverableForm({
     }
   };
 
+  // Improved date validation
+  const isValidDate = (date: Date | null | undefined): boolean => {
+    return date != null && date instanceof Date && !isNaN(date.getTime());
+  };
+
+  // Enhanced safe date addition function
+  const safeAddDays = (date: Date | null | undefined, days: number): Date => {
+    if (!isValidDate(date)) {
+      return new Date(); // Return current date as fallback
+    }
+    try {
+      return addDays(date as Date, days);
+    } catch (error) {
+      console.error("Error adding days to date:", error);
+      return new Date();
+    }
+  };
+
+  // Safe date formatting function
+  const safeFormat = (
+    date: Date | null | undefined,
+    formatStr: string
+  ): string => {
+    try {
+      if (!isValidDate(date)) return "Invalid Date";
+      return format(date as Date, formatStr);
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Invalid Date";
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedBatch) {
       toast.error("Please select a batch template");
+      return;
+    }
+
+    if (!isValidDate(startDate)) {
+      toast.error("Please select a valid start date");
       return;
     }
 
@@ -75,17 +112,25 @@ export default function BatchDeliverableForm({
 
       // Create all deliverables in the batch
       const promises = batch.templates.map((template) => {
+        const deadlineDate = safeAddDays(startDate, template.daysUntilDeadline);
+        const releaseDate =
+          typeof template.daysUntilRelease === "number"
+            ? safeAddDays(startDate, template.daysUntilRelease)
+            : undefined;
+
+        if (!isValidDate(deadlineDate)) {
+          throw new Error("Invalid deadline date calculation");
+        }
+
+        if (releaseDate && !isValidDate(releaseDate)) {
+          throw new Error("Invalid release date calculation");
+        }
+
         const deliverableData = {
           ...template,
-          edit_deadline: addDays(
-            startDate,
-            template.daysUntilDeadline
-          ).toISOString(),
-          release_date: addDays(
-            startDate,
-            template.daysUntilRelease
-          ).toISOString(),
-          editor: "", // Will be assigned later
+          edit_deadline: deadlineDate.toISOString(),
+          release_date: releaseDate?.toISOString(),
+          editor: "",
           status: "not_started",
           tags: [],
           edit_dates: [],
@@ -186,18 +231,22 @@ export default function BatchDeliverableForm({
                     {template.duration ? ` - ${template.duration}s` : ""})
                     <div className="ml-6 text-xs text-muted-foreground">
                       Deadline: Day {template.daysUntilDeadline} (
-                      {format(
-                        addDays(startDate, template.daysUntilDeadline),
+                      {safeFormat(
+                        safeAddDays(startDate, template.daysUntilDeadline),
                         "PP"
                       )}
                       )
-                      <br />
-                      Release: Day {template.daysUntilRelease} (
-                      {format(
-                        addDays(startDate, template.daysUntilRelease),
-                        "PP"
+                      {typeof template.daysUntilRelease === "number" && (
+                        <>
+                          <br />
+                          Release: Day {template.daysUntilRelease} (
+                          {safeFormat(
+                            safeAddDays(startDate, template.daysUntilRelease),
+                            "PP"
+                          )}
+                          )
+                        </>
                       )}
-                      )
                     </div>
                   </li>
                 ))}

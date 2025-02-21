@@ -9,14 +9,15 @@ export async function GET() {
 
     // Convert array to record with name as key, ensuring type safety
     const templatesRecord = templates.reduce((acc, template) => {
-      // Convert MongoDB document to BatchTemplate
-      const batchTemplate: BatchTemplate = {
+      // Convert MongoDB document to BatchTemplate, preserving _id
+      const batchTemplate: BatchTemplate & { _id?: any } = {
+        _id: template._id,
         name: template.name,
         templates: template.templates,
       };
       acc[template.name] = batchTemplate;
       return acc;
-    }, {} as Record<string, BatchTemplate>);
+    }, {} as Record<string, BatchTemplate & { _id?: any }>);
 
     return NextResponse.json({ templates: templatesRecord });
   } catch (error) {
@@ -52,12 +53,14 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       // Update existing template
+      const { _id, ...templateWithoutId } = template; // Remove _id if present
       await db
         .collection("batch_templates")
-        .updateOne({ name: template.name }, { $set: template });
+        .updateOne({ name: template.name }, { $set: templateWithoutId });
     } else {
       // Create new template
-      await db.collection("batch_templates").insertOne(template);
+      const { _id, ...templateWithoutId } = template; // Remove _id if present
+      await db.collection("batch_templates").insertOne(templateWithoutId);
     }
 
     return NextResponse.json({ success: true });

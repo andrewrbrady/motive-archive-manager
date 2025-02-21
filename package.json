@@ -12,7 +12,10 @@
     "test:mongodb": "ts-node scripts/test-mongodb.ts",
     "migrate:cars": "ts-node scripts/migrate-to-atlas.ts",
     "init-batch-templates": "ts-node -r tsconfig-paths/register src/scripts/init-batch-templates.ts",
-    "migrate-event-assignees": "ts-node -r tsconfig-paths/register src/scripts/migrate-event-assignees.ts"
+    "migrate-event-assignees": "ts-node -r tsconfig-paths/register src/scripts/migrate-event-assignees.ts",
+    "create-template": "node --loader ts-node/esm scripts/create-motive-studio-template.ts",
+    "normalize:client-ids": "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/normalize-client-ids.ts",
+    "transfer-batch-templates": "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/transfer-batch-templates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
@@ -88,7 +91,7 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.16",
-    "@types/node": "^20",
+    "@types/node": "^20.17.19",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "dotenv": "^16.4.7",
@@ -99,6 +102,6 @@
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
-    "typescript": "^5"
+    "typescript": "^5.7.3"
   }
 }

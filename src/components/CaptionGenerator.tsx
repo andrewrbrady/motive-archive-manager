@@ -82,7 +82,9 @@ const fetchClientInstagram = async (clientId: string) => {
       throw new Error("Failed to fetch client");
     }
     const client = await response.json();
-    return client.instagram ? `@${client.instagram.replace(/^@/, "")}` : null;
+    return client.socialMedia?.instagram
+      ? `@${client.socialMedia.instagram.replace(/^@/, "")}`
+      : null;
   } catch (error) {
     console.error("Error fetching client Instagram:", error);
     return null;

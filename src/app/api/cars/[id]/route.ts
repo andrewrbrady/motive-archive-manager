@@ -19,7 +19,14 @@ interface Car {
     name: string;
     email: string;
     phone: string;
-    address: string;
+    address: {
+      street: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
+    businessType: string;
   };
 }
 
@@ -99,7 +106,14 @@ export async function GET(
         name: "",
         email: "",
         phone: "",
-        address: "",
+        address: {
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          country: "",
+        },
+        businessType: "",
       },
     });
 
@@ -118,7 +132,14 @@ export async function GET(
           name: clientDoc.name || "",
           email: clientDoc.email || "",
           phone: clientDoc.phone || "",
-          address: clientDoc.address || "",
+          address: {
+            street: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            country: "",
+          },
+          businessType: clientDoc.businessType || "",
         };
         console.error(
           "[DEBUG] GET - Updated car with client info:",

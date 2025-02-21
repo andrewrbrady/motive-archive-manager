@@ -15,7 +15,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import UserDeliverables from "@/components/users/UserDeliverables";
 import UserEvents from "@/components/users/UserEvents";
-import UserCalendar from "@/components/users/UserCalendar";
 
 interface User {
   _id: string;
@@ -191,21 +190,12 @@ export default function UserDashboard() {
             </CardContent>
           </Card>
 
-          {/* Tabs for Calendar, Deliverables, and Events */}
-          <Tabs defaultValue="calendar" className="space-y-4">
+          {/* Tabs for Deliverables and Events */}
+          <Tabs defaultValue="deliverables" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
               <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
               <TabsTrigger value="events">Events</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="calendar">
-              <Card>
-                <CardContent className="p-0">
-                  <UserCalendar userName={user.name} />
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="deliverables">
               <UserDeliverables userName={user.name} />

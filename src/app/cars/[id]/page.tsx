@@ -24,6 +24,7 @@ import type { Car as BaseCar, CarImage, Engine } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
 import CalendarTab from "@/components/cars/CalendarTab";
+import ProductionTab from "@/components/cars/ProductionTab";
 
 interface MeasurementValue {
   value: number | null;
@@ -102,9 +103,14 @@ interface ExtendedCar extends BaseCar {
     name: string;
     email: string;
     phone: string;
-    address: string;
-    company?: string;
-    role?: string;
+    address: {
+      street: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
+    businessType: string;
   } | null;
   interior_features?: {
     seats?: number;
@@ -1331,6 +1337,7 @@ export default function CarPage() {
             <TabsList className="mb-6">
               <TabsTrigger value="gallery">Image Gallery</TabsTrigger>
               <TabsTrigger value="specs">Specifications</TabsTrigger>
+              <TabsTrigger value="production">Production</TabsTrigger>
               <TabsTrigger value="bat">BaT Listing</TabsTrigger>
               <TabsTrigger value="captions">Social Media</TabsTrigger>
               <TabsTrigger value="service">Service History</TabsTrigger>
@@ -1394,6 +1401,10 @@ export default function CarPage() {
                 onEnrich={handleEnrichData}
                 isEnriching={isEnriching}
               />
+            </TabsContent>
+
+            <TabsContent value="production">
+              <ProductionTab carId={car._id} />
             </TabsContent>
 
             <TabsContent value="bat">

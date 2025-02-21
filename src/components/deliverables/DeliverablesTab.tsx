@@ -379,6 +379,22 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     );
   };
 
+  const isValidDate = (date: any): boolean => {
+    if (!date) return false;
+    const d = new Date(date);
+    return d instanceof Date && !isNaN(d.getTime());
+  };
+
+  const safeFormat = (date: any, formatStr: string): string => {
+    try {
+      if (!isValidDate(date)) return "N/A";
+      return format(new Date(date), formatStr);
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "N/A";
+    }
+  };
+
   const renderCell = (deliverable: Deliverable, field: keyof Deliverable) => {
     const isEditing =
       editingCell?.id === deliverable._id?.toString() &&
@@ -551,13 +567,12 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
 
     if (field === "edit_deadline" || field === "release_date") {
-      const date = new Date(deliverable[field]);
       return (
         <div
           onClick={() => handleCellClick(deliverable, field)}
           className="cursor-pointer"
         >
-          {format(date, "MMM d, yyyy")}
+          {safeFormat(deliverable[field], "MMM d, yyyy")}
         </div>
       );
     }
