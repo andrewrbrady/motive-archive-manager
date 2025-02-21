@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { Car } from "@/types/car";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronUpIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import { Trash2 } from "lucide-react";
 
@@ -23,16 +23,21 @@ type SortDirection = "asc" | "desc";
 
 export default function ListView({ cars, currentSearchParams }: ListViewProps) {
   const router = useRouter();
-  const [sortField, setSortField] = useState<SortField>("year");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const searchParams = useSearchParams();
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
+    const params = new URLSearchParams(searchParams.toString());
+    const currentSort = params.get("sort");
+    const [currentField, currentDirection] = (currentSort || "").split("_");
+
+    let newDirection: SortDirection = "asc";
+    if (currentField === field) {
+      newDirection = currentDirection === "asc" ? "desc" : "asc";
     }
+
+    params.set("sort", `${field}_${newDirection}`);
+    params.set("page", "1"); // Reset to first page when sorting changes
+    router.push(`/cars?${params.toString()}`);
   };
 
   const handleDelete = async (e: React.MouseEvent, carId: string) => {
@@ -63,28 +68,13 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
     }
   };
 
-  const sortedCars = [...cars].sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
-
-    if (typeof aValue === "number" && typeof bValue === "number") {
-      return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-    }
-
-    if (aValue === null || aValue === undefined) return 1;
-    if (bValue === null || bValue === undefined) return -1;
-
-    const aString = String(aValue).toLowerCase();
-    const bString = String(bValue).toLowerCase();
-
-    return sortDirection === "asc"
-      ? aString.localeCompare(bString)
-      : bString.localeCompare(aString);
-  });
+  // Get current sort state from URL
+  const currentSort = searchParams.get("sort") || "";
+  const [currentField, currentDirection] = currentSort.split("_");
 
   const SortIndicator = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null;
-    return sortDirection === "asc" ? (
+    if (currentField !== field) return null;
+    return currentDirection === "asc" ? (
       <ChevronUpIcon className="w-4 h-4 inline-block ml-1" />
     ) : (
       <ChevronDownIcon className="w-4 h-4 inline-block ml-1" />
@@ -151,7 +141,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-[#111111] divide-y divide-gray-200 dark:divide-gray-800">
-          {sortedCars.map((car) => (
+          {cars.map((car) => (
             <tr
               key={car._id}
               className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-black/25 transition-colors cursor-pointer"

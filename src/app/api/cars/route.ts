@@ -122,15 +122,37 @@ export async function GET(request: NextRequest) {
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
     if (minPrice || maxPrice) {
-      query["price.listPrice"] = {};
-      if (minPrice) query["price.listPrice"].$gte = parseFloat(minPrice);
-      if (maxPrice) query["price.listPrice"].$lte = parseFloat(maxPrice);
+      query.$or = [
+        // Check price.listPrice for new structure
+        {
+          "price.listPrice": {
+            ...(minPrice && { $gte: parseFloat(minPrice) }),
+            ...(maxPrice && { $lte: parseFloat(maxPrice) }),
+          },
+        },
+        // Check legacy price field for backwards compatibility
+        {
+          price: {
+            $type: "number",
+            ...(minPrice && { $gte: parseFloat(minPrice) }),
+            ...(maxPrice && { $lte: parseFloat(maxPrice) }),
+          },
+        },
+      ];
     }
 
     // Add client filter
     const clientId = searchParams.get("clientId");
     if (clientId) {
-      query.client = clientId;
+      try {
+        query.client = new ObjectId(clientId);
+      } catch (error) {
+        console.error("Invalid client ID format:", clientId);
+        return NextResponse.json(
+          { error: "Invalid client ID format" },
+          { status: 400 }
+        );
+      }
     }
 
     // Get total count for pagination
@@ -140,32 +162,97 @@ export async function GET(request: NextRequest) {
     const sortParam = searchParams.get("sort") || "createdAt_desc";
     const [sortField, sortDirection] = sortParam.split("_");
     const sortOptions = { asc: 1, desc: -1 };
-    const sortQuery = {
-      [sortField === "createdAt" ? "_id" : sortField]:
-        sortOptions[sortDirection as keyof typeof sortOptions] || -1,
+    const direction =
+      sortOptions[sortDirection as keyof typeof sortOptions] || -1;
+
+    // Map sort fields to their MongoDB field paths
+    const sortFieldMap: Record<string, string> = {
+      year: "year",
+      make: "make",
+      model: "model",
+      price: "price.listPrice",
+      mileage: "mileage.value",
+      horsepower: "engine.power.hp",
+      color: "color",
+      condition: "condition",
+      location: "location",
+      createdAt: "_id", // Using _id as a proxy for createdAt since it contains timestamp
     };
 
+    const sortQuery = {
+      [sortFieldMap[sortField] || "_id"]: direction,
+    };
+
+    // Add secondary sort by _id to ensure consistent ordering
+    if (sortField !== "createdAt") {
+      sortQuery._id = -1;
+    }
+
+    console.log("MongoDB Query:", {
+      query,
+      skip,
+      pageSize,
+      sortQuery,
+      clientId: clientId ? new ObjectId(clientId) : null,
+    });
+
     // Fetch cars with aggregation to include images
-    const cars = await db
-      .collection("cars")
-      .aggregate([
-        { $match: query },
-        {
-          $lookup: {
-            from: "images",
-            localField: "imageIds",
-            foreignField: "_id",
-            as: "images",
-          },
+    const pipeline = [
+      { $match: query },
+      {
+        $lookup: {
+          from: "images",
+          let: { imageIds: "$imageIds" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $in: [
+                    "$_id",
+                    {
+                      $cond: {
+                        if: { $isArray: "$$imageIds" },
+                        then: {
+                          $map: {
+                            input: "$$imageIds",
+                            as: "id",
+                            in: { $toObjectId: "$$id" },
+                          },
+                        },
+                        else: [],
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+          as: "images",
         },
-        { $sort: sortQuery },
-        { $skip: skip },
-        { $limit: pageSize },
-      ])
-      .toArray();
+      },
+      { $sort: sortQuery },
+      { $skip: skip },
+      { $limit: pageSize },
+    ];
+
+    console.log("Aggregation Pipeline:", JSON.stringify(pipeline, null, 2));
+
+    const cars = await db.collection("cars").aggregate(pipeline).toArray();
+
+    console.log(`Found ${cars.length} cars matching query`);
+
+    if (cars.length === 0) {
+      console.log("No cars found matching query criteria");
+      return NextResponse.json({
+        cars: [],
+        total: 0,
+        page,
+        totalPages: 0,
+      });
+    }
 
     // Log the raw data for debugging
-    console.log("Raw cars data sample:", cars[0]);
+    console.log("Raw cars data sample:", JSON.stringify(cars[0], null, 2));
 
     // Standardize the response format with defensive checks
     const standardizedCars = cars
