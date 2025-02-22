@@ -44,6 +44,10 @@ interface FiltersSectionProps {
   platforms: Platform[];
 }
 
+type FilterKey = keyof FiltersSectionProps["currentFilters"];
+type FilterValue<K extends FilterKey> =
+  FiltersSectionProps["currentFilters"][K];
+
 export function FiltersSection({
   currentFilters,
   makes,
@@ -60,7 +64,10 @@ export function FiltersSection({
     endDate: currentFilters.endDate || "",
   });
 
-  const handleFilterChange = (key: string, value: string | boolean) => {
+  const handleFilterChange = <K extends FilterKey>(
+    key: K,
+    value: FilterValue<K>
+  ) => {
     const newFilters = { ...filters };
     newFilters[key] = value;
     setFilters(newFilters);

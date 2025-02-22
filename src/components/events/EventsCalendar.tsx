@@ -5,7 +5,7 @@ import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enUS } from "date-fns/locale";
-import { Event, EventStatus, EventType } from "@/types/event";
+import { Event as ApiEvent, EventStatus, EventType } from "@/types/event";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -31,10 +31,17 @@ import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import "./calendar.css";
 import { MultiSelect } from "@/components/ui/multi-select";
 
-interface EventsCalendarProps {
-  events: Event[];
-  onUpdateEvent: (eventId: string, updates: Partial<Event>) => Promise<void>;
-  onDeleteEvent: (eventId: string) => Promise<void>;
+interface SelectOption {
+  label: string;
+  value: string;
+}
+
+interface EditingEvent extends ApiEvent {
+  tempDescription?: string;
+  tempStart?: string;
+  tempEnd?: string;
+  tempAssignees?: SelectOption[];
+  tempType?: EventType;
 }
 
 interface CalendarEvent {
@@ -42,16 +49,16 @@ interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  resource: Event;
+  resource: ApiEvent;
   allDay: boolean;
 }
 
-interface EditingEvent extends Event {
-  tempDescription?: string;
-  tempStart?: string;
-  tempEnd?: string;
-  tempAssignees?: string[];
-  tempType?: EventType;
+interface EventsCalendarProps {
+  events: ApiEvent[];
+  onUpdateEvent: (eventId: string, updates: Partial<ApiEvent>) => Promise<void>;
+  onDeleteEvent: (eventId: string) => Promise<void>;
+  selectedEventTypes?: SelectOption[];
+  onEventTypesChange?: (types: SelectOption[]) => void;
 }
 
 interface User {
@@ -61,6 +68,15 @@ interface User {
   roles: string[];
   creativeRoles: string[];
   status: string;
+}
+
+type stringOrDate = string | Date;
+
+interface EventInteractionArgs<TEvent> {
+  event: TEvent;
+  start: stringOrDate;
+  end?: stringOrDate;
+  isAllDay?: boolean;
 }
 
 const locales = {
@@ -81,6 +97,8 @@ export default function EventsCalendar({
   events,
   onUpdateEvent,
   onDeleteEvent,
+  selectedEventTypes = [],
+  onEventTypesChange,
 }: EventsCalendarProps) {
   const [view, setView] = useState<View>("month");
   const [date, setDate] = useState(new Date());
@@ -106,11 +124,11 @@ export default function EventsCalendar({
     fetchUsers();
   }, []);
 
-  const formatEventType = (type: string) => {
+  const formatEventType = (type: string): string => {
     return type
-      .replace(/_/g, " ")
-      .toLowerCase()
-      .replace(/\b\w/g, (l) => l.toUpperCase());
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   const calendarEvents = useMemo(() => {
@@ -139,29 +157,44 @@ export default function EventsCalendar({
     });
   }, [events, view]);
 
-  const getEventStyle = (event: Event) => {
-    let backgroundColor = "#374151"; // Default gray (zinc-700)
-
-    switch (event.status) {
-      case EventStatus.NOT_STARTED:
-        backgroundColor = "#374151"; // zinc-700
-        break;
-      case EventStatus.IN_PROGRESS:
-        backgroundColor = "var(--accent-hover)"; // blue-600
-        break;
-      case EventStatus.COMPLETED:
-        backgroundColor = "#059669"; // emerald-600
-        break;
+  const getEventColor = (type: EventType) => {
+    switch (type) {
+      case EventType.AUCTION_SUBMISSION:
+        return "#F43F5E"; // Rose
+      case EventType.AUCTION_LISTING:
+        return "#F59E0B"; // Amber
+      case EventType.AUCTION_END:
+        return "#10B981"; // Emerald
+      case EventType.INSPECTION:
+        return "var(--accent-primary)"; // Blue
+      case EventType.DETAIL:
+        return "#8B5CF6"; // Purple
+      case EventType.PRODUCTION:
+        return "#EC4899"; // Pink
+      case EventType.POST_PRODUCTION:
+        return "#6366F1"; // Indigo
+      case EventType.MARKETING:
+        return "#14B8A6"; // Teal
+      case EventType.PICKUP:
+        return "#F43F5E"; // Rose
+      case EventType.DELIVERY:
+        return "#0EA5E9"; // Sky
+      case EventType.OTHER:
+      default:
+        return "#6B7280"; // Gray
     }
+  };
 
+  const getEventStyle = (event: object) => {
+    const typedEvent = event as ApiEvent;
     return {
       style: {
-        backgroundColor,
-        color: "var(--background-primary)",
+        backgroundColor: getEventColor(typedEvent.type),
+        color: "#fff",
         border: "none",
         borderRadius: "4px",
-        padding: "2px 4px",
-        opacity: 0.9,
+        padding: "2px 5px",
+        opacity: typedEvent.status === EventStatus.COMPLETED ? 0.5 : 1,
       },
     };
   };
@@ -254,54 +287,50 @@ export default function EventsCalendar({
     },
   };
 
-  const handleEventDrop = async ({ event, start }: any) => {
-    try {
-      // Always update the start date
-      const updates: Partial<Event> = {
-        start: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-      };
-
-      // Only include end date if the original event actually had one
-      if (event.resource.end) {
-        // Calculate the new end date by maintaining the same duration
-        const originalStart = new Date(event.resource.start);
-        const originalEnd = new Date(event.resource.end);
-        const duration = originalEnd.getTime() - originalStart.getTime();
-        const newEnd = new Date(start.getTime() + duration);
-        updates.end = format(newEnd, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
-      }
-
-      await onUpdateEvent(event.id, updates);
-    } catch (error) {
-      console.error("Error updating event:", error);
-    }
+  const handleEventDrop = (args: EventInteractionArgs<object>) => {
+    const event = args.event as CalendarEvent;
+    const typedEvent = event.resource as ApiEvent;
+    const start =
+      typeof args.start === "string" ? new Date(args.start) : args.start;
+    onUpdateEvent(typedEvent.id, {
+      start: start.toISOString(),
+    });
   };
 
-  const handleEventResize = async ({ event, start, end }: any) => {
-    try {
-      const updates: Partial<Event> = {
-        start: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-        end: format(end, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), // Resize always sets an end date
-      };
-      await onUpdateEvent(event.id, updates);
-    } catch (error) {
-      console.error("Error updating event:", error);
-    }
+  const handleEventResize = (args: EventInteractionArgs<object>) => {
+    const event = args.event as CalendarEvent;
+    const typedEvent = event.resource as ApiEvent;
+    const start =
+      typeof args.start === "string" ? new Date(args.start) : args.start;
+    const end = args.end
+      ? typeof args.end === "string"
+        ? new Date(args.end)
+        : args.end
+      : undefined;
+    onUpdateEvent(typedEvent.id, {
+      start: start.toISOString(),
+      end: end?.toISOString(),
+    });
   };
 
   const handleSelectEvent = (event: CalendarEvent) => {
-    // Format dates to ISO string but trim off milliseconds and timezone
     const formattedStart = format(event.start, "yyyy-MM-dd'T'HH:mm");
     const formattedEnd = event.resource.end
       ? format(new Date(event.resource.end), "yyyy-MM-dd'T'HH:mm")
       : undefined;
+
+    // Convert string[] to SelectOption[]
+    const assignees = (event.resource.assignees || []).map((assignee) => ({
+      label: assignee,
+      value: assignee,
+    }));
 
     setSelectedEvent({
       ...event.resource,
       tempDescription: event.resource.description,
       tempStart: formattedStart,
       tempEnd: formattedEnd,
-      tempAssignees: event.resource.assignees,
+      tempAssignees: assignees,
       tempType: event.resource.type,
     });
     setIsEditModalOpen(true);
@@ -311,7 +340,7 @@ export default function EventsCalendar({
     if (!selectedEvent) return;
 
     try {
-      const updates: Partial<Event> = {};
+      const updates: Partial<ApiEvent> = {};
       if (selectedEvent.tempDescription !== selectedEvent.description) {
         updates.description = selectedEvent.tempDescription;
       }
@@ -321,8 +350,16 @@ export default function EventsCalendar({
       if (selectedEvent.tempEnd !== selectedEvent.end) {
         updates.end = selectedEvent.tempEnd;
       }
-      if (selectedEvent.tempAssignees !== selectedEvent.assignees) {
-        updates.assignees = selectedEvent.tempAssignees;
+      if (selectedEvent.tempAssignees) {
+        const newAssignees = selectedEvent.tempAssignees.map(
+          (option) => option.value
+        );
+        if (
+          JSON.stringify(newAssignees) !==
+          JSON.stringify(selectedEvent.assignees)
+        ) {
+          updates.assignees = newAssignees;
+        }
       }
       if (selectedEvent.tempType !== selectedEvent.type) {
         updates.type = selectedEvent.tempType;
@@ -375,54 +412,69 @@ export default function EventsCalendar({
     };
   }, []);
 
+  const handleEventClick = (
+    event: object,
+    e: React.SyntheticEvent<HTMLElement>
+  ) => {
+    const calendarEvent = event as CalendarEvent;
+    const typedEvent = calendarEvent.resource as ApiEvent;
+    setSelectedEvent(typedEvent);
+    setIsEditModalOpen(true);
+  };
+
+  const selectedTypes = selectedEventTypes;
+  const eventTypeOptions = Object.values(EventType).map((type: EventType) => ({
+    label: formatEventType(type),
+    value: type,
+  })) as SelectOption[];
+
+  const getBaseColor = (base: string): string => {
+    switch (base) {
+      case "primary":
+        return "var(--primary)";
+      case "secondary":
+        return "var(--secondary)";
+      case "accent":
+        return "var(--accent)";
+      default:
+        return base;
+    }
+  };
+
   return (
     <>
       <div
         ref={calendarRef}
         className={cn(
-          "relative w-full mb-8",
-          isFullscreen ? "h-screen" : "h-[900px]",
-          "bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
+          "relative h-full w-full overflow-hidden rounded-lg border bg-background",
+          isFullscreen && "fixed inset-0 z-50"
         )}
       >
         <DragAndDropCalendar
           localizer={localizer}
           events={calendarEvents}
-          startAccessor={(event: any) => event.start}
-          endAccessor={(event: any) => event.end}
+          view={view}
+          onView={setView}
+          date={date}
+          onNavigate={setDate}
+          min={new Date(0, 0, 0, 8, 0, 0)}
+          max={new Date(0, 0, 0, 20, 0, 0)}
+          components={components}
+          className="h-full w-full"
+          onEventDrop={handleEventDrop}
+          onEventResize={handleEventResize}
+          draggableAccessor={() => true}
+          resizable
+          selectable
+          popup
           eventPropGetter={getEventStyle}
           dayPropGetter={dayPropGetter}
+          onSelectEvent={handleEventClick}
           views={{
             month: true,
             week: true,
             day: true,
-            agenda: true,
           }}
-          view={view}
-          date={date}
-          onView={(newView: View) => setView(newView)}
-          onNavigate={(newDate: Date) => setDate(newDate)}
-          min={new Date(0, 0, 0, 8, 0, 0)}
-          max={new Date(0, 0, 0, 20, 0, 0)}
-          components={components}
-          className={cn(
-            "events-calendar h-full",
-            isFullscreen && "fullscreen-calendar",
-            "dark:dark"
-          )}
-          onEventDrop={handleEventDrop}
-          onEventResize={handleEventResize}
-          onSelectEvent={handleSelectEvent}
-          resizable
-          draggableAccessor={() => true}
-          popup={true}
-          selectable={true}
-          resizableAccessor={() => true}
-          step={30}
-          timeslots={2}
-          length={30}
-          showMultiDayTimes={true}
-          dayLayoutAlgorithm="no-overlap"
           formats={{
             agendaDateFormat: "MMM d, yyyy",
             agendaTimeFormat: "h:mm a",
@@ -479,9 +531,9 @@ export default function EventsCalendar({
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(EventType).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.replace(/_/g, " ")}
+                    {eventTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -532,7 +584,7 @@ export default function EventsCalendar({
                   onChange={(values) =>
                     setSelectedEvent({
                       ...selectedEvent,
-                      tempAssignees: values,
+                      tempAssignees: values as SelectOption[],
                     })
                   }
                   options={users.map((user) => ({
@@ -540,10 +592,6 @@ export default function EventsCalendar({
                     label: user.name,
                   }))}
                   placeholder="Select assignees"
-                  menuPortalTarget={document.body}
-                  styles={{
-                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                  }}
                 />
               </div>
               <div className="flex justify-between">

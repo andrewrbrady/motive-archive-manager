@@ -20,7 +20,7 @@ import { Plus, Edit, Trash2, Save, Copy } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-interface ShotTemplate {
+export interface ShotTemplate {
   title: string;
   description: string;
   angle?: string;

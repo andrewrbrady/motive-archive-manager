@@ -1,10 +1,24 @@
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { OpenAI } from "openai";
+import { ModelType } from "@/components/ModelSelector";
+import { RateLimiter } from "limiter";
 import { getDatabase } from "./mongodb";
 import { ObjectId } from "mongodb";
-import { RateLimiter } from "limiter";
-import { ModelType } from "@/components/ModelSelector";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Document } from "@langchain/core/documents";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import clientPromise from "./mongodb";
 import Anthropic from "@anthropic-ai/sdk";
-import OpenAI from "openai";
+
+interface SearchResult {
+  content: string;
+  metadata: {
+    carId: string;
+    fileId: string;
+    fileName: string;
+    matchType: "keyword" | "semantic" | "both";
+    score: number;
+  };
+}
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -24,24 +38,17 @@ const claudeLimiter = new RateLimiter({
   interval: "minute",
 });
 
-interface SearchResult {
-  content: string;
-  metadata: {
-    carId: string;
-    fileId: string;
-    fileName: string;
-    matchType: "keyword" | "semantic" | "both";
-    score: number;
-  };
-}
-
-// Initialize embeddings instance for semantic search with retry logic
+// Initialize embeddings model
 const embeddings = new OpenAIEmbeddings({
   openAIApiKey: process.env.OPENAI_API_KEY,
   modelName: "text-embedding-3-small",
   stripNewLines: true,
-  maxRetries: 3,
-  maxConcurrency: 5,
+});
+
+// Initialize text splitter
+const textSplitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1000,
+  chunkOverlap: 200,
 });
 
 // Initialize Anthropic client
@@ -59,8 +66,8 @@ async function callWithRateLimit<T>(
   try {
     await limiter.removeTokens(1);
     return await fn();
-  } catch (error: any) {
-    if (error.status === 429) {
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("429")) {
       console.log("Rate limit hit, waiting before retry...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return callWithRateLimit(fn, model);
@@ -183,65 +190,25 @@ function estimateTokens(text: string): number {
 }
 
 // Helper function to chunk content into smaller pieces
-function chunkContent(content: string, maxTokens: number = 4000): string[] {
-  // Split content into paragraphs
-  const paragraphs = content.split(/\n\n+/);
+function chunkContent(content: string, maxChunkSize: number): string[] {
   const chunks: string[] = [];
   let currentChunk = "";
 
-  for (const paragraph of paragraphs) {
-    const currentTokens = estimateTokens(currentChunk);
-    const paragraphTokens = estimateTokens(paragraph);
-
-    // If adding this paragraph would exceed maxTokens, start a new chunk
-    if (
-      currentTokens + paragraphTokens > maxTokens &&
-      currentChunk.length > 0
-    ) {
+  const sentences = content.split(/[.!?]+\s+/);
+  for (const sentence of sentences) {
+    if (currentChunk.length + sentence.length > maxChunkSize) {
       chunks.push(currentChunk.trim());
-      currentChunk = "";
-    }
-    currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
-
-    // If current chunk is getting close to limit, start a new one
-    // More conservative threshold at 80% of max tokens
-    if (estimateTokens(currentChunk) > maxTokens * 0.8) {
-      chunks.push(currentChunk.trim());
-      currentChunk = "";
+      currentChunk = sentence;
+    } else {
+      currentChunk += (currentChunk ? " " : "") + sentence;
     }
   }
 
-  // Add the last chunk if it's not empty
-  if (currentChunk.trim()) {
+  if (currentChunk) {
     chunks.push(currentChunk.trim());
   }
 
-  // If any chunk is still too large, split it further
-  return chunks.flatMap((chunk) => {
-    if (estimateTokens(chunk) > maxTokens) {
-      // Split on sentences if paragraph splitting wasn't enough
-      const sentences = chunk.split(/(?<=[.!?])\s+/);
-      let subChunks: string[] = [];
-      let currentSubChunk = "";
-
-      for (const sentence of sentences) {
-        // More conservative check including the new sentence
-        if (
-          estimateTokens(currentSubChunk + " " + sentence) >
-          maxTokens * 0.8
-        ) {
-          if (currentSubChunk) subChunks.push(currentSubChunk.trim());
-          currentSubChunk = sentence;
-        } else {
-          currentSubChunk += (currentSubChunk ? " " : "") + sentence;
-        }
-      }
-
-      if (currentSubChunk) subChunks.push(currentSubChunk.trim());
-      return subChunks;
-    }
-    return [chunk];
-  });
+  return chunks;
 }
 
 // Helper function to generate embedding for a chunk with retries
@@ -254,7 +221,7 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
         `Chunk too large (${estimatedTokens} estimated tokens), splitting further`
       );
       const subChunks = chunkContent(chunk, 6000);
-      const embeddings = await Promise.all(
+      const embeddingResults = await Promise.all(
         subChunks.map((subChunk) =>
           callWithRateLimit(
             () => embeddings.embedQuery(subChunk),
@@ -264,11 +231,11 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
       );
 
       // Average the embeddings of sub-chunks
-      const embeddingLength = embeddings[0].length;
+      const embeddingLength = embeddingResults[0].length;
       const averageEmbedding = new Array(embeddingLength).fill(0);
-      for (const embedding of embeddings) {
+      for (const embedding of embeddingResults) {
         for (let i = 0; i < embeddingLength; i++) {
-          averageEmbedding[i] += embedding[i] / embeddings.length;
+          averageEmbedding[i] += embedding[i] / embeddingResults.length;
         }
       }
       return averageEmbedding;
@@ -279,26 +246,27 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
       "gpt-4o-mini"
     );
   } catch (error) {
-    console.error("Error generating embedding for chunk:", error);
-    if (error.error?.message?.includes("maximum context length")) {
-      console.log("Splitting chunk further due to token limit...");
-      const subChunks = chunkContent(
-        chunk,
-        Math.floor(estimateTokens(chunk) * 0.75)
-      );
-      const embeddings = await Promise.all(
-        subChunks.map((subChunk) => generateEmbeddingForChunk(subChunk))
-      );
-
-      // Average the embeddings
-      const embeddingLength = embeddings[0].length;
-      const averageEmbedding = new Array(embeddingLength).fill(0);
-      for (const embedding of embeddings) {
-        for (let i = 0; i < embeddingLength; i++) {
-          averageEmbedding[i] += embedding[i] / embeddings.length;
+    if (error instanceof Error) {
+      console.error("Error generating embedding for chunk:", error.message);
+      if (error.message.includes("maximum context length")) {
+        console.log("Splitting chunk further due to token limit...");
+        const smallerChunks = chunkContent(
+          chunk,
+          Math.floor(chunk.length * 0.75)
+        );
+        const embeddings = await Promise.all(
+          smallerChunks.map((chunk) => generateEmbeddingForChunk(chunk))
+        );
+        // Average the embeddings
+        const embeddingLength = embeddings[0].length;
+        const averageEmbedding = new Array(embeddingLength).fill(0);
+        for (const embedding of embeddings) {
+          for (let i = 0; i < embeddingLength; i++) {
+            averageEmbedding[i] += embedding[i] / embeddings.length;
+          }
         }
+        return averageEmbedding;
       }
-      return averageEmbedding;
     }
     throw error;
   }
@@ -345,7 +313,7 @@ async function regenerateEmbedding(doc: any): Promise<void> {
     console.log(`Generating embedding for document ${doc._id}...`);
 
     // Split content into chunks if it's large
-    const chunks = chunkContent(doc.content);
+    const chunks = chunkContent(doc.content, 6000);
     console.log(`Split document into ${chunks.length} chunks`);
 
     // Generate embeddings for each chunk
@@ -506,7 +474,7 @@ Answer:`;
     }, model);
   } catch (error) {
     console.error("Error generating answer:", error);
-    if (error.message === "Rate limit exceeded") {
+    if (error instanceof Error && error.message === "Rate limit exceeded") {
       return "I apologize, but I'm currently experiencing high demand. Please try your search again in a moment.";
     }
     return "I apologize, but I encountered an error while generating an answer. Please try rephrasing your question or try again later.";
@@ -658,7 +626,7 @@ export async function prepareResearchContent(
     const db = await getDatabase();
 
     // Split content into chunks if it's large
-    const chunks = chunkContent(content);
+    const chunks = chunkContent(content, 6000);
     console.log(`Split document into ${chunks.length} chunks`);
 
     // Generate embeddings for each chunk

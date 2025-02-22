@@ -167,6 +167,7 @@ export default function CarPage() {
     indices: number[],
     deleteFromStorage: boolean = false
   ) => {
+    if (!car) return;
     try {
       const index = indices[0]; // We'll handle one image at a time for now
       const imageUrl = car.images[index];
@@ -392,7 +393,6 @@ export default function CarPage() {
                             setCar({
                               ...car,
                               engine: {
-                                type: car.engine?.type || "",
                                 ...(car.engine || {}),
                                 displacement: e.target.value,
                               },

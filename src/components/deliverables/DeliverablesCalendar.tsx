@@ -182,7 +182,9 @@ export default function DeliverablesCalendar() {
 
     deliverables.forEach((deliverable) => {
       const deadline = new Date(deliverable.edit_deadline);
-      const releaseDate = new Date(deliverable.release_date);
+      const releaseDate = deliverable.release_date
+        ? new Date(deliverable.release_date)
+        : deadline;
       const baseTitle = `${
         deliverable.car
           ? `${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model} - `
@@ -241,8 +243,9 @@ export default function DeliverablesCalendar() {
   const eventStyleGetter = (event: CalendarEvent) => {
     let backgroundColor = "";
     let className = "";
-    const status = event.resource.status;
-    const isDeadline = event.resource.isDeadline;
+    const deliverable = event.resource as Deliverable;
+    const status = deliverable.status;
+    const isDeadline = event.title.includes("Deadline");
 
     // Base color based on status
     let baseColor = "";
@@ -608,9 +611,9 @@ export default function DeliverablesCalendar() {
       <DragAndDropCalendar
         localizer={localizer}
         events={events}
-        startAccessor={(event: any) => event.start}
-        endAccessor={(event: any) => event.end}
-        eventPropGetter={eventStyleGetter}
+        startAccessor={(event) => (event as CalendarEvent).start}
+        endAccessor={(event) => (event as CalendarEvent).end}
+        eventPropGetter={(event) => eventStyleGetter(event as CalendarEvent)}
         dayPropGetter={dayPropGetter}
         views={["month", "week", "day"]}
         view={view}

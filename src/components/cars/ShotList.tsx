@@ -19,15 +19,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit, Trash2, Camera, FileText, List } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import ShotListTemplates from "./ShotListTemplates";
+import ShotListTemplates, { ShotTemplate } from "./ShotListTemplates";
 
-interface Shot {
+interface Shot extends ShotTemplate {
   id: string;
-  title: string;
-  description: string;
-  angle?: string;
-  lighting?: string;
-  notes?: string;
   completed?: boolean;
 }
 
@@ -252,29 +247,35 @@ export default function ShotList({ carId }: ShotListProps) {
     }
   };
 
-  const handleApplyTemplate = async (templateShots: Shot[]) => {
+  const handleApplyTemplate = async (templateShots: ShotTemplate[]) => {
     try {
-      const response = await fetch(`/api/cars/${carId}/shot-lists`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "New Shot List from Template",
-          description: "Created from template",
-          shots: templateShots.map((shot) => ({
-            ...shot,
-            id: crypto.randomUUID(),
-            completed: false,
-          })),
-        }),
-      });
+      const shotsWithIds = templateShots.map((shot) => ({
+        ...shot,
+        id: crypto.randomUUID(),
+        completed: false,
+      }));
+      setSelectedList((prev) => ({
+        ...prev!,
+        shots: [...prev!.shots, ...shotsWithIds],
+      }));
 
-      if (!response.ok)
-        throw new Error("Failed to create shot list from template");
+      const response = await fetch(
+        `/api/cars/${carId}/shot-lists/${selectedList?.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            shots: [...selectedList!.shots, ...shotsWithIds],
+          }),
+        }
+      );
 
-      await fetchShotLists();
-      setShowTemplates(false);
+      if (!response.ok) {
+        throw new Error("Failed to update shot list");
+      }
+
       toast.success("Template applied successfully");
     } catch (error) {
       console.error("Error applying template:", error);

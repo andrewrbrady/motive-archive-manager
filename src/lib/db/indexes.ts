@@ -1,76 +1,39 @@
-import { Db } from "mongodb";
+import { MongoClient } from "mongodb";
+import { Collections } from "@/types/mongodb";
 
-export async function createIndexes(db: Db) {
+export async function createIndexes(client: MongoClient) {
+  const db = client.db();
+  const collections: Collections = {
+    cars: db.collection("cars"),
+    images: db.collection("images"),
+    vectors: db.collection("vectors"),
+  };
+
+  // Create indexes for vectors collection
   try {
-    // Create indexes for research_files collection
-    await db.collection("research_files").createIndexes([
-      {
-        key: { carId: 1 },
-        name: "research_files_car",
-      },
-      {
-        key: { createdAt: -1 },
-        name: "research_files_date",
-      },
-    ]);
-
-    // Create vector search index for research_vectors collection
-    try {
-      await db.command({
-        createSearchIndexes: "research_vectors",
-        indexes: [
-          {
-            name: "vector_search",
-            definition: {
-              mappings: {
-                dynamic: false,
-                fields: {
-                  embedding: {
-                    dimensions: 1536,
-                    similarity: "cosine",
-                    type: "knnVector",
-                  },
-                  pageContent: {
-                    type: "string",
-                  },
-                  "metadata.carId": {
-                    type: "token",
-                  },
-                  "metadata.fileId": {
-                    type: "token",
-                  },
-                  "metadata.fileName": {
-                    type: "string",
-                  },
-                  "metadata.chunk": {
-                    type: "number",
-                  },
-                },
-              },
-            },
-          },
-        ],
-      });
-      console.log("Successfully created vector search index");
-    } catch (indexError) {
-      // Ignore vector index errors as they might require special handling
-      console.warn("Vector index creation skipped:", indexError.message);
+    await collections.vectors.createIndex({ vector: 1 });
+  } catch (indexError) {
+    // Ignore vector index errors as they might require special handling
+    if (indexError instanceof Error) {
+      console.warn(
+        "Warning: Failed to create vector index:",
+        indexError.message
+      );
+    } else {
+      console.warn("Warning: Failed to create vector index:", indexError);
     }
-
-    // Create indexes for images collection
-    await db.collection("images").createIndexes([
-      {
-        key: { carId: 1 },
-        name: "images_car",
-      },
-      {
-        key: { createdAt: -1 },
-        name: "images_date",
-      },
-    ]);
-
-    console.log("Successfully created/verified indexes for collections");
-  } catch (error) {
-    console.warn("Some indexes already exist:", error.message);
   }
+
+  // Create indexes for images collection
+  try {
+    await collections.images.createIndex({ carId: 1 });
+  } catch (indexError) {
+    if (indexError instanceof Error) {
+      console.error("Error: Failed to create image index:", indexError.message);
+    } else {
+      console.error("Error: Failed to create image index:", indexError);
+    }
+  }
+
+  console.log("Successfully created/verified indexes for collections");
 }

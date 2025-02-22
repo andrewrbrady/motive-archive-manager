@@ -202,7 +202,10 @@ interface ClientInfo {
 }
 
 interface CarFormData extends CarData {
-  // Add any form-specific fields here
+  // Add form-specific fields here
+  _id: string;
+  images?: CarImage[];
+  status: "available" | "sold" | "pending";
 }
 
 interface BaTCarDetails {
@@ -381,7 +384,13 @@ const toCarFormData = (car: ExtendedCar): CarFormData => {
         name: car.clientInfo.name,
         email: car.clientInfo.email,
         phone: car.clientInfo.phone,
-        address: `${car.clientInfo.address.street}, ${car.clientInfo.address.city}, ${car.clientInfo.address.state} ${car.clientInfo.address.zipCode}, ${car.clientInfo.address.country}`,
+        address: car.clientInfo.address
+          ? `${car.clientInfo.address.street || ""}, ${
+              car.clientInfo.address.city || ""
+            }, ${car.clientInfo.address.state || ""} ${
+              car.clientInfo.address.zipCode || ""
+            }, ${car.clientInfo.address.country || ""}`
+          : undefined,
         company: car.clientInfo.businessType,
       }
     : undefined;

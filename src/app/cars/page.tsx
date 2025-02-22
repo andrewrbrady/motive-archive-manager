@@ -118,11 +118,11 @@ export default async function CarsPage({
       ...client,
       _id: client._id.toString(),
       primaryContactId: client.primaryContactId?.toString(),
-      documents: client.documents?.map((doc) => ({
+      documents: (client.documents || []).map((doc) => ({
         ...doc,
         _id: doc._id.toString(),
       })),
-      cars: client.cars?.map((car) => ({
+      cars: (client.cars || []).map((car) => ({
         ...car,
         _id: car._id.toString(),
       })),

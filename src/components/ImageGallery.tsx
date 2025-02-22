@@ -79,6 +79,15 @@ interface ImageGalleryProps {
   onImageProgress?: (progress: UploadProgress) => void;
 }
 
+interface Filters {
+  angle?: string;
+  description?: string;
+  movement?: string;
+  tod?: string;
+  view?: string;
+  side?: string;
+}
+
 // Common classes for consistent styling
 const skeletonClasses =
   "bg-background-secondary dark:bg-background-secondary rounded-lg relative w-full";
@@ -114,13 +123,7 @@ export function ImageGallery({
   const [currentPage, setCurrentPage] = useState(1);
   const [isMainVisible, setIsMainVisible] = useState(true);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
-  const [filters, setFilters] = useState<{
-    angle?: string;
-    movement?: string;
-    tod?: string;
-    view?: string;
-    side?: string;
-  }>({});
+  const [filters, setFilters] = useState<Filters>({});
   const mainImageRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
@@ -225,7 +228,7 @@ export function ImageGallery({
   }, [filteredImages.length, mainIndex, currentPage, itemsPerPage]);
 
   const handleFilterChange = (
-    key: keyof ImageMetadata,
+    key: keyof Filters,
     value: string | undefined
   ) => {
     setFilters((prev) => ({

@@ -86,14 +86,17 @@ export async function vectorizeResearchFile(
 
     // Generate embeddings
     console.log("Generating embeddings...");
+    const validDocuments = documents.filter(
+      (doc): doc is NonNullable<typeof doc> => doc !== null
+    );
     const embeddingResults = await embeddings.embedDocuments(
-      documents.map((doc) => doc.pageContent)
+      validDocuments.map((doc) => doc.pageContent)
     );
     console.log(`Generated ${embeddingResults.length} embeddings`);
 
     // Insert documents with embeddings directly
     console.log("Adding documents to vector store...");
-    const documentsToInsert = documents.map((doc, i) => ({
+    const documentsToInsert = validDocuments.map((doc, i) => ({
       embedding: embeddingResults[i],
       metadata: doc.metadata,
       pageContent: doc.pageContent,

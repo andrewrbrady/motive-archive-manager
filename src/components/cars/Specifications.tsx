@@ -343,7 +343,7 @@ const Specifications = ({
         return {
           ...prev,
           [parent]: {
-            ...(prev[parent] || {}),
+            ...((prev as any)[parent] || {}),
             [child]: value,
           },
         };
@@ -364,7 +364,7 @@ const Specifications = ({
     setLocalSpecs((prev) => ({
       ...prev,
       [parent]: {
-        ...(prev[parent] || {}),
+        ...((prev as Record<string, any>)[parent] || {}),
         [field]: value,
       },
     }));
@@ -403,9 +403,11 @@ const Specifications = ({
         const data = await response.json();
         setClients(data.clients || []); // Extract the clients array from the response
 
-        // If we have a client ID but no clientInfo, find and set the client name
+        // If we have a client ID but no clientInfo and we have clients data
         if (car.client && !car.clientInfo && data.clients?.length > 0) {
-          const clientMatch = data.clients.find((c) => c._id === car.client);
+          const clientMatch = data.clients.find(
+            (c: Client) => c._id === car.client
+          );
           if (clientMatch) {
             setLocalSpecs((prev) => ({
               ...prev,

@@ -68,14 +68,13 @@ export function VehicleCard({
 
   // Determine the link URL and target based on variant
   const linkProps = {
-    href: auction
-      ? auction.link
-      : variant === "inventory"
-      ? inventory?.url
-      : `/cars/${car?._id}${
-          currentSearchParams ? `?${currentSearchParams}` : ""
-        }`,
-    target: showExternalLink ? "_blank" : undefined,
+    href:
+      variant === "car"
+        ? `/cars/${(vehicle as Car)._id}${currentSearchParams || ""}`
+        : variant === "inventory"
+        ? (vehicle as InventoryItem).url
+        : (vehicle as Auction).link,
+    target: variant === "car" ? undefined : "_blank",
   };
 
   // Get the image URL based on variant
@@ -94,16 +93,18 @@ export function VehicleCard({
 
   return (
     <div className="bg-background rounded-lg border border-border-primary overflow-hidden">
-      <Link {...linkProps}>
-        <div className="relative aspect-[16/9]">
-          <CardImage
-            src={imageUrl}
-            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            priority={variant === "car"}
-          />
-        </div>
-      </Link>
+      {linkProps.href && (
+        <Link href={linkProps.href} target={linkProps.target}>
+          <div className="relative aspect-[16/9]">
+            <CardImage
+              src={imageUrl}
+              alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              priority={variant === "car"}
+            />
+          </div>
+        </Link>
+      )}
 
       <div className="divide-y divide-border-primary">
         {/* Combined Year Make Model */}

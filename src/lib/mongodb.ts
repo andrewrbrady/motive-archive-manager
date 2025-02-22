@@ -12,14 +12,24 @@ const options: MongoClientOptions = {};
 // Get database name from environment or use default
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
+// Define the type for cached mongoose connection
+interface MongooseCache {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+}
+
+// Extend the global object type
+declare global {
+  // We need to use var here because let/const are not allowed in global scope
+  // eslint-disable-next-line no-var
+  var mongoose: MongooseCache | undefined;
+}
+
 // Global is used here to maintain a cached connection across hot reloads
 // in development. This prevents connections growing exponentially
 // during API Route usage.
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
+const cached: MongooseCache = global.mongoose || { conn: null, promise: null };
+global.mongoose = cached;
 
 // For Mongoose ORM connection (used by models)
 export async function dbConnect() {
@@ -57,7 +67,7 @@ let clientPromise: Promise<MongoClient>;
 if (process.env.NODE_ENV === "development") {
   // In development mode, use a global variable so that the value
   // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  let globalWithMongo = global as typeof globalThis & {
+  const globalWithMongo = global as typeof globalThis & {
     _mongoClientPromise?: Promise<MongoClient>;
   };
 

@@ -1,4 +1,10 @@
 import { getDatabase } from "../lib/mongodb";
+import { IndexDirection } from "mongodb";
+
+interface IndexDefinition {
+  key: { [key: string]: IndexDirection };
+  name: string;
+}
 
 async function setupDeliverables() {
   try {
@@ -9,7 +15,7 @@ async function setupDeliverables() {
     console.log("Created deliverables collection");
 
     // Create indexes
-    const indexes = [
+    const indexes: IndexDefinition[] = [
       { key: { car_id: 1 }, name: "car_id_idx" },
       { key: { status: 1 }, name: "status_idx" },
       { key: { platform: 1 }, name: "platform_idx" },

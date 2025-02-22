@@ -1,4 +1,5 @@
 import { getCache, setCache } from "./cache";
+import { AIImageAnalysis } from "@/types/car";
 
 export interface ImageMetadata {
   angle?: string;
@@ -7,14 +8,12 @@ export interface ImageMetadata {
   tod?: string;
   view?: string;
   side?: string;
-  aiAnalysis?: {
-    angle?: string;
-    description?: string;
-    movement?: string;
-    tod?: string;
-    view?: string;
-    side?: string;
-  };
+  aiAnalysis?: AIImageAnalysis;
+  [key: string]:
+    | string
+    | { [key: string]: string | undefined }
+    | AIImageAnalysis
+    | undefined;
 }
 
 interface CloudflareImageResponse {

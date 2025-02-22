@@ -45,12 +45,18 @@ import { Button } from "@/components/ui/button";
 import InfiniteMonthView from "./InfiniteMonthView";
 import { Separator } from "@/components/ui/separator";
 
-// Create DnD Calendar
-const DragAndDropCalendar = withDragAndDrop(Calendar);
+// Create DnD Calendar with proper typing
+const DragAndDropCalendar = withDragAndDrop<CalendarEvent, object>(
+  Calendar as any
+);
 
 interface CalendarTabProps {
   carId: string;
 }
+
+type DeliverableWithEventType = Deliverable & {
+  eventType: "deadline" | "release";
+};
 
 interface CalendarEvent {
   id: string;
@@ -58,7 +64,7 @@ interface CalendarEvent {
   start: Date;
   end: Date;
   type: "event" | "deliverable";
-  resource: Event | Deliverable;
+  resource: Event | DeliverableWithEventType;
   allDay: boolean;
 }
 
@@ -158,18 +164,20 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
               eventTypeFilters.length === 0 ||
               eventTypeFilters.includes(event.type)
           )
-          .map((event) => ({
-            id: event.id,
-            title: event.type
-              .replace(/_/g, " ")
-              .toLowerCase()
-              .replace(/\b\w/g, (l) => l.toUpperCase()),
-            start: new Date(event.start),
-            end: event.end ? new Date(event.end) : new Date(event.start),
-            type: "event",
-            resource: event,
-            allDay: event.isAllDay || !event.end || view === "month",
-          }))
+          .map(
+            (event): CalendarEvent => ({
+              id: event.id,
+              title: event.type
+                .replace(/_/g, " ")
+                .toLowerCase()
+                .replace(/\b\w/g, (l) => l.toUpperCase()),
+              start: new Date(event.start),
+              end: event.end ? new Date(event.end) : new Date(event.start),
+              type: "event",
+              resource: event,
+              allDay: event.isAllDay || !event.end || view === "month",
+            })
+          )
       : [];
 
     const deliverableItems: CalendarEvent[] = showDeliverables
@@ -181,37 +189,47 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
               (deliverableTypeFilters.length === 0 ||
                 deliverableTypeFilters.includes(deliverable.type))
           )
-          .flatMap((deliverable) => {
-            const items = [];
+          .flatMap((deliverable): CalendarEvent[] => {
+            const items: CalendarEvent[] = [];
 
             if (
               deliverableEventFilters.length === 0 ||
               deliverableEventFilters.includes("deadline")
             ) {
-              items.push({
+              const deadlineEvent: CalendarEvent = {
                 id: `${deliverable._id?.toString()}-deadline`,
                 title: `${deliverable.title} (Edit Deadline)`,
                 start: new Date(deliverable.edit_deadline),
                 end: new Date(deliverable.edit_deadline),
                 type: "deliverable",
-                resource: { ...deliverable, eventType: "deadline" },
+                resource: {
+                  ...deliverable,
+                  eventType: "deadline",
+                } as DeliverableWithEventType,
                 allDay: true,
-              });
+              };
+              items.push(deadlineEvent);
             }
 
             if (
               deliverableEventFilters.length === 0 ||
               deliverableEventFilters.includes("release")
             ) {
-              items.push({
-                id: `${deliverable._id?.toString()}-release`,
-                title: `${deliverable.title} (Release)`,
-                start: new Date(deliverable.release_date),
-                end: new Date(deliverable.release_date),
-                type: "deliverable",
-                resource: { ...deliverable, eventType: "release" },
-                allDay: true,
-              });
+              if (deliverable.release_date) {
+                const releaseEvent: CalendarEvent = {
+                  id: `${deliverable._id?.toString()}-release`,
+                  title: `${deliverable.title} (Release)`,
+                  start: new Date(deliverable.release_date),
+                  end: new Date(deliverable.release_date),
+                  type: "deliverable",
+                  resource: {
+                    ...deliverable,
+                    eventType: "release",
+                  } as DeliverableWithEventType,
+                  allDay: true,
+                };
+                items.push(releaseEvent);
+              }
             }
 
             return items;
@@ -262,9 +280,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       };
     } else {
       // Deliverable styling
-      const deliverableResource = event.resource as Deliverable & {
-        eventType?: "deadline" | "release";
-      };
+      const deliverableResource = event.resource as DeliverableWithEventType;
       let backgroundColor = "#d97706"; // Default amber-600
 
       if (deliverableResource.eventType === "deadline") {
@@ -810,79 +826,80 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
   }
 
   return (
-    <div
-      ref={calendarRef}
-      className={cn(
-        "relative w-full",
-        isFullscreen ? "h-screen" : "h-[900px]",
-        "bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
-      )}
-    >
-      <DragAndDropCalendar
-        localizer={localizer}
-        events={filteredCalendarEvents}
-        startAccessor={(event: CalendarEvent) => event.start}
-        endAccessor={(event: CalendarEvent) => event.end}
-        eventPropGetter={getEventStyle}
-        views={{
-          [Views.MONTH]: true,
-          [Views.WEEK]: true,
-          [Views.WORK_WEEK]: true,
-          [Views.AGENDA]: true,
-        }}
-        view={view}
-        date={date}
-        onView={handleViewChange}
-        onNavigate={(newDate: Date) => setDate(newDate)}
-        min={new Date(0, 0, 0, 8, 0, 0)}
-        max={new Date(0, 0, 0, 20, 0, 0)}
-        components={components}
+    <div className="flex h-full flex-col space-y-4">
+      <div
+        ref={calendarRef}
         className={cn(
-          "events-calendar h-full",
-          isFullscreen && "fullscreen-calendar"
+          "flex-1 overflow-hidden rounded-lg border bg-background shadow-sm",
+          isFullscreen && "h-screen w-screen"
         )}
-        onEventDrop={handleEventDrop}
-        onEventResize={handleEventResize}
-        resizable
-        selectable
-        draggableAccessor={() => true}
-        resizableAccessor={(event: CalendarEvent) => !event.allDay}
-        showMultiDayTimes
-        popup
-        timeslots={2}
-        step={30}
-        defaultView={view}
-        dayLayoutAlgorithm="no-overlap"
-        scrollToTime={new Date(0, 0, 0, 8, 0, 0)}
-        longPressThreshold={10}
-        formats={{
-          timeGutterFormat: (date: Date, culture?: string, localizer?: any) => {
-            return format(date, "h aa").toLowerCase();
-          },
-          agendaDateFormat: "MMM d, yyyy",
-          agendaTimeFormat: "h:mm a",
-          agendaTimeRangeFormat: ({ start, end }) => {
-            if (start.getDate() === end.getDate()) {
-              return `${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
-            }
-            return `${format(start, "MMM d h:mm a")} - ${format(
-              end,
-              "MMM d h:mm a"
-            )}`;
-          },
-        }}
-        messages={{
-          allDay: "All Day",
-          date: "Date",
-          time: "Time",
-          event: "Event",
-          noEventsInRange: "No events in this range.",
-          showMore: (total) => `+${total} more`,
-          tomorrow: "Tomorrow",
-          today: "Today",
-          agenda: "List",
-        }}
-      />
+      >
+        <DragAndDropCalendar
+          localizer={localizer}
+          events={filteredCalendarEvents}
+          startAccessor="start"
+          endAccessor="end"
+          eventPropGetter={(event) => getEventStyle(event as CalendarEvent)}
+          views={{
+            [Views.MONTH]: true,
+            [Views.WEEK]: true,
+            [Views.WORK_WEEK]: true,
+            [Views.AGENDA]: true,
+          }}
+          view={view}
+          date={date}
+          onView={handleViewChange}
+          onNavigate={(newDate: Date) => setDate(newDate)}
+          min={new Date(0, 0, 0, 8, 0, 0)}
+          max={new Date(0, 0, 0, 20, 0, 0)}
+          components={components}
+          className={cn(
+            "events-calendar h-full",
+            isFullscreen && "fullscreen-calendar"
+          )}
+          onEventDrop={(args) => handleEventDrop(args as DragDropEventArgs)}
+          onEventResize={(args) => handleEventResize(args as ResizeEventArgs)}
+          resizable
+          selectable
+          draggableAccessor={() => true}
+          resizableAccessor={(event) => !(event as CalendarEvent).allDay}
+          showMultiDayTimes
+          popup
+          timeslots={2}
+          step={30}
+          defaultView={view}
+          dayLayoutAlgorithm="no-overlap"
+          scrollToTime={new Date(0, 0, 0, 8, 0, 0)}
+          longPressThreshold={10}
+          formats={{
+            timeGutterFormat: (date: Date) => {
+              return format(date, "h aa").toLowerCase();
+            },
+            agendaDateFormat: "MMM d, yyyy",
+            agendaTimeFormat: "h:mm a",
+            agendaTimeRangeFormat: ({ start, end }) => {
+              if (start.getDate() === end.getDate()) {
+                return `${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
+              }
+              return `${format(start, "MMM d h:mm a")} - ${format(
+                end,
+                "MMM d h:mm a"
+              )}`;
+            },
+          }}
+          messages={{
+            allDay: "All Day",
+            date: "Date",
+            time: "Time",
+            event: "Event",
+            noEventsInRange: "No events in this range.",
+            showMore: (total) => `+${total} more`,
+            tomorrow: "Tomorrow",
+            today: "Today",
+            agenda: "List",
+          }}
+        />
+      </div>
     </div>
   );
 }

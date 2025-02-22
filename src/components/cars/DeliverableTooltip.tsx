@@ -50,7 +50,8 @@ export default function DeliverableTooltip({
               </div>
               <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
                 <Clock className="mr-2 h-4 w-4" />
-                {format(new Date(deliverable.release_date), "MMM d, yyyy")}
+                {deliverable.release_date &&
+                  format(new Date(deliverable.release_date), "MMM d, yyyy")}
               </div>
             </div>
           </div>

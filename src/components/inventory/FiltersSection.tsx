@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Dealer } from "@/lib/fetchDealers";
 import { Make } from "@/lib/fetchMakes";
 import {
@@ -32,6 +32,22 @@ interface FiltersSectionProps {
   makes: Make[];
 }
 
+interface Filters {
+  make: string;
+  model: string;
+  dealer: string;
+  minPrice: string;
+  maxPrice: string;
+  minMileage: string;
+  maxMileage: string;
+  minYear: string;
+  maxYear: string;
+  transmission: string;
+  color: string;
+  interior_color: string;
+  [key: string]: string; // Add index signature
+}
+
 export default function FiltersSection({
   currentFilters,
   _dealers,
@@ -39,7 +55,22 @@ export default function FiltersSection({
 }: FiltersSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [filters, setFilters] = React.useState(currentFilters);
+  const pathname = usePathname();
+
+  const [filters, setFilters] = useState<Filters>({
+    make: "",
+    model: "",
+    dealer: "",
+    minPrice: "",
+    maxPrice: "",
+    minMileage: "",
+    maxMileage: "",
+    minYear: "",
+    maxYear: "",
+    transmission: "",
+    color: "",
+    interior_color: "",
+  });
 
   const transmissions = ["All Types", "Automatic", "Manual", "DCT"];
 
@@ -49,7 +80,7 @@ export default function FiltersSection({
     (currentYear - i).toString()
   );
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key: keyof Filters, value: string) => {
     const newFilters = { ...filters };
     newFilters[key] = value;
     setFilters(newFilters);

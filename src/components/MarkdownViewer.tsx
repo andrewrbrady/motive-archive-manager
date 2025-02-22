@@ -14,6 +14,9 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import { Components } from "react-markdown";
+import type { ComponentPropsWithoutRef } from "react";
+import { cn } from "@/lib/utils";
 
 interface MarkdownViewerProps {
   content: string;
@@ -21,9 +24,8 @@ interface MarkdownViewerProps {
   onFocusFileList?: () => void;
 }
 
-interface CodeBlockProps {
-  className?: string;
-  children: React.ReactNode;
+interface CodeProps extends ComponentPropsWithoutRef<"code"> {
+  inline?: boolean;
 }
 
 interface TableProps {
@@ -260,7 +262,19 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeKatex]}
               components={{
-                code({ className, children }: CodeBlockProps) {
+                code: ({
+                  inline,
+                  className,
+                  children,
+                  ...props
+                }: CodeProps) => {
+                  if (inline) {
+                    return (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    );
+                  }
                   const match = /language-(\w+)/.exec(className || "");
                   return match ? (
                     <SyntaxHighlighter
@@ -271,61 +285,60 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                       {String(children).replace(/\n$/, "")}
                     </SyntaxHighlighter>
                   ) : (
-                    <code className={className}>{children}</code>
-                  );
-                },
-                table({ children }: TableProps) {
-                  return (
-                    <div className="my-8 overflow-x-auto">
-                      <table className="min-w-full border border-zinc-800 table-auto">
-                        {children}
-                      </table>
-                    </div>
-                  );
-                },
-                thead({ children }) {
-                  return <thead className="bg-zinc-900">{children}</thead>;
-                },
-                tbody({ children }) {
-                  return (
-                    <tbody className="divide-y divide-zinc-800">
+                    <code className={className} {...props}>
                       {children}
-                    </tbody>
+                    </code>
                   );
                 },
-                tr({ children }) {
-                  return <tr className="hover:bg-zinc-900/50">{children}</tr>;
-                },
-                th({ children, align }: TableCellProps) {
-                  return (
-                    <th
-                      className={`px-4 py-3 text-sm font-semibold border-b border-zinc-800 text-zinc-300 ${
-                        align === "right"
-                          ? "text-right"
-                          : align === "center"
-                          ? "text-center"
-                          : "text-left"
-                      }`}
+                table: ({ children, ...props }) => (
+                  <div className="my-8 overflow-x-auto">
+                    <table
+                      className="min-w-full border border-zinc-800 table-auto"
+                      {...props}
                     >
                       {children}
-                    </th>
-                  );
-                },
-                td({ children, align }: TableCellProps) {
-                  return (
-                    <td
-                      className={`px-4 py-3 text-sm border-zinc-800 text-zinc-400 ${
-                        align === "right"
-                          ? "text-right"
-                          : align === "center"
-                          ? "text-center"
-                          : "text-left"
-                      }`}
-                    >
-                      {children}
-                    </td>
-                  );
-                },
+                    </table>
+                  </div>
+                ),
+                thead: ({ children, ...props }) => (
+                  <thead className="bg-zinc-900" {...props}>
+                    {children}
+                  </thead>
+                ),
+                tbody: ({ children, ...props }) => (
+                  <tbody className="divide-y divide-zinc-800" {...props}>
+                    {children}
+                  </tbody>
+                ),
+                tr: ({ children, ...props }) => (
+                  <tr className="hover:bg-zinc-900/50" {...props}>
+                    {children}
+                  </tr>
+                ),
+                th: ({ children, align, ...props }) => (
+                  <th
+                    className={cn(
+                      "border border-zinc-800 px-4 py-2 text-left",
+                      align === "center" && "text-center",
+                      align === "right" && "text-right"
+                    )}
+                    {...props}
+                  >
+                    {children}
+                  </th>
+                ),
+                td: ({ children, align, ...props }) => (
+                  <td
+                    className={cn(
+                      "border border-zinc-800 px-4 py-2 text-left",
+                      align === "center" && "text-center",
+                      align === "right" && "text-right"
+                    )}
+                    {...props}
+                  >
+                    {children}
+                  </td>
+                ),
                 img({ src, alt }) {
                   return (
                     <img
