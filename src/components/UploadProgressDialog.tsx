@@ -54,7 +54,7 @@ export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
   const isProcessing = uploading > 0 || analyzing > 0 || pending > 0;
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-[#111111] rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 p-4 space-y-4">
+    <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-[var(--background-primary)] rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">

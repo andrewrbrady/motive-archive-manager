@@ -140,7 +140,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-[#111111] divide-y divide-gray-200 dark:divide-gray-800">
+        <tbody className="bg-background dark:bg-[var(--background-primary)] divide-y divide-gray-200 dark:divide-gray-800">
           {cars.map((car) => (
             <tr
               key={car._id}

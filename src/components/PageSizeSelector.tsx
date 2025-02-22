@@ -33,7 +33,7 @@ const PageSizeSelector = ({
         id="pageSize"
         value={currentPageSize}
         onChange={(e) => handlePageSizeChange(e.target.value)}
-        className="text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700"
+        className="text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700"
       >
         {options.map((size) => (
           <option key={size} value={size}>

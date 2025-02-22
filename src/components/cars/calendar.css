@@ -72,11 +72,11 @@
 
 /* Agenda view optimizations */
 .events-calendar .rbc-agenda-view {
-  @apply bg-white dark:bg-[#111111] border-zinc-200 dark:border-zinc-800;
+  @apply bg-white dark:bg-[var(--background-primary)] border-zinc-200 dark:border-zinc-800;
 }
 
 .events-calendar .rbc-agenda-table {
-  @apply border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111111];
+  @apply border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-table thead {
@@ -84,7 +84,7 @@
 }
 
 .events-calendar .rbc-agenda-table tbody {
-  @apply bg-white dark:bg-[#111111];
+  @apply bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-table th,
@@ -98,19 +98,19 @@
 }
 
 .events-calendar .rbc-agenda-time-cell {
-  @apply text-zinc-700 dark:text-zinc-300 bg-white dark:bg-[#111111];
+  @apply text-zinc-700 dark:text-zinc-300 bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-event-cell {
-  @apply font-medium bg-white dark:bg-[#111111];
+  @apply font-medium bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-content {
-  @apply bg-white dark:bg-[#111111];
+  @apply bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-empty {
-  @apply bg-white dark:bg-[#111111] text-zinc-500 dark:text-zinc-400;
+  @apply bg-white dark:bg-[var(--background-primary)] text-zinc-500 dark:text-zinc-400;
 }
 
 .events-calendar .rbc-agenda-view .rbc-header {

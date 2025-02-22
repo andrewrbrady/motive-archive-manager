@@ -147,7 +147,7 @@ export default function EventsCalendar({
         backgroundColor = "#374151"; // zinc-700
         break;
       case EventStatus.IN_PROGRESS:
-        backgroundColor = "#2563eb"; // blue-600
+        backgroundColor = "var(--accent-hover)"; // blue-600
         break;
       case EventStatus.COMPLETED:
         backgroundColor = "#059669"; // emerald-600
@@ -157,7 +157,7 @@ export default function EventsCalendar({
     return {
       style: {
         backgroundColor,
-        color: "#ffffff",
+        color: "var(--background-primary)",
         border: "none",
         borderRadius: "4px",
         padding: "2px 4px",
@@ -382,7 +382,7 @@ export default function EventsCalendar({
         className={cn(
           "relative w-full mb-8",
           isFullscreen ? "h-screen" : "h-[900px]",
-          "bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
+          "bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
         )}
       >
         <DragAndDropCalendar

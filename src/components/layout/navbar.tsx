@@ -6,6 +6,13 @@ import Image from "next/image";
 import { logos } from "@/data/site-content";
 import { useTheme } from "@/components/ThemeProvider";
 
+// Common classes for consistent styling
+const navClasses =
+  "fixed top-0 left-0 right-0 z-50 bg-background-primary border-b border-gray-800";
+const linkClasses =
+  "text-sm uppercase tracking-wider text-gray-400 hover:text-gray-300 transition-colors";
+const iconButtonClasses = "text-gray-400 hover:text-gray-300 transition-colors";
+
 interface NavbarProps {
   className?: string;
 }
@@ -19,11 +26,7 @@ export default function Navbar({ className }: NavbarProps) {
       <div className="h-20" />
 
       {/* Navbar */}
-      <nav
-        className={`fixed top-0 left-0 right-0 z-50 bg-white dark:bg-[#111111] border-b border-gray-200 dark:border-gray-800 ${
-          className || ""
-        }`}
-      >
+      <nav className={`${navClasses} ${className || ""}`}>
         <div className="container mx-auto flex justify-between items-center h-20 px-4">
           <div className="flex items-center space-x-12">
             <Link href="/" className="shrink-0">
@@ -36,64 +39,34 @@ export default function Navbar({ className }: NavbarProps) {
               />
             </Link>
             <div className="space-x-8">
-              <Link
-                href="/"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/" className={linkClasses}>
                 Home
               </Link>
-              <Link
-                href="/cars"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/cars" className={linkClasses}>
                 Cars
               </Link>
-              <Link
-                href="/inventory"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/inventory" className={linkClasses}>
                 Inventory
               </Link>
-              <Link
-                href="/auctions"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/auctions" className={linkClasses}>
                 Auctions
               </Link>
-              <Link
-                href="/raw"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/raw" className={linkClasses}>
                 Raw
               </Link>
-              <Link
-                href="/deliverables"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/deliverables" className={linkClasses}>
                 Deliverables
               </Link>
-              <Link
-                href="/events"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/events" className={linkClasses}>
                 Events
               </Link>
-              <Link
-                href="/users"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/users" className={linkClasses}>
                 Users
               </Link>
-              <Link
-                href="/clients"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/clients" className={linkClasses}>
                 Clients
               </Link>
-              <Link
-                href="/makes"
-                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
+              <Link href="/makes" className={linkClasses}>
                 Makes
               </Link>
             </div>
@@ -101,7 +74,7 @@ export default function Navbar({ className }: NavbarProps) {
           <div className="flex items-center space-x-6">
             <button
               onClick={toggleTheme}
-              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              className={iconButtonClasses}
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (
@@ -110,18 +83,10 @@ export default function Navbar({ className }: NavbarProps) {
                 <Moon className="w-5 h-5" />
               )}
             </button>
-            <a
-              href="#"
-              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              aria-label="Instagram"
-            >
+            <a href="#" className={iconButtonClasses} aria-label="Instagram">
               <Instagram className="w-5 h-5" />
             </a>
-            <a
-              href="#"
-              className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              aria-label="Email"
-            >
+            <a href="#" className={iconButtonClasses} aria-label="Email">
               <Mail className="w-5 h-5" />
             </a>
           </div>

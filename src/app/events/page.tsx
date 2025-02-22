@@ -156,7 +156,7 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a]">
+    <div className="min-h-screen bg-gray-50 dark:bg-[var(--background-primary)]">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">

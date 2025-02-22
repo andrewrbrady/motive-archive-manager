@@ -243,7 +243,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
           backgroundColor = "#374151"; // zinc-700
           break;
         case EventStatus.IN_PROGRESS:
-          backgroundColor = "#2563eb"; // blue-600
+          backgroundColor = "var(--accent-hover)"; // blue-600
           break;
         case EventStatus.COMPLETED:
           backgroundColor = "#059669"; // emerald-600
@@ -253,7 +253,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       return {
         style: {
           backgroundColor,
-          color: "#ffffff",
+          color: "var(--background-primary)",
           border: "none",
           borderRadius: "4px",
           padding: "2px 4px",
@@ -268,7 +268,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       let backgroundColor = "#d97706"; // Default amber-600
 
       if (deliverableResource.eventType === "deadline") {
-        backgroundColor = "#dc2626"; // red-600 for deadlines
+        backgroundColor = "var(--error-secondary)"; // red-600 for deadlines
       } else if (deliverableResource.eventType === "release") {
         backgroundColor = "#7c3aed"; // violet-600 for releases
       }
@@ -294,7 +294,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       return {
         style: {
           backgroundColor,
-          color: "#ffffff",
+          color: "var(--background-primary)",
           border: "none",
           borderRadius: "4px",
           padding: "2px 4px",
@@ -815,7 +815,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       className={cn(
         "relative w-full",
         isFullscreen ? "h-screen" : "h-[900px]",
-        "bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
+        "bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-4"
       )}
     >
       <DragAndDropCalendar

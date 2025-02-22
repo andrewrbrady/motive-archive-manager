@@ -33,7 +33,7 @@ interface Image {
 }
 
 async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI as string);
   await client.connect();
   return client;
 }

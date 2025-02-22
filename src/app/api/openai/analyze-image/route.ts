@@ -76,7 +76,10 @@ function cleanMarkdownJSON(text: string | null | undefined): string {
   return text.replace(/```(json)?\n?|\n```$/g, "").trim();
 }
 
-function normalizeValue(field: AllowedField, value: string): string {
+function normalizeValue(
+  field: AllowedField,
+  value: string | undefined
+): string {
   if (!value) return "";
 
   const normalizedValue = value.toLowerCase().trim();
@@ -121,11 +124,11 @@ function normalizeAnalysis(analysis: ImageAnalysis): ImageAnalysis {
   if (!analysis) return {};
 
   const normalized = {
-    angle: normalizeValue("angle", analysis.angle),
-    view: normalizeValue("view", analysis.view),
-    movement: normalizeValue("movement", analysis.movement),
-    tod: normalizeValue("tod", analysis.tod),
-    side: normalizeValue("side", analysis.side),
+    angle: normalizeValue("angle", analysis.angle || ""),
+    view: normalizeValue("view", analysis.view || ""),
+    movement: normalizeValue("movement", analysis.movement || ""),
+    tod: normalizeValue("tod", analysis.tod || ""),
+    side: normalizeValue("side", analysis.side || ""),
     description: analysis.description || "",
   };
 

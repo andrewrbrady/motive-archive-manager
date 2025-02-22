@@ -3,6 +3,18 @@
 import React from "react";
 import { X, Loader2, Check, AlertTriangle } from "lucide-react";
 
+// Common classes for consistent styling
+const dialogClasses =
+  "dark:bg-background-primary rounded-lg border border-gray-200 dark:border-gray-800";
+const overlayClasses =
+  "fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center";
+const statusItemClasses = {
+  base: "flex items-center justify-between p-2 rounded-md",
+  error: "bg-red-50 dark:bg-red-950/30",
+  success: "bg-green-50 dark:bg-green-950/30",
+  pending: "bg-gray-50 dark:bg-gray-800/50",
+};
+
 interface DeleteStatus {
   imageId: string;
   status: "pending" | "deleting" | "complete" | "error";
@@ -67,8 +79,8 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
   const { completed, errors, pending } = getStatusSummary();
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-[#111111] rounded-lg p-6 w-full max-w-md border border-gray-200 dark:border-gray-800">
+    <div className={overlayClasses}>
+      <div className={`${dialogClasses} p-6 w-full max-w-md`}>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
             Delete {imageCount > 1 ? `${imageCount} Images` : "Image"}
@@ -118,12 +130,12 @@ export const DeleteImageDialog: React.FC<DeleteImageDialogProps> = ({
               {deleteStatus.map((status, index) => (
                 <div
                   key={index}
-                  className={`flex items-center justify-between p-2 rounded-md ${
+                  className={`${statusItemClasses.base} ${
                     status.status === "error"
-                      ? "bg-red-50 dark:bg-red-950/30"
+                      ? statusItemClasses.error
                       : status.status === "complete"
-                      ? "bg-green-50 dark:bg-green-950/30"
-                      : "bg-gray-50 dark:bg-gray-800/50"
+                      ? statusItemClasses.success
+                      : statusItemClasses.pending
                   }`}
                 >
                   <div className="flex items-center gap-2">

@@ -61,7 +61,7 @@ export function EnrichmentProgress({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg overflow-hidden">
+    <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">

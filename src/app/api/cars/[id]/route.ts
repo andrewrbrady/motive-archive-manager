@@ -83,7 +83,7 @@ interface UpdateBody {
 
 // Helper function to get MongoDB client
 async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI, {
+  const client = new MongoClient(MONGODB_URI as string, {
     connectTimeoutMS: 10000,
     socketTimeoutMS: 45000,
   });
@@ -389,7 +389,7 @@ export async function PATCH(
     console.log("\nReceived Updates:", JSON.stringify(updates, null, 2));
 
     // Clean up the updates object
-    const cleanedUpdates = Object.entries(updates).reduce(
+    const cleanedUpdates = Object.entries(updates).reduce<Record<string, any>>(
       (acc, [key, value]) => {
         // Skip null, undefined, or empty string values
         if (value === null || value === undefined || value === "") {
@@ -470,11 +470,17 @@ export async function PATCH(
   } catch (error) {
     console.error("\n=== CAR UPDATE ERROR ===");
     console.error("Error details:", error);
-    console.error("Stack trace:", error.stack);
+    console.error(
+      "Stack trace:",
+      error instanceof Error ? error.stack : "No stack trace available"
+    );
     console.error("\n=========================\n");
 
     return NextResponse.json(
-      { error: "Failed to update car", details: error.message },
+      {
+        error: "Failed to update car",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   } finally {

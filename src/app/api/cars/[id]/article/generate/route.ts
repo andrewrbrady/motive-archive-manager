@@ -337,13 +337,13 @@ async function generateContent(
       "Content-Type": "application/json",
       ...(isClaude
         ? {
-            "x-api-key": apiConfig.key,
+            "x-api-key": process.env.ANTHROPIC_API_KEY || "",
             "anthropic-version": "2023-06-01",
           }
         : {
-            Authorization: `Bearer ${apiConfig.key}`,
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY || ""}`,
           }),
-    },
+    } as HeadersInit,
     body: JSON.stringify(requestBody),
   });
 

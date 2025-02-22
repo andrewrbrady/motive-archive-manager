@@ -296,6 +296,10 @@ interface InteriorFeaturesValue {
   upholstery?: string;
 }
 
+// Common class names for form inputs
+const baseInputClasses =
+  "bg-white dark:bg-background-primary border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-background-primary";
+
 // Main component definition
 const Specifications = ({
   car,
@@ -422,7 +426,7 @@ const Specifications = ({
   }, [car.client]);
 
   return (
-    <div className="bg-white dark:bg-[#111111] rounded-lg border border-gray-200 dark:border-gray-800">
+    <div className="dark:bg-background-primary rounded-lg border border-gray-200 dark:border-gray-800">
       <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
           Specifications
@@ -491,7 +495,7 @@ const Specifications = ({
                 onChange={(e) =>
                   handleInputChange("year", parseInt(e.target.value) || "")
                 }
-                className="w-24 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-24 ${baseInputClasses}`}
               />
             ) : (
               car.year
@@ -507,7 +511,7 @@ const Specifications = ({
                 type="text"
                 value={localSpecs.make || ""}
                 onChange={(e) => handleInputChange("make", e.target.value)}
-                className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-40 ${baseInputClasses}`}
               />
             ) : (
               car.make
@@ -525,7 +529,7 @@ const Specifications = ({
                 type="text"
                 value={localSpecs.model || ""}
                 onChange={(e) => handleInputChange("model", e.target.value)}
-                className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-40 ${baseInputClasses}`}
               />
             ) : (
               car.model
@@ -543,7 +547,7 @@ const Specifications = ({
                 type="text"
                 value={localSpecs.color || ""}
                 onChange={(e) => handleInputChange("color", e.target.value)}
-                className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-40 ${baseInputClasses}`}
               />
             ) : (
               car.color || "N/A"
@@ -582,7 +586,7 @@ const Specifications = ({
                 type="text"
                 value={localSpecs.vin || car.vin || ""}
                 onChange={(e) => handleInputChange("vin", e.target.value)}
-                className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-40 ${baseInputClasses}`}
               />
             ) : (
               car.vin || "N/A"
@@ -599,7 +603,7 @@ const Specifications = ({
               <select
                 value={localSpecs.client ?? ""}
                 onChange={(e) => handleInputChange("client", e.target.value)}
-                className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-48 ${baseInputClasses}`}
               >
                 <option value="">Select client</option>
                 {clients.map((client) => (
@@ -627,7 +631,7 @@ const Specifications = ({
                 type="text"
                 value={localSpecs.location || car.location || ""}
                 onChange={(e) => handleInputChange("location", e.target.value)}
-                className="w-40 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-40 ${baseInputClasses}`}
               />
             ) : (
               car.location || "N/A"
@@ -654,7 +658,7 @@ const Specifications = ({
                       : null,
                   })
                 }
-                className="w-28 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-28 ${baseInputClasses}`}
               />
             ) : car.price?.listPrice ? (
               `$${car.price.listPrice
@@ -686,7 +690,7 @@ const Specifications = ({
                         : null,
                     })
                   }
-                  className="w-28 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                  className={`w-28 ${baseInputClasses}`}
                 />
               ) : car.price?.soldPrice ? (
                 `$${car.price.soldPrice
@@ -714,7 +718,7 @@ const Specifications = ({
                     onChange={(e) =>
                       handleNestedInputChange("engine", "type", e.target.value)
                     }
-                    className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                    className={`w-48 ${baseInputClasses}`}
                   />
                 ) : (
                   car.engine?.type || "N/A"
@@ -808,7 +812,7 @@ const Specifications = ({
                           e.target.value
                         )
                       }
-                      className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                      className={`w-48 ${baseInputClasses}`}
                     />
                   ) : (
                     car.manufacturing.series
@@ -837,7 +841,7 @@ const Specifications = ({
                           e.target.value
                         )
                       }
-                      className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                      className={`w-48 ${baseInputClasses}`}
                     />
                   ) : (
                     car.manufacturing.trim
@@ -865,7 +869,7 @@ const Specifications = ({
                           e.target.value
                         )
                       }
-                      className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                      className={`w-48 ${baseInputClasses}`}
                     />
                   ) : (
                     car.manufacturing.bodyClass
@@ -888,7 +892,7 @@ const Specifications = ({
                   type="number"
                   value={getNumberInputValue(localSpecs.doors ?? car.doors)}
                   onChange={(e) => handleInputChange("doors", e.target.value)}
-                  className="w-24 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                  className={`w-24 ${baseInputClasses}`}
                 />
               ) : (
                 car.doors
@@ -917,7 +921,7 @@ const Specifications = ({
                       e.target.value
                     )
                   }
-                  className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                  className={`w-48 ${baseInputClasses}`}
                 />
               ) : (
                 car.safety.tpms.type
@@ -1079,7 +1083,7 @@ const Specifications = ({
                     onChange={(e) =>
                       handleInputChange("interior_color", e.target.value)
                     }
-                    className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                    className={`w-48 ${baseInputClasses}`}
                   />
                 ) : (
                   car.interior_color || "N/A"
@@ -1105,7 +1109,7 @@ const Specifications = ({
                         parseInt(e.target.value) || ""
                       )
                     }
-                    className="w-24 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                    className={`w-24 ${baseInputClasses}`}
                   />
                 ) : (
                   car.interior_features.seats || "N/A"
@@ -1135,7 +1139,7 @@ const Specifications = ({
                       e.target.value
                     )
                   }
-                  className="w-48 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                  className={`w-48 ${baseInputClasses}`}
                 />
               ) : (
                 car.transmission.type
@@ -1156,7 +1160,7 @@ const Specifications = ({
                 onChange={(e) =>
                   handleInputChange("description", e.target.value)
                 }
-                className="w-full h-32 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#111111]"
+                className={`w-full h-32 ${baseInputClasses}`}
                 placeholder="Enter car description..."
               />
             ) : (

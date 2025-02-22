@@ -32,7 +32,7 @@ export default function InventoryItemPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-background">
         <Navbar />
         <div className="flex justify-center items-center h-[calc(100vh-64px)]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
@@ -43,7 +43,7 @@ export default function InventoryItemPage() {
 
   if (!item) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-background">
         <Navbar />
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold">Item not found</h1>
@@ -53,7 +53,7 @@ export default function InventoryItemPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">

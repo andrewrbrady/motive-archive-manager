@@ -255,17 +255,17 @@ export default function BaTListingGenerator({
       <h1 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
         BaT Listing Generator
       </h1>
-      <div className="space-y-3 rounded-lg p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800">
+      <div className="space-y-3 rounded-lg p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Select
               value={focus}
               onValueChange={(value: ListingFocus) => setFocus(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select focus" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="mechanical"
                   className="text-gray-900 dark:text-white"
@@ -299,10 +299,10 @@ export default function BaTListingGenerator({
               value={style}
               onValueChange={(value: Style) => setStyle(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select style" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="factual"
                   className="text-gray-900 dark:text-white"
@@ -332,10 +332,10 @@ export default function BaTListingGenerator({
               value={tone}
               onValueChange={(value: Tone) => setTone(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select tone" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="enthusiastic"
                   className="text-gray-900 dark:text-white"
@@ -369,10 +369,10 @@ export default function BaTListingGenerator({
               value={length}
               onValueChange={(value: Length) => setLength(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select length" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="concise"
                   className="text-gray-900 dark:text-white"
@@ -435,7 +435,7 @@ export default function BaTListingGenerator({
                 e.stopPropagation();
               }
             }}
-            className="min-h-[80px] bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="min-h-[80px] bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
           />
         </div>
 
@@ -443,7 +443,7 @@ export default function BaTListingGenerator({
           onClick={handleGenerate}
           disabled={isGenerating}
           variant="outline"
-          className="w-full bg-[#111111] hover:bg-black dark:bg-[#111111] dark:hover:bg-black text-white border-gray-800"
+          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-gray-800"
         >
           {isGenerating ? (
             <>
@@ -460,7 +460,7 @@ export default function BaTListingGenerator({
         )}
 
         {generatedListing && (
-          <div className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+          <div className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
             <p
               className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
               onKeyDown={(e) => {
@@ -516,7 +516,7 @@ export default function BaTListingGenerator({
               {savedListings.map((listing) => (
                 <div
                   key={listing._id}
-                  className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                  className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
                 >
                   {editingListingId === listing._id ? (
                     <Textarea
@@ -530,7 +530,7 @@ export default function BaTListingGenerator({
                           textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
                         }
                       }}
-                      className="w-full resize-none bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
+                      className="w-full resize-none bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault();

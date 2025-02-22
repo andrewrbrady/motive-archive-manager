@@ -127,7 +127,7 @@ export default function InfiniteMonthView({
           {Array.from({ length: startWeekDay }).map((_, index) => (
             <div
               key={`empty-start-${index}`}
-              className="h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111111]"
+              className="h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--background-primary)]"
             />
           ))}
 
@@ -238,7 +238,7 @@ export default function InfiniteMonthView({
           }).map((_, index) => (
             <div
               key={`empty-end-${index}`}
-              className="h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111111]"
+              className="h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--background-primary)]"
             />
           ))}
         </div>
@@ -248,7 +248,7 @@ export default function InfiniteMonthView({
 
   return (
     <div ref={containerRef} className={cn("h-full relative", className)}>
-      <div className="sticky top-0 z-20 bg-white dark:bg-[#111111]">
+      <div className="sticky top-0 z-20 bg-white dark:bg-[var(--background-primary)]">
         <div className="py-2 px-4 border-b border-l border-r border-zinc-200 dark:border-zinc-800">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             {format(visibleMonthDate, "MMMM yyyy")}

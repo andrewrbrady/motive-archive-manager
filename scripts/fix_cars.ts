@@ -59,7 +59,7 @@ interface Car {
 }
 
 async function fixCars() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI as string);
 
   try {
     await client.connect();

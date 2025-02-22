@@ -372,7 +372,7 @@ export default function CaptionGenerator({
       <h1 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
         Caption Generator
       </h1>
-      <div className="space-y-3 rounded-lg p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800">
+      <div className="space-y-3 rounded-lg p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800">
         <div className="flex gap-3">
           <div className="flex-1">
             <Select
@@ -380,10 +380,10 @@ export default function CaptionGenerator({
               value={platform}
               onValueChange={(value: Platform) => setPlatform(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="instagram"
                   className="text-gray-900 dark:text-white"
@@ -405,10 +405,10 @@ export default function CaptionGenerator({
               value={template}
               onValueChange={handleTemplateChange}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select template" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="none"
                   className="text-gray-900 dark:text-white"
@@ -469,7 +469,7 @@ export default function CaptionGenerator({
               }
             }}
             placeholder="Add any additional context for the caption..."
-            className="min-h-[80px] bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="min-h-[80px] bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
           />
         </div>
 
@@ -479,10 +479,10 @@ export default function CaptionGenerator({
               value={tone}
               onValueChange={(value: Tone) => setTone(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select tone" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="professional"
                   className="text-gray-900 dark:text-white"
@@ -515,10 +515,10 @@ export default function CaptionGenerator({
               value={style}
               onValueChange={(value: Style) => setStyle(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select style" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="descriptive"
                   className="text-gray-900 dark:text-white"
@@ -545,10 +545,10 @@ export default function CaptionGenerator({
               value={length}
               onValueChange={(value: Length) => setLength(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select length" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
                 <SelectItem
                   value="concise"
                   className="text-gray-900 dark:text-white"
@@ -598,7 +598,7 @@ export default function CaptionGenerator({
           onClick={() => handleGenerate()}
           disabled={isGenerating}
           variant="outline"
-          className="w-full bg-[#111111] hover:bg-black dark:bg-[#111111] dark:hover:bg-black text-white border-gray-800"
+          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-gray-800"
         >
           {isGenerating ? "Generating..." : "Generate Caption"}
         </Button>
@@ -620,7 +620,7 @@ export default function CaptionGenerator({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Generated caption (only if it's Instagram) */}
               {generatedCaption && platform === "instagram" && (
-                <div className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+                <div className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
                   <p
                     className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
                     onKeyDown={(e) => {
@@ -666,7 +666,7 @@ export default function CaptionGenerator({
                 .map((caption) => (
                   <div
                     key={caption._id}
-                    className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                    className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
                   >
                     {editingCaptionId === caption._id ? (
                       <Textarea
@@ -674,7 +674,7 @@ export default function CaptionGenerator({
                         onChange={(e) =>
                           handleTextChange(e.target.value, caption._id)
                         }
-                        className="min-h-[200px] w-full resize-none bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
+                        className="min-h-[200px] w-full resize-none bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
                         onKeyDown={(e) => {
                           // Only stop propagation for arrow keys, don't prevent default
                           if (
@@ -797,7 +797,7 @@ export default function CaptionGenerator({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Generated caption (only if it's YouTube) */}
               {generatedCaption && platform === "youtube" && (
-                <div className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+                <div className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
                   <p
                     className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
                     onKeyDown={(e) => {
@@ -843,7 +843,7 @@ export default function CaptionGenerator({
                 .map((caption) => (
                   <div
                     key={caption._id}
-                    className="group relative p-3 bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                    className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
                   >
                     {editingCaptionId === caption._id ? (
                       <Textarea
@@ -851,7 +851,7 @@ export default function CaptionGenerator({
                         onChange={(e) =>
                           handleTextChange(e.target.value, caption._id)
                         }
-                        className="min-h-[200px] w-full resize-none bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
+                        className="min-h-[200px] w-full resize-none bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
                         onKeyDown={(e) => {
                           // Only stop propagation for arrow keys, don't prevent default
                           if (

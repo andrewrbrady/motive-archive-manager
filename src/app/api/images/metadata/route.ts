@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     const imageIds = ids.split(",").map((id) => new ObjectId(id));
 
-    client = await MongoClient.connect(MONGODB_URI);
+    client = await MongoClient.connect(MONGODB_URI as string);
     const db = client.db(DB_NAME);
     const collection: Collection<Image> = db.collection("images");
 

@@ -65,7 +65,7 @@ export default function HeroSection() {
   };
 
   return (
-    <section className="min-h-screen flex flex-col md:flex-row">
+    <section className="min-h-screen flex flex-col md:flex-row bg-background">
       {/* Left side - Text Content */}
       <div className="w-full md:w-1/2 flex items-center z-10">
         <motion.div

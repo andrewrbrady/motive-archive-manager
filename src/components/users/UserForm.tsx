@@ -170,7 +170,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
               <SelectItem
                 key={role}
                 value={role}
-                className="!bg-white dark:!bg-[#1a1a1a] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+                className="!bg-white dark:!bg-[var(--background-secondary)] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
               >
                 {role.charAt(0).toUpperCase() + role.slice(1)}
               </SelectItem>
@@ -198,7 +198,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
               <SelectItem
                 key={status}
                 value={status}
-                className="!bg-white dark:!bg-[#1a1a1a] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+                className="!bg-white dark:!bg-[var(--background-secondary)] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
               >
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </SelectItem>
@@ -223,7 +223,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
               <SelectItem
                 key={role}
                 value={role}
-                className="!bg-white dark:!bg-[#1a1a1a] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+                className="!bg-white dark:!bg-[var(--background-secondary)] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
               >
                 {role
                   .split("_")

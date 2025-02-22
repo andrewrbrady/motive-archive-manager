@@ -235,8 +235,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   onClick={() => handleFilterChange("angle", angle)}
                   className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
                     activeFilters.angle === angle
-                      ? "bg-[#222222] text-white"
-                      : "bg-[#f4f4f5] dark:bg-[#1a1a1a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#222222]"
+                      ? "bg-[var(--background-tertiary)] text-white"
+                      : "bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)] text-[var(--text-secondary)] dark:text-[var(--text-disabled)] hover:bg-[var(--background-tertiary)] dark:hover:bg-[var(--background-tertiary)]"
                   }`}
                 >
                   {angle}
@@ -258,8 +258,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   onClick={() => handleFilterChange("view", view)}
                   className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
                     activeFilters.view === view
-                      ? "bg-[#222222] text-white"
-                      : "bg-[#f4f4f5] dark:bg-[#1a1a1a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#222222]"
+                      ? "bg-[var(--background-tertiary)] text-white"
+                      : "bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)] text-[var(--text-secondary)] dark:text-[var(--text-disabled)] hover:bg-[var(--background-tertiary)] dark:hover:bg-[var(--background-tertiary)]"
                   }`}
                 >
                   {view}
@@ -281,8 +281,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   onClick={() => handleFilterChange("movement", movement)}
                   className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
                     activeFilters.movement === movement
-                      ? "bg-[#222222] text-white"
-                      : "bg-[#f4f4f5] dark:bg-[#1a1a1a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#222222]"
+                      ? "bg-[var(--background-tertiary)] text-white"
+                      : "bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)] text-[var(--text-secondary)] dark:text-[var(--text-disabled)] hover:bg-[var(--background-tertiary)] dark:hover:bg-[var(--background-tertiary)]"
                   }`}
                 >
                   {movement}
@@ -304,8 +304,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   onClick={() => handleFilterChange("tod", tod)}
                   className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
                     activeFilters.tod === tod
-                      ? "bg-[#222222] text-white"
-                      : "bg-[#f4f4f5] dark:bg-[#1a1a1a] text-[#52525b] dark:text-[#a1a1aa] hover:bg-[#e4e4e7] dark:hover:bg-[#222222]"
+                      ? "bg-[var(--background-tertiary)] text-white"
+                      : "bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)] text-[var(--text-secondary)] dark:text-[var(--text-disabled)] hover:bg-[var(--background-tertiary)] dark:hover:bg-[var(--background-tertiary)]"
                   }`}
                 >
                   {tod}
@@ -328,7 +328,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
             {filteredImages.length > 0 ? (
               <>
                 <div
-                  className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#f4f4f5] dark:bg-[#1a1a1a] shadow-sm dark:shadow-md transition-shadow hover:shadow-md dark:hover:shadow-lg"
+                  className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)] shadow-sm dark:shadow-md transition-shadow hover:shadow-md dark:hover:shadow-lg"
                   onTouchStart={handleTouchStart}
                   onTouchEnd={handleTouchEnd}
                 >
@@ -350,7 +350,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       setModalIndex(mainIndex);
                       setIsModalOpen(true);
                     }}
-                    className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                    className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
                     aria-label="Open fullscreen view"
                   >
                     <ZoomIn className="w-5 h-5" />
@@ -358,20 +358,20 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
                   <button
                     onClick={handlePrev}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
                     onClick={handleNext}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
                     aria-label="Next image"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="mt-4 space-y-2 text-[#52525b] dark:text-[#a1a1aa]">
+                <div className="mt-4 space-y-2 text-[var(--text-secondary)] dark:text-[var(--text-disabled)]">
                   {filteredImages[mainIndex]?.metadata.description && (
                     <p className="text-sm">
                       {filteredImages[mainIndex].metadata.description}
@@ -379,22 +379,22 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   )}
                   <div className="flex flex-wrap gap-2 text-xs">
                     {filteredImages[mainIndex]?.metadata.angle && (
-                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                      <span className="px-2 py-1 rounded-full bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)]">
                         Angle: {filteredImages[mainIndex].metadata.angle}
                       </span>
                     )}
                     {filteredImages[mainIndex]?.metadata.view && (
-                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                      <span className="px-2 py-1 rounded-full bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)]">
                         View: {filteredImages[mainIndex].metadata.view}
                       </span>
                     )}
                     {filteredImages[mainIndex]?.metadata.movement && (
-                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                      <span className="px-2 py-1 rounded-full bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)]">
                         Movement: {filteredImages[mainIndex].metadata.movement}
                       </span>
                     )}
                     {filteredImages[mainIndex]?.metadata.tod && (
-                      <span className="px-2 py-1 rounded-full bg-[#f4f4f5] dark:bg-[#1a1a1a]">
+                      <span className="px-2 py-1 rounded-full bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)]">
                         Time of Day: {filteredImages[mainIndex].metadata.tod}
                       </span>
                     )}
@@ -402,7 +402,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 </div>
               </>
             ) : (
-              <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[#f4f4f5] dark:bg-[#1a1a1a] text-[#52525b] dark:text-[#a1a1aa]">
+              <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[var(--background-secondary)] dark:bg-[var(--background-secondary)] text-[var(--text-secondary)] dark:text-[var(--text-disabled)]">
                 <p>No images match the selected filters</p>
               </div>
             )}
@@ -421,9 +421,9 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       onClick={() => setMainIndex(actualIndex)}
                       className={`aspect-square relative transition-all duration-150 ease-in-out ${
                         actualIndex === mainIndex
-                          ? "ring-2 ring-[#222222] dark:ring-[#222222]"
+                          ? "ring-2 ring-[var(--background-tertiary)] dark:ring-[var(--background-tertiary)]"
                           : "opacity-75 hover:opacity-100"
-                      } focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]`}
+                      } focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]`}
                       aria-label={`View image ${actualIndex + 1}`}
                       aria-current={
                         actualIndex === mainIndex ? "true" : "false"
@@ -441,7 +441,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 })}
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-[#52525b] dark:text-[#a1a1aa]">
+              <div className="flex-1 flex items-center justify-center text-[var(--text-secondary)] dark:text-[var(--text-disabled)]">
                 <p>No images match the selected filters</p>
               </div>
             )}
@@ -451,18 +451,18 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                  className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <span className="text-sm text-[#52525b] dark:text-[#a1a1aa]">
+                <span className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-disabled)]">
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+                  className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
                   aria-label="Next page"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -481,7 +481,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
           >
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-2 text-white hover:text-[#e4e4e7] dark:hover:text-[#a1a1aa] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+              className="absolute top-4 right-4 p-2 text-white hover:text-[var(--background-tertiary)] dark:hover:text-[var(--text-disabled)] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
               aria-label="Close fullscreen view"
             >
               <X className="w-6 h-6" />
@@ -501,14 +501,14 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
             />
             <button
               onClick={handlePrev}
-              className="absolute left-4 p-2 text-white hover:text-[#e4e4e7] dark:hover:text-[#a1a1aa] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+              className="absolute left-4 p-2 text-white hover:text-[var(--background-tertiary)] dark:hover:text-[var(--text-disabled)] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
               aria-label="Previous image"
             >
               <ChevronLeft className="w-8 h-8" />
             </button>
             <button
               onClick={handleNext}
-              className="absolute right-4 p-2 text-white hover:text-[#e4e4e7] dark:hover:text-[#a1a1aa] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[#111111]"
+              className="absolute right-4 p-2 text-white hover:text-[var(--background-tertiary)] dark:hover:text-[var(--text-disabled)] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 dark:focus:ring-offset-[var(--background-primary)]"
               aria-label="Next image"
             >
               <ChevronRight className="w-8 h-8" />

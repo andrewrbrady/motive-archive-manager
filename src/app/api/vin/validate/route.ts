@@ -60,7 +60,14 @@ Remember: Return ONLY the JSON object with no additional text.`;
     });
 
     try {
-      const analysis = JSON.parse(completion.choices[0].message.content);
+      const content = completion.choices[0].message.content;
+      if (!content) {
+        return NextResponse.json(
+          { error: "No content in AI response" },
+          { status: 500 }
+        );
+      }
+      const analysis = JSON.parse(content);
       return NextResponse.json(analysis);
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);

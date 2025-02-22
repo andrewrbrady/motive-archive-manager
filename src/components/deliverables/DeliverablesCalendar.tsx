@@ -248,13 +248,13 @@ export default function DeliverablesCalendar() {
     let baseColor = "";
     switch (status) {
       case "not_started":
-        baseColor = isDeadline ? "#ef4444" : "#f87171";
+        baseColor = isDeadline ? "var(--error-primary)" : "#f87171";
         break;
       case "in_progress":
         baseColor = isDeadline ? "#f59e0b" : "#fbbf24";
         break;
       case "done":
-        baseColor = isDeadline ? "#22c55e" : "#4ade80";
+        baseColor = isDeadline ? "var(--success-primary)" : "#4ade80";
         break;
       default:
         baseColor = isDeadline ? "#6b7280" : "#9ca3af";

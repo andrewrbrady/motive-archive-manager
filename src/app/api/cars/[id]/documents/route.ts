@@ -10,7 +10,7 @@ if (!MONGODB_URI) {
 
 // Helper function to get MongoDB client
 async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI, {
+  const client = new MongoClient(MONGODB_URI as string, {
     connectTimeoutMS: 10000,
     socketTimeoutMS: 45000,
   });

@@ -10,7 +10,7 @@ if (!MONGODB_URI) {
 }
 
 async function migrateBatchTemplates() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI as string);
 
   try {
     console.log("Connecting to MongoDB Atlas...");

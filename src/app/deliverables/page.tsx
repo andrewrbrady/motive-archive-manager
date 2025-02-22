@@ -12,7 +12,7 @@ export default function DeliverablePage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <main className="min-h-screen bg-background">
         <div className="container mx-auto py-8 space-y-8">
           <h1 className="text-3xl font-bold">Deliverables</h1>
           <DeliverablesTabs />

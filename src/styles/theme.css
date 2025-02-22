@@ -5,15 +5,15 @@
 @layer base {
   :root {
     /* Light Mode */
-    --background-primary: #ffffff;
-    --background-secondary: #f4f4f5;
-    --background-tertiary: #e4e4e7;
+    --background-primary: var(--background-primary);
+    --background-secondary: var(--background-secondary);
+    --background-tertiary: var(--background-tertiary);
 
-    --text-primary: #18181b;
-    --text-secondary: #52525b;
-    --text-tertiary: #71717a;
+    --text-primary: var(--text-primary);
+    --text-secondary: var(--text-secondary);
+    --text-tertiary: var(--text-tertiary);
 
-    --border-primary: #e4e4e7;
+    --border-primary: var(--background-tertiary);
     --border-secondary: #d4d4d8;
 
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -23,13 +23,13 @@
 
   .dark {
     /* Dark Mode */
-    --background-primary: #111111;
-    --background-secondary: #1a1a1a;
-    --background-tertiary: #222222;
+    --background-primary: var(--background-primary);
+    --background-secondary: var(--background-secondary);
+    --background-tertiary: var(--background-tertiary);
 
-    --text-primary: #ffffff;
+    --text-primary: var(--background-primary);
     --text-secondary: #a1a1aa;
-    --text-tertiary: #71717a;
+    --text-tertiary: var(--text-tertiary);
 
     --border-primary: #27272a;
     --border-secondary: #3f3f46;

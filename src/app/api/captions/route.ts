@@ -160,7 +160,7 @@ export async function DELETE(request: NextRequest) {
       {
         $set: {
           captionIds: car.captionIds.filter(
-            (id) => id.toString() !== captionId
+            (id: ObjectId) => id.toString() !== captionId
           ),
         },
       }

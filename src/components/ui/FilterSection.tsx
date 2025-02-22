@@ -13,7 +13,7 @@ export function FilterSection({
   onClearFilters = () => {},
 }: FilterSectionProps) {
   return (
-    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800">
+    <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800">
       <div className="p-4">{children}</div>
       {hasActiveFilters && (
         <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-2 flex justify-end">
@@ -56,7 +56,7 @@ export function FilterSelect({
   return (
     <select
       {...props}
-      className={`block w-full text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700 px-3 py-1.5 ${className}`}
+      className={`block w-full text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700 px-3 py-1.5 ${className}`}
     />
   );
 }
@@ -68,7 +68,7 @@ export function FilterInput({
   return (
     <input
       {...props}
-      className={`block w-full text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111] text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700 px-3 py-1.5 ${className}`}
+      className={`block w-full text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700 px-3 py-1.5 ${className}`}
     />
   );
 }

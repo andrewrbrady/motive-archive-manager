@@ -53,7 +53,7 @@ function extractHorsepower(value: any): number | null {
 }
 
 async function migrateMeasurements() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI as string);
 
   try {
     await client.connect();
@@ -126,7 +126,9 @@ async function migrateMeasurements() {
           migratedCount++;
           console.log(`Successfully migrated document ${doc._id}:`, update);
         } catch (error) {
-          skipReason = `Update failed: ${error.message}`;
+          skipReason = `Update failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`;
           skippedDocs.push({ id: doc._id, reason: skipReason });
         }
       } else if (skipReason) {

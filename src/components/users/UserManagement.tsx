@@ -114,7 +114,7 @@ export default function UserManagement() {
         </Button>
       </div>
 
-      <div className="rounded-md border-[1px] border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111111]">
+      <div className="rounded-md border-[1px] border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)]">
         <Table>
           <TableHeader>
             <TableRow className="border-b border-gray-200 dark:border-gray-800 hover:bg-transparent">
@@ -231,7 +231,7 @@ export default function UserManagement() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[#111111] border-gray-200 dark:border-gray-800">
+        <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800">
           <DialogHeader className="border-b border-gray-200 dark:border-gray-800 pb-4">
             <DialogTitle className="text-gray-900 dark:text-gray-100">
               {selectedUser ? "Edit User" : "Create New User"}

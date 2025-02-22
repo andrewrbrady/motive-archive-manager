@@ -90,8 +90,8 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[#111111]">
-      <nav className="fixed top-0 w-full z-50 bg-[#1a1f3c] shadow-md">
+    <div className="flex flex-col min-h-screen bg-background">
+      <nav className="fixed top-0 w-full z-50 bg-background shadow-md">
         <Navbar />
       </nav>
 

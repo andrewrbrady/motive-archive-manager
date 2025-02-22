@@ -83,7 +83,7 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#111111]">
+      <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center py-8">
@@ -96,7 +96,7 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
 
   if (!client) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#111111]">
+      <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center py-8 text-gray-500">
@@ -108,7 +108,7 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#111111]">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
@@ -251,7 +251,7 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
                               <div className="w-16 h-16 bg-muted flex-shrink-0 flex items-center justify-center">
                                 <MotiveLogo
                                   className="w-10 h-10"
-                                  fillColor="#3b82f6"
+                                  fillColor="var(--accent-primary)"
                                 />
                               </div>
                             )}

@@ -9,7 +9,7 @@ import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
-import SortSelector from "../../components/ui/SortSelector";
+import SortSelector from "@/components/ui/SortSelector";
 import { Car, Client } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Link from "next/link";
@@ -57,7 +57,7 @@ export default function CarsPageClient({
   }).toString();
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[#111111]">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[var(--background-primary)]">
       <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="space-y-6">

@@ -6,7 +6,7 @@ import { logos } from "@/data/site-content";
 
 export default function Footer() {
   return (
-    <footer className="bg-white dark:bg-[#111111] border-t border-gray-200 dark:border-gray-800 py-12">
+    <footer className="bg-white dark:bg-[var(--background-primary)] border-t border-gray-200 dark:border-gray-800 py-12">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">

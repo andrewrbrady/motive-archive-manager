@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
     // ObjectId validation logging
     let fileObjectId, carObjectId;
     try {
+      if (!fileId || !carId) {
+        throw new Error("File ID or Car ID is missing");
+      }
       fileObjectId = new ObjectId(fileId);
       carObjectId = new ObjectId(carId);
       console.log("Research Content API - ObjectId Validation:", {
@@ -107,10 +110,13 @@ export async function GET(request: NextRequest) {
       query: {
         _id: query._id.toString(),
         $or: query.$or.map((condition) => {
-          if (condition.carId) {
+          if ("carId" in condition && condition.carId) {
             return { carId: condition.carId.toString() };
           }
-          return { "metadata.carId": condition["metadata.carId"].toString() };
+          if ("metadata.carId" in condition && condition["metadata.carId"]) {
+            return { "metadata.carId": condition["metadata.carId"].toString() };
+          }
+          return condition;
         }),
       },
       dbName: db.databaseName,

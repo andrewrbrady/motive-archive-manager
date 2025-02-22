@@ -117,7 +117,7 @@ async function migrateCar(db: any, car: Car) {
 
 async function main() {
   console.log("Starting image metadata migration...");
-  const client = await MongoClient.connect(MONGODB_URI);
+  const client = await MongoClient.connect(MONGODB_URI as string);
   const db = client.db(DB_NAME);
 
   try {

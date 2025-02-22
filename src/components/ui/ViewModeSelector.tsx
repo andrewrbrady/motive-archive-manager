@@ -19,7 +19,7 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 bg-white dark:bg-[#111111] rounded-md border border-gray-200 dark:border-gray-800 p-1">
+    <div className="flex items-center gap-2 bg-white dark:bg-[var(--background-primary)] rounded-md border border-gray-200 dark:border-gray-800 p-1">
       <button
         onClick={() => handleViewChange("grid")}
         className={`p-1.5 rounded-sm transition-colors ${

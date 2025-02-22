@@ -79,11 +79,15 @@ interface ImageGalleryProps {
   onImageProgress?: (progress: UploadProgress) => void;
 }
 
+// Common classes for consistent styling
+const skeletonClasses =
+  "bg-background-secondary dark:bg-background-secondary rounded-lg relative w-full";
+const cardClasses =
+  "dark:bg-background-primary border border-gray-200 dark:border-gray-800 rounded-lg";
+
+// Update ImageSkeleton component
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
-  <div
-    className="animate-pulse bg-[#f5f5f5] dark:bg-[#1a1a1a] rounded-lg relative w-full"
-    style={{ aspectRatio }}
-  />
+  <div className={skeletonClasses} style={{ aspectRatio }} />
 );
 
 export function ImageGallery({
@@ -456,7 +460,9 @@ export function ImageGallery({
       <div>
         <div className="flex gap-6">
           <div className="w-2/3">
-            <div className="w-full aspect-[4/3] relative bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+            <div
+              className={`relative aspect-[4/3] w-full overflow-hidden rounded-lg ${skeletonClasses}`}
+            >
               {uploading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   <Loader2 className="w-8 h-8 animate-spin text-gray-400 dark:text-gray-500" />
@@ -576,45 +582,30 @@ export function ImageGallery({
       )}
       <div className="flex gap-6">
         <div className="w-2/3 space-y-3">
-          <div
-            ref={mainImageRef}
-            className={`sticky top-4 mb-4 transition-opacity duration-300 ${
-              isMainVisible ? "opacity-100" : "opacity-0"
-            }`}
-          >
+          <div ref={mainImageRef} className="sticky top-4 mb-4">
             <div
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#f5f5f5] dark:bg-[#1a1a1a]"
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-background-secondary dark:bg-background-secondary"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
               {displayImages[mainIndex] && (
-                <>
-                  {!mainImageLoaded && (
-                    <ImageSkeleton aspectRatio={aspectRatio} />
-                  )}
-                  <Image
-                    key={`${displayImages[mainIndex].id}-${isEditMode}`}
-                    src={getImageUrl(displayImages[mainIndex].url)}
-                    alt={
-                      title
-                        ? `${title} - View ${mainIndex + 1}`
-                        : `View ${mainIndex + 1} of ${displayImages.length}`
-                    }
-                    className={cn(
-                      "object-cover transition-opacity duration-300",
-                      !mainImageLoaded && "opacity-0"
-                    )}
-                    fill
-                    sizes="100vw"
-                    priority
-                    onLoadingComplete={() => {
-                      setMainImageLoaded(true);
-                    }}
-                    onError={() =>
-                      handleImageError(displayImages[mainIndex].url)
-                    }
-                  />
-                </>
+                <Image
+                  key={`${displayImages[mainIndex].id}-${isEditMode}`}
+                  src={getImageUrl(displayImages[mainIndex].url)}
+                  alt={
+                    title
+                      ? `${title} - View ${mainIndex + 1}`
+                      : `View ${mainIndex + 1} of ${displayImages.length}`
+                  }
+                  className="object-cover"
+                  fill
+                  sizes="100vw"
+                  priority
+                  onLoadingComplete={() => {
+                    setMainImageLoaded(true);
+                  }}
+                  onError={() => handleImageError(displayImages[mainIndex].url)}
+                />
               )}
               <button
                 onClick={() => {
@@ -644,7 +635,7 @@ export function ImageGallery({
           </div>
 
           {showMetadata && mainImageLoaded && (
-            <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm p-3">
+            <div className={`${cardClasses} shadow-sm p-3`}>
               <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
                   <div className="flex items-center gap-1.5">
@@ -920,7 +911,7 @@ export function ImageGallery({
 
       {showDeleteAllConfirm && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-[#111111] rounded-lg p-6 max-w-md w-full mx-4 space-y-4 border border-gray-200 dark:border-gray-800">
+          <div className={`${cardClasses} p-6 max-w-md w-full mx-4 space-y-4`}>
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
               Delete All Images?
             </h3>

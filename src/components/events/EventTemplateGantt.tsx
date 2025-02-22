@@ -34,10 +34,10 @@ interface EventTemplateGanttProps {
 }
 
 const EVENT_TYPE_COLORS: Record<EventType, string> = {
-  [EventType.AUCTION_SUBMISSION]: "#EF4444", // Red
+  [EventType.AUCTION_SUBMISSION]: "var(--error-primary)", // Red
   [EventType.AUCTION_LISTING]: "#F59E0B", // Amber
   [EventType.AUCTION_END]: "#10B981", // Emerald
-  [EventType.INSPECTION]: "#3B82F6", // Blue
+  [EventType.INSPECTION]: "var(--accent-primary)", // Blue
   [EventType.DETAIL]: "#8B5CF6", // Purple
   [EventType.PRODUCTION]: "#EC4899", // Pink
   [EventType.POST_PRODUCTION]: "#6366F1", // Indigo

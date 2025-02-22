@@ -10,7 +10,7 @@ if (!uri) {
 }
 
 async function getClient() {
-  const client = await MongoClient.connect(uri, {
+  const client = await MongoClient.connect(uri as string, {
     connectTimeoutMS: 10000,
     socketTimeoutMS: 45000,
   });

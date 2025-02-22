@@ -8,7 +8,7 @@ if (!MONGODB_URI) {
 }
 
 async function normalizeClientIds() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI as string);
 
   try {
     console.log("Connecting to MongoDB...");

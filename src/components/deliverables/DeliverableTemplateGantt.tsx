@@ -14,14 +14,14 @@ import { GripVertical, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PLATFORM_COLORS: Record<string, string> = {
-  "Instagram Reels": "#2563eb",
-  "Instagram Post": "#3b82f6",
+  "Instagram Reels": "var(--accent-hover)",
+  "Instagram Post": "var(--accent-primary)",
   "Instagram Story": "#60a5fa",
-  YouTube: "#dc2626",
-  "YouTube Shorts": "#ef4444",
+  YouTube: "var(--error-secondary)",
+  "YouTube Shorts": "var(--error-primary)",
   TikTok: "#171717",
   "Bring a Trailer": "#0f766e",
-  Facebook: "#1d4ed8",
+  Facebook: "var(--accent-secondary)",
   Other: "#6B7280",
 };
 

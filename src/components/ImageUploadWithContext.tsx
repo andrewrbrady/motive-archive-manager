@@ -133,7 +133,7 @@ export default function ImageUploadWithContext({
   return (
     <div className="space-y-6">
       {/* Image Gallery */}
-      <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+      <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-4">
         <ImageGallery
           images={images}
           isEditMode={isEditMode}
@@ -174,7 +174,7 @@ export default function ImageUploadWithContext({
                 </label>
                 <textarea
                   id="uploadContext"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-gray-950 dark:focus:ring-gray-300 focus:border-gray-950 dark:focus:border-gray-300 dark:bg-[#111111] dark:text-gray-300"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-gray-950 dark:focus:ring-gray-300 focus:border-gray-950 dark:focus:border-gray-300 dark:bg-[var(--background-primary)] dark:text-gray-300"
                   rows={3}
                   placeholder="Add any additional details about the vehicle, location, or specific features you'd like the AI to focus on..."
                   value={context}

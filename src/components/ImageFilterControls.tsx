@@ -82,7 +82,7 @@ export function ImageFilterControls({
   };
 
   return (
-    <div className="bg-white dark:bg-[#111111] border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm p-3">
+    <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm p-3">
       <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
         {/* Angle Filter */}
         <div className="px-4 first:pl-0 last:pr-0">

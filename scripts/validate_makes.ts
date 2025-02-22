@@ -37,7 +37,7 @@ interface OpenAIResponse {
 }
 
 async function validateMakes() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI as string);
 
   try {
     await client.connect();

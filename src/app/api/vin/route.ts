@@ -140,6 +140,7 @@ export async function GET(request: Request) {
 
     // Get AI analysis of the data
     let aiAnalysis;
+    let additionalFields: Record<string, AIAnalysisField> = {};
     try {
       const aiResponse = await fetch(
         new URL("/api/vin/validate", request.url).toString(),
@@ -170,22 +171,32 @@ export async function GET(request: Request) {
           })
         );
 
-        // Check if AI found GVWR in the data
-        const gvwrField = Object.entries(aiResult.additionalFields || {}).find(
-          ([key, info]: [string, AIAnalysisField]) =>
-            key.toLowerCase().includes("gvwr") ||
-            key.toLowerCase().includes("weight") ||
-            info.value.toLowerCase().includes("gvwr")
-        );
+        if (aiResult?.additionalFields) {
+          additionalFields = aiResult.additionalFields as Record<
+            string,
+            AIAnalysisField
+          >;
+          // Check if AI found GVWR in the data
+          const gvwrField = Object.entries(additionalFields).find(
+            ([key, info]) =>
+              key.toLowerCase().includes("gvwr") ||
+              key.toLowerCase().includes("weight") ||
+              info.value.toLowerCase().includes("gvwr")
+          ) as [string, AIAnalysisField] | undefined;
 
-        if (gvwrField) {
-          const [_, info] = gvwrField as [string, AIAnalysisField];
-          // Extract numeric value and unit from the GVWR string
-          const match = info.value.match(/(\d+(?:,\d+)?)\s*(lbs?|pounds?|kg)/i);
-          if (match) {
-            const value = parseInt(match[1].replace(",", ""));
-            const unit = match[2].toLowerCase().startsWith("lb") ? "lbs" : "kg";
-            results.GVWR = { value, unit };
+          if (gvwrField) {
+            const [_, info] = gvwrField;
+            // Extract numeric value and unit from the GVWR string
+            const match = info.value.match(
+              /(\d+(?:,\d+)?)\s*(lbs?|pounds?|kg)/i
+            );
+            if (match) {
+              const value = parseInt(match[1].replace(",", ""));
+              const unit = match[2].toLowerCase().startsWith("lb")
+                ? "lbs"
+                : "kg";
+              results.GVWR = { value, unit };
+            }
           }
         }
       }
@@ -204,7 +215,10 @@ export async function GET(request: Request) {
       engineConfiguration: results["Engine Configuration"],
       engineCylinders:
         parseInt(results["Engine Number of Cylinders"]) || undefined,
-      error: data.Results.some((r) => r.Variable === "Error Code" && r.Value)
+      error: data.Results.some(
+        (r: { Variable: string; Value: string }) =>
+          r.Variable === "Error Code" && r.Value
+      )
         ? {
             code: results["Error Code"],
             text: results["Error Text"],
@@ -213,7 +227,8 @@ export async function GET(request: Request) {
         : undefined,
       validationStatus: {
         isPartial: data.Results.some(
-          (r) => r.Variable === "Error Code" && r.Value === "6"
+          (r: { Variable: string; Value: string }) =>
+            r.Variable === "Error Code" && r.Value === "6"
         ),
         suggestedVIN: results["Suggested VIN"],
         possibleValues: results["Possible Values"]
@@ -296,7 +311,7 @@ export async function GET(request: Request) {
             }
           : undefined,
       },
-      aiAnalysis,
+      aiAnalysis: additionalFields,
     };
 
     console.log("Final VIN response:", vinInfo);
