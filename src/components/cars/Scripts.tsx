@@ -937,9 +937,12 @@ ${template.rows
 
   const handleDeleteScript = async (scriptId: string) => {
     try {
-      const response = await fetch(`/api/cars/${carId}/scripts/${scriptId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/cars/${carId}/scripts?fileId=${scriptId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to delete script");
 

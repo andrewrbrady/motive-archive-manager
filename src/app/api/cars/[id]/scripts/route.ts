@@ -75,20 +75,20 @@ export async function DELETE(
 
     const db = await getDatabase();
 
-    // Delete the file from MongoDB
+    // Delete the script from MongoDB
     const result = await db
-      .collection("script_files")
-      .deleteOne({ _id: new ObjectId(fileId) });
+      .collection("scripts")
+      .deleteOne({ _id: new ObjectId(fileId), carId: new ObjectId(params.id) });
 
     if (result.deletedCount === 0) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+      return NextResponse.json({ error: "Script not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting script file:", error);
+    console.error("Error deleting script:", error);
     return NextResponse.json(
-      { error: "Failed to delete script file" },
+      { error: "Failed to delete script" },
       { status: 500 }
     );
   }

@@ -1,21 +1,9 @@
 // app/api/assets/[id]/route.ts
-import { MongoClient, ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB || "motive_archive";
-
-if (!uri) {
-  throw new Error("Please add your Mongo URI to .env.local");
-}
-
-async function getClient() {
-  const client = await MongoClient.connect(uri as string, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  return client;
-}
+export const dynamic = "force-dynamic";
 
 type RouteContext = {
   params: {
@@ -25,14 +13,11 @@ type RouteContext = {
 
 // GET single asset
 export async function GET(_request: NextRequest, { params }: RouteContext) {
-  let client;
   try {
     const id = params.id;
     console.log(`Fetching asset with ID: ${id}`);
 
-    client = await getClient();
-    const db = client.db(dbName);
-
+    const db = await getDatabase();
     const asset = await db.collection("raw").findOne({
       _id: new ObjectId(id),
     });
@@ -51,17 +36,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      console.log(`Closing MongoDB connection for asset ${params.id}`);
-      await client.close();
-    }
   }
 }
 
 // PATCH single asset
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
-  let client;
   try {
     const id = params.id;
     const data = await request.json();
@@ -74,9 +53,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       );
     }
 
-    client = await getClient();
-    const db = client.db(dbName);
-
+    const db = await getDatabase();
     const updateResult = await db.collection("raw").updateOne(
       { _id: new ObjectId(id) },
       {
@@ -101,18 +78,14 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }
 
 // DELETE single asset
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
-  let client;
   try {
     const id = params.id;
-    client = await getClient();
-    const db = client.db(dbName);
+    const db = await getDatabase();
 
     const deleteResult = await db.collection("raw").deleteOne({
       _id: new ObjectId(id),
@@ -132,8 +105,6 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }
 
