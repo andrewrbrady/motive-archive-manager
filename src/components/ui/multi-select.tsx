@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Command as CommandPrimitive } from "cmdk";
+import { cn } from "@/lib/utils";
 
 interface Option {
   label: string;
@@ -16,6 +17,7 @@ interface MultiSelectProps {
   value: Option[];
   onChange: (value: Option[]) => void;
   placeholder?: string;
+  className?: string;
 }
 
 export function MultiSelect({
@@ -23,6 +25,7 @@ export function MultiSelect({
   value,
   onChange,
   placeholder = "Select options...",
+  className,
 }: MultiSelectProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [open, setOpen] = React.useState(false);
@@ -56,9 +59,15 @@ export function MultiSelect({
   return (
     <Command
       onKeyDown={handleKeyDown}
-      className="overflow-visible bg-white dark:bg-gray-800"
+      className={cn("overflow-visible bg-transparent", className)}
     >
-      <div className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+      <div
+        className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 bg-background"
+        onClick={() => {
+          inputRef.current?.focus();
+          setOpen(true);
+        }}
+      >
         <div className="flex gap-1 flex-wrap">
           {value.map((option) => (
             <Badge
@@ -78,7 +87,10 @@ export function MultiSelect({
                   e.preventDefault();
                   e.stopPropagation();
                 }}
-                onClick={() => handleUnselect(option)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUnselect(option);
+                }}
               >
                 <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
               </button>
@@ -88,7 +100,10 @@ export function MultiSelect({
             ref={inputRef}
             value={inputValue}
             onValueChange={setInputValue}
-            onBlur={() => setOpen(false)}
+            onBlur={() => {
+              setOpen(false);
+              setInputValue("");
+            }}
             onFocus={() => setOpen(true)}
             placeholder={value.length === 0 ? placeholder : undefined}
             className="ml-2 bg-transparent outline-none placeholder:text-muted-foreground flex-1"
@@ -97,11 +112,12 @@ export function MultiSelect({
       </div>
       <div className="relative mt-2">
         {open && selectables.length > 0 ? (
-          <div className="absolute w-full z-10 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in">
-            <CommandGroup className="h-full overflow-auto">
+          <div className="absolute w-full z-50 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in">
+            <CommandGroup className="max-h-[200px] overflow-auto">
               {selectables.map((option) => (
                 <CommandItem
                   key={option.value}
+                  value={option.value}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();

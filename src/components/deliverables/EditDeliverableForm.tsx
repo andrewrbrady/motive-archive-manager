@@ -223,6 +223,8 @@ export default function EditDeliverableForm({
                 <SelectItem value="Video">Video</SelectItem>
                 <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
                 <SelectItem value="Video Gallery">Video Gallery</SelectItem>
+                <SelectItem value="Still">Still</SelectItem>
+                <SelectItem value="Graphic">Graphic</SelectItem>
                 <SelectItem value="feature">Feature</SelectItem>
                 <SelectItem value="promo">Promo</SelectItem>
                 <SelectItem value="review">Review</SelectItem>

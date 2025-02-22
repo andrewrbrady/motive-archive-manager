@@ -24,7 +24,14 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { MultiSelect } from "@/components/ui/multi-select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 export interface ListViewProps {
   events: Event[];
@@ -496,28 +503,93 @@ export default function ListView({
               </TableCell>
               <TableCell className="min-w-[200px]">
                 {isEditMode ? (
-                  <div className="relative">
-                    <MultiSelect
-                      value={event.assignees || []}
-                      onChange={(values) => {
-                        updateEventField(event.id, "assignees", values);
-                      }}
-                      options={users.map((user) => ({
-                        value: user.name,
-                        label: user.name,
-                      }))}
-                      placeholder="Select assignees"
-                      className="z-[9999]"
-                      menuPortalTarget={document.body}
-                      styles={{
-                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      }}
-                    />
-                  </div>
-                ) : event.assignees?.length > 0 ? (
-                  event.assignees.join(", ")
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                      >
+                        {Array.isArray(event.assignees) &&
+                        event.assignees.length > 0
+                          ? `${event.assignees.length} selected`
+                          : "Select assignees"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-2" align="start">
+                      <ScrollArea className="h-[200px]">
+                        <div className="grid grid-cols-2 gap-1">
+                          {users.map((user) => {
+                            const isSelected =
+                              Array.isArray(event.assignees) &&
+                              event.assignees.includes(user.name);
+                            return (
+                              <button
+                                key={user._id}
+                                onClick={() => {
+                                  const currentAssignees = Array.isArray(
+                                    event.assignees
+                                  )
+                                    ? [...event.assignees]
+                                    : [];
+                                  if (!isSelected) {
+                                    updateEventField(event.id, "assignees", [
+                                      ...currentAssignees,
+                                      user.name,
+                                    ]);
+                                  } else {
+                                    updateEventField(
+                                      event.id,
+                                      "assignees",
+                                      currentAssignees.filter(
+                                        (name) => name !== user.name
+                                      )
+                                    );
+                                  }
+                                }}
+                                className={`flex items-center space-x-2 p-2 rounded-md transition-colors text-left ${
+                                  isSelected
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                    : "hover:bg-accent"
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors ${
+                                    isSelected
+                                      ? "bg-primary border-primary text-primary-foreground"
+                                      : "border-input"
+                                  }`}
+                                >
+                                  {isSelected && <Check className="h-3 w-3" />}
+                                </div>
+                                <span className="text-sm truncate">
+                                  {user.name}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
                 ) : (
-                  "Unassigned"
+                  <div className="flex flex-wrap gap-1">
+                    {Array.isArray(event.assignees) &&
+                    event.assignees.length > 0 ? (
+                      event.assignees.map((name) => (
+                        <Badge
+                          key={name}
+                          variant="secondary"
+                          className="text-xs py-0.5 px-2"
+                        >
+                          {name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-muted-foreground">Unassigned</span>
+                    )}
+                  </div>
                 )}
               </TableCell>
               {isEditMode && (

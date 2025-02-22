@@ -6,6 +6,13 @@
   position: relative;
   height: 100%;
   overflow: hidden;
+  --border-subtle: rgba(161, 161, 170, 0.15);
+  --border-very-subtle: rgba(161, 161, 170, 0.1);
+}
+
+.dark .events-calendar {
+  --border-subtle: rgba(244, 244, 245, 0.1);
+  --border-very-subtle: rgba(244, 244, 245, 0.05);
 }
 
 /* Month view optimizations */
@@ -256,93 +263,128 @@
 
 /* Week view optimizations */
 .events-calendar .rbc-time-view {
-  border: none;
+  border: 1px solid var(--border-subtle) !important;
   display: flex;
   flex-direction: column;
   flex: 1;
   width: 100%;
   min-height: 0;
   border-radius: 4px;
-  @apply border border-zinc-200 dark:border-zinc-800;
 }
 
-.events-calendar .rbc-time-content {
-  flex: 1;
-  overflow-y: auto;
-  position: relative;
-  outline: none;
-  min-height: 0;
-}
-
-.events-calendar .rbc-time-content > * + * > * {
-  @apply border-l border-zinc-200 dark:border-zinc-800;
-}
-
+/* Header fixes */
 .events-calendar .rbc-time-header {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
+  position: relative !important;
+  z-index: 3 !important;
+  background: inherit !important;
+  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
 }
 
 .events-calendar .rbc-time-header-content {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  border-left: none;
+  position: relative !important;
+  z-index: 3 !important;
+  min-height: fit-content !important;
+  @apply border-l border-zinc-200/20 dark:border-zinc-700/20 !important;
 }
 
 .events-calendar .rbc-time-header-cell {
-  flex: 1 1 0;
-  min-width: 0;
-  padding-right: 5px;
-  text-align: right;
+  min-height: fit-content !important;
+  height: auto !important;
 }
 
-.events-calendar .rbc-time-gutter {
-  white-space: nowrap;
+.events-calendar .rbc-header {
+  position: relative !important;
+  z-index: 3 !important;
+  background: inherit !important;
+  min-height: 30px !important;
+  height: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 4px !important;
+  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-header:last-child {
+  border-right: none !important;
+}
+
+.events-calendar .rbc-header .rbc-button-link {
+  @apply text-zinc-600 dark:text-zinc-400 text-sm font-normal;
+  width: 100%;
+  padding: 4px;
+}
+
+.events-calendar .rbc-allday-cell {
+  position: relative !important;
+  z-index: 2 !important;
+  background: inherit !important;
+  min-height: fit-content !important;
+  height: auto !important;
+  margin-bottom: 8px !important;
+  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-time-header.rbc-overflowing {
+  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-time-header .rbc-row-bg {
+  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-time-header .rbc-day-bg + .rbc-day-bg {
+  @apply border-l border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+/* Time slot and vertical border styling */
+.events-calendar .rbc-time-view .rbc-day-slot {
+  @apply border-l border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-time-content > .rbc-time-gutter {
+  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-time-header-gutter {
+  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+}
+
+.events-calendar .rbc-day-slot .rbc-time-slot {
+  @apply border-zinc-200/20 dark:border-zinc-700/20;
+  border-top: 1px solid;
+  min-height: 30px;
+}
+
+.events-calendar .rbc-day-slot .rbc-time-slot:first-child {
+  border-top: none;
 }
 
 .events-calendar .rbc-time-slot {
-  flex: 1 0 0;
+  @apply text-zinc-600 dark:text-zinc-400;
 }
 
-.events-calendar .rbc-day-slot {
-  position: relative;
-  display: inline-flex;
-  overflow: hidden;
-  flex: 1 0 0;
+/* Time label styling */
+.events-calendar .rbc-time-slot .rbc-label {
+  @apply text-zinc-400 dark:text-zinc-600 text-xs font-normal;
+  padding-right: 8px;
 }
 
-.events-calendar .rbc-day-slot .rbc-events-container {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  left: 0;
-  right: 0;
-  margin-right: 10px;
+.events-calendar .rbc-timeslot-group {
+  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
 }
 
-.events-calendar .rbc-day-slot .rbc-event {
-  border: none;
-  display: flex;
-  max-height: 100%;
-  flex-flow: column wrap;
-  align-items: flex-start;
-  overflow: hidden;
-  position: absolute;
+/* Event container z-index adjustments */
+.events-calendar .rbc-events-container {
+  z-index: 1 !important;
 }
 
-/* Smooth scrolling */
-.events-calendar .rbc-time-content {
-  scroll-behavior: smooth;
+.events-calendar .rbc-time-view .rbc-day-slot .rbc-events-container {
+  margin-top: 0 !important;
 }
 
-/* Hide scrollbar but keep functionality */
-.events-calendar .rbc-time-content::-webkit-scrollbar {
-  width: 0px;
-}
-
-.events-calendar .rbc-time-content {
-  scrollbar-width: none;
+/* Ensure proper event layering */
+.events-calendar .rbc-event {
+  z-index: 1 !important;
 }

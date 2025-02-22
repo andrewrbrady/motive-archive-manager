@@ -24,7 +24,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { MultiSelect } from "@/components/ui/multi-select";
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface User {
   _id: string;
@@ -213,15 +219,61 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
             <FormItem>
               <FormLabel>Assignees</FormLabel>
               <FormControl>
-                <MultiSelect
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={users.map((user) => ({
-                    value: user.name,
-                    label: user.name,
-                  }))}
-                  placeholder="Select assignees"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {field.value.length > 0
+                        ? `${field.value.length} selected`
+                        : "Select assignees"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-2" align="start">
+                    <ScrollArea className="h-[200px]">
+                      <div className="grid grid-cols-2 gap-1">
+                        {users.map((user) => {
+                          const isSelected = field.value.includes(user.name);
+                          return (
+                            <button
+                              key={user._id}
+                              type="button"
+                              onClick={() => {
+                                const newValue = isSelected
+                                  ? field.value.filter(
+                                      (name) => name !== user.name
+                                    )
+                                  : [...field.value, user.name];
+                                field.onChange(newValue);
+                              }}
+                              className={`flex items-center space-x-2 p-2 rounded-md transition-colors text-left ${
+                                isSelected
+                                  ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                  : "hover:bg-accent"
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors ${
+                                  isSelected
+                                    ? "bg-primary border-primary text-primary-foreground"
+                                    : "border-input"
+                                }`}
+                              >
+                                {isSelected && <Check className="h-3 w-3" />}
+                              </div>
+                              <span className="text-sm truncate">
+                                {user.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
               </FormControl>
               <FormMessage />
             </FormItem>

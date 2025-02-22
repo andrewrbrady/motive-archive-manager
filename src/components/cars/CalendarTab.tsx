@@ -37,9 +37,13 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import InfiniteMonthView from "./InfiniteMonthView";
+import { Separator } from "@/components/ui/separator";
 
 // Create DnD Calendar
 const DragAndDropCalendar = withDragAndDrop(Calendar);
@@ -151,7 +155,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       ? events
           .filter(
             (event) =>
-              eventTypeFilters.length > 0 &&
+              eventTypeFilters.length === 0 ||
               eventTypeFilters.includes(event.type)
           )
           .map((event) => ({
@@ -164,7 +168,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
             end: event.end ? new Date(event.end) : new Date(event.start),
             type: "event",
             resource: event,
-            allDay: event.isAllDay || false,
+            allDay: event.isAllDay || !event.end || view === "month",
           }))
       : [];
 
@@ -172,16 +176,16 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       ? deliverables
           .filter(
             (deliverable) =>
-              deliverablePlatformFilters.length > 0 &&
-              deliverablePlatformFilters.includes(deliverable.platform) &&
-              deliverableTypeFilters.length > 0 &&
-              deliverableTypeFilters.includes(deliverable.type)
+              (deliverablePlatformFilters.length === 0 ||
+                deliverablePlatformFilters.includes(deliverable.platform)) &&
+              (deliverableTypeFilters.length === 0 ||
+                deliverableTypeFilters.includes(deliverable.type))
           )
           .flatMap((deliverable) => {
             const items = [];
 
             if (
-              deliverableEventFilters.length > 0 &&
+              deliverableEventFilters.length === 0 ||
               deliverableEventFilters.includes("deadline")
             ) {
               items.push({
@@ -191,12 +195,12 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
                 end: new Date(deliverable.edit_deadline),
                 type: "deliverable",
                 resource: { ...deliverable, eventType: "deadline" },
-                allDay: false,
+                allDay: true,
               });
             }
 
             if (
-              deliverableEventFilters.length > 0 &&
+              deliverableEventFilters.length === 0 ||
               deliverableEventFilters.includes("release")
             ) {
               items.push({
@@ -206,7 +210,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
                 end: new Date(deliverable.release_date),
                 type: "deliverable",
                 resource: { ...deliverable, eventType: "release" },
-                allDay: false,
+                allDay: true,
               });
             }
 
@@ -226,6 +230,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
     deliverableTypeFilters,
     showEvents,
     showDeliverables,
+    view,
   ]);
 
   const getEventStyle = (event: CalendarEvent) => {
@@ -391,51 +396,211 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
           </button>
         </div>
         <div className="rbc-toolbar-label">{toolbarProps.label}</div>
-        <div className="rbc-btn-group">
-          <button
-            type="button"
-            onClick={() => toolbarProps.onView("month" as View)}
-            className={cn(
-              "flex items-center justify-center px-3 py-1",
-              (toolbarProps.view as string) === "month" && "rbc-active"
-            )}
-            title="Month view"
+        <div className="flex items-center gap-2">
+          <div className="rbc-btn-group">
+            <button
+              type="button"
+              onClick={() => toolbarProps.onView("month" as View)}
+              className={cn(
+                "flex items-center justify-center px-3 py-1",
+                (toolbarProps.view as string) === "month" && "rbc-active"
+              )}
+              title="Month view"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => toolbarProps.onView("week" as View)}
+              className={cn(
+                "flex items-center justify-center px-3 py-1",
+                (toolbarProps.view as string) === "week" && "rbc-active"
+              )}
+              title="Week view"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => toolbarProps.onView("work_week" as View)}
+              className={cn(
+                "flex items-center justify-center px-3 py-1",
+                (toolbarProps.view as string) === "work_week" && "rbc-active"
+              )}
+              title="Work Week view"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => toolbarProps.onView("agenda" as View)}
+              className={cn(
+                "flex items-center justify-center px-3 py-1",
+                (toolbarProps.view as string) === "agenda" && "rbc-active"
+              )}
+              title="List view"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEvents(!showEvents)}
+              className={cn(
+                "flex items-center gap-2",
+                showEvents && "bg-zinc-100 dark:bg-zinc-800"
+              )}
+            >
+              {showEvents ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              Events
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeliverables(!showDeliverables)}
+              className={cn(
+                "flex items-center gap-2",
+                showDeliverables && "bg-zinc-100 dark:bg-zinc-800"
+              )}
+            >
+              {showDeliverables ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              Deliverables
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {showEvents && uniqueEventTypes.length > 0 && (
+                  <>
+                    <DropdownMenuLabel>Event Types</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      {uniqueEventTypes.map((type) => (
+                        <DropdownMenuCheckboxItem
+                          key={type}
+                          checked={eventTypeFilters.includes(type)}
+                          onCheckedChange={(checked) => {
+                            setEventTypeFilters(
+                              checked
+                                ? [...eventTypeFilters, type]
+                                : eventTypeFilters.filter((t) => t !== type)
+                            );
+                          }}
+                        >
+                          {type.replace(/_/g, " ")}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </>
+                )}
+
+                {showDeliverables && (
+                  <>
+                    {showEvents && uniqueEventTypes.length > 0 && (
+                      <DropdownMenuSeparator />
+                    )}
+                    <DropdownMenuLabel>Deliverable Types</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      {uniqueDeliverableTypes.map((type) => (
+                        <DropdownMenuCheckboxItem
+                          key={type}
+                          checked={deliverableTypeFilters.includes(type)}
+                          onCheckedChange={(checked) => {
+                            setDeliverableTypeFilters(
+                              checked
+                                ? [...deliverableTypeFilters, type]
+                                : deliverableTypeFilters.filter(
+                                    (t) => t !== type
+                                  )
+                            );
+                          }}
+                        >
+                          {type}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuGroup>
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Platforms</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      {uniqueDeliverablePlatforms.map((platform) => (
+                        <DropdownMenuCheckboxItem
+                          key={platform}
+                          checked={deliverablePlatformFilters.includes(
+                            platform
+                          )}
+                          onCheckedChange={(checked) => {
+                            setDeliverablePlatformFilters(
+                              checked
+                                ? [...deliverablePlatformFilters, platform]
+                                : deliverablePlatformFilters.filter(
+                                    (p) => p !== platform
+                                  )
+                            );
+                          }}
+                        >
+                          {platform}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuGroup>
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Event Categories</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      {deliverableEventCategories.map((category) => (
+                        <DropdownMenuCheckboxItem
+                          key={category}
+                          checked={deliverableEventFilters.includes(category)}
+                          onCheckedChange={(checked) => {
+                            setDeliverableEventFilters(
+                              checked
+                                ? [...deliverableEventFilters, category]
+                                : deliverableEventFilters.filter(
+                                    (c) => c !== category
+                                  )
+                            );
+                          }}
+                        >
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           >
-            <CalendarIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => toolbarProps.onView("week" as View)}
-            className={cn(
-              "flex items-center justify-center px-3 py-1",
-              (toolbarProps.view as string) === "week" && "rbc-active"
+            {isFullscreen ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
             )}
-            title="Week view"
-          >
-            <CalendarIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => toolbarProps.onView("work_week" as View)}
-            className={cn(
-              "flex items-center justify-center px-3 py-1",
-              (toolbarProps.view as string) === "work_week" && "rbc-active"
-            )}
-            title="Work Week view"
-          >
-            <CalendarIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => toolbarProps.onView("agenda" as View)}
-            className={cn(
-              "flex items-center justify-center px-3 py-1",
-              (toolbarProps.view as string) === "agenda" && "rbc-active"
-            )}
-            title="List view"
-          >
-            <List className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
     ),
@@ -495,6 +660,27 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
       }
 
       if (event.type === "event") {
+        let adjustedEnd;
+
+        // For all-day events, ensure they stay within their day
+        if (isAllDay || event.allDay) {
+          // Set start to beginning of day
+          start.setHours(0, 0, 0, 0);
+          // Set end to same day as start
+          adjustedEnd = new Date(start);
+          adjustedEnd.setHours(23, 59, 59, 999);
+        } else {
+          // For non-all-day events, maintain original duration
+          const originalEvent = event.resource as Event;
+          const originalStart = new Date(originalEvent.start);
+          const originalEnd = originalEvent.end
+            ? new Date(originalEvent.end)
+            : new Date(originalEvent.start);
+          const originalDuration =
+            originalEnd.getTime() - originalStart.getTime();
+          adjustedEnd = new Date(start.getTime() + originalDuration);
+        }
+
         const response = await fetch(`/api/cars/${carId}/events/${event.id}`, {
           method: "PUT",
           headers: {
@@ -502,7 +688,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
           },
           body: JSON.stringify({
             start: start.toISOString(),
-            end: end.toISOString(),
+            end: adjustedEnd.toISOString(),
             isAllDay: isAllDay,
           }),
         });
@@ -660,24 +846,28 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
         resizable
         selectable
         draggableAccessor={() => true}
-        resizableAccessor={() => true}
+        resizableAccessor={(event: CalendarEvent) => !event.allDay}
         showMultiDayTimes
         popup
-        length={30}
+        timeslots={2}
+        step={30}
         defaultView={view}
         dayLayoutAlgorithm="no-overlap"
         scrollToTime={new Date(0, 0, 0, 8, 0, 0)}
         longPressThreshold={10}
         formats={{
+          timeGutterFormat: (date: Date, culture?: string, localizer?: any) => {
+            return format(date, "h aa").toLowerCase();
+          },
           agendaDateFormat: "MMM d, yyyy",
           agendaTimeFormat: "h:mm a",
           agendaTimeRangeFormat: ({ start, end }) => {
             if (start.getDate() === end.getDate()) {
               return `${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
             }
-            return `${format(start, "MMM d, h:mm a")} - ${format(
+            return `${format(start, "MMM d h:mm a")} - ${format(
               end,
-              "MMM d, h:mm a"
+              "MMM d h:mm a"
             )}`;
           },
         }}

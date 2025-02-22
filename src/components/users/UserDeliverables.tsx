@@ -61,7 +61,14 @@ const PLATFORMS = [
   "Other",
 ];
 
-const TYPES = ["Photo Gallery", "Video", "Mixed Gallery", "Video Gallery"];
+const TYPES = [
+  "Photo Gallery",
+  "Video",
+  "Mixed Gallery",
+  "Video Gallery",
+  "Still",
+  "Graphic",
+];
 
 const STATUSES = ["not_started", "in_progress", "done"];
 

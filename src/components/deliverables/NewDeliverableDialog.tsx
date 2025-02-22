@@ -294,6 +294,8 @@ export default function NewDeliverableDialog({
                     <SelectItem value="Video">Video</SelectItem>
                     <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
                     <SelectItem value="Video Gallery">Video Gallery</SelectItem>
+                    <SelectItem value="Still">Still</SelectItem>
+                    <SelectItem value="Graphic">Graphic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

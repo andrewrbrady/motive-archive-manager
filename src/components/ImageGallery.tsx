@@ -654,7 +654,11 @@ export function ImageGallery({
                     </span>
                   </div>
                   <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
-                    {displayImages[mainIndex]?.metadata?.angle || "N/A"}
+                    {displayImages[
+                      mainIndex
+                    ]?.metadata?.angle?.toLowerCase() === "not applicable"
+                      ? ""
+                      : displayImages[mainIndex]?.metadata?.angle || ""}
                   </span>
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
@@ -807,6 +811,11 @@ export function ImageGallery({
                 return (
                   <div
                     key={index}
+                    onClick={() =>
+                      isEditMode
+                        ? handleImageSelect(actualIndex)
+                        : handleThumbnailClick(actualIndex)
+                    }
                     className={cn(
                       "relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200",
                       isEditMode && "hover:opacity-90"

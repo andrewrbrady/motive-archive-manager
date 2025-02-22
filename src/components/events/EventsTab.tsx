@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Event, EventStatus, EventType } from "@/types/event";
 import { toast } from "sonner";
-import EventsCalendar from "./EventsCalendar";
-import ListView from "./ListView";
+import ListView from "@/components/events/ListView";
+import EventBatchTemplates from "@/components/events/EventBatchTemplates";
+import EventBatchManager from "@/components/events/EventBatchManager";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, ChevronsUpDown, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,8 +26,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSearchParams, useRouter } from "next/navigation";
-import EventBatchTemplates from "./EventBatchTemplates";
 import { MultiSelect } from "@/components/ui/multi-select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface Option {
+  label: string;
+  value: string;
+}
 
 interface User {
   _id: string;
@@ -248,140 +258,186 @@ export default function EventsTab({ carId }: { carId: string }) {
 
   return (
     <div className="space-y-4">
-      <Tabs value={view} onValueChange={updateViewInUrl} className="w-full">
-        <div className="flex justify-between items-center">
-          <TabsList>
-            <TabsTrigger value="list">List View</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-          </TabsList>
-
-          <div className="flex gap-2">
-            <EventBatchTemplates carId={carId} onEventsCreated={fetchEvents} />
-            <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Event
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Event</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Event Type</Label>
-                    <Select
-                      value={newEvent.type}
-                      onValueChange={(value) =>
-                        setNewEvent({ ...newEvent, type: value as EventType })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.values(EventType).map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type.replace(/_/g, " ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Description</Label>
-                    <Textarea
-                      value={newEvent.description}
-                      onChange={(e) =>
-                        setNewEvent({
-                          ...newEvent,
-                          description: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>Start Date</Label>
-                    <Input
-                      type="datetime-local"
-                      value={newEvent.start}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, start: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>End Date (Optional)</Label>
-                    <Input
-                      type="datetime-local"
-                      value={newEvent.end}
-                      onChange={(e) =>
-                        setNewEvent({ ...newEvent, end: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>Assignees</Label>
-                    <MultiSelect
-                      value={newEvent.assignees}
-                      onChange={(values) => {
-                        console.log("Selected assignees:", values); // Debug log
-                        setNewEvent({ ...newEvent, assignees: values });
-                      }}
-                      options={users.map((user) => ({
-                        value: user.name,
-                        label: user.name,
-                      }))}
-                      placeholder="Select assignees"
-                    />
-                  </div>
-                  <div>
-                    <Label>Status</Label>
-                    <Select
-                      value={newEvent.status}
-                      onValueChange={(value) =>
-                        setNewEvent({
-                          ...newEvent,
-                          status: value as EventStatus,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.values(EventStatus).map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {status.replace(/_/g, " ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={handleAddEvent}>Create Event</Button>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Events</h2>
+        <div className="flex gap-2">
+          <EventBatchTemplates carId={carId} onEventsCreated={fetchEvents} />
+          <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Event
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="overflow-visible">
+              <DialogHeader>
+                <DialogTitle>Add New Event</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Event Type</Label>
+                  <Select
+                    value={newEvent.type}
+                    onValueChange={(value) =>
+                      setNewEvent({ ...newEvent, type: value as EventType })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(EventType).map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea
+                    value={newEvent.description}
+                    onChange={(e) =>
+                      setNewEvent({
+                        ...newEvent,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Start Date</Label>
+                  <Input
+                    type="datetime-local"
+                    value={newEvent.start}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, start: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>End Date (Optional)</Label>
+                  <Input
+                    type="datetime-local"
+                    value={newEvent.end}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, end: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Assignees</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                      >
+                        {Array.isArray(newEvent.assignees) &&
+                        newEvent.assignees.length > 0
+                          ? `${newEvent.assignees.length} selected`
+                          : "Select assignees"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-2" align="start">
+                      <ScrollArea className="h-[200px]">
+                        <div className="grid grid-cols-2 gap-1">
+                          {users.map((user) => {
+                            const isSelected =
+                              Array.isArray(newEvent.assignees) &&
+                              newEvent.assignees.includes(user.name);
+                            return (
+                              <button
+                                key={user._id}
+                                type="button"
+                                onClick={() => {
+                                  const currentAssignees = Array.isArray(
+                                    newEvent.assignees
+                                  )
+                                    ? [...newEvent.assignees]
+                                    : [];
+                                  if (!isSelected) {
+                                    setNewEvent({
+                                      ...newEvent,
+                                      assignees: [
+                                        ...currentAssignees,
+                                        user.name,
+                                      ],
+                                    });
+                                  } else {
+                                    setNewEvent({
+                                      ...newEvent,
+                                      assignees: currentAssignees.filter(
+                                        (name) => name !== user.name
+                                      ),
+                                    });
+                                  }
+                                }}
+                                className={`flex items-center space-x-2 p-2 rounded-md transition-colors text-left ${
+                                  isSelected
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                    : "hover:bg-accent"
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors ${
+                                    isSelected
+                                      ? "bg-primary border-primary text-primary-foreground"
+                                      : "border-input"
+                                  }`}
+                                >
+                                  {isSelected && <Check className="h-3 w-3" />}
+                                </div>
+                                <span className="text-sm truncate">
+                                  {user.name}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select
+                    value={newEvent.status}
+                    onValueChange={(value) =>
+                      setNewEvent({
+                        ...newEvent,
+                        status: value as EventStatus,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(EventStatus).map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleAddEvent}>Create Event</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
+      </div>
 
-        <TabsContent value="list" className="mt-6">
-          <ListView
-            events={events}
-            onUpdateEvent={handleUpdateEvent}
-            onDeleteEvent={handleDeleteEvent}
-            onEventUpdated={fetchEvents}
-          />
-        </TabsContent>
-        <TabsContent value="calendar" className="mt-6">
-          <EventsCalendar
-            events={events}
-            onUpdateEvent={handleUpdateEvent}
-            onDeleteEvent={handleDeleteEvent}
-          />
-        </TabsContent>
-      </Tabs>
+      <ListView
+        events={events}
+        onUpdateEvent={handleUpdateEvent}
+        onDeleteEvent={handleDeleteEvent}
+        onEventUpdated={fetchEvents}
+      />
     </div>
   );
 }

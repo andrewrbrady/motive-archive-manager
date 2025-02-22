@@ -160,8 +160,8 @@ export default function ImageUploadWithContext({
           showFilters={showFilters}
           title={title}
           aspectRatio="4/3"
-          thumbnailsPerRow={8}
-          rowsPerPage={3}
+          thumbnailsPerRow={3}
+          rowsPerPage={5}
           carId={carId}
           contextInput={
             isEditMode && (

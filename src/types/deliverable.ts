@@ -16,6 +16,8 @@ export type DeliverableType =
   | "Video"
   | "Mixed Gallery"
   | "Video Gallery"
+  | "Still"
+  | "Graphic"
   | "feature"
   | "promo"
   | "review"

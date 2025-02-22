@@ -340,6 +340,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "Video", label: "Video" },
         { value: "Mixed Gallery", label: "Mixed Gallery" },
         { value: "Video Gallery", label: "Video Gallery" },
+        { value: "Still", label: "Still" },
+        { value: "Graphic", label: "Graphic" },
       ];
     } else if (field === "status") {
       options = [
@@ -482,6 +484,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 <SelectItem value="Video">Video</SelectItem>
                 <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
                 <SelectItem value="Video Gallery">Video Gallery</SelectItem>
+                <SelectItem value="Still">Still</SelectItem>
+                <SelectItem value="Graphic">Graphic</SelectItem>
               </SelectContent>
             </Select>
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>

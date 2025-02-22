@@ -44,6 +44,7 @@ const filterValidOptions = (options: string[]): string[] => {
       "none",
       "",
       "null",
+      "not applicable",
     ].map((v) => v.toLowerCase())
   );
 
