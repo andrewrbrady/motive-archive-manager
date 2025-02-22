@@ -8,6 +8,7 @@ import {
   Plus,
   Clock,
   Save,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
@@ -33,6 +34,17 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ScriptTemplates from "./ScriptTemplates";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import MarkdownEditor from "@/components/MarkdownEditor";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // Import the ScriptTemplate type
 interface ScriptRow {
@@ -50,32 +62,46 @@ interface ScriptTemplate {
   rows: ScriptRow[];
   createdAt?: Date;
   updatedAt?: Date;
+  platforms: Platform[];
+  aspectRatio: AspectRatio;
 }
 
-// Dynamically import MarkdownEditor with no SSR
-const MarkdownEditor = dynamic(() => import("../MarkdownEditor"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full">
-      <Loader2 className="w-6 h-6 animate-spin" />
-    </div>
-  ),
-});
+export type Platform =
+  | "instagram_reels"
+  | "youtube_shorts"
+  | "youtube"
+  | "stream_otv";
+export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
+
+const PLATFORMS: { value: Platform; label: string }[] = [
+  { value: "instagram_reels", label: "Instagram Reels" },
+  { value: "youtube_shorts", label: "YouTube Shorts" },
+  { value: "youtube", label: "YouTube" },
+  { value: "stream_otv", label: "Stream/OTV" },
+];
+
+const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
+  { value: "9:16", label: "9:16 (Vertical)" },
+  { value: "16:9", label: "16:9 (Horizontal)" },
+  { value: "1:1", label: "1:1 (Square)" },
+  { value: "4:5", label: "4:5 (Instagram)" },
+];
 
 interface Script {
-  _id: string;
-  filename: string;
-  contentType: string;
-  size: number;
-  url: string;
-  createdAt: string;
-  updatedAt: string;
-  content?: string;
+  _id?: string;
+  name: string;
+  description: string;
+  platforms: Platform[];
+  aspectRatio: AspectRatio;
+  content: string;
+  brief: string;
+  duration: string;
+  rows?: ScriptRow[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  size?: number;
   processingStatus?: "pending" | "completed" | "failed";
   processingError?: string;
-  rows?: ScriptRow[];
-  brief?: string;
-  duration?: string;
 }
 
 interface ScriptsProps {
@@ -83,6 +109,8 @@ interface ScriptsProps {
 }
 
 export default function Scripts({ carId }: ScriptsProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [files, setFiles] = useState<Script[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +129,6 @@ export default function Scripts({ carId }: ScriptsProps) {
   const fileListRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const [isCreatingScript, setIsCreatingScript] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
   const scriptForm = useForm<{
@@ -111,6 +138,23 @@ export default function Scripts({ carId }: ScriptsProps) {
       filename: "",
     },
   });
+
+  // Replace isEditing state with a function that reads from URL
+  const isEditing = searchParams.get("edit") === "true";
+
+  // Replace setIsEditing with a function that updates the URL
+  const setIsEditing = useCallback(
+    (value: boolean) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value) {
+        params.set("edit", "true");
+      } else {
+        params.delete("edit");
+      }
+      router.replace(`?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
 
   useEffect(() => {
     fetchFiles();
@@ -122,7 +166,7 @@ export default function Scripts({ carId }: ScriptsProps) {
       const response = await fetch(`/api/cars/${carId}/scripts`);
       if (!response.ok) throw new Error("Failed to fetch scripts");
       const data = await response.json();
-      setFiles(data.files || []);
+      setFiles(data || []);
     } catch (error) {
       console.error("Error fetching scripts:", error);
       setError("Failed to load scripts");
@@ -361,9 +405,19 @@ Add a brief description of the script here...
   };
 
   const handleFileClick = async (file: Script) => {
+    setIsEditing(false);
     setIsLoadingContent(true);
     setError(null);
     try {
+      // If the script already has content (created from template), use it directly
+      if (file.content) {
+        setMarkdownContent(file.content);
+        setSelectedFile(file);
+        setIsLoadingContent(false);
+        return;
+      }
+
+      // Otherwise, fetch content from S3 for uploaded files
       const response = await fetch(
         `/api/cars/${carId}/scripts/content?fileId=${file._id}`
       );
@@ -382,8 +436,8 @@ Add a brief description of the script here...
         ...file,
         content,
         rows,
-        brief: briefMatch ? briefMatch[1].trim() : undefined,
-        duration: durationMatch ? durationMatch[1].trim() : undefined,
+        brief: briefMatch ? briefMatch[1].trim() : "",
+        duration: durationMatch ? durationMatch[1].trim() : "00:00",
       });
     } catch (error) {
       console.error("Error loading markdown content:", error);
@@ -548,7 +602,7 @@ ${rows
     setSelectedFile((prev) => (prev ? { ...prev, rows: updatedRows } : null));
 
     // Update markdown content while preserving brief and duration
-    const newContent = `# ${selectedFile.filename}
+    const newContent = `# ${selectedFile.name}
 
 ## Brief
 ${selectedFile.brief || "Add a brief description of the script here..."}
@@ -573,7 +627,7 @@ ${convertRowsToMarkdown(updatedRows)}`;
     setSelectedFile((prev) => (prev ? { ...prev, rows: updatedRows } : null));
 
     // Update markdown content while preserving brief and duration
-    const newContent = `# ${selectedFile.filename}
+    const newContent = `# ${selectedFile.name}
 
 ## Brief
 ${selectedFile.brief || "Add a brief description of the script here..."}
@@ -604,7 +658,7 @@ ${convertRowsToMarkdown(updatedRows)}`;
     setSelectedFile((prev) => (prev ? { ...prev, rows: updatedRows } : null));
 
     // Update markdown content while preserving brief and duration
-    const newContent = `# ${selectedFile.filename}
+    const newContent = `# ${selectedFile.name}
 
 ## Brief
 ${selectedFile.brief || "Add a brief description of the script here..."}
@@ -682,18 +736,39 @@ ${convertRowsToMarkdown(updatedRows)}`;
 
   const handleApplyTemplate = async (template: ScriptTemplate) => {
     try {
-      // Create a new file with a timestamp
-      const timestamp = new Date().toISOString().split("T")[0];
-      const filename = `script-${timestamp}`;
-
       // Extract duration from template name if available
       const durationMatch = template.name.match(/(\d+)\s*Second/i);
       const duration = durationMatch
         ? `00:${durationMatch[1].padStart(2, "0")}`
         : "00:00";
 
-      // Convert template rows to markdown content
-      const content = `# ${template.name}
+      // Validate and normalize platform values
+      const validPlatforms = [
+        "instagram_reels",
+        "youtube_shorts",
+        "youtube",
+        "stream_otv",
+      ] as const;
+
+      const normalizedPlatforms = Array.isArray(template.platforms)
+        ? template.platforms.filter((platform): platform is Platform =>
+            validPlatforms.includes(platform as Platform)
+          )
+        : [];
+
+      // If no platforms are selected, use youtube as default
+      if (normalizedPlatforms.length === 0) {
+        normalizedPlatforms.push("youtube");
+      }
+
+      // Create the script object with all required fields
+      const script: Script = {
+        name: template.name,
+        description:
+          template.description || `Script template for ${template.name}`,
+        platforms: normalizedPlatforms,
+        aspectRatio: template.aspectRatio,
+        content: `# ${template.name}
 
 ## Brief
 ${template.description}
@@ -707,56 +782,189 @@ ${duration}
 |------|-------|-------|-----|
 ${template.rows
   .map((row) => `| ${row.time} | ${row.video} | ${row.audio} | ${row.gfx} |`)
-  .join("\n")}
-`;
+  .join("\n")}`,
+        brief: template.description || `Script template for ${template.name}`,
+        duration: duration,
+        rows: template.rows.map((row) => ({
+          ...row,
+          id: crypto.randomUUID(),
+        })),
+      };
 
-      const file = new File([content], filename, { type: "text/plain" });
-
-      // Upload the file
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch(`/api/cars/${carId}/scripts/upload`, {
+      // Create the script
+      const response = await fetch(`/api/cars/${carId}/scripts`, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(script),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create script from template");
+        const error = await response.json();
+        console.error("Server response:", error);
+        throw new Error(error.error || "Failed to create script from template");
       }
 
-      const newFile = await response.json();
+      const createdScript = await response.json();
+      setFiles((prev) => [...prev, createdScript]);
+      toast.success("Script created from template");
+      setShowTemplates(false);
+    } catch (error) {
+      console.error("Error creating script from template:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to create script from template"
+      );
+    }
+  };
 
-      // Update the content with rows immediately after upload
-      const contentResponse = await fetch(
-        `/api/cars/${carId}/scripts/content`,
-        {
+  const handleNewScript = () => {
+    setSelectedFile({
+      _id: undefined,
+      name: "New Script",
+      description: "",
+      platforms: [],
+      aspectRatio: "16:9",
+      content: "",
+      brief: "",
+      duration: "00:00",
+      createdAt: undefined,
+      updatedAt: undefined,
+    });
+    setIsEditing(true);
+  };
+
+  const handleEditClick = () => {
+    if (isEditing) {
+      handleSaveScript(true);
+    } else {
+      setIsEditing(true);
+    }
+  };
+
+  const handleSaveScript = async (shouldExit: boolean = false) => {
+    if (!selectedFile) return;
+
+    try {
+      const scriptData = {
+        name: selectedFile.name || "Untitled Script",
+        description: selectedFile.description || "",
+        platforms: selectedFile.platforms || [],
+        aspectRatio: selectedFile.aspectRatio || "16:9",
+        content: markdownContent || "",
+        brief: selectedFile.brief || "",
+        duration: selectedFile.duration || "00:00",
+        rows: selectedFile.rows || [],
+      };
+
+      let response;
+      // For existing scripts, use the scripts/content endpoint
+      if (selectedFile._id) {
+        response = await fetch(`/api/cars/${carId}/scripts/content`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            Accept: "application/json",
           },
           body: JSON.stringify({
-            fileId: newFile._id,
-            content,
-            rows: template.rows.map((row) => ({
-              ...row,
-              id: crypto.randomUUID(), // Generate new IDs for the rows
-            })),
+            fileId: selectedFile._id,
+            ...scriptData,
           }),
-        }
-      );
-
-      if (!contentResponse.ok) {
-        throw new Error("Failed to update script content");
+        });
+      } else {
+        // For new scripts, use the scripts endpoint
+        response = await fetch(`/api/cars/${carId}/scripts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            ...scriptData,
+            carId: carId, // Make sure to include the carId for new scripts
+          }),
+        });
       }
 
-      await fetchFiles();
-      setShowTemplates(false);
-      toast.success("Script created from template");
+      if (!response.ok) {
+        let errorMessage = `Failed to ${
+          selectedFile._id ? "save" : "create"
+        } script`;
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          const text = await response.text();
+          console.error("Server response:", text);
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const savedData = await response.json();
+
+      // Update the files list and selected file with the latest content
+      const updatedScript = {
+        ...selectedFile,
+        ...scriptData,
+        ...savedData,
+        _id: savedData._id || selectedFile._id, // Ensure we have the _id for new scripts
+        updatedAt: new Date(),
+      };
+
+      setFiles((prev) =>
+        selectedFile._id
+          ? prev.map((s) => (s._id === selectedFile._id ? updatedScript : s))
+          : [...prev, updatedScript]
+      );
+      setSelectedFile(updatedScript);
+      setMarkdownContent(scriptData.content);
+
+      if (shouldExit) {
+        setIsEditing(false);
+      }
+      toast.success("Script saved successfully");
     } catch (error) {
-      console.error("Error creating script from template:", error);
-      toast.error("Failed to create script from template");
+      console.error("Error saving script:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save script"
+      );
     }
+  };
+
+  const handleDeleteScript = async (scriptId: string) => {
+    try {
+      const response = await fetch(`/api/cars/${carId}/scripts/${scriptId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Failed to delete script");
+
+      setFiles((prev) => prev.filter((s) => s._id !== scriptId));
+      if (selectedFile?._id === scriptId) {
+        setSelectedFile(null);
+        setIsEditing(false);
+      }
+      toast.success("Script deleted successfully");
+    } catch (error) {
+      console.error("Error deleting script:", error);
+      toast.error("Failed to delete script");
+    }
+  };
+
+  const handleDuplicateScript = (script: Script) => {
+    const duplicate = {
+      ...script,
+      _id: undefined,
+      name: `${script.name} (Copy)`,
+      createdAt: undefined,
+      updatedAt: undefined,
+    };
+    setSelectedFile(duplicate);
+    setIsEditing(true);
   };
 
   return (
@@ -882,7 +1090,9 @@ ${template.rows
                         </span>
                       </div>
                       <span className="text-xs text-zinc-500 flex-shrink-0">
-                        {formatFileSize(file.size)}
+                        {file.size !== undefined
+                          ? formatFileSize(file.size)
+                          : "Unknown size"}
                       </span>
                     </div>
                   ))}
@@ -950,7 +1160,7 @@ ${template.rows
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-zinc-100 hover:text-zinc-300 block truncate">
-                            {truncateFilename(file.filename)}
+                            {truncateFilename(file.name)}
                           </span>
                           {file.processingStatus === "pending" && (
                             <span className="text-xs text-zinc-500">
@@ -968,10 +1178,15 @@ ${template.rows
                           )}
                         </div>
                         <div className="text-sm text-zinc-400">
-                          {formatFileSize(file.size)} •{" "}
-                          {formatDistanceToNow(new Date(file.createdAt), {
-                            addSuffix: true,
-                          })}
+                          {file.size !== undefined
+                            ? formatFileSize(file.size)
+                            : "Unknown size"}{" "}
+                          •{" "}
+                          {file.createdAt
+                            ? formatDistanceToNow(new Date(file.createdAt), {
+                                addSuffix: true,
+                              })
+                            : "Unknown date"}
                         </div>
                       </div>
                     </div>
@@ -981,10 +1196,22 @@ ${template.rows
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(file._id);
+                          handleDuplicateScript(file);
                         }}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (file._id) {
+                            handleDeleteScript(file._id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </div>
@@ -1005,33 +1232,42 @@ ${template.rows
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex-none px-2 py-1 border-b border-zinc-800 bg-background z-10 flex items-center justify-between">
                   <h3 className="text-sm font-medium text-zinc-100 truncate">
-                    {selectedFile.filename}
+                    {selectedFile.name}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsEditing(!isEditing)}
-                      className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
-                    >
-                      {isEditing ? (
-                        <>Cancel</>
-                      ) : (
-                        <>
-                          <Edit2 className="h-3 w-3 mr-1" />
-                          Edit
-                        </>
-                      )}
-                    </Button>
-                    {isEditing && (
+                    {isEditing ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setSelectedFile(selectedFile);
+                            setMarkdownContent(selectedFile.content || "");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                          onClick={() => handleSaveScript(true)}
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          Save & Exit
+                        </Button>
+                      </>
+                    ) : (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleContentSave(markdownContent)}
                         className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                        onClick={handleEditClick}
                       >
-                        <Save className="h-3 w-3 mr-1" />
-                        Save
+                        <Edit2 className="h-3 w-3 mr-1" />
+                        Edit
                       </Button>
                     )}
                   </div>
@@ -1048,11 +1284,6 @@ ${template.rows
                           <Textarea
                             value={selectedFile.brief ?? ""}
                             onChange={(e) => {
-                              const newContent = markdownContent.replace(
-                                /## Brief[\s\S]*?\n\n/,
-                                `## Brief\n${e.target.value}\n\n`
-                              );
-                              setMarkdownContent(newContent);
                               setSelectedFile((prev) =>
                                 prev ? { ...prev, brief: e.target.value } : null
                               );
@@ -1077,11 +1308,6 @@ ${template.rows
                               const formattedDuration = formatDuration(
                                 e.target.value
                               );
-                              const newContent = markdownContent.replace(
-                                /## Duration[\s\S]*?\n\n/,
-                                `## Duration\n${formattedDuration}\n\n`
-                              );
-                              setMarkdownContent(newContent);
                               setSelectedFile((prev) =>
                                 prev
                                   ? { ...prev, duration: formattedDuration }
@@ -1094,6 +1320,100 @@ ${template.rows
                         ) : (
                           <p className="text-sm text-zinc-300">
                             {formatDuration(selectedFile.duration || "00:00")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Platform and Aspect Ratio Controls */}
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-medium text-zinc-400">
+                          Platforms
+                        </h3>
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            {PLATFORMS.map((platform) => (
+                              <div
+                                key={platform.value}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={selectedFile.platforms?.includes(
+                                    platform.value
+                                  )}
+                                  onCheckedChange={(checked) => {
+                                    if (!selectedFile) return;
+                                    const currentPlatforms =
+                                      selectedFile.platforms || [];
+                                    setSelectedFile({
+                                      ...selectedFile,
+                                      platforms: checked
+                                        ? [...currentPlatforms, platform.value]
+                                        : currentPlatforms.filter(
+                                            (p) => p !== platform.value
+                                          ),
+                                    });
+                                  }}
+                                />
+                                <Label>{platform.label}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-zinc-300">
+                            {selectedFile.platforms
+                              ?.map(
+                                (p) =>
+                                  PLATFORMS.find(
+                                    (platform) => platform.value === p
+                                  )?.label
+                              )
+                              .join(", ") || "No platforms selected"}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-medium text-zinc-400">
+                          Aspect Ratio
+                        </h3>
+                        {isEditing ? (
+                          <Select
+                            value={selectedFile.aspectRatio}
+                            onValueChange={(value: AspectRatio) =>
+                              setSelectedFile((prev) =>
+                                prev ? { ...prev, aspectRatio: value } : null
+                              )
+                            }
+                          >
+                            <SelectTrigger className="bg-neutral-800 border-neutral-700 text-neutral-100">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent
+                              className="bg-neutral-900 border border-neutral-700 text-neutral-100 shadow-lg [&>*]:bg-neutral-900"
+                              position="popper"
+                              sideOffset={4}
+                            >
+                              {ASPECT_RATIOS.map((ratio) => (
+                                <SelectItem
+                                  key={ratio.value}
+                                  value={ratio.value}
+                                  className="text-neutral-100 data-[highlighted]:bg-neutral-800 data-[highlighted]:text-neutral-100 bg-neutral-900 relative"
+                                >
+                                  {ratio.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <p className="text-sm text-zinc-300">
+                            {
+                              ASPECT_RATIOS.find(
+                                (ratio) =>
+                                  ratio.value === selectedFile.aspectRatio
+                              )?.label
+                            }
                           </p>
                         )}
                       </div>

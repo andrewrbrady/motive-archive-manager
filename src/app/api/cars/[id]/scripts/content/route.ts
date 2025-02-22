@@ -110,7 +110,17 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { fileId, content, rows, brief, duration } = body;
+    const {
+      fileId,
+      content,
+      rows,
+      brief,
+      duration,
+      name,
+      description,
+      platforms,
+      aspectRatio,
+    } = body;
 
     if (!fileId || content === undefined) {
       return NextResponse.json(
@@ -121,25 +131,30 @@ export async function PUT(
 
     const db = await getDatabase();
 
-    // Update the script file in MongoDB
-    const result = await db.collection("script_files").updateOne(
-      { _id: new ObjectId(fileId) },
+    // Update the script in MongoDB
+    const result = await db.collection("scripts").findOneAndUpdate(
+      { _id: new ObjectId(fileId), carId: new ObjectId(params.id) },
       {
         $set: {
           content,
           rows,
           brief,
           duration,
+          name,
+          description,
+          platforms,
+          aspectRatio,
           updatedAt: new Date(),
         },
-      }
+      },
+      { returnDocument: "after" }
     );
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+    if (!result) {
+      return NextResponse.json({ error: "Script not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error updating script content:", error);
     return NextResponse.json(

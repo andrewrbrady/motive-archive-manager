@@ -3,6 +3,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock, Copy, Plus, Trash2, Save, Edit2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+
+export type Platform =
+  | "instagram_reels"
+  | "youtube_shorts"
+  | "youtube"
+  | "stream_otv";
+export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
+
+const PLATFORMS: { value: Platform; label: string }[] = [
+  { value: "instagram_reels", label: "Instagram Reels" },
+  { value: "youtube_shorts", label: "YouTube Shorts" },
+  { value: "youtube", label: "YouTube" },
+  { value: "stream_otv", label: "Stream/OTV" },
+];
+
+const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
+  { value: "9:16", label: "9:16 (Vertical)" },
+  { value: "16:9", label: "16:9 (Horizontal)" },
+  { value: "1:1", label: "1:1 (Square)" },
+  { value: "4:5", label: "4:5 (Instagram)" },
+];
 
 interface ScriptRow {
   id: string;
@@ -16,6 +46,8 @@ interface ScriptTemplate {
   _id?: string;
   name: string;
   description: string;
+  platforms: Platform[];
+  aspectRatio: AspectRatio;
   rows: ScriptRow[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -30,6 +62,8 @@ const DEFAULT_TEMPLATES: Omit<ScriptTemplate, "_id">[] = [
     name: "6 Second Teaser",
     description:
       "Quick, impactful social media spot focusing on a single key feature or angle",
+    platforms: ["instagram_reels", "youtube_shorts"],
+    aspectRatio: "9:16",
     rows: [
       {
         id: crypto.randomUUID(),
@@ -60,6 +94,8 @@ const DEFAULT_TEMPLATES: Omit<ScriptTemplate, "_id">[] = [
     name: "15 Second Teaser",
     description:
       "Social media and pre-roll optimized spot showcasing key features and personality",
+    platforms: ["youtube", "stream_otv"],
+    aspectRatio: "16:9",
     rows: [
       {
         id: crypto.randomUUID(),
@@ -104,6 +140,8 @@ const DEFAULT_TEMPLATES: Omit<ScriptTemplate, "_id">[] = [
     name: "30 Second Commercial",
     description:
       "Full commercial spot for TV and online, telling a complete story about the vehicle",
+    platforms: ["youtube", "stream_otv"],
+    aspectRatio: "16:9",
     rows: [
       {
         id: crypto.randomUUID(),
@@ -151,6 +189,97 @@ const DEFAULT_TEMPLATES: Omit<ScriptTemplate, "_id">[] = [
     createdAt: new Date(),
     updatedAt: new Date(),
   },
+  {
+    name: "60 Second Feature",
+    description:
+      "In-depth feature video highlighting all aspects of the vehicle",
+    platforms: ["youtube"],
+    aspectRatio: "16:9",
+    rows: [
+      {
+        id: crypto.randomUUID(),
+        time: "0:00-0:10",
+        video: "Cinematic opening sequence",
+        audio: "Atmospheric music + Natural sounds",
+        gfx: "Clean frame",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:10-0:20",
+        video: "Exterior walk-around",
+        audio: "VO describing design + Music",
+        gfx: "Design highlight callouts",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:20-0:30",
+        video: "Interior showcase",
+        audio: "VO highlighting features + Music",
+        gfx: "Feature specs and details",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:30-0:40",
+        video: "Performance/mechanical features",
+        audio: "Engine sounds + VO + Music",
+        gfx: "Technical specifications",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:40-0:50",
+        video: "Driving footage",
+        audio: "Engine/road sounds + Music swell",
+        gfx: "Performance stats overlay",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:50-0:60",
+        video: "Closing beauty shots",
+        audio: "Music finale + End VO",
+        gfx: "Final specs + Call to action",
+      },
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    name: "Instagram Story Highlight",
+    description: "Vertical format highlight reel for Instagram Stories",
+    platforms: ["instagram_reels"],
+    aspectRatio: "9:16",
+    rows: [
+      {
+        id: crypto.randomUUID(),
+        time: "0:00-0:03",
+        video: "Opening hero shot",
+        audio: "Music intro",
+        gfx: "Vehicle name overlay",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:03-0:06",
+        video: "Quick exterior details",
+        audio: "Music building",
+        gfx: "Spec highlights",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:06-0:09",
+        video: "Interior showcase",
+        audio: "Music continuing",
+        gfx: "Feature callouts",
+      },
+      {
+        id: crypto.randomUUID(),
+        time: "0:09-0:12",
+        video: "Final beauty shot",
+        audio: "Music peak and end",
+        gfx: "Call to action",
+      },
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
 ];
 
 export default function ScriptTemplates({
@@ -166,12 +295,18 @@ export default function ScriptTemplates({
     try {
       const results = await Promise.all(
         DEFAULT_TEMPLATES.map(async (template) => {
+          const templateWithDefaults = {
+            ...template,
+            platforms: template.platforms || [],
+            aspectRatio: template.aspectRatio || "16:9",
+          };
+
           const response = await fetch("/api/script-templates", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify(template),
+            body: JSON.stringify(templateWithDefaults),
           });
 
           if (!response.ok) {
@@ -336,7 +471,11 @@ export default function ScriptTemplates({
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setSelectedTemplate(template);
+                          setSelectedTemplate({
+                            ...template,
+                            platforms: template.platforms || [],
+                            aspectRatio: template.aspectRatio || "16:9",
+                          });
                           setIsEditing(true);
                         }}
                       >
@@ -352,7 +491,13 @@ export default function ScriptTemplates({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onApplyTemplate(template)}
+                        onClick={() =>
+                          onApplyTemplate({
+                            ...template,
+                            platforms: template.platforms || [],
+                            aspectRatio: template.aspectRatio || "16:9",
+                          })
+                        }
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Use Template
@@ -369,7 +514,7 @@ export default function ScriptTemplates({
         {selectedTemplate && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex-1 mr-4">
+              <div className="flex-1 mr-4 space-y-4">
                 <Input
                   value={selectedTemplate.name}
                   onChange={(e) =>
@@ -391,9 +536,93 @@ export default function ScriptTemplates({
                     })
                   }
                   placeholder="Template Description"
-                  className="mt-1 text-sm text-neutral-400 bg-transparent border-0 p-0 focus-visible:ring-0 h-auto"
+                  className="text-sm text-neutral-400 bg-transparent border-0 p-0 focus-visible:ring-0 h-auto"
                   disabled={!isEditing}
                 />
+
+                {isEditing && (
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Platforms</Label>
+                      <div className="space-y-2">
+                        {PLATFORMS.map((platform) => (
+                          <div
+                            key={platform.value}
+                            className="flex items-center space-x-2"
+                          >
+                            <Checkbox
+                              checked={selectedTemplate.platforms.includes(
+                                platform.value
+                              )}
+                              onCheckedChange={(checked) => {
+                                setSelectedTemplate({
+                                  ...selectedTemplate,
+                                  platforms: checked
+                                    ? [
+                                        ...selectedTemplate.platforms,
+                                        platform.value,
+                                      ]
+                                    : selectedTemplate.platforms.filter(
+                                        (p) => p !== platform.value
+                                      ),
+                                });
+                              }}
+                            />
+                            <Label>{platform.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Aspect Ratio</Label>
+                      <Select
+                        value={selectedTemplate.aspectRatio}
+                        onValueChange={(value: AspectRatio) =>
+                          setSelectedTemplate({
+                            ...selectedTemplate,
+                            aspectRatio: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ASPECT_RATIOS.map((ratio) => (
+                            <SelectItem key={ratio.value} value={ratio.value}>
+                              {ratio.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {!isEditing && (
+                  <div className="flex gap-2 pt-2">
+                    <div className="text-sm text-neutral-400">
+                      Platforms:{" "}
+                      {selectedTemplate.platforms
+                        .map(
+                          (p) =>
+                            PLATFORMS.find((platform) => platform.value === p)
+                              ?.label
+                        )
+                        .join(", ")}
+                    </div>
+                    <div className="text-sm text-neutral-400">
+                      Aspect Ratio:{" "}
+                      {
+                        ASPECT_RATIOS.find(
+                          (ratio) =>
+                            ratio.value === selectedTemplate.aspectRatio
+                        )?.label
+                      }
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 {isEditing ? (

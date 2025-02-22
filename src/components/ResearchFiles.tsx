@@ -363,8 +363,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }
   };
 
-  const handleContentSave = async (newContent: string) => {
-    if (!selectedFile) return;
+  const handleContentSave = async (fileId: string, newContent: string) => {
+    if (!selectedFile || selectedFile._id !== fileId) return;
     setMarkdownContent(newContent);
     setSelectedFile({ ...selectedFile, content: newContent });
   };
@@ -874,12 +874,11 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     }
                   >
                     <MarkdownEditor
-                      content={selectedFile.content || ""}
-                      filename={selectedFile.filename}
-                      fileId={selectedFile._id}
-                      carId={carId}
-                      lastModified={selectedFile.updatedAt}
-                      onSave={handleContentSave}
+                      value={selectedFile.content || ""}
+                      onChange={(newContent) =>
+                        handleContentSave(selectedFile._id, newContent)
+                      }
+                      readOnly={false}
                     />
                   </Suspense>
                 ) : (

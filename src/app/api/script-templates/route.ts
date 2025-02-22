@@ -10,10 +10,19 @@ export interface ScriptRow {
   gfx: string;
 }
 
+export type Platform =
+  | "instagram_reels"
+  | "youtube_shorts"
+  | "youtube"
+  | "stream_otv";
+export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
+
 export interface ScriptTemplate {
   _id?: string;
   name: string;
   description: string;
+  platforms: Platform[];
+  aspectRatio: AspectRatio;
   rows: ScriptRow[];
   createdAt: Date;
   updatedAt: Date;
@@ -37,11 +46,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, rows } = body;
+    const { name, description, platforms, aspectRatio, rows } = body;
 
-    if (!name || !description || !rows) {
+    if (!name || !description || !rows || !platforms || !aspectRatio) {
       return NextResponse.json(
-        { error: "Name, description, and rows are required" },
+        {
+          error:
+            "Name, description, platforms, aspect ratio, and rows are required",
+        },
         { status: 400 }
       );
     }
@@ -50,6 +62,8 @@ export async function POST(request: NextRequest) {
     const result = await db.collection("script_templates").insertOne({
       name,
       description,
+      platforms,
+      aspectRatio,
       rows,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -59,6 +73,8 @@ export async function POST(request: NextRequest) {
       _id: result.insertedId.toString(),
       name,
       description,
+      platforms,
+      aspectRatio,
       rows,
     });
   } catch (error) {
@@ -73,11 +89,14 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { _id, name, description, rows } = body;
+    const { _id, name, description, platforms, aspectRatio, rows } = body;
 
-    if (!_id || !name || !description || !rows) {
+    if (!_id || !name || !description || !rows || !platforms || !aspectRatio) {
       return NextResponse.json(
-        { error: "ID, name, description, and rows are required" },
+        {
+          error:
+            "ID, name, description, platforms, aspect ratio, and rows are required",
+        },
         { status: 400 }
       );
     }
@@ -89,6 +108,8 @@ export async function PUT(request: NextRequest) {
         $set: {
           name,
           description,
+          platforms,
+          aspectRatio,
           rows,
           updatedAt: new Date(),
         },
