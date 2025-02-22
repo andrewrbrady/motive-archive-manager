@@ -90,6 +90,12 @@ export default function Navbar({ className }: NavbarProps) {
               >
                 Clients
               </Link>
+              <Link
+                href="/makes"
+                className="text-sm uppercase tracking-wider text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              >
+                Makes
+              </Link>
             </div>
           </div>
           <div className="flex items-center space-x-6">

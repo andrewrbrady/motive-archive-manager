@@ -395,6 +395,19 @@ export async function PATCH(
         if (value === null || value === undefined || value === "") {
           return acc;
         }
+
+        // Handle client field specifically
+        if (key === "client" && value) {
+          try {
+            // Store client ID as ObjectId for consistency
+            acc[key] = new ObjectId(value.toString());
+          } catch (error) {
+            console.error("Error converting client ID:", error);
+            throw new Error("Invalid client ID format");
+          }
+          return acc;
+        }
+
         // Handle nested objects
         if (typeof value === "object" && !Array.isArray(value)) {
           const cleaned = Object.entries(value).reduce(
