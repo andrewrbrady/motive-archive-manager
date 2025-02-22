@@ -1,27 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Camera, FileText, Calendar } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ShotList from "./ShotList";
+import Scripts from "./Scripts";
 
 interface ProductionTabProps {
   carId: string;
 }
 
 export default function ProductionTab({ carId }: ProductionTabProps) {
-  const [activeSection, setActiveSection] = useState("shoots");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeSection, setActiveSection] = useState(
+    searchParams.get("section") || "shoots"
+  );
+
+  const updateUrlParams = (section: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("section", section);
+    router.replace(`?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section) {
+      setActiveSection(section);
+    }
+  }, [searchParams]);
 
   return (
     <div className="space-y-6">
       <Tabs
         value={activeSection}
-        onValueChange={setActiveSection}
+        onValueChange={(value) => {
+          setActiveSection(value);
+          updateUrlParams(value);
+        }}
         className="w-full"
       >
         <TabsList>
           <TabsTrigger value="shoots">Photo Shoots</TabsTrigger>
           <TabsTrigger value="documentation">Documentation</TabsTrigger>
+          <TabsTrigger value="shot-lists">Shot Lists</TabsTrigger>
+          <TabsTrigger value="scripts">Scripts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="shoots" className="mt-6">
@@ -34,7 +58,7 @@ export default function ProductionTab({ carId }: ProductionTabProps) {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Upcoming Shoots Card */}
               <Card>
                 <CardHeader>
@@ -62,19 +86,6 @@ export default function ProductionTab({ carId }: ProductionTabProps) {
                   <p className="text-muted-foreground">
                     No recent shoots found
                   </p>
-                </CardContent>
-              </Card>
-
-              {/* Shot List Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Shot List
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ShotList carId={carId} />
                 </CardContent>
               </Card>
             </div>
@@ -129,6 +140,14 @@ export default function ProductionTab({ carId }: ProductionTabProps) {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="shot-lists" className="mt-6">
+          <ShotList carId={carId} />
+        </TabsContent>
+
+        <TabsContent value="scripts" className="mt-6">
+          <Scripts carId={carId} />
         </TabsContent>
       </Tabs>
     </div>

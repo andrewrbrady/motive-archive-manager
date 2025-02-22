@@ -123,24 +123,27 @@ export default function MarkdownEditor({
   const handleSave = async (contentToSave: string) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/cars/${carId}/research/content`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileId,
-          content: contentToSave,
-        }),
-      });
+      if (onSave) {
+        await onSave(contentToSave);
+      } else {
+        const response = await fetch(`/api/cars/${carId}/scripts/content`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileId,
+            content: contentToSave,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to save content");
+        if (!response.ok) {
+          throw new Error("Failed to save content");
+        }
       }
 
       setLastSaved(new Date());
       setIsDirty(false);
-      onSave?.(contentToSave);
     } catch (error) {
       console.error("Error saving content:", error);
     } finally {

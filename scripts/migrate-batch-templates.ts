@@ -17,7 +17,7 @@ async function migrateBatchTemplates() {
     await client.connect();
 
     // Connect to both databases in the same cluster
-    const sourceDb = client.db("motive-archive");
+    const sourceDb = client.db("motive_archive");
     const targetDb = client.db("motive_archive");
 
     // Get the batch_templates collection from source

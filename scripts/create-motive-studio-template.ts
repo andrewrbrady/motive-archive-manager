@@ -5,7 +5,7 @@ async function connectToDatabase() {
   const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
   const client = new MongoClient(uri);
   await client.connect();
-  const db = client.db("motive-archive");
+  const db = client.db("motive_archive");
   return { client, db };
 }
 

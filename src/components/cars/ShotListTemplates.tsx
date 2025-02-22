@@ -37,10 +37,12 @@ interface Template {
 
 interface ShotListTemplatesProps {
   onApplyTemplate: (shots: ShotTemplate[]) => void;
+  isEmbedded?: boolean;
 }
 
 export default function ShotListTemplates({
   onApplyTemplate,
+  isEmbedded = false,
 }: ShotListTemplatesProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -132,8 +134,11 @@ export default function ShotListTemplates({
   };
 
   const handleApplyTemplate = (template: Template) => {
+    if (!template.shots || template.shots.length === 0) {
+      toast.error("This template has no shots");
+      return;
+    }
     onApplyTemplate(template.shots);
-    toast.success("Template applied successfully");
   };
 
   const handleAddShot = () => {
@@ -160,226 +165,241 @@ export default function ShotListTemplates({
 
   return (
     <div>
-      <Dialog open={isCreating} onOpenChange={setIsCreating}>
-        <DialogTrigger asChild>
-          <Button variant="outline">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Template
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingTemplate ? "Edit Template" : "Create Shot List Template"}
-            </DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className="space-y-6"
-            >
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Template Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Standard Car Shoot"
-                        {...field}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Template Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Describe the purpose of this template..."
-                        {...field}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+      <div>
+        {!isEmbedded && (
+          <Dialog open={isCreating} onOpenChange={setIsCreating}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Template
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingTemplate
+                    ? "Edit Template"
+                    : "Create Shot List Template"}
+                </DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(handleSubmit)}
+                  className="space-y-6"
+                >
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Template Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Standard Car Shoot"
+                            {...field}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Template Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the purpose of this template..."
+                            {...field}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-medium">Shots</h4>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddShot}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Shot
-                  </Button>
-                </div>
-
-                {form.watch("shots")?.map((_, index) => (
-                  <div key={index} className="space-y-4 p-4 border rounded-lg">
+                  <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h5 className="font-medium">Shot {index + 1}</h5>
+                      <h4 className="font-medium">Shots</h4>
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveShot(index)}
+                        variant="outline"
+                        onClick={handleAddShot}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Shot
                       </Button>
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name={`shots.${index}.title`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Title</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., Front 3/4 View"
-                              {...field}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`shots.${index}.description`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Describe the shot composition..."
-                              {...field}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`shots.${index}.angle`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Angle</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., Low angle, eye level"
-                              {...field}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`shots.${index}.lighting`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lighting</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., Natural, Studio"
-                              {...field}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`shots.${index}.notes`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Notes</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Any additional notes..."
-                              {...field}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ))}
-              </div>
+                    {form.watch("shots")?.map((_, index) => (
+                      <div
+                        key={index}
+                        className="space-y-4 p-4 border rounded-lg"
+                      >
+                        <div className="flex justify-between items-center">
+                          <h5 className="font-medium">Shot {index + 1}</h5>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveShot(index)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
 
-              <div className="flex justify-end">
-                <Button type="submit">
-                  <Save className="w-4 h-4 mr-2" />
-                  {editingTemplate ? "Update Template" : "Save Template"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      <div className="mt-4 space-y-4">
-        <h3 className="text-lg font-semibold">Available Templates</h3>
-        {isLoading ? (
-          <div className="text-center py-4">Loading templates...</div>
-        ) : templates.length === 0 ? (
-          <div className="text-center py-4 text-muted-foreground">
-            No templates available. Create your first template to get started.
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {templates.map((template) => (
-              <div
-                key={template.id}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="font-medium">{template.name}</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {template.description}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {template.shots.length} shots
-                    </p>
+                        <FormField
+                          control={form.control}
+                          name={`shots.${index}.title`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Title</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Front 3/4 View"
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shots.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Describe the shot composition..."
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shots.${index}.angle`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Angle</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Low angle, eye level"
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shots.${index}.lighting`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Lighting</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., Natural, Studio"
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shots.${index}.notes`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Notes</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Any additional notes..."
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleApplyTemplate(template)}
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Apply
+
+                  <div className="flex justify-end">
+                    <Button type="submit">
+                      <Save className="w-4 h-4 mr-2" />
+                      {editingTemplate ? "Update Template" : "Save Template"}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(template)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(template.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        <div className={`space-y-4 ${isEmbedded ? "" : "mt-4"}`}>
+          {!isEmbedded && (
+            <h3 className="text-lg font-semibold">Available Templates</h3>
+          )}
+          {isLoading ? (
+            <div className="text-center py-4">Loading templates...</div>
+          ) : templates.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              No templates available.{" "}
+              {!isEmbedded && "Create your first template to get started."}
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="bg-neutral-900 border border-neutral-800 rounded-lg p-4"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-medium">{template.name}</h4>
+                      <p className="text-sm text-neutral-400">
+                        {template.description}
+                      </p>
+                      <p className="text-sm text-neutral-500 mt-1">
+                        {template.shots.length} shots
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {!isEmbedded && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(template)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(template.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleApplyTemplate(template)}
+                      >
+                        {isEmbedded ? "Use Template" : "Apply Template"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

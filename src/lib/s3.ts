@@ -33,11 +33,17 @@ export interface S3UploadResult {
   size: number;
 }
 
-export async function uploadResearchFile(
+export async function uploadFile(
   file: File,
-  carId: string
+  carId: string,
+  type: "research" | "script_files"
 ): Promise<S3UploadResult> {
-  const key = `cars/${carId}/${Date.now()}-${file.name}`;
+  const timestamp = Date.now();
+  const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, "-");
+  const key = `cars/${carId}/${type}/${sanitizedFilename.replace(
+    /\.([^.]+)$/,
+    `-${timestamp}.$1`
+  )}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const command = new PutObjectCommand({
@@ -68,6 +74,13 @@ export async function uploadResearchFile(
     contentType: file.type,
     size: file.size,
   };
+}
+
+export async function uploadResearchFile(
+  file: File,
+  carId: string
+): Promise<S3UploadResult> {
+  return uploadFile(file, carId, "research");
 }
 
 export async function deleteResearchFile(key: string): Promise<void> {

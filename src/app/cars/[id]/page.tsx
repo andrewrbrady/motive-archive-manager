@@ -27,6 +27,7 @@ import CalendarTab from "@/components/cars/CalendarTab";
 import ProductionTab from "@/components/cars/ProductionTab";
 import { MeasurementValue } from "@/types/measurements";
 import { Car } from "@/types/car";
+import ShotList from "@/components/cars/ShotList";
 
 interface Power {
   hp: number;
