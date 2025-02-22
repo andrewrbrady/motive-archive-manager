@@ -20,13 +20,13 @@ import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ImageGalleryEnhanced } from "@/components/cars/ImageGalleryEnhanced";
-import type { Car as BaseCar, CarImage, Engine } from "@/types/car";
+import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
 import CalendarTab from "@/components/cars/CalendarTab";
 import ProductionTab from "@/components/cars/ProductionTab";
 import { MeasurementValue } from "@/types/measurements";
-import { Car, PriceHistory } from "@/types/car";
+import { Car } from "@/types/car";
 
 interface Power {
   hp: number;
@@ -93,80 +93,8 @@ interface ApiCarResponse {
   aiAnalysis?: any;
 }
 
-interface ExtendedCar {
-  _id: string;
-  make: string;
-  model: string;
-  year: number;
-  price: {
-    listPrice: number | null;
-    soldPrice?: number | null;
-    priceHistory: Array<{
-      type: "list" | "sold";
-      price: number | null;
-      date: string;
-      notes?: string;
-    }>;
-  };
+interface ExtendedCar extends Omit<BaseCar, "mileage"> {
   mileage: MeasurementValue;
-  color?: string | null;
-  interior_color?: string | null;
-  vin?: string;
-  status?: "available" | "sold" | "pending";
-  condition?: string;
-  location?: string;
-  description?: string;
-  type?: string;
-  client?: string;
-  clientInfo?: ClientInfo;
-  engine?: {
-    type?: string;
-    displacement?: MeasurementValue;
-    power?: Power;
-    torque?: Torque;
-    features?: string[];
-    configuration?: string;
-    cylinders?: number;
-    fuelType?: string;
-    manufacturer?: string;
-  };
-  dimensions?: {
-    wheelbase?: MeasurementValue;
-    weight?: MeasurementValue;
-    gvwr?: MeasurementValue;
-    trackWidth?: MeasurementValue;
-    length?: MeasurementValue;
-    width?: MeasurementValue;
-    height?: MeasurementValue;
-  };
-  manufacturing?: {
-    plant?: {
-      city?: string;
-      country?: string;
-      company?: string;
-    };
-    series?: string;
-    trim?: string;
-    bodyClass?: string;
-  };
-  doors?: number;
-  safety?: {
-    tpms?: {
-      type: string;
-      present: boolean;
-    };
-  };
-  interior_features?: {
-    seats?: number;
-    upholstery?: string;
-    features?: string[];
-  };
-  transmission?: {
-    type: string;
-    speeds?: number;
-  };
-  images?: CarImage[];
-  imageIds: string[];
 }
 
 interface Dimensions {
@@ -273,7 +201,9 @@ interface ClientInfo {
   businessType: string;
 }
 
-interface CarFormData extends ExtendedCar {}
+interface CarFormData extends CarData {
+  // Add any form-specific fields here
+}
 
 interface BaTCarDetails {
   _id: string;
@@ -308,7 +238,38 @@ interface BaTCarDetails {
   description?: string;
 }
 
-interface CarData extends ExtendedCar {}
+interface CarData
+  extends Omit<
+    ExtendedCar,
+    | "dimensions"
+    | "interior_features"
+    | "transmission"
+    | "mileage"
+    | "year"
+    | "clientInfo"
+  > {
+  year: number;
+  mileage: MeasurementValue;
+  dimensions?: Record<string, MeasurementValue>;
+  interior_features?: {
+    seats?: number;
+    upholstery?: string;
+    features?: string[];
+  };
+  transmission?: {
+    type: string;
+    speeds?: number;
+  };
+  clientInfo?: {
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    company?: string;
+    role?: string;
+    [key: string]: string | undefined;
+  };
+}
 
 interface DimensionsMap {
   length?: { value: number; unit: string };
@@ -414,80 +375,78 @@ const handleNestedPath = (
 };
 
 // Convert car data to form data with proper type handling
-const toCarFormData = (car: ExtendedCar): CarFormData => ({
-  _id: car._id,
-  make: car.make,
-  model: car.model,
-  year: car.year,
-  price: car.price,
-  mileage: car.mileage,
-  color: car.color,
-  interior_color: car.interior_color,
-  vin: car.vin,
-  status: car.status,
-  condition: car.condition,
-  location: car.location,
-  description: car.description,
-  type: car.type,
-  client: car.client,
-  clientInfo: car.clientInfo,
-  engine: car.engine,
-  dimensions: car.dimensions,
-  manufacturing: car.manufacturing,
-  doors: car.doors,
-  safety: car.safety,
-  interior_features: car.interior_features,
-  transmission: car.transmission,
-  images: car.images,
-  imageIds: car.imageIds,
-});
+const toCarFormData = (car: ExtendedCar): CarFormData => {
+  const transformedClientInfo = car.clientInfo
+    ? {
+        name: car.clientInfo.name,
+        email: car.clientInfo.email,
+        phone: car.clientInfo.phone,
+        address: `${car.clientInfo.address.street}, ${car.clientInfo.address.city}, ${car.clientInfo.address.state} ${car.clientInfo.address.zipCode}, ${car.clientInfo.address.country}`,
+        company: car.clientInfo.businessType,
+      }
+    : undefined;
+
+  return {
+    ...car,
+    year: car.year ?? 0,
+    mileage: car.mileage ?? { value: 0, unit: "mi" },
+    clientInfo: transformedClientInfo,
+  };
+};
+
+const toBaseMileage = (
+  measurement: MeasurementValue | undefined
+): { value: number; unit: string } | undefined => {
+  if (!measurement || measurement.value === null) {
+    return { value: 0, unit: measurement?.unit || "mi" };
+  }
+  return {
+    value: measurement.value,
+    unit: measurement.unit,
+  };
+};
 
 // Convert form data back to car data with proper type handling
-const fromCarFormData = (formData: CarFormData): Partial<ExtendedCar> => ({
-  _id: formData._id,
-  make: formData.make,
-  model: formData.model,
-  year: formData.year,
-  price: formData.price,
-  mileage: formData.mileage,
-  color: formData.color,
-  interior_color: formData.interior_color,
-  vin: formData.vin,
-  status: formData.status,
-  condition: formData.condition,
-  location: formData.location,
-  description: formData.description,
-  type: formData.type,
-  client: formData.client,
-  clientInfo: formData.clientInfo
-    ? {
-        _id: formData.clientInfo._id,
-        name: formData.clientInfo.name,
-        email: formData.clientInfo.email,
-        phone: formData.clientInfo.phone,
-        address: formData.clientInfo.address,
-        businessType: formData.clientInfo.businessType,
-      }
-    : undefined,
-  engine: formData.engine,
-  dimensions: formData.dimensions,
-  manufacturing: formData.manufacturing,
-  doors: formData.doors,
-  safety: formData.safety,
-  interior_features: formData.interior_features,
-  transmission: formData.transmission,
-  images: formData.images,
-});
+const fromCarFormData = (
+  formData: CarFormData,
+  originalCar: ExtendedCar
+): Partial<BaseCar> => {
+  const {
+    dimensions,
+    interior_features,
+    transmission,
+    mileage,
+    clientInfo,
+    ...rest
+  } = formData;
+
+  return {
+    ...rest,
+    mileage: toBaseMileage(mileage),
+    dimensions: dimensions
+      ? Object.entries(dimensions).reduce(
+          (acc, [key, value]) => ({
+            ...acc,
+            [key]: toBaseMileage(value),
+          }),
+          {}
+        )
+      : undefined,
+    interior_features,
+    transmission,
+    clientInfo: originalCar.clientInfo,
+  };
+};
 
 // Convert to BaT car details
 const toBaTCarDetails = (car: ExtendedCar): BaTCarDetails => ({
   _id: car._id,
-  year: car.year,
+  year: car.year ?? 0,
   make: car.make,
   model: car.model,
-  color: car.color || undefined,
+  color: car.color,
   mileage:
-    car.mileage && typeof car.mileage.value === "number"
+    car.mileage && car.mileage.value !== null
       ? {
           value: car.mileage.value,
           unit: car.mileage.unit,
@@ -497,8 +456,7 @@ const toBaTCarDetails = (car: ExtendedCar): BaTCarDetails => ({
     ? {
         type: car.engine.type,
         displacement:
-          car.engine.displacement &&
-          typeof car.engine.displacement.value === "number"
+          car.engine.displacement && car.engine.displacement.value !== null
             ? {
                 value: car.engine.displacement.value,
                 unit: car.engine.displacement.unit,
@@ -511,13 +469,13 @@ const toBaTCarDetails = (car: ExtendedCar): BaTCarDetails => ({
           : undefined,
       }
     : undefined,
-  transmission: car.transmission || { type: "" },
+  transmission: car.transmission ?? { type: "" },
   vin: car.vin,
   condition: car.condition,
-  interior_color: car.interior_color || undefined,
+  interior_color: car.interior_color,
   interior_features: car.interior_features
     ? {
-        seats: car.interior_features.seats || 0,
+        seats: car.interior_features.seats ?? 0,
         upholstery: car.interior_features.upholstery,
       }
     : undefined,
@@ -544,9 +502,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSpecsEditMode, setIsSpecsEditMode] = useState(false);
   const [isSpecsSaving, setIsSpecsSaving] = useState(false);
-  const [editedSpecs, setEditedSpecs] = useState<Partial<CarFormData> | null>(
-    null
-  );
+  const [editedSpecs, setEditedSpecs] = useState<Partial<CarData> | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [isEnriching, setIsEnriching] = useState(false);
@@ -651,8 +607,10 @@ export default function CarPage({ params }: { params: { id: string } }) {
       }
 
       // Handle nested fields
-      const existingFieldValue = (prev[field as keyof CarFormData] ||
-        {}) as Record<string, unknown>;
+      const existingFieldValue = (prev[field as keyof CarData] || {}) as Record<
+        string,
+        unknown
+      >;
       return {
         ...prev,
         [field]: {
@@ -1159,31 +1117,22 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
   // Update the handleSpecsEdit function
   const handleSpecsEdit = async (
-    editedSpecs: Partial<ExtendedCar>
+    editedSpecs: Partial<CarData>
   ): Promise<void> => {
     if (!car) return;
 
     try {
       setIsSpecsSaving(true);
-
-      const formData: Partial<ExtendedCar> = {
-        ...editedSpecs,
-        clientInfo: editedSpecs.clientInfo,
-        color: editedSpecs.color,
-        interior_color: editedSpecs.interior_color,
-        mileage: editedSpecs.mileage,
-      };
-
       const response = await fetch(`/api/cars/${car._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(fromCarFormData(editedSpecs as CarData, car)),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update car");
+        throw new Error("Failed to update car specifications");
       }
 
       const updatedCar = await response.json();
@@ -1191,7 +1140,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
       setIsSpecsEditMode(false);
       toast.success("Car specifications updated successfully");
     } catch (error) {
-      console.error("Error updating car:", error);
+      console.error("Error updating car specifications:", error);
       toast.error("Failed to update car specifications");
     } finally {
       setIsSpecsSaving(false);
@@ -1306,6 +1255,19 @@ export default function CarPage({ params }: { params: { id: string } }) {
     );
   }
 
+  const carDetails = {
+    _id: car._id,
+    year: car.year ?? 0,
+    make: car.make,
+    model: car.model,
+    color: car.color,
+    engine: car.engine,
+    mileage: toBaseMileage(car.mileage),
+    type: car.type,
+    client: car.client,
+    description: car.description || "",
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -1373,7 +1335,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 car={toCarFormData(car)}
                 isEditMode={isSpecsEditMode}
                 onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
-                onSave={handleSpecsEdit}
+                onSave={async (editedSpecs) => {
+                  await handleSpecsEdit(editedSpecs as CarData);
+                }}
                 editedSpecs={editedSpecs}
                 onInputChange={(field, value, nestedField) =>
                   handleInputChange(field, value, nestedField)
@@ -1395,20 +1359,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
             </TabsContent>
 
             <TabsContent value="captions">
-              <CaptionGenerator
-                carDetails={{
-                  _id: car._id,
-                  year: car.year,
-                  make: car.make,
-                  model: car.model,
-                  color: car.color,
-                  engine: car.engine,
-                  mileage: car.mileage,
-                  type: car.type,
-                  client: car.client,
-                  description: car.description || "",
-                }}
-              />
+              <CaptionGenerator carDetails={carDetails} />
             </TabsContent>
 
             <TabsContent value="service">
@@ -1425,7 +1376,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
             </TabsContent>
 
             <TabsContent value="article">
-              <ArticleGenerator car={car} />
+              <ArticleGenerator
+                car={fromCarFormData(toCarFormData(car), car) as BaseCar}
+              />
             </TabsContent>
 
             <TabsContent value="deliverables" className="mt-6">
