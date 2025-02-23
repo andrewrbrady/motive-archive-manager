@@ -1,22 +1,24 @@
 import { MeasurementValue } from "./car";
 import { ObjectId } from "mongodb";
 
+export interface SearchParams {
+  page?: string;
+  search?: string;
+  make?: string;
+  model?: string;
+  dealer?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  minMileage?: string;
+  maxMileage?: string;
+  minYear?: string;
+  maxYear?: string;
+  transmission?: string;
+  view?: string;
+}
+
 export interface InventoryPageProps {
-  searchParams: {
-    page?: string;
-    search?: string;
-    make?: string;
-    model?: string;
-    dealer?: string;
-    minPrice?: string;
-    maxPrice?: string;
-    minMileage?: string;
-    maxMileage?: string;
-    minYear?: string;
-    maxYear?: string;
-    transmission?: string;
-    view?: string;
-  };
+  searchParams: SearchParams;
 }
 
 export interface InventoryItemRaw {
@@ -71,7 +73,7 @@ export interface RawAsset {
   date: string; // YYMMDD format
   client?: string;
   description: string;
-  locations: string[] | ObjectId[]; // Array of storage locations or ObjectIds
+  locations: Array<string | ObjectId>; // Array of storage locations or ObjectIds
   carIds?: string[]; // Array of associated car IDs
   cars?: Car[];
   files?: {
@@ -84,6 +86,7 @@ export interface RawAsset {
   updatedAt?: string;
 }
 
+// TODO: Import this from car.ts instead of duplicating
 export interface Car {
   _id: string;
   make: string;
