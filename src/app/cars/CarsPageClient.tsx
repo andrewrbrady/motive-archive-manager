@@ -21,6 +21,7 @@ interface CarsPageClientProps {
   totalPages: number;
   currentPage: number;
   pageSize: number;
+  totalCount: number;
   view: "grid" | "list";
   isEditMode: boolean;
   filters: {
@@ -41,6 +42,7 @@ export default function CarsPageClient({
   totalPages,
   currentPage,
   pageSize,
+  totalCount,
   view,
   isEditMode,
   filters,
@@ -61,7 +63,7 @@ export default function CarsPageClient({
       <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <PageTitle title="Cars Collection" count={totalPages * pageSize}>
+          <PageTitle title="Cars Collection" count={totalCount}>
             <div className="flex items-center gap-4 ml-auto">
               <SortSelector currentSort={filters.sort || "createdAt_desc"} />
               <PageSizeSelector

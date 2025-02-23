@@ -114,7 +114,8 @@ export default function CarImageEditor({
       progress.metadata
     ) {
       const newImage: CarImage = {
-        id: progress.imageUrl,
+        _id: progress.imageUrl,
+        cloudflareId: progress.imageUrl.split("/").pop() || progress.fileName,
         url: progress.imageUrl,
         filename: progress.fileName,
         metadata: progress.metadata,
@@ -166,7 +167,8 @@ export default function CarImageEditor({
             : [
                 ...currentImages,
                 {
-                  id: imageUrl,
+                  _id: imageUrl,
+                  cloudflareId: imageUrl.split("/").pop() || "",
                   url: imageUrl,
                   filename: imageUrl.split("/").pop() || "",
                   metadata: {},
@@ -191,7 +193,9 @@ export default function CarImageEditor({
             >
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
-                  <span className="text-[hsl(var(--foreground))]">{progress.fileName}</span>
+                  <span className="text-[hsl(var(--foreground))]">
+                    {progress.fileName}
+                  </span>
                   <span className="text-[hsl(var(--foreground-muted))]">
                     {progress.status === "error"
                       ? "Error"
@@ -211,7 +215,9 @@ export default function CarImageEditor({
                   />
                 </div>
                 {progress.status === "error" && (
-                  <p className="text-xs text-destructive-500 mt-1">{progress.error}</p>
+                  <p className="text-xs text-destructive-500 mt-1">
+                    {progress.error}
+                  </p>
                 )}
               </div>
             </div>

@@ -21,7 +21,9 @@
     "theme:convert": "tsx scripts/convert-colors.ts",
     "theme:validate": "tsx scripts/validate-theme.ts",
     "theme:check": "npm run theme:search && npm run theme:validate",
-    "theme:convert-semantic": "tsx scripts/convert-semantic-colors.ts"
+    "theme:convert-semantic": "tsx scripts/convert-semantic-colors.ts",
+    "migrate:hard-drives": "tsx src/scripts/migrate-hard-drives.ts",
+    "migrate:raw-locations": "tsx src/scripts/migrate-raw-locations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
@@ -58,6 +60,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
+    "csv-parse": "^5.6.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.12.0",
     "fuse.js": "^7.0.0",

@@ -6,24 +6,32 @@ import {
 } from "@/lib/cloudflare";
 import { CarImage } from "@/types/car";
 
-type ImageMetadata = CarImage["metadata"];
-type MetadataKey = keyof Omit<ImageMetadata, "aiAnalysis">;
-type _MetadataValue = string | number | boolean | null;
+// Define the metadata structure that matches the CarImage interface
+interface ImageMetadataFields {
+  angle?: string;
+  description?: string;
+  movement?: string;
+  tod?: string;
+  view?: string;
+  side?: string;
+}
+
+type MetadataKey = keyof ImageMetadataFields;
 
 interface ImageMetadataEditorProps {
   imageId: string;
-  metadata: ImageMetadata;
-  onMetadataChange: (newMetadata: ImageMetadata) => void;
+  metadata: ImageMetadataFields;
+  onMetadataChange: (newMetadata: ImageMetadataFields) => void;
 }
 
-const ALLOWED_METADATA_FIELDS: MetadataKey[] = [
+const ALLOWED_METADATA_FIELDS = [
   "angle",
   "description",
   "movement",
   "tod",
   "view",
   "side",
-];
+] as const;
 
 export const ImageMetadataEditor: React.FC<ImageMetadataEditorProps> = ({
   imageId,

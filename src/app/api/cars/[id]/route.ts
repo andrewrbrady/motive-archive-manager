@@ -119,6 +119,17 @@ export async function GET(
       .aggregate([
         { $match: { _id: objectId } },
         {
+          $addFields: {
+            imageIds: {
+              $map: {
+                input: "$imageIds",
+                as: "id",
+                in: { $toObjectId: "$$id" },
+              },
+            },
+          },
+        },
+        {
           $lookup: {
             from: "images",
             localField: "imageIds",
@@ -190,6 +201,7 @@ export async function GET(
             ...img,
             _id: img._id?.toString() || "",
             car_id: img.car_id?.toString() || "",
+            url: img.url.endsWith("/public") ? img.url : `${img.url}/public`,
           }));
       }
 
@@ -397,6 +409,14 @@ export async function PATCH(
     >((acc, [key, value]) => {
       // Skip null or undefined values, but allow empty strings and zero values
       if (value === null || value === undefined) {
+        // Special case: preserve images and imageIds even if not in update
+        if (
+          (key === "images" || key === "imageIds") &&
+          existingCar &&
+          existingCar[key]
+        ) {
+          acc[key] = existingCar[key];
+        }
         return acc;
       }
 

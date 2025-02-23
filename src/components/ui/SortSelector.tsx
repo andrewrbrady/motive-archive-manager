@@ -48,6 +48,18 @@ const sortOptions: SortOption[] = [
     field: "year",
     direction: "asc",
   },
+  {
+    label: "Make: A to Z",
+    value: "make_asc",
+    field: "make",
+    direction: "asc",
+  },
+  {
+    label: "Make: Z to A",
+    value: "make_desc",
+    field: "make",
+    direction: "desc",
+  },
 ];
 
 interface SortSelectorProps {

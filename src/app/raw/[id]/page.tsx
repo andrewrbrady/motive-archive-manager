@@ -9,33 +9,29 @@ import { RawAsset } from "@/types/inventory";
 import { Car } from "@/types/car";
 import CarSelector from "@/components/CarSelector";
 
-interface Engine {
-  type: string;
-  displacement?: string;
-  power_output?: string;
-  torque?: string;
-  features?: string[];
-}
-
-interface UploadProgress {
-  fileName: string;
-  progress: number;
-  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
-  error?: string;
-  currentStep?: string;
-}
-
 interface RawAssetFormProps {
   params: {
     id: string;
   };
 }
 
+// Use a simpler type structure for the form
+type FormRawAsset = {
+  _id: string;
+  date: string;
+  description: string;
+  client: string;
+  locations: string[];
+  carIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export default function RawAssetForm({ params }: RawAssetFormProps) {
   const router = useRouter();
   const isNew = params.id === "new";
 
-  const [asset, setAsset] = useState<RawAsset>({
+  const [asset, setAsset] = useState<FormRawAsset>({
     _id: "",
     date: "",
     description: "",
@@ -45,6 +41,7 @@ export default function RawAssetForm({ params }: RawAssetFormProps) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
+
   const [selectedCars, setSelectedCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(!isNew);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +57,22 @@ export default function RawAssetForm({ params }: RawAssetFormProps) {
       const response = await fetch(`/api/raw/${params.id}`);
       if (!response.ok) throw new Error("Failed to fetch asset");
       const data = await response.json();
-      setAsset(data);
+
+      // Ensure all locations are strings
+      const locations = Array.isArray(data.locations)
+        ? data.locations.map((loc: unknown) => String(loc))
+        : [];
+
+      setAsset({
+        _id: String(data._id || ""),
+        date: String(data.date || ""),
+        description: String(data.description || ""),
+        client: String(data.client || ""),
+        locations,
+        carIds: Array.isArray(data.carIds) ? data.carIds.map(String) : [],
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      });
 
       // Fetch associated cars
       if (data.carIds?.length) {
@@ -181,7 +193,7 @@ export default function RawAssetForm({ params }: RawAssetFormProps) {
                       type="text"
                       value={location}
                       onChange={(e) => {
-                        const newLocations = [...asset.locations];
+                        const newLocations = [...asset.locations] as string[];
                         newLocations[index] = e.target.value;
                         setAsset({ ...asset, locations: newLocations });
                       }}
@@ -204,7 +216,10 @@ export default function RawAssetForm({ params }: RawAssetFormProps) {
                 <button
                   type="button"
                   onClick={() =>
-                    setAsset({ ...asset, locations: [...asset.locations, ""] })
+                    setAsset({
+                      ...asset,
+                      locations: [...asset.locations, ""] as string[],
+                    })
                   }
                   className="px-4 py-2 text-[hsl(var(--info))] hover:bg-[hsl(var(--info))] hover:text-[hsl(var(--info-foreground))] rounded"
                 >

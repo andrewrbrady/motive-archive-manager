@@ -69,23 +69,29 @@ export interface AIImageAnalysis {
 }
 
 export interface CarImage {
-  id: string;
+  _id: string;
+  cloudflareId: string;
   url: string;
   filename: string;
-  metadata: {
+  metadata?: {
     angle?: string;
     description?: string;
     movement?: string;
     tod?: string;
     view?: string;
     side?: string;
-    aiAnalysis?: AIImageAnalysis;
+    aiAnalysis?: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+      side?: string;
+    };
   };
-  variants?: {
-    [key: string]: string;
-  };
-  createdAt: string;
-  updatedAt: string;
+  carId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PriceHistory {

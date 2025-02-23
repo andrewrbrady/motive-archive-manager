@@ -1,4 +1,5 @@
 import { MeasurementValue } from "./car";
+import { ObjectId } from "mongodb";
 
 export interface InventoryPageProps {
   searchParams: {
@@ -70,7 +71,7 @@ export interface RawAsset {
   date: string; // YYMMDD format
   client?: string;
   description: string;
-  locations: string[]; // Array of storage locations
+  locations: string[] | ObjectId[]; // Array of storage locations or ObjectIds
   carIds?: string[]; // Array of associated car IDs
   cars?: Car[];
   files?: {

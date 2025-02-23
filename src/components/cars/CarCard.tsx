@@ -4,10 +4,36 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Car, CarImage as CarImageType } from "@/types/car";
+import { Car } from "@/types/car";
 import { Trash2, Loader2 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
+
+interface CarImage {
+  _id: string;
+  cloudflareId: string;
+  url: string;
+  filename: string;
+  metadata?: {
+    angle?: string;
+    description?: string;
+    movement?: string;
+    tod?: string;
+    view?: string;
+    side?: string;
+    aiAnalysis?: {
+      angle?: string;
+      description?: string;
+      movement?: string;
+      tod?: string;
+      view?: string;
+      side?: string;
+    };
+  };
+  carId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 interface CarCardProps {
   car: Car;
@@ -26,10 +52,10 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     hasImages: Boolean(car.images?.length),
   });
 
-  const [primaryImage, setPrimaryImage] = useState<Pick<
-    CarImageType,
-    "id" | "url"
-  > | null>(null);
+  const [primaryImage, setPrimaryImage] = useState<{
+    id?: string;
+    url: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,25 +66,25 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       setPrimaryImage(null);
       setLoading(true);
 
-      // First check if we have direct images array
-      if (car.images?.[0]?.url) {
-        console.log("CarCard: Using direct image URL");
-        setPrimaryImage({
-          id: car.images[0].id,
-          url: `${car.images[0].url}/public`,
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Fall back to imageIds if no direct images
-      if (!car.imageIds?.[0]) {
-        console.log("CarCard: No image IDs available");
-        setLoading(false);
-        return;
-      }
-
       try {
+        // First check if we have direct images array with the new structure
+        if (car.images?.[0]?.url) {
+          console.log("CarCard: Using direct image URL from new structure");
+          setPrimaryImage({
+            id: car.images[0]._id,
+            url: car.images[0].url,
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Fall back to imageIds if no direct images
+        if (!car.imageIds?.[0]) {
+          console.log("CarCard: No image IDs available");
+          setLoading(false);
+          return;
+        }
+
         const response = await fetch(
           `/api/images/metadata?ids=${car.imageIds[0]}`
         );
@@ -69,10 +95,6 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
         });
 
         if (!response.ok) {
-          console.error("CarCard: Response not OK:", {
-            status: response.status,
-            statusText: response.statusText,
-          });
           throw new Error("Failed to fetch image metadata");
         }
 
@@ -208,7 +230,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
         <div className="mt-2 space-y-1">
           {car.price && (
             <p className="text-sm text-text-secondary">
-              {car.price.listPrice !== null
+              {car.price.listPrice === 0 || car.price.listPrice
                 ? `$${car.price.listPrice.toLocaleString()}`
                 : "Price on request"}
               {car.status === "sold" && car.price.soldPrice && (
@@ -223,8 +245,39 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
               {formatMileage(car.mileage)}
             </p>
           )}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+            {car.color && (
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium">Ext:</span> {car.color}
+              </p>
+            )}
+            {car.interior_color && (
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium">Int:</span> {car.interior_color}
+              </p>
+            )}
+            {car.transmission?.type && (
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium">Trans:</span>{" "}
+                {car.transmission.type}
+                {car.transmission.speeds && ` ${car.transmission.speeds}-speed`}
+              </p>
+            )}
+          </div>
           {car.location && (
             <p className="text-sm text-text-secondary">{car.location}</p>
+          )}
+          {car.status && (
+            <p
+              className={cn(
+                "text-sm font-medium mt-2",
+                car.status === "sold" && "text-accent-success",
+                car.status === "pending" && "text-accent-warning",
+                car.status === "available" && "text-accent-info"
+              )}
+            >
+              {car.status.charAt(0).toUpperCase() + car.status.slice(1)}
+            </p>
           )}
         </div>
       </div>

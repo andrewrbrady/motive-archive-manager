@@ -79,13 +79,7 @@ export async function POST(request: NextRequest) {
     const car = await db.collection("cars").findOne({ _id: result.insertedId });
 
     console.log("Created car:", JSON.stringify(car, null, 2));
-    return NextResponse.json(
-      {
-        _id: result.insertedId,
-        ...data,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json(car, { status: 201 });
   } catch (error) {
     console.error("Error creating car:", error);
     return NextResponse.json(
@@ -99,9 +93,35 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = parseInt(searchParams.get("pageSize") || "48");
+    const pageSize = Math.min(
+      parseInt(searchParams.get("pageSize") || "48"),
+      96 // Maximum page size
+    );
     const search = searchParams.get("search") || "";
     const sort = searchParams.get("sort") || "createdAt_desc";
+
+    console.log("Request parameters:", {
+      page,
+      pageSize,
+      search,
+      sort,
+      filters: {
+        make: searchParams.get("make"),
+        minYear: searchParams.get("minYear"),
+        maxYear: searchParams.get("maxYear"),
+        clientId: searchParams.get("clientId"),
+        minPrice: searchParams.get("minPrice"),
+        maxPrice: searchParams.get("maxPrice"),
+      },
+    });
+
+    // Validate page number
+    if (page < 1) {
+      return NextResponse.json(
+        { error: "Invalid page number" },
+        { status: 400 }
+      );
+    }
 
     // Get filter parameters
     const make = searchParams.get("make");
@@ -116,7 +136,21 @@ export async function GET(request: Request) {
     const carsCollection = db.collection("cars");
 
     // Build query
-    const query: any = {};
+    const query: any = {
+      // Ensure createdAt exists for all documents in the query
+      createdAt: { $exists: true },
+    };
+
+    console.log("Received filter parameters:", {
+      make,
+      minYear,
+      maxYear,
+      clientId,
+      minPrice,
+      maxPrice,
+      search,
+      sort,
+    });
 
     // Add search condition if search term exists
     if (search) {
@@ -169,26 +203,80 @@ export async function GET(request: Request) {
     // Add year range filter
     if (minYear || maxYear) {
       query.year = {};
-      if (minYear) query.year.$gte = parseInt(minYear);
-      if (maxYear) query.year.$lte = parseInt(maxYear);
+      if (minYear) {
+        const minYearNum = parseInt(minYear);
+        if (!isNaN(minYearNum)) {
+          query.year.$gte = minYearNum;
+        }
+      }
+      if (maxYear) {
+        const maxYearNum = parseInt(maxYear);
+        if (!isNaN(maxYearNum)) {
+          query.year.$lte = maxYearNum;
+        }
+      }
+      // If no valid year filters were added, remove the empty year query
+      if (Object.keys(query.year).length === 0) {
+        delete query.year;
+      }
     }
 
     // Add client filter
     if (clientId) {
-      query.client = clientId;
+      try {
+        query.client = new ObjectId(clientId);
+      } catch (error) {
+        console.error("Invalid client ID format:", error);
+        // If the ID is invalid, return no results
+        query.client = null;
+      }
     }
 
     // Add price range filter
     if (minPrice || maxPrice) {
       query["price.listPrice"] = {};
-      if (minPrice) query["price.listPrice"].$gte = parseInt(minPrice);
-      if (maxPrice) query["price.listPrice"].$lte = parseInt(maxPrice);
+      if (minPrice) {
+        const minPriceNum = parseInt(minPrice);
+        if (!isNaN(minPriceNum)) {
+          query["price.listPrice"].$gte = minPriceNum;
+        }
+      }
+      if (maxPrice) {
+        const maxPriceNum = parseInt(maxPrice);
+        if (!isNaN(maxPriceNum)) {
+          query["price.listPrice"].$lte = maxPriceNum;
+        }
+      }
+      // If no valid price filters were added, remove the empty price query
+      if (Object.keys(query["price.listPrice"]).length === 0) {
+        delete query["price.listPrice"];
+      }
     }
 
     // Determine sort order
     const [sortField, sortDirection] = sort.split("_");
     const sortOptions: any = {};
-    sortOptions[sortField] = sortDirection === "desc" ? -1 : 1;
+
+    // Map sort fields to their database counterparts
+    const sortFieldMap: { [key: string]: string } = {
+      price: "price.listPrice",
+      createdAt: "createdAt",
+      year: "year",
+      make: "make",
+      model: "model",
+    };
+
+    // Get the actual database field name
+    const dbSortField = sortFieldMap[sortField] || "createdAt";
+    sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
+
+    console.log("Using sort options:", {
+      requestedSort: sort,
+      dbField: dbSortField,
+      direction: sortDirection,
+      finalSortOptions: sortOptions,
+      query,
+    });
 
     // Get total count for pagination
     const totalCount = await carsCollection.countDocuments(query);
@@ -202,10 +290,16 @@ export async function GET(request: Request) {
       .limit(pageSize)
       .toArray();
 
+    console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
+    console.log("Found", cars.length, "cars matching the query");
+    console.log("Total cars in database matching query:", totalCount);
+    console.log("Total pages:", totalPages, "Page size:", pageSize);
+
     return NextResponse.json({
       cars,
       totalPages,
       currentPage: page,
+      totalCount,
     });
   } catch (error) {
     console.error("Error fetching cars:", error);

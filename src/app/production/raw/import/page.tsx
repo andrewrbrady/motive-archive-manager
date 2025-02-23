@@ -57,7 +57,7 @@ export default function ImportRawAssets() {
 
       const result = await response.json();
       if (result.success) {
-        router.push("/raw");
+        router.push("/production?tab=raw-assets");
       } else {
         throw new Error(result.error || "Failed to import data");
       }

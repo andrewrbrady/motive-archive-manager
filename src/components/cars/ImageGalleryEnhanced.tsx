@@ -28,6 +28,11 @@ interface ImageGalleryProps {
 export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   images,
 }) => {
+  // Sort images by filename
+  const sortedImages = [...images].sort((a, b) =>
+    a.filename.localeCompare(b.filename)
+  );
+
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
@@ -45,7 +50,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   const rowsPerPage = 5;
 
   // Get unique filter values
-  const filterOptions = images.reduce(
+  const filterOptions = sortedImages.reduce(
     (acc, img) => {
       if (img.metadata.angle && !acc.angles.includes(img.metadata.angle)) {
         acc.angles.push(img.metadata.angle);
@@ -73,7 +78,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   );
 
   // Filter images based on active filters
-  const filteredImages = images.filter((img) => {
+  const filteredImages = sortedImages.filter((img) => {
     return Object.entries(activeFilters).every(([key, value]) => {
       if (!value) return true;
       return img.metadata[key as keyof typeof img.metadata] === value;
@@ -333,10 +338,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   onTouchEnd={handleTouchEnd}
                 >
                   <Image
-                    src={`${filteredImages[mainIndex]?.url.replace(
-                      "/public",
-                      ""
-                    )}/public`}
+                    src={filteredImages[mainIndex]?.url}
                     alt={`Vehicle view ${mainIndex + 1} of ${
                       filteredImages.length
                     }`}
@@ -430,7 +432,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       }
                     >
                       <Image
-                        src={`${image.url.replace("/public", "")}/width=200`}
+                        src={image.url.replace("/public", "/width=200")}
                         alt={`Thumbnail ${actualIndex + 1}`}
                         className="object-cover rounded-md"
                         fill
@@ -487,10 +489,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
               <X className="w-6 h-6" />
             </button>
             <Image
-              src={`${filteredImages[modalIndex]?.url.replace(
-                "/public",
-                ""
-              )}/public`}
+              src={filteredImages[modalIndex]?.url}
               alt={`Full size view ${modalIndex + 1} of ${
                 filteredImages.length
               }`}

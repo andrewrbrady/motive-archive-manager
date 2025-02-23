@@ -8,7 +8,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 // Common classes for consistent styling
 const navClasses =
-  "fixed top-0 left-0 right-0 z-50 bg-background-primary border-b border-[hsl(var(--border))]";
+  "fixed top-0 left-0 right-0 z-50 bg-[hsl(var(--background-secondary))] border-b border-[hsl(var(--border))] shadow-sm backdrop-blur-sm";
 const linkClasses =
   "text-sm uppercase tracking-wider text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
 const iconButtonClasses =

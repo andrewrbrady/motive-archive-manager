@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -11,22 +11,49 @@ import { Plus } from "lucide-react";
 import ShotListTemplatesTab from "@/components/production/ShotListTemplatesTab";
 import ScriptTemplatesTab from "@/components/production/ScriptTemplatesTab";
 import RawAssetsTab from "@/components/production/RawAssetsTab";
+import HardDrivesTab from "@/components/production/HardDrivesTab";
 
 export default function ProductionClient() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<string>(() => {
+  const [activeTab, setActiveTab] = useState<string>("shot-lists");
+
+  // Effect to sync with URL params
+  useEffect(() => {
     const tab = searchParams.get("tab");
-    return tab || "shot-lists";
-  });
+    console.log("Current URL tab:", tab);
+    if (tab) {
+      console.log("Setting active tab to:", tab);
+      setActiveTab(tab);
+    } else {
+      console.log("Setting default tab");
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "shot-lists");
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [searchParams, router, pathname]);
+
+  // Add specific effect for hard-drives tab
+  useEffect(() => {
+    if (activeTab === "hard-drives") {
+      console.log("Hard drives tab is active, ensuring URL is updated");
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", "hard-drives");
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [activeTab, searchParams, router, pathname]);
 
   const handleTabChange = (value: string) => {
+    console.log("Tab change triggered:", value);
     setActiveTab(value);
-    const newParams = new URLSearchParams(searchParams.toString());
-    newParams.set("tab", value);
-    router.push(`/production?${newParams.toString()}`, {
-      scroll: false,
-    });
+    const params = new URLSearchParams(searchParams.toString());
+    console.log("Previous params:", params.toString());
+    params.set("tab", value);
+    console.log("New params:", params.toString());
+    const newUrl = `${pathname}?${params.toString()}`;
+    console.log("New URL:", newUrl);
+    router.replace(newUrl);
   };
 
   return (
@@ -47,10 +74,12 @@ export default function ProductionClient() {
             <TabsList className="mb-6 w-full bg-background-secondary/50 dark:bg-background-secondary/25 p-1 gap-1">
               <TabsTrigger value="shot-lists">Shot List Templates</TabsTrigger>
               <TabsTrigger value="scripts">Script Templates</TabsTrigger>
-              <TabsTrigger value="raw">Raw Assets</TabsTrigger>
+              <TabsTrigger value="raw-assets">Raw Assets</TabsTrigger>
               <TabsTrigger value="upcoming">Upcoming Productions</TabsTrigger>
-              <TabsTrigger value="inventory">Studio Inventory</TabsTrigger>
-              <TabsTrigger value="drives">Hard Drives</TabsTrigger>
+              <TabsTrigger value="studio-inventory">
+                Studio Inventory
+              </TabsTrigger>
+              <TabsTrigger value="hard-drives">Hard Drives</TabsTrigger>
             </TabsList>
 
             <TabsContent value="shot-lists">
@@ -61,7 +90,7 @@ export default function ProductionClient() {
               <ScriptTemplatesTab />
             </TabsContent>
 
-            <TabsContent value="raw">
+            <TabsContent value="raw-assets">
               <RawAssetsTab />
             </TabsContent>
 
@@ -77,7 +106,7 @@ export default function ProductionClient() {
               </div>
             </TabsContent>
 
-            <TabsContent value="inventory">
+            <TabsContent value="studio-inventory">
               <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
                 <h3 className="text-lg font-medium mb-4">Studio Inventory</h3>
                 <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
@@ -87,14 +116,8 @@ export default function ProductionClient() {
               </div>
             </TabsContent>
 
-            <TabsContent value="drives">
-              <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
-                <h3 className="text-lg font-medium mb-4">Hard Drives</h3>
-                <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                  Track and manage hard drives used for storing production
-                  footage and assets.
-                </p>
-              </div>
+            <TabsContent value="hard-drives">
+              <HardDrivesTab />
             </TabsContent>
           </Tabs>
         </div>

@@ -41,38 +41,47 @@ export async function GET(request: Request) {
         .map((term) => parseInt(term));
 
       // Get matching car IDs first - separate queries for text and year matches
-      const [textMatchingCarIds, yearMatchingCarIds] = await Promise.all([
-        // Text-based matches (make, model, color)
-        db
-          .collection("cars")
-          .find({
-            $or: [
-              { make: searchRegex },
-              { model: searchRegex },
-              { color: searchRegex },
-            ],
-          })
-          .project({ _id: 1 })
-          .map((car) => car._id)
-          .toArray(),
+      const [textMatchingCarIds, yearMatchingCarIds, matchingDriveIds] =
+        await Promise.all([
+          // Text-based matches (make, model, color)
+          db
+            .collection("cars")
+            .find({
+              $or: [
+                { make: searchRegex },
+                { model: searchRegex },
+                { color: searchRegex },
+              ],
+            })
+            .project({ _id: 1 })
+            .map((car) => car._id)
+            .toArray(),
 
-        // Year-based matches - handle both string and number types
-        yearTerms.length > 0
-          ? db
-              .collection("cars")
-              .find({
-                $or: yearTerms.map((year) => ({
-                  $or: [
-                    { year: year }, // Match number
-                    { year: year.toString() }, // Match string
-                  ],
-                })),
-              })
-              .project({ _id: 1 })
-              .map((car) => car._id)
-              .toArray()
-          : Promise.resolve([]),
-      ]);
+          // Year-based matches - handle both string and number types
+          yearTerms.length > 0
+            ? db
+                .collection("cars")
+                .find({
+                  $or: yearTerms.map((year) => ({
+                    $or: [
+                      { year: year }, // Match number
+                      { year: year.toString() }, // Match string
+                    ],
+                  })),
+                })
+                .project({ _id: 1 })
+                .map((car) => car._id)
+                .toArray()
+            : Promise.resolve([]),
+
+          // Search for matching hard drive labels
+          db
+            .collection("hard_drives")
+            .find({ label: searchRegex })
+            .project({ _id: 1 })
+            .map((drive) => drive._id)
+            .toArray(),
+        ]);
 
       // Combine all matching car IDs
       const matchingCarIds = [
@@ -83,6 +92,7 @@ export async function GET(request: Request) {
       console.log("Year terms:", yearTerms);
       console.log("Text matching car IDs:", textMatchingCarIds.length);
       console.log("Year matching car IDs:", yearMatchingCarIds.length);
+      console.log("Matching drive IDs:", matchingDriveIds.length);
       console.log("Total matching car IDs:", matchingCarIds.length);
 
       query.$or = [{ date: searchRegex }, { description: searchRegex }];
@@ -90,6 +100,11 @@ export async function GET(request: Request) {
       // Only add car ID search if we found matching cars
       if (matchingCarIds.length > 0) {
         query.$or.push({ carIds: { $in: matchingCarIds } });
+      }
+
+      // Add storage location search if we found matching drives
+      if (matchingDriveIds.length > 0) {
+        query.$or.push({ locations: { $in: matchingDriveIds } });
       }
     }
 
@@ -164,7 +179,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { date, description, locations } = await request.json();
+    const {
+      date,
+      description,
+      locations,
+      carIds = [],
+      cars = [],
+    } = await request.json();
 
     // Validate required fields
     if (!date || !description || !locations) {
@@ -179,7 +200,8 @@ export async function POST(request: Request) {
       date,
       description,
       locations,
-      cars: [],
+      carIds,
+      cars,
     });
 
     return new Response(JSON.stringify(newAsset), { status: 201 });

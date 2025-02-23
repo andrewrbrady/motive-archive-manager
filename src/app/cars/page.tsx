@@ -69,6 +69,7 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       cars: data.cars as Car[],
       totalPages: data.totalPages,
       currentPage: page,
+      totalCount: data.totalCount,
     };
   } catch (error) {
     console.error("Error fetching cars:", error);
@@ -106,7 +107,7 @@ export default async function CarsPage({
       }
     });
 
-    const [{ cars, totalPages, currentPage }, makes, clients] =
+    const [{ cars, totalPages, currentPage, totalCount }, makes, clients] =
       await Promise.all([
         getCars(page, pageSize, filters),
         fetchMakes(),
@@ -134,6 +135,7 @@ export default async function CarsPage({
         totalPages={totalPages}
         currentPage={currentPage}
         pageSize={pageSize}
+        totalCount={totalCount}
         view={view}
         isEditMode={isEditMode}
         filters={filters}

@@ -29,7 +29,7 @@ export default function CarSelector({
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/cars?search=${encodeURIComponent(query)}`
+        `/api/cars?search=${encodeURIComponent(query)}&sort=createdAt_desc`
       );
       if (!response.ok) throw new Error("Failed to fetch cars");
       const data = await response.json();

@@ -94,8 +94,12 @@ interface ApiCarResponse {
   aiAnalysis?: any;
 }
 
-interface ExtendedCar extends Omit<BaseCar, "mileage"> {
+interface ExtendedCar
+  extends Omit<BaseCar, "mileage" | "year" | "images" | "imageIds"> {
   mileage: MeasurementValue;
+  year: number;
+  images?: CarImage[];
+  imageIds: string[];
 }
 
 interface Dimensions {
@@ -1133,12 +1137,32 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
     try {
       setIsSpecsSaving(true);
+      // Preserve the existing images and imageIds
+      const updatedSpecs = {
+        ...fromCarFormData(editedSpecs as CarData, car),
+        // Map CarImage to Image type
+        images:
+          car.images?.map((img) => ({
+            _id: img._id,
+            cloudflareId: img.cloudflareId,
+            url: img.url,
+            filename: img.filename,
+            metadata: img.metadata || {},
+            carId: car._id,
+            createdAt: img.createdAt || new Date().toISOString(),
+            updatedAt: img.updatedAt || new Date().toISOString(),
+          })) || [],
+        imageIds: car.imageIds || [],
+      };
+
+      console.log("Updating car with specs:", updatedSpecs);
+
       const response = await fetch(`/api/cars/${car._id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(fromCarFormData(editedSpecs as CarData, car)),
+        body: JSON.stringify(updatedSpecs),
       });
 
       if (!response.ok) {
@@ -1146,9 +1170,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
       }
 
       const updatedCar = await response.json();
+      console.log("Updated car:", updatedCar);
       setCar(updatedCar);
       setIsSpecsEditMode(false);
-      toast.success("Car specifications updated successfully");
     } catch (error) {
       console.error("Error updating car specifications:", error);
       toast.error("Failed to update car specifications");
@@ -1324,18 +1348,29 @@ export default function CarPage({ params }: { params: { id: string } }) {
                   </button>
                 </div>
                 <ImageUploadWithContext
-                  images={car.images || []}
+                  images={
+                    car.images?.map((img) => ({
+                      id: img._id,
+                      url: img.url.endsWith("/public")
+                        ? img.url
+                        : `${img.url}/public`,
+                      filename: img.filename,
+                      metadata: img.metadata || {},
+                      variants: {},
+                      createdAt: img.createdAt || new Date().toISOString(),
+                      updatedAt: img.updatedAt || new Date().toISOString(),
+                    })) || []
+                  }
                   isEditMode={isEditMode}
                   onRemoveImage={handleRemoveImage}
                   onImagesChange={handleImageUpload}
                   uploading={uploadingImages}
                   uploadProgress={uploadProgress}
-                  setUploadProgress={setUploadProgress}
                   showMetadata={true}
                   showFilters={true}
                   title={`${car.year} ${car.make} ${car.model}`}
                   onContextChange={setAdditionalContext}
-                  carId={car._id}
+                  carId={id}
                 />
               </div>
             </TabsContent>

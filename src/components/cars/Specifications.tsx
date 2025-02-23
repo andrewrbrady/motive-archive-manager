@@ -769,8 +769,29 @@ const Specifications = ({
                     Power Output
                   </span>
                   <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
-                    {car.engine.power.hp} hp / {car.engine.power.kW} kW /{" "}
-                    {car.engine.power.ps} ps
+                    {isEditMode ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={
+                            localSpecs.engine?.power?.hp ?? car.engine.power.hp
+                          }
+                          onChange={(e) => {
+                            const hp = parseFloat(e.target.value) || 0;
+                            const kW = Math.round(hp * 0.7457);
+                            const ps = Math.round(hp * 1.014);
+                            handleInputChange("engine", {
+                              ...car.engine,
+                              power: { hp, kW, ps },
+                            });
+                          }}
+                          className={`w-20 ${baseInputClasses}`}
+                        />
+                        <span>hp</span>
+                      </div>
+                    ) : (
+                      `${car.engine.power.hp} hp / ${car.engine.power.kW} kW / ${car.engine.power.ps} ps`
+                    )}
                   </span>
                 </div>
               </>

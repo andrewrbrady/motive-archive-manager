@@ -2,6 +2,9 @@ import "./globals.css";
 import { Metadata } from "next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Motive Archive",
@@ -28,7 +31,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-background antialiased">
+      <body
+        className={`min-h-screen bg-background antialiased ${inter.className}`}
+      >
         <ThemeProvider>{children}</ThemeProvider>
         <Toaster />
       </body>
