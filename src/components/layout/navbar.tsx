@@ -11,7 +11,8 @@ const navClasses =
   "fixed top-0 left-0 right-0 z-50 bg-background-primary border-b border-[hsl(var(--border))]";
 const linkClasses =
   "text-sm uppercase tracking-wider text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
-const iconButtonClasses = "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
+const iconButtonClasses =
+  "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
 
 interface NavbarProps {
   className?: string;
@@ -53,9 +54,6 @@ export default function Navbar({ className }: NavbarProps) {
               </Link>
               <Link href="/auctions" className={linkClasses}>
                 Auctions
-              </Link>
-              <Link href="/raw" className={linkClasses}>
-                Raw
               </Link>
               <Link href="/deliverables" className={linkClasses}>
                 Deliverables

@@ -388,56 +388,107 @@ export async function PATCH(
     const updates = await request.json();
     console.log("\nReceived Updates:", JSON.stringify(updates, null, 2));
 
-    // Clean up the updates object
-    const cleanedUpdates = Object.entries(updates).reduce<Record<string, any>>(
-      (acc, [key, value]) => {
-        // Skip null, undefined, or empty string values
-        if (value === null || value === undefined || value === "") {
-          return acc;
-        }
+    // Remove _id from updates to prevent MongoDB error
+    const { _id, ...updatesWithoutId } = updates;
 
-        // Handle client field specifically
-        if (key === "client" && value) {
+    // Clean up the updates object
+    const cleanedUpdates = Object.entries(updatesWithoutId).reduce<
+      Record<string, any>
+    >((acc, [key, value]) => {
+      // Skip null or undefined values, but allow empty strings and zero values
+      if (value === null || value === undefined) {
+        return acc;
+      }
+
+      // Handle client field specifically
+      if (key === "client") {
+        if (!value) {
+          acc[key] = null;
+        } else {
           try {
+            // Validate the client ID format
+            if (!ObjectId.isValid(value.toString())) {
+              throw new Error(`Invalid client ID format: ${value}`);
+            }
             // Store client ID as ObjectId for consistency
             acc[key] = new ObjectId(value.toString());
           } catch (error) {
             console.error("Error converting client ID:", error);
-            throw new Error("Invalid client ID format");
+            throw new Error(`Invalid client ID format: ${value}`);
           }
-          return acc;
         }
-
-        // Handle nested objects
-        if (typeof value === "object" && !Array.isArray(value)) {
-          const cleaned = Object.entries(value).reduce(
-            (nested, [nestedKey, nestedValue]) => {
-              if (
-                nestedValue === null ||
-                nestedValue === undefined ||
-                nestedValue === ""
-              ) {
-                return nested;
-              }
-              return { ...nested, [nestedKey]: nestedValue };
-            },
-            {}
-          );
-          if (Object.keys(cleaned).length > 0) {
-            acc[key] = cleaned;
-          }
-          return acc;
-        }
-        acc[key] = value;
         return acc;
-      },
-      {}
-    );
+      }
+
+      // Handle nested objects (including measurements and complex structures)
+      if (typeof value === "object" && !Array.isArray(value)) {
+        const cleaned = Object.entries(value).reduce<Record<string, any>>(
+          (nested, [nestedKey, nestedValue]) => {
+            // Skip null or undefined nested values, but allow empty strings and zero values
+            if (nestedValue === null || nestedValue === undefined) {
+              return nested;
+            }
+
+            // Handle measurement values
+            if (
+              typeof nestedValue === "object" &&
+              "value" in nestedValue &&
+              "unit" in nestedValue
+            ) {
+              // Allow zero values for measurements
+              nested[nestedKey] = nestedValue;
+              return nested;
+            }
+
+            // Handle other nested objects
+            if (
+              typeof nestedValue === "object" &&
+              !Array.isArray(nestedValue)
+            ) {
+              const deepCleaned = Object.entries(nestedValue).reduce<
+                Record<string, any>
+              >((deep, [deepKey, deepValue]) => {
+                if (deepValue === null || deepValue === undefined) {
+                  return deep;
+                }
+                return { ...deep, [deepKey]: deepValue };
+              }, {});
+              if (Object.keys(deepCleaned).length > 0) {
+                nested[nestedKey] = deepCleaned;
+              }
+              return nested;
+            }
+
+            nested[nestedKey] = nestedValue;
+            return nested;
+          },
+          {}
+        );
+        if (Object.keys(cleaned).length > 0) {
+          acc[key] = cleaned;
+        }
+        return acc;
+      }
+
+      // Handle arrays
+      if (Array.isArray(value)) {
+        acc[key] = value.filter((item) => item !== null && item !== undefined);
+        return acc;
+      }
+
+      acc[key] = value;
+      return acc;
+    }, {});
 
     console.log("\nCleaned Updates:", JSON.stringify(cleanedUpdates, null, 2));
 
     client = await getMongoClient();
     const db = client.db(DB_NAME);
+
+    // Validate car ID
+    if (!ObjectId.isValid(params.id)) {
+      throw new Error(`Invalid car ID format: ${params.id}`);
+    }
     const objectId = new ObjectId(params.id);
 
     // First verify the car exists
@@ -446,6 +497,9 @@ export async function PATCH(
       console.error(`Car not found with ID: ${params.id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
+
+    // Update the updatedAt timestamp
+    cleanedUpdates.updatedAt = new Date();
 
     // Perform the update with cleaned data
     const result = await db

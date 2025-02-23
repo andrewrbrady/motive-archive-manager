@@ -104,7 +104,7 @@ export async function PUT(request: NextRequest) {
       { returnDocument: "after" }
     );
 
-    if (!result) {
+    if (!result || !result.value) {
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }
@@ -112,8 +112,8 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json({
-      ...result,
-      id: result._id.toString(),
+      ...result.value,
+      id: result.value._id.toString(),
       _id: undefined,
     });
   } catch (error) {

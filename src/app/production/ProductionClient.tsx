@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import ShotListTemplatesTab from "@/components/production/ShotListTemplatesTab";
 import ScriptTemplatesTab from "@/components/production/ScriptTemplatesTab";
+import RawAssetsTab from "@/components/production/RawAssetsTab";
 
 export default function ProductionClient() {
   const router = useRouter();
@@ -46,6 +47,7 @@ export default function ProductionClient() {
             <TabsList className="mb-6 w-full bg-background-secondary/50 dark:bg-background-secondary/25 p-1 gap-1">
               <TabsTrigger value="shot-lists">Shot List Templates</TabsTrigger>
               <TabsTrigger value="scripts">Script Templates</TabsTrigger>
+              <TabsTrigger value="raw">Raw Assets</TabsTrigger>
               <TabsTrigger value="upcoming">Upcoming Productions</TabsTrigger>
               <TabsTrigger value="inventory">Studio Inventory</TabsTrigger>
               <TabsTrigger value="drives">Hard Drives</TabsTrigger>
@@ -57,6 +59,10 @@ export default function ProductionClient() {
 
             <TabsContent value="scripts">
               <ScriptTemplatesTab />
+            </TabsContent>
+
+            <TabsContent value="raw">
+              <RawAssetsTab />
             </TabsContent>
 
             <TabsContent value="upcoming">

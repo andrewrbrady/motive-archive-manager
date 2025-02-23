@@ -64,3 +64,29 @@ export function transformInventoryItem(item: InventoryItemRaw): InventoryItem {
     images: item.images,
   };
 }
+
+export interface RawAsset {
+  _id: string;
+  date: string; // YYMMDD format
+  client?: string;
+  description: string;
+  locations: string[]; // Array of storage locations
+  carIds?: string[]; // Array of associated car IDs
+  cars?: Car[];
+  files?: {
+    [location: string]: {
+      path: string;
+      files: string[];
+    };
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Car {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
+}

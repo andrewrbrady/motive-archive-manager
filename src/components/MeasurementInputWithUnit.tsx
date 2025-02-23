@@ -20,26 +20,32 @@ export default function MeasurementInputWithUnit({
   placeholder,
   className = "",
 }: MeasurementInputWithUnitProps) {
+  // Ensure value has a valid structure
+  const safeValue = {
+    value: value?.value ?? null,
+    unit: value?.unit || availableUnits[0] || "",
+  };
+
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value === "" ? null : Number(e.target.value);
-    onChange({ ...value, value: newValue });
+    onChange({ ...safeValue, value: newValue });
   };
 
   const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onChange({ ...value, unit: e.target.value });
+    onChange({ ...safeValue, unit: e.target.value });
   };
 
   return (
     <div className={`flex gap-1 ${className}`}>
       <input
         type="number"
-        value={value.value === null ? "" : value.value}
+        value={safeValue.value === null ? "" : safeValue.value}
         onChange={handleValueChange}
         placeholder={placeholder}
         className="w-32 bg-background text-text-primary border border-border-primary rounded-md px-3 py-2 text-sm placeholder:text-text-tertiary transition-all duration-base focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
       />
       <select
-        value={value.unit}
+        value={safeValue.unit}
         onChange={handleUnitChange}
         className="w-20 bg-background text-text-primary border border-border-primary rounded-md px-2 py-2 text-sm placeholder:text-text-tertiary transition-all duration-base focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
       >

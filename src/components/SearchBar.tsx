@@ -136,14 +136,14 @@ export const FuzzySearchBar: React.FC<SearchBarProps> = ({
         onKeyDown={handleKeyDown}
         onFocus={() => value && setShowSuggestions(true)}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2 rounded-lg border border-[hsl(var(--border-primary))] focus:outline-none focus:border-destructive-500"
+        className="w-full pl-10 pr-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--foreground-muted))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
       />
       <button
         onClick={() => {
           onSearch();
           setShowSuggestions(false);
         }}
-        className="absolute left-2 top-1/2 transform -translate-y-1/2 text-[hsl(var(--foreground-muted))] hover:text-destructive-500"
+        className="absolute left-2 top-1/2 transform -translate-y-1/2 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--info))]"
       >
         <Search className="w-5 h-5" />
       </button>
@@ -151,15 +151,15 @@ export const FuzzySearchBar: React.FC<SearchBarProps> = ({
       {showSuggestions && filteredSuggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-10 w-full mt-1 bg-[var(--background-primary)] rounded-lg shadow-lg border border-[hsl(var(--border-subtle))] max-h-60 overflow-auto"
+          className="absolute z-10 w-full mt-1 bg-[hsl(var(--background))] rounded-lg shadow-lg border border-[hsl(var(--border))] max-h-60 overflow-auto"
         >
           {filteredSuggestions.map((suggestion, index) => (
             <div
               key={suggestion}
               className={`px-4 py-2 cursor-pointer ${
                 index === selectedIndex
-                  ? "bg-destructive-50 text-destructive-900"
-                  : "hover:bg-[hsl(var(--background))]"
+                  ? "bg-[hsl(var(--info))] text-[hsl(var(--info-foreground))]"
+                  : "hover:bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]"
               }`}
               onClick={() => {
                 onChange(suggestion);

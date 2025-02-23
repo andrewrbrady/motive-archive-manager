@@ -191,7 +191,9 @@ const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
 
   return (
     <div className="flex justify-between py-2 border-b border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
-      <span className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">{label}</span>
+      <span className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+        {label}
+      </span>
       <span className="text-[hsl(var(--foreground))] dark:text-white font-medium">
         {typeof displayValue === "number"
           ? displayValue.toLocaleString()
@@ -317,22 +319,21 @@ const Specifications = ({
 }: SpecificationProps) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [localSpecs, setLocalSpecs] = useState<Partial<CarData>>(car);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedId, setLastSavedId] = useState(car._id);
 
-  // Single useEffect to manage localSpecs state
+  // Only update localSpecs when car ID changes or edit mode is toggled off
   useEffect(() => {
-    // Only update localSpecs when not in edit mode or when car data changes significantly
-    const shouldUpdate =
-      !isEditMode ||
-      car._id !== localSpecs._id ||
-      car.year !== localSpecs.year ||
-      car.make !== localSpecs.make ||
-      car.model !== localSpecs.model;
-
-    if (shouldUpdate) {
-      console.log("Updating localSpecs with new car data");
+    const isNewCar = car._id !== lastSavedId;
+    if (isNewCar || (!isEditMode && !isSaving)) {
+      console.log(
+        "Updating localSpecs - Reason:",
+        isNewCar ? "New car" : "Edit mode off"
+      );
       setLocalSpecs(car);
+      setLastSavedId(car._id);
     }
-  }, [car, isEditMode]);
+  }, [car._id, isEditMode, isSaving, lastSavedId]);
 
   const handleInputChange = (field: string, value: any) => {
     console.log(`Updating field ${field} with value:`, value);
@@ -374,15 +375,18 @@ const Specifications = ({
     console.log("\n=== SAVING SPECIFICATIONS ===");
     console.log("Current local specs:", localSpecs);
 
+    setIsSaving(true);
     try {
       await onSave?.(localSpecs);
-      // Don't reset localSpecs here - let the parent component handle the update
       console.log("Save successful");
+      // Don't reset localSpecs here - let the server response update the car prop
     } catch (error) {
       console.error("Error saving specifications:", error);
       toast.error("Failed to save specifications");
-      // On error, reset to car data
+      // Only reset on error
       setLocalSpecs(car);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -488,7 +492,9 @@ const Specifications = ({
       <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
         {/* Basic Info */}
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">Year</span>
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+            Year
+          </span>
           <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
@@ -506,7 +512,9 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">Make</span>
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+            Make
+          </span>
           <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
@@ -581,7 +589,9 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">VIN</span>
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+            VIN
+          </span>
           <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white font-mono pr-3">
             {isEditMode ? (
               <input
