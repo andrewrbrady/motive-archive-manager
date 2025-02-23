@@ -95,7 +95,7 @@ export default async function ReceiptPage({
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                  <thead className="text-xs text-[hsl(var(--foreground))] uppercase bg-[hsl(var(--background))]">
                     <tr>
                       <th className="px-4 py-2 text-left">Item</th>
                       <th className="px-4 py-2 text-right">Qty</th>

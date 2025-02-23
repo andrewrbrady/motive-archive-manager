@@ -131,7 +131,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
 
   if (clients.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-[hsl(var(--foreground-muted))]">
         No clients found. Add a new client to get started.
       </div>
     );
@@ -171,8 +171,8 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                       client.status === "active"
-                        ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20"
-                        : "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20"
+                        ? "bg-success-50 text-success-700 ring-1 ring-inset ring-success-600/20"
+                        : "bg-destructive-50 text-destructive-700 ring-1 ring-inset ring-destructive-600/20"
                     }`}
                   >
                     {client.status}

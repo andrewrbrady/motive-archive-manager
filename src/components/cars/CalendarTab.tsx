@@ -80,6 +80,16 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
+// Replace hex colors with theme variables
+const statusColors = {
+  NOT_STARTED: "var(--destructive)",
+  IN_PROGRESS: "var(--warning)",
+  COMPLETED: "var(--success)",
+  default: "var(--zinc-500)",
+  purple: "var(--purple-500)",
+  blue: "var(--info)",
+};
+
 export default function CalendarTab({ carId }: CalendarTabProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
@@ -469,7 +479,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
               onClick={() => setShowEvents(!showEvents)}
               className={cn(
                 "flex items-center gap-2",
-                showEvents && "bg-zinc-100 dark:bg-zinc-800"
+                showEvents && "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
               )}
             >
               {showEvents ? (
@@ -485,7 +495,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
               onClick={() => setShowDeliverables(!showDeliverables)}
               className={cn(
                 "flex items-center gap-2",
-                showDeliverables && "bg-zinc-100 dark:bg-zinc-800"
+                showDeliverables && "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
               )}
             >
               {showDeliverables ? (
@@ -638,11 +648,11 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
             <div
               className={cn(
                 "w-2 h-2 rounded-full",
-                event.type === "event" ? "bg-blue-500" : "bg-amber-500"
+                event.type === "event" ? "bg-info-500" : "bg-warning-500"
               )}
             />
             <span className="font-medium">{event.title}</span>
-            <span className="text-zinc-500 dark:text-zinc-400 text-sm">
+            <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] text-sm">
               {dateTimeDisplay}
             </span>
           </div>
@@ -839,7 +849,20 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
           events={filteredCalendarEvents}
           startAccessor="start"
           endAccessor="end"
-          eventPropGetter={(event) => getEventStyle(event as CalendarEvent)}
+          eventPropGetter={(event) => {
+            const eventResource = event.resource as Event;
+            const status = eventResource.status;
+            return {
+              style: {
+                backgroundColor: statusColors[status] || statusColors.default,
+                color: "var(--background-primary)",
+                border: "none",
+                borderRadius: "4px",
+                padding: "2px 4px",
+                opacity: 0.9,
+              },
+            };
+          }}
           views={{
             [Views.MONTH]: true,
             [Views.WEEK]: true,

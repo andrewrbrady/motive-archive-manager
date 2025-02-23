@@ -33,22 +33,22 @@ export default function DeliverableTooltip({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <User className="mr-2 h-4 w-4" />
                 {deliverable.editor || "Unassigned"}
               </div>
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <Video className="mr-2 h-4 w-4" />
                 {deliverable.platform}
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {format(new Date(deliverable.edit_deadline), "MMM d, yyyy")}
               </div>
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <Clock className="mr-2 h-4 w-4" />
                 {deliverable.release_date &&
                   format(new Date(deliverable.release_date), "MMM d, yyyy")}

@@ -16,7 +16,7 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
           rel="noopener noreferrer"
           className="block"
         >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          <h2 className="text-xl font-semibold text-[hsl(var(--foreground))] dark:text-white hover:text-info-600 dark:hover:text-info-400 transition-colors">
             {item.year} {item.make} {item.model}
           </h2>
         </Link>
@@ -25,8 +25,8 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
       <div className="grid grid-cols-2 gap-4">
         {item.price && (
           <div>
-            <dt className="text-sm text-gray-500 dark:text-gray-400">Price</dt>
-            <dd className="text-sm font-medium text-gray-900 dark:text-white">
+            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">Price</dt>
+            <dd className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
               ${item.price.toLocaleString()}
             </dd>
           </div>
@@ -34,10 +34,10 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
 
         {item.mileage && item.mileage.value !== null && (
           <div>
-            <dt className="text-sm text-gray-500 dark:text-gray-400">
+            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
               Mileage
             </dt>
-            <dd className="text-sm font-medium text-gray-900 dark:text-white">
+            <dd className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
               {item.mileage.value.toLocaleString()} {item.mileage.unit}
             </dd>
           </div>
@@ -45,10 +45,10 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
 
         {item.transmission && (
           <div>
-            <dt className="text-sm text-gray-500 dark:text-gray-400">
+            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
               Transmission
             </dt>
-            <dd className="text-sm font-medium text-gray-900 dark:text-white">
+            <dd className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
               {item.transmission}
             </dd>
           </div>
@@ -56,8 +56,8 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
 
         {item.dealer && (
           <div>
-            <dt className="text-sm text-gray-500 dark:text-gray-400">Dealer</dt>
-            <dd className="text-sm font-medium text-gray-900 dark:text-white">
+            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">Dealer</dt>
+            <dd className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
               {item.dealer}
             </dd>
           </div>

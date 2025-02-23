@@ -149,7 +149,7 @@ export default function CarImageEditor({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Edit Images</h3>
         {saving && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-[hsl(var(--foreground-muted))]">
             <Loader2 className="w-4 h-4 animate-spin" />
             Saving changes...
           </div>
@@ -182,7 +182,7 @@ export default function CarImageEditor({
       />
 
       {uploadProgress.length > 0 && (
-        <div className="mt-4 space-y-2 bg-gray-50 p-4 rounded-lg">
+        <div className="mt-4 space-y-2 bg-[hsl(var(--background))] p-4 rounded-lg">
           <h4 className="text-sm font-medium mb-3">Upload Progress</h4>
           {uploadProgress.map((progress) => (
             <div
@@ -191,27 +191,27 @@ export default function CarImageEditor({
             >
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
-                  <span className="text-gray-700">{progress.fileName}</span>
-                  <span className="text-gray-500">
+                  <span className="text-[hsl(var(--foreground))]">{progress.fileName}</span>
+                  <span className="text-[hsl(var(--foreground-muted))]">
                     {progress.status === "error"
                       ? "Error"
                       : `${progress.progress}%`}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-1">
+                <div className="w-full bg-[hsl(var(--background))] rounded-full h-1">
                   <div
                     className={`h-1 rounded-full transition-all duration-300 ${
                       progress.status === "error"
-                        ? "bg-red-500"
+                        ? "bg-destructive-500"
                         : progress.status === "complete"
-                        ? "bg-green-500"
-                        : "bg-blue-500"
+                        ? "bg-success-500"
+                        : "bg-info-500"
                     }`}
                     style={{ width: `${progress.progress}%` }}
                   />
                 </div>
                 {progress.status === "error" && (
-                  <p className="text-xs text-red-500 mt-1">{progress.error}</p>
+                  <p className="text-xs text-destructive-500 mt-1">{progress.error}</p>
                 )}
               </div>
             </div>

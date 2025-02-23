@@ -25,7 +25,7 @@ Transmission: 5 speed manual
 0-60: 3.1 seconds
 Top Speed: 229mph
 
-What’s is your favorite race car of early 90s?
+What's is your favorite race car of early 90s?
 
 #motivearchive #ferrari #f40 #f40LM #automotivehistory #racecar #collectorcar #vintagecar #vintageracecar`,
     },
@@ -48,7 +48,7 @@ Finished in Rosso Corsa over black leather interior. One of only 330 examples pr
 
 This McLaren P1 offers a rare opportunity to own one of the most advanced and exhilarating HyperCard ever produced. Equipped with an upgraded Gen 2 battery and just 740 miles it is suited for both driving enthusiasts and collectors alike. Priced competitively.
 
-There’s still time before Christmas 🎄 🎅
+There's still time before Christmas 🎄 🎅
 
 #mclaren #mclarenp1 #mousemotors #mclarenchicago #hypercar #p1 #collectorcar `,
     },
@@ -128,3 +128,5 @@ export const CAPTION_GUIDELINES = {
     "More detailed than Instagram, but still focused on facts",
   ],
 };
+
+const highlightColor = "var(--destructive)";

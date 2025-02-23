@@ -2,10 +2,29 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { db } = await connectToDatabase();
-    const templates = await db.collection("shotTemplates").find({}).toArray();
+    const { searchParams } = new URL(request.url);
+    const sort = searchParams.get("sort");
+
+    let sortOptions = {};
+    if (sort) {
+      const [field, direction] = sort.split("_");
+      sortOptions = {
+        [field === "shots" ? "shots.length" : field]:
+          direction === "asc" ? 1 : -1,
+      };
+    } else {
+      // Default sort by updatedAt desc
+      sortOptions = { updatedAt: -1 };
+    }
+
+    const templates = await db
+      .collection("shotTemplates")
+      .find()
+      .sort(sortOptions)
+      .toArray();
 
     return NextResponse.json(
       templates.map((template) => ({
@@ -30,7 +49,7 @@ export async function POST(request: Request) {
     const result = await db.collection("shotTemplates").insertOne({
       name: data.name,
       description: data.description,
-      shots: data.shots,
+      shots: data.shots || [],
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -38,6 +57,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       id: result.insertedId.toString(),
       ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
   } catch (error) {
     console.error("Error creating shot template:", error);

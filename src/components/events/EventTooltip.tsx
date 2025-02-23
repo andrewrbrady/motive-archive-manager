@@ -31,23 +31,23 @@ export default function EventTooltip({ children, event }: EventTooltipProps) {
         align="start"
         sideOffset={2}
         className={cn(
-          "z-50 w-80 rounded-lg border border-zinc-200 bg-white p-4 shadow-md",
-          "dark:border-zinc-800 dark:bg-zinc-950"
+          "z-50 w-80 rounded-lg border border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] p-4 shadow-md",
+          "dark:border-[hsl(var(--border-subtle))] dark:bg-[hsl(var(--background))]"
         )}
       >
         <div className="space-y-4">
           <div>
-            <h4 className="font-medium text-zinc-900 dark:text-zinc-100">
+            <h4 className="font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
               {formatEventType(event.type)}
             </h4>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
               {event.description}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <User className="mr-2 h-4 w-4" />
                 {event.assignees?.length > 0
                   ? event.assignees.join(", ")
@@ -56,11 +56,11 @@ export default function EventTooltip({ children, event }: EventTooltipProps) {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {format(new Date(event.start), "MMM d, yyyy")}
               </div>
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <Clock className="mr-2 h-4 w-4" />
                 {event.end ? (
                   <>

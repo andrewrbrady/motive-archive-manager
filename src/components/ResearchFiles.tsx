@@ -556,7 +556,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
         {/* Left Column */}
         <div className="flex flex-col min-h-0">
           {/* Search and Upload Section */}
-          <div className="flex-none px-1.5 py-0.5 border-b border-zinc-800 bg-background z-20">
+          <div className="flex-none px-1.5 py-0.5 border-b border-[hsl(var(--border))] bg-background z-20">
             <div className="flex gap-1 mb-0.5 relative">
               <div className="flex-1">
                 <form onSubmit={handleSearch} className="flex gap-1">
@@ -597,8 +597,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               onDrop={handleDrop}
               className={`border border-dashed rounded-md p-0.5 text-center transition-colors ${
                 isDragging
-                  ? "border-zinc-500 bg-zinc-800/50"
-                  : "border-zinc-800 hover:border-zinc-700"
+                  ? "border-zinc-500 bg-[hsl(var(--background))] bg-opacity-50"
+                  : "border-[hsl(var(--border))] hover:border-[hsl(var(--border-subtle))]"
               }`}
             >
               <input
@@ -613,9 +613,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                 htmlFor="file"
                 className="flex items-center justify-center gap-1 cursor-pointer text-sm"
               >
-                <Upload className="h-3 w-3 text-zinc-400" />
-                <span className="text-zinc-400">
-                  <span className="font-medium text-zinc-300">
+                <Upload className="h-3 w-3 text-[hsl(var(--foreground-muted))]" />
+                <span className="text-[hsl(var(--foreground-muted))]">
+                  <span className="font-medium text-[hsl(var(--foreground-subtle))]">
                     Drop files or click
                   </span>{" "}
                   (.md)
@@ -625,28 +625,28 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
             {selectedFiles.length > 0 && (
               <div className="mt-1.5 flex flex-col max-h-32">
-                <div className="text-xs text-zinc-400 px-1">
+                <div className="text-xs text-[hsl(var(--foreground-muted))] px-1">
                   Selected files:
                 </div>
                 <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 mt-1">
                   {selectedFiles.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between gap-2 text-sm px-1 py-0.5 hover:bg-zinc-800/50"
+                      className="flex items-center justify-between gap-2 text-sm px-1 py-0.5 hover:bg-[hsl(var(--background))] bg-opacity-50"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <FileText className="h-3 w-3 text-zinc-400 flex-shrink-0" />
-                        <span className="truncate text-zinc-300">
+                        <FileText className="h-3 w-3 text-[hsl(var(--foreground-muted))] flex-shrink-0" />
+                        <span className="truncate text-[hsl(var(--foreground-subtle))]">
                           {file.name}
                         </span>
                       </div>
-                      <span className="text-xs text-zinc-500 flex-shrink-0">
+                      <span className="text-xs text-[hsl(var(--foreground-muted))] flex-shrink-0">
                         {formatFileSize(file.size)}
                       </span>
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-end mt-1 pt-1 border-t border-zinc-800">
+                <div className="flex justify-end mt-1 pt-1 border-t border-[hsl(var(--border))]">
                   <Button
                     size="sm"
                     onClick={handleUpload}
@@ -702,25 +702,25 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
             }}
           >
             {error && (
-              <div className="mx-2 mt-1.5 rounded border border-red-900/50 bg-red-900/10 p-1 text-sm text-red-400">
+              <div className="mx-2 mt-1.5 rounded border border-destructive-900 border-opacity-50 bg-destructive-900/10 p-1 text-sm text-destructive-400">
                 {error}
               </div>
             )}
 
             {searchResults.length > 0 && (
-              <div className="border-b border-zinc-800">
+              <div className="border-b border-[hsl(var(--border))]">
                 <div className="p-1.5">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-medium text-zinc-300">
+                    <h3 className="text-sm font-medium text-[hsl(var(--foreground-subtle))]">
                       Search Results
                     </h3>
                   </div>
                   {searchAnswer && (
-                    <div className="mb-2 p-2 rounded bg-zinc-800/75 text-sm">
+                    <div className="mb-2 p-2 rounded bg-[hsl(var(--background))] bg-opacity-75 text-sm">
                       <div className="font-medium text-zinc-200 mb-1">
                         Answer
                       </div>
-                      <div className="text-zinc-400 whitespace-pre-wrap">
+                      <div className="text-[hsl(var(--foreground-muted))] whitespace-pre-wrap">
                         {searchAnswer}
                       </div>
                     </div>
@@ -729,7 +729,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     {searchResults.map((result, index) => (
                       <div
                         key={`${result.metadata.fileId}-${index}`}
-                        className="p-1.5 rounded bg-zinc-800/50 hover:bg-zinc-800 transition-colors cursor-pointer text-sm"
+                        className="p-1.5 rounded bg-[hsl(var(--background))] bg-opacity-50 hover:bg-[hsl(var(--background))] transition-colors cursor-pointer text-sm"
                         onClick={() => {
                           const file = files.find(
                             (f) => f._id === result.metadata.fileId
@@ -741,11 +741,11 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                           <span className="font-medium text-zinc-200">
                             {result.metadata.fileName}
                           </span>
-                          <span className="text-xs text-zinc-500">
+                          <span className="text-xs text-[hsl(var(--foreground-muted))]">
                             {result.metadata.matchType}
                           </span>
                         </div>
-                        <p className="text-xs text-zinc-400 line-clamp-2">
+                        <p className="text-xs text-[hsl(var(--foreground-muted))] line-clamp-2">
                           {result.content}
                         </p>
                       </div>
@@ -757,7 +757,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
             <div className="divide-y divide-zinc-800">
               <div className="px-2 py-1 sticky top-0 bg-background z-10 flex items-center justify-between">
-                <h3 className="text-sm font-medium text-zinc-300">
+                <h3 className="text-sm font-medium text-[hsl(var(--foreground-subtle))]">
                   Research Files
                 </h3>
                 {files.length > 0 && (
@@ -766,7 +766,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     size="sm"
                     onClick={handleDeleteAll}
                     disabled={isDeletingAll}
-                    className="h-6 text-xs text-zinc-400 hover:text-red-400 hover:bg-red-400/10"
+                    className="h-6 text-xs text-[hsl(var(--foreground-muted))] hover:text-destructive-400 hover:bg-destructive-400 bg-opacity-10"
                   >
                     {isDeletingAll ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -782,10 +782,10 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   <div className="animate-pulse space-y-2">
                     {[...Array(3)].map((_, i) => (
                       <div key={i} className="flex items-center space-x-4">
-                        <div className="h-4 w-4 bg-zinc-800 rounded" />
+                        <div className="h-4 w-4 bg-[hsl(var(--background))] rounded" />
                         <div className="flex-1 space-y-1">
-                          <div className="h-3 bg-zinc-800 rounded w-3/4" />
-                          <div className="h-2 bg-zinc-800 rounded w-1/2" />
+                          <div className="h-3 bg-[hsl(var(--background))] rounded w-3/4" />
+                          <div className="h-2 bg-[hsl(var(--background))] rounded w-1/2" />
                         </div>
                       </div>
                     ))}
@@ -796,34 +796,34 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   {files.map((file) => (
                     <div
                       key={file._id}
-                      className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 px-4 -mx-4 rounded ${
-                        selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
+                      className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-[hsl(var(--background))]/50 px-4 -mx-4 rounded ${
+                        selectedFile?._id === file._id ? "bg-[hsl(var(--background))] bg-opacity-50" : ""
                       }`}
                       onClick={() => handleFileClick(file)}
                     >
                       <div className="flex gap-4 min-w-0 flex-1">
-                        <FileText className="h-5 w-5 mt-0.5 text-zinc-400 flex-shrink-0" />
+                        <FileText className="h-5 w-5 mt-0.5 text-[hsl(var(--foreground-muted))] flex-shrink-0" />
                         <div className="space-y-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-zinc-100 hover:text-zinc-300 block truncate">
+                            <span className="font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-subtle))] block truncate">
                               {truncateFilename(file.filename)}
                             </span>
                             {file.processingStatus === "pending" && (
-                              <span className="text-xs text-zinc-500">
+                              <span className="text-xs text-[hsl(var(--foreground-muted))]">
                                 <Loader2 className="h-3 w-3 animate-spin inline-block mr-1" />
                                 Processing
                               </span>
                             )}
                             {file.processingStatus === "failed" && (
                               <span
-                                className="text-xs text-red-400"
+                                className="text-xs text-destructive-400"
                                 title={file.processingError}
                               >
                                 Processing failed
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-zinc-400">
+                          <div className="text-sm text-[hsl(var(--foreground-muted))]">
                             {formatFileSize(file.size)} •{" "}
                             {formatDistanceToNow(new Date(file.createdAt), {
                               addSuffix: true,
@@ -838,14 +838,14 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                           e.stopPropagation();
                           handleDelete(file._id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 hover:bg-transparent flex-shrink-0"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[hsl(var(--foreground-muted))] hover:text-destructive-400 hover:bg-transparent flex-shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
                   {files.length === 0 && (
-                    <div className="py-3 text-center text-zinc-500 text-sm">
+                    <div className="py-3 text-center text-[hsl(var(--foreground-muted))] text-sm">
                       <FileText className="h-8 w-8 mx-auto mb-1 opacity-20" />
                       <p>No research files uploaded yet</p>
                     </div>
@@ -883,19 +883,19 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                   </Suspense>
                 ) : (
                   <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex-none px-2 py-1 border-b border-zinc-800 bg-background z-10 flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-zinc-100 truncate">
+                    <div className="flex-none px-2 py-1 border-b border-[hsl(var(--border))] bg-background z-10 flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-[hsl(var(--foreground))] truncate">
                         {selectedFile.filename}
                       </h3>
                       <div className="flex items-center gap-2">
-                        <div className="text-xs text-zinc-400">
+                        <div className="text-xs text-[hsl(var(--foreground-muted))]">
                           {isVimMode ? "VIM" : "-- INSERT --"}
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => setIsEditing(true)}
-                          className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                          className="h-6 text-xs text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))]"
                         >
                           <Edit2 className="h-3 w-3 mr-1" />
                           Edit
@@ -913,7 +913,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               </div>
             )
           ) : (
-            <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+            <div className="flex items-center justify-center h-full text-[hsl(var(--foreground-muted))] text-sm">
               Select a file to view its content
             </div>
           )}

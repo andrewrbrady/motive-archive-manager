@@ -369,10 +369,10 @@ export default function CaptionGenerator({
 
   return (
     <div className="space-y-3">
-      <h1 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
+      <h1 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
         Caption Generator
       </h1>
-      <div className="space-y-3 rounded-lg p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800">
+      <div className="space-y-3 rounded-lg p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
         <div className="flex gap-3">
           <div className="flex-1">
             <Select
@@ -380,19 +380,19 @@ export default function CaptionGenerator({
               value={platform}
               onValueChange={(value: Platform) => setPlatform(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="instagram"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Instagram
                 </SelectItem>
                 <SelectItem
                   value="youtube"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   YouTube
                 </SelectItem>
@@ -405,31 +405,31 @@ export default function CaptionGenerator({
               value={template}
               onValueChange={handleTemplateChange}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select template" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="none"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   No Template
                 </SelectItem>
                 <SelectItem
                   value="bat"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Bring a Trailer
                 </SelectItem>
                 <SelectItem
                   value="dealer"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Dealer Reference
                 </SelectItem>
                 <SelectItem
                   value="question"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Ask Question
                 </SelectItem>
@@ -448,7 +448,7 @@ export default function CaptionGenerator({
                   const newQuestion = await generateQuestion(carDetails);
                   setContext(newQuestion);
                 }}
-                className="ml-auto h-8 px-2 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                className="ml-auto h-8 px-2 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                 title="Generate new question"
               >
                 <RefreshCw className="w-3 h-3" />
@@ -469,7 +469,7 @@ export default function CaptionGenerator({
               }
             }}
             placeholder="Add any additional context for the caption..."
-            className="min-h-[80px] bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="min-h-[80px] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--foreground-muted))] dark:placeholder:text-[hsl(var(--foreground-muted))]"
           />
         </div>
 
@@ -479,31 +479,31 @@ export default function CaptionGenerator({
               value={tone}
               onValueChange={(value: Tone) => setTone(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select tone" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="professional"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Professional
                 </SelectItem>
                 <SelectItem
                   value="casual"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Casual
                 </SelectItem>
                 <SelectItem
                   value="enthusiastic"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Enthusiastic
                 </SelectItem>
                 <SelectItem
                   value="technical"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Technical
                 </SelectItem>
@@ -515,25 +515,25 @@ export default function CaptionGenerator({
               value={style}
               onValueChange={(value: Style) => setStyle(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select style" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="descriptive"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Descriptive
                 </SelectItem>
                 <SelectItem
                   value="minimal"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Minimal
                 </SelectItem>
                 <SelectItem
                   value="storytelling"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Storytelling
                 </SelectItem>
@@ -545,31 +545,31 @@ export default function CaptionGenerator({
               value={length}
               onValueChange={(value: Length) => setLength(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select length" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="concise"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Concise (1-2 lines)
                 </SelectItem>
                 <SelectItem
                   value="standard"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Standard (2-3 lines)
                 </SelectItem>
                 <SelectItem
                   value="detailed"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Detailed (3-4 lines)
                 </SelectItem>
                 <SelectItem
                   value="comprehensive"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Comprehensive (4+ lines)
                 </SelectItem>
@@ -577,7 +577,7 @@ export default function CaptionGenerator({
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-xs text-gray-500 dark:text-gray-400">
+            <label className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
               Creativity: {temperature}
             </label>
             <div className="relative flex items-center">
@@ -588,7 +588,7 @@ export default function CaptionGenerator({
                 step="0.1"
                 value={temperature}
                 onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                className="w-full h-1 bg-gray-200 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gray-900 dark:[&::-webkit-slider-thumb]:bg-white"
+                className="w-full h-1 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--background))] dark:[&::-webkit-slider-thumb]:bg-[var(--background-primary)]"
               />
             </div>
           </div>
@@ -598,13 +598,13 @@ export default function CaptionGenerator({
           onClick={() => handleGenerate()}
           disabled={isGenerating}
           variant="outline"
-          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-gray-800"
+          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
         >
           {isGenerating ? "Generating..." : "Generate Caption"}
         </Button>
 
         {error && (
-          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+          <p className="text-sm text-destructive-500 dark:text-destructive-400">{error}</p>
         )}
 
         {/* Grid layout for all captions */}
@@ -612,17 +612,17 @@ export default function CaptionGenerator({
           {/* Instagram Captions */}
           <div className="space-y-3">
             <div className="flex items-center gap-1.5">
-              <Instagram className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <Instagram className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+              <span className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 Instagram Captions
               </span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Generated caption (only if it's Instagram) */}
               {generatedCaption && platform === "instagram" && (
-                <div className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+                <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
                   <p
-                    className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
+                    className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
                     onKeyDown={(e) => {
                       if (
                         [
@@ -643,7 +643,7 @@ export default function CaptionGenerator({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleCopy(generatedCaption, "generated")}
-                      className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                      className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                       title="Copy caption"
                     >
                       {copiedId === "generated" ? (
@@ -654,7 +654,7 @@ export default function CaptionGenerator({
                     </Button>
                   </div>
                   <div className="absolute bottom-2 right-2">
-                    <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                    <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       New
                     </span>
                   </div>
@@ -666,7 +666,7 @@ export default function CaptionGenerator({
                 .map((caption) => (
                   <div
                     key={caption._id}
-                    className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                    className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
                   >
                     {editingCaptionId === caption._id ? (
                       <Textarea
@@ -674,7 +674,7 @@ export default function CaptionGenerator({
                         onChange={(e) =>
                           handleTextChange(e.target.value, caption._id)
                         }
-                        className="min-h-[200px] w-full resize-none bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
+                        className="min-h-[200px] w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
                         onKeyDown={(e) => {
                           // Only stop propagation for arrow keys, don't prevent default
                           if (
@@ -700,7 +700,7 @@ export default function CaptionGenerator({
                       />
                     ) : (
                       <p
-                        className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
+                        className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
                         onKeyDown={(e) => {
                           if (
                             [
@@ -722,7 +722,7 @@ export default function CaptionGenerator({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCopy(caption.caption, caption._id)}
-                        className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                        className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                         title="Copy caption"
                       >
                         {copiedId === caption._id ? (
@@ -737,7 +737,7 @@ export default function CaptionGenerator({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleSaveEdit(caption._id)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                             title="Save changes"
                           >
                             <Check className="w-4 h-4" />
@@ -749,7 +749,7 @@ export default function CaptionGenerator({
                               setEditingCaptionId(null);
                               setEditingText("");
                             }}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
                             title="Cancel editing"
                           >
                             <X className="w-4 h-4" />
@@ -764,7 +764,7 @@ export default function CaptionGenerator({
                               setEditingCaptionId(caption._id);
                               setEditingText(caption.caption);
                             }}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                             title="Edit caption"
                           >
                             <Pencil className="w-4 h-4" />
@@ -773,7 +773,7 @@ export default function CaptionGenerator({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(caption._id)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
                             title="Delete caption"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -789,17 +789,17 @@ export default function CaptionGenerator({
           {/* YouTube Captions */}
           <div className="space-y-3">
             <div className="flex items-center gap-1.5">
-              <Youtube className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <Youtube className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+              <span className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 YouTube Captions
               </span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Generated caption (only if it's YouTube) */}
               {generatedCaption && platform === "youtube" && (
-                <div className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+                <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
                   <p
-                    className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
+                    className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
                     onKeyDown={(e) => {
                       if (
                         [
@@ -820,7 +820,7 @@ export default function CaptionGenerator({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleCopy(generatedCaption, "generated")}
-                      className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                      className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                       title="Copy caption"
                     >
                       {copiedId === "generated" ? (
@@ -831,7 +831,7 @@ export default function CaptionGenerator({
                     </Button>
                   </div>
                   <div className="absolute bottom-2 right-2">
-                    <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+                    <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       New
                     </span>
                   </div>
@@ -843,7 +843,7 @@ export default function CaptionGenerator({
                 .map((caption) => (
                   <div
                     key={caption._id}
-                    className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                    className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
                   >
                     {editingCaptionId === caption._id ? (
                       <Textarea
@@ -851,7 +851,7 @@ export default function CaptionGenerator({
                         onChange={(e) =>
                           handleTextChange(e.target.value, caption._id)
                         }
-                        className="min-h-[200px] w-full resize-none bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
+                        className="min-h-[200px] w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
                         onKeyDown={(e) => {
                           // Only stop propagation for arrow keys, don't prevent default
                           if (
@@ -877,7 +877,7 @@ export default function CaptionGenerator({
                       />
                     ) : (
                       <p
-                        className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
+                        className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
                         onKeyDown={(e) => {
                           if (
                             [
@@ -899,7 +899,7 @@ export default function CaptionGenerator({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleCopy(caption.caption, caption._id)}
-                        className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                        className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                         title="Copy caption"
                       >
                         {copiedId === caption._id ? (
@@ -914,7 +914,7 @@ export default function CaptionGenerator({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleSaveEdit(caption._id)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                             title="Save changes"
                           >
                             <Check className="w-4 h-4" />
@@ -926,7 +926,7 @@ export default function CaptionGenerator({
                               setEditingCaptionId(null);
                               setEditingText("");
                             }}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
                             title="Cancel editing"
                           >
                             <X className="w-4 h-4" />
@@ -941,7 +941,7 @@ export default function CaptionGenerator({
                               setEditingCaptionId(caption._id);
                               setEditingText(caption.caption);
                             }}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                             title="Edit caption"
                           >
                             <Pencil className="w-4 h-4" />
@@ -950,7 +950,7 @@ export default function CaptionGenerator({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(caption._id)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
                             title="Delete caption"
                           >
                             <Trash2 className="w-4 h-4" />

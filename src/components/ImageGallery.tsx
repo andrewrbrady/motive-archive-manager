@@ -92,7 +92,7 @@ interface Filters {
 const skeletonClasses =
   "bg-background-secondary dark:bg-background-secondary rounded-lg relative w-full";
 const cardClasses =
-  "dark:bg-background-primary border border-gray-200 dark:border-gray-800 rounded-lg";
+  "dark:bg-background-primary border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg";
 
 // Update ImageSkeleton component
 const ImageSkeleton = ({ aspectRatio = "4/3" }: { aspectRatio?: string }) => (
@@ -468,15 +468,15 @@ export function ImageGallery({
             >
               {uploading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <Loader2 className="w-8 h-8 animate-spin text-gray-400 dark:text-gray-500" />
-                  <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
+                  <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+                  <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase tracking-wide text-sm font-medium">
                     Uploading Images...
                   </span>
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   <MotiveLogo className="w-16 h-16 opacity-50" />
-                  <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wide text-sm font-medium">
+                  <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase tracking-wide text-sm font-medium">
                     {!images || images.length === 0
                       ? "No Images Available"
                       : "No Images Match The Selected Filters"}
@@ -501,7 +501,7 @@ export function ImageGallery({
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
+                    className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
                   >
                     {uploading ? (
                       <>
@@ -530,7 +530,7 @@ export function ImageGallery({
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
-                      className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
+                      className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
                     >
                       {uploading ? (
                         <>
@@ -553,11 +553,11 @@ export function ImageGallery({
               {Array.from({ length: placeholderCount }).map((_, index) => (
                 <div
                   key={index}
-                  className="aspect-[4/3] rounded-lg bg-neutral-100 dark:bg-neutral-800 relative group"
+                  className="aspect-[4/3] rounded-lg bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] relative group"
                 >
                   {isEditMode && index === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <span className="text-gray-400 dark:text-gray-500 text-sm">
+                      <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] text-sm">
                         Click &quot;Add Images&quot; to begin
                       </span>
                     </div>
@@ -615,21 +615,21 @@ export function ImageGallery({
                   setModalIndex(mainIndex);
                   setIsModalOpen(true);
                 }}
-                className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20"
+                className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20"
                 aria-label="Open fullscreen view"
               >
                 <ZoomIn className="w-5 h-5" />
               </button>
               <button
                 onClick={handlePrev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20"
                 aria-label="Previous image"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
                 onClick={handleNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20"
                 aria-label="Next image"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -639,15 +639,15 @@ export function ImageGallery({
 
           {showMetadata && mainImageLoaded && (
             <div className={`${cardClasses} shadow-sm p-3`}>
-              <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
+              <div className="grid grid-cols-4 divide-x divide-zinc-200 dark:divide-zinc-800">
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
                   <div className="flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                    <Compass className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
                       Angle
                     </span>
                   </div>
-                  <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
                     {displayImages[
                       mainIndex
                     ]?.metadata?.angle?.toLowerCase() === "not applicable"
@@ -657,40 +657,40 @@ export function ImageGallery({
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
                   <div className="flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                    <Eye className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
                       View
                     </span>
                   </div>
-                  <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
                     {displayImages[mainIndex]?.metadata?.view || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
                   <div className="flex items-center gap-1.5">
-                    <Sun className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                    <Sun className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
                       Time of Day
                     </span>
                   </div>
-                  <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
                     {displayImages[mainIndex]?.metadata?.tod || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center px-4 first:pl-0 last:pr-0">
                   <div className="flex items-center gap-1.5">
-                    <Move className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                    <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+                    <Move className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
                       Movement
                     </span>
                   </div>
-                  <span className="uppercase text-xs ml-auto text-gray-600 dark:text-gray-300">
+                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
                     {displayImages[mainIndex]?.metadata?.movement || "N/A"}
                   </span>
                 </div>
               </div>
               {displayImages[mainIndex]?.metadata?.description && (
-                <div className="mt-2 text-gray-600 dark:text-gray-300 border-t border-gray-200 dark:border-gray-800 pt-2">
+                <div className="mt-2 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))] border-t border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] pt-2">
                   {displayImages[mainIndex].metadata.description}
                 </div>
               )}
@@ -727,7 +727,7 @@ export function ImageGallery({
                       ]);
                     }
                   }}
-                  className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 flex items-center gap-2 text-sm"
+                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2 text-sm"
                 >
                   <Check className="w-3.5 h-3.5" />
                   Select All
@@ -737,15 +737,15 @@ export function ImageGallery({
                   disabled={selectedImages.length === 0}
                   className={`px-3 py-1.5 border rounded-md flex items-center gap-2 text-sm ${
                     selectedImages.length > 0
-                      ? "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-red-600 dark:hover:text-red-400"
-                      : "border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-600"
+                      ? "border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 hover:text-destructive-600 dark:hover:text-destructive-400"
+                      : "border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-subtle))]"
                   }`}
                 >
                   <X className="w-3.5 h-3.5" />
                   {selectedImages.length > 0 ? (
                     <>
                       Delete ({selectedImages.length})
-                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                      <span className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] ml-2">
                         ⇧⌫
                       </span>
                     </>
@@ -755,9 +755,9 @@ export function ImageGallery({
                 </button>
                 <button
                   onClick={() => setShowDeleteAllConfirm(true)}
-                  className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 flex items-center gap-2 text-sm group ml-auto"
+                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2 text-sm group ml-auto"
                 >
-                  <Trash2 className="w-3.5 h-3.5 group-hover:text-red-500 dark:group-hover:text-red-400" />
+                  <Trash2 className="w-3.5 h-3.5 group-hover:text-destructive-500 dark:group-hover:text-destructive-400" />
                   Delete All
                 </button>
               </div>
@@ -774,7 +774,7 @@ export function ImageGallery({
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
+                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
                 >
                   {uploading ? (
                     <>
@@ -826,7 +826,7 @@ export function ImageGallery({
                           ? ""
                           : "opacity-75 dark:opacity-60",
                         isSelected
-                          ? "ring-2 ring-red-500 dark:ring-red-500"
+                          ? "ring-2 ring-destructive-500 dark:ring-destructive-500"
                           : ""
                       )}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -837,8 +837,8 @@ export function ImageGallery({
                         className={cn(
                           "absolute inset-0 rounded-lg transition-colors duration-200",
                           isSelected
-                            ? "bg-red-500/10"
-                            : "hover:bg-gray-950/5 dark:hover:bg-white/5"
+                            ? "bg-destructive-500 bg-opacity-10"
+                            : "hover:bg-[hsl(var(--background))] bg-opacity-5 dark:hover:bg-[var(--background-primary)]/5"
                         )}
                       />
                     )}
@@ -852,18 +852,18 @@ export function ImageGallery({
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 disabled:opacity-50"
+                className="p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20 disabled:opacity-50"
                 aria-label="Previous page"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 bg-black/50 dark:bg-white/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-white/20 disabled:opacity-50"
+                className="p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20 disabled:opacity-50"
                 aria-label="Next page"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -882,7 +882,7 @@ export function ImageGallery({
         >
           <button
             onClick={() => setIsModalOpen(false)}
-            className="absolute top-4 right-4 p-2 text-white hover:text-gray-300 dark:hover:text-gray-400"
+            className="absolute top-4 right-4 p-2 text-white hover:text-[hsl(var(--foreground-subtle))] dark:hover:text-[hsl(var(--foreground-muted))]"
             aria-label="Close fullscreen view"
           >
             <X className="w-6 h-6" />
@@ -897,14 +897,14 @@ export function ImageGallery({
           />
           <button
             onClick={handlePrev}
-            className="absolute left-4 p-2 text-white hover:text-gray-300 dark:hover:text-gray-400"
+            className="absolute left-4 p-2 text-white hover:text-[hsl(var(--foreground-subtle))] dark:hover:text-[hsl(var(--foreground-muted))]"
             aria-label="Previous image"
           >
             <ChevronLeft className="w-8 h-8" />
           </button>
           <button
             onClick={handleNext}
-            className="absolute right-4 p-2 text-white hover:text-gray-300 dark:hover:text-gray-400"
+            className="absolute right-4 p-2 text-white hover:text-[hsl(var(--foreground-subtle))] dark:hover:text-[hsl(var(--foreground-muted))]"
             aria-label="Next image"
           >
             <ChevronRight className="w-8 h-8" />
@@ -915,23 +915,23 @@ export function ImageGallery({
       {showDeleteAllConfirm && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center">
           <div className={`${cardClasses} p-6 max-w-md w-full mx-4 space-y-4`}>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <h3 className="text-lg font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
               Delete All Images?
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
               Are you sure you want to delete all {images.length} images? This
               action cannot be undone.
             </p>
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowDeleteAllConfirm(false)}
-                className="px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400 text-sm"
+                className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAll}
-                className="px-3 py-1.5 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
+                className="px-3 py-1.5 border border-destructive-200 dark:border-destructive-800 rounded-md hover:bg-destructive-50 dark:hover:bg-destructive-950 bg-opacity-30 text-destructive-600 dark:text-destructive-400 text-sm flex items-center gap-2"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete All

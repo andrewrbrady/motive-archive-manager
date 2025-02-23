@@ -355,15 +355,15 @@ export default function ShotListTemplates({
               {templates.map((template) => (
                 <div
                   key={template.id}
-                  className="bg-neutral-900 border border-neutral-800 rounded-lg p-4"
+                  className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="font-medium">{template.name}</h4>
-                      <p className="text-sm text-neutral-400">
+                      <p className="text-sm text-[hsl(var(--foreground-muted))]">
                         {template.description}
                       </p>
-                      <p className="text-sm text-neutral-500 mt-1">
+                      <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
                         {template.shots.length} shots
                       </p>
                     </div>

@@ -517,7 +517,7 @@ export default function ListView({
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-2" align="start">
+                    <PopoverContent className="w-[300px] p-0" align="start">
                       <ScrollArea className="h-[200px]">
                         <div className="grid grid-cols-2 gap-1">
                           {users.map((user) => {
@@ -599,7 +599,7 @@ export default function ListView({
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(event.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
+                      className="text-destructive-500 hover:text-destructive-700 hover:bg-destructive-100 dark:hover:bg-destructive-900 bg-opacity-20"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

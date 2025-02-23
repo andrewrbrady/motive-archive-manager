@@ -65,7 +65,7 @@ export default function ClientsFilters({
       <div className="flex flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[hsl(var(--foreground-muted))]" />
             <Input
               placeholder="Search clients..."
               value={filters.search}

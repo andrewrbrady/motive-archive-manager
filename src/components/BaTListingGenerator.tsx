@@ -252,41 +252,41 @@ export default function BaTListingGenerator({
 
   return (
     <div className="space-y-3">
-      <h1 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
+      <h1 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
         BaT Listing Generator
       </h1>
-      <div className="space-y-3 rounded-lg p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800">
+      <div className="space-y-3 rounded-lg p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Select
               value={focus}
               onValueChange={(value: ListingFocus) => setFocus(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select focus" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="mechanical"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Mechanical Details
                 </SelectItem>
                 <SelectItem
                   value="cosmetic"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Cosmetic Condition
                 </SelectItem>
                 <SelectItem
                   value="historical"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Historical Background
                 </SelectItem>
                 <SelectItem
                   value="comprehensive"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Comprehensive
                 </SelectItem>
@@ -299,25 +299,25 @@ export default function BaTListingGenerator({
               value={style}
               onValueChange={(value: Style) => setStyle(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select style" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="factual"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Factual
                 </SelectItem>
                 <SelectItem
                   value="storytelling"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Storytelling
                 </SelectItem>
                 <SelectItem
                   value="technical"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Technical
                 </SelectItem>
@@ -332,31 +332,31 @@ export default function BaTListingGenerator({
               value={tone}
               onValueChange={(value: Tone) => setTone(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select tone" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="enthusiastic"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Enthusiastic
                 </SelectItem>
                 <SelectItem
                   value="professional"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Professional
                 </SelectItem>
                 <SelectItem
                   value="casual"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Casual
                 </SelectItem>
                 <SelectItem
                   value="formal"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Formal
                 </SelectItem>
@@ -369,31 +369,31 @@ export default function BaTListingGenerator({
               value={length}
               onValueChange={(value: Length) => setLength(value)}
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <SelectValue placeholder="Select length" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white">
+              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
                 <SelectItem
                   value="concise"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Concise
                 </SelectItem>
                 <SelectItem
                   value="standard"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Standard
                 </SelectItem>
                 <SelectItem
                   value="detailed"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Detailed
                 </SelectItem>
                 <SelectItem
                   value="comprehensive"
-                  className="text-gray-900 dark:text-white"
+                  className="text-[hsl(var(--foreground))] dark:text-white"
                 >
                   Comprehensive
                 </SelectItem>
@@ -404,7 +404,7 @@ export default function BaTListingGenerator({
 
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <label className="text-xs text-gray-500 dark:text-gray-400">
+            <label className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
               Creativity: {temperature.toFixed(1)}
             </label>
           </div>
@@ -416,7 +416,7 @@ export default function BaTListingGenerator({
               step="0.1"
               value={temperature}
               onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full h-1 bg-gray-200 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gray-900 dark:[&::-webkit-slider-thumb]:bg-white"
+              className="w-full h-1 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--background))] dark:[&::-webkit-slider-thumb]:bg-[var(--background-primary)]"
             />
           </div>
         </div>
@@ -435,7 +435,7 @@ export default function BaTListingGenerator({
                 e.stopPropagation();
               }
             }}
-            className="min-h-[80px] bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="min-h-[80px] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--foreground-muted))] dark:placeholder:text-[hsl(var(--foreground-muted))]"
           />
         </div>
 
@@ -443,7 +443,7 @@ export default function BaTListingGenerator({
           onClick={handleGenerate}
           disabled={isGenerating}
           variant="outline"
-          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-gray-800"
+          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
         >
           {isGenerating ? (
             <>
@@ -456,13 +456,13 @@ export default function BaTListingGenerator({
         </Button>
 
         {error && (
-          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+          <p className="text-sm text-destructive-500 dark:text-destructive-400">{error}</p>
         )}
 
         {generatedListing && (
-          <div className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
+          <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
             <p
-              className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8"
+              className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
               onKeyDown={(e) => {
                 if (
                   ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
@@ -480,7 +480,7 @@ export default function BaTListingGenerator({
                 variant="ghost"
                 size="sm"
                 onClick={handleCopy}
-                className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                 title="Copy listing"
               >
                 {copied ? (
@@ -493,14 +493,14 @@ export default function BaTListingGenerator({
                 variant="ghost"
                 size="sm"
                 onClick={handleSave}
-                className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                 title="Save listing"
               >
                 <Check className="w-4 h-4" />
               </Button>
             </div>
             <div className="absolute bottom-2 right-2">
-              <span className="text-xs uppercase text-gray-500 dark:text-gray-400">
+              <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 New
               </span>
             </div>
@@ -509,14 +509,14 @@ export default function BaTListingGenerator({
 
         {savedListings.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <h2 className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
               Saved Listings
             </h2>
             <div className="grid grid-cols-1 gap-3">
               {savedListings.map((listing) => (
                 <div
                   key={listing._id}
-                  className="group relative p-3 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
+                  className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
                 >
                   {editingListingId === listing._id ? (
                     <Textarea
@@ -530,7 +530,7 @@ export default function BaTListingGenerator({
                           textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
                         }
                       }}
-                      className="w-full resize-none bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 text-sm pr-8"
+                      className="w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault();
@@ -544,7 +544,7 @@ export default function BaTListingGenerator({
                       }}
                     />
                   ) : (
-                    <p className="text-sm whitespace-pre-wrap text-gray-900 dark:text-gray-100 pr-8">
+                    <p className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8">
                       {listing.content}
                     </p>
                   )}
@@ -555,7 +555,7 @@ export default function BaTListingGenerator({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleSaveEdit(listing._id)}
-                          className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                           title="Save changes"
                         >
                           <Check className="w-4 h-4" />
@@ -567,7 +567,7 @@ export default function BaTListingGenerator({
                             setEditingListingId(null);
                             setEditingText("");
                           }}
-                          className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
                           title="Cancel editing"
                         >
                           <X className="w-4 h-4" />
@@ -582,7 +582,7 @@ export default function BaTListingGenerator({
                             setEditingListingId(listing._id);
                             setEditingText(listing.content);
                           }}
-                          className="h-8 w-8 p-0 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                           title="Edit listing"
                         >
                           <Pencil className="w-4 h-4" />
@@ -591,7 +591,7 @@ export default function BaTListingGenerator({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(listing._id)}
-                          className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
                           title="Delete listing"
                         >
                           <Trash2 className="w-4 h-4" />

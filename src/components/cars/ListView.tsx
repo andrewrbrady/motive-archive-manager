@@ -93,7 +93,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
     children: React.ReactNode;
   }) => (
     <th
-      className={`${width} py-2 px-3 text-${align} font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-black/40 transition-colors`}
+      className={`${width} py-2 px-3 text-${align} font-medium text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 cursor-pointer hover:bg-[hsl(var(--background))] dark:hover:bg-black/40 transition-colors`}
       onClick={() => handleSort(field)}
     >
       <span className="inline-flex items-center">
@@ -107,7 +107,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
-          <tr className="bg-gray-50 dark:bg-black/25 border-y border-gray-200 dark:border-gray-800">
+          <tr className="bg-[hsl(var(--background))] dark:bg-black/25 border-y border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
             <HeaderCell field="year" width="w-[8%]">
               Year
             </HeaderCell>
@@ -135,61 +135,61 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
             <HeaderCell field="location" width="w-[10%]">
               Location
             </HeaderCell>
-            <th className="w-[5%] py-2 px-3 text-left font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800">
+            <th className="w-[5%] py-2 px-3 text-left font-medium text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="bg-background dark:bg-[var(--background-primary)] divide-y divide-gray-200 dark:divide-gray-800">
+        <tbody className="bg-background dark:bg-[var(--background-primary)] divide-y divide-zinc-200 dark:divide-zinc-800">
           {cars.map((car) => (
             <tr
               key={car._id}
-              className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-black/25 transition-colors cursor-pointer"
+              className="border-b border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 hover:bg-[hsl(var(--background))] dark:hover:bg-black/25 transition-colors cursor-pointer"
               onClick={() =>
                 router.push(`/cars/${car._id}?${currentSearchParams}`)
               }
             >
-              <td className="w-[8%] py-2 px-3 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[8%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.year}
               </td>
-              <td className="w-[12%] py-2 px-3 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[12%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.make}
               </td>
-              <td className="w-[15%] py-2 px-3 border border-gray-200 dark:border-gray-800">
-                <span className="text-gray-900 dark:text-gray-100">
+              <td className="w-[15%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
+                <span className="text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                   {car.model}
                 </span>
               </td>
-              <td className="w-[12%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[12%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.price &&
                 typeof car.price === "object" &&
                 car.price.listPrice
                   ? `$${car.price.listPrice.toLocaleString()}`
                   : "Price on request"}
               </td>
-              <td className="w-[12%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[12%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.mileage && car.mileage.value !== null
                   ? `${car.mileage.value.toLocaleString()} ${car.mileage.unit}`
                   : "-"}
               </td>
-              <td className="w-[8%] py-2 px-3 text-right border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[8%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.engine?.power?.hp
                   ? `${car.engine.power.hp.toLocaleString()} hp`
                   : "-"}
               </td>
-              <td className="w-[10%] py-2 px-3 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[10%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.color}
               </td>
-              <td className="w-[8%] py-2 px-3 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[8%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.condition || "-"}
               </td>
-              <td className="w-[10%] py-2 px-3 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <td className="w-[10%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.location || "-"}
               </td>
-              <td className="w-[5%] py-2 px-3 border border-gray-200 dark:border-gray-800">
+              <td className="w-[5%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
                 <button
                   onClick={(e) => handleDelete(e, car._id)}
-                  className="p-1.5 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 hover:border-red-300 dark:hover:border-red-700"
+                  className="p-1.5 text-destructive-500 dark:text-destructive-400 hover:text-destructive-700 dark:hover:text-destructive-300 transition-colors rounded-full hover:bg-destructive-50 dark:hover:bg-destructive-900 bg-opacity-20 border border-destructive-200 dark:border-destructive-800 hover:border-destructive-300 dark:hover:border-destructive-700"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

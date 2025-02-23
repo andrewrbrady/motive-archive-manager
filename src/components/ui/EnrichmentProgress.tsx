@@ -61,15 +61,15 @@ export function EnrichmentProgress({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg overflow-hidden">
+    <div className="fixed bottom-4 right-4 w-96 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+      <div className="px-4 py-3 border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] flex items-center justify-between">
+        <h3 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
           Enriching Vehicle Data
         </h3>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+          className="text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
         >
           <X className="w-4 h-4" />
         </button>
@@ -78,7 +78,7 @@ export function EnrichmentProgress({
       {/* Content */}
       <div className="px-4 py-3">
         {status === "error" ? (
-          <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+          <div className="flex items-start gap-3 text-destructive-600 dark:text-destructive-400">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-medium">Error</p>
@@ -96,15 +96,15 @@ export function EnrichmentProgress({
                 <div key={s.id} className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
                     {isComplete ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-green-400" />
+                      <CheckCircle2 className="w-5 h-5 text-success-500 dark:text-success-400" />
                     ) : isActive ? (
-                      <Loader2 className="w-5 h-5 text-blue-500 dark:text-blue-400 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-info-500 dark:text-info-400 animate-spin" />
                     ) : (
                       <div
                         className={`w-5 h-5 rounded-full border-2 ${
                           isPending
-                            ? "border-gray-300 dark:border-gray-700"
-                            : "border-blue-500 dark:border-blue-400"
+                            ? "border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))]"
+                            : "border-info-500 dark:border-info-400"
                         }`}
                       />
                     )}
@@ -113,15 +113,15 @@ export function EnrichmentProgress({
                     <p
                       className={`text-sm font-medium ${
                         isActive
-                          ? "text-blue-500 dark:text-blue-400"
+                          ? "text-info-500 dark:text-info-400"
                           : isComplete
-                          ? "text-green-500 dark:text-green-400"
-                          : "text-gray-500 dark:text-gray-400"
+                          ? "text-success-500 dark:text-success-400"
+                          : "text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]"
                       }`}
                     >
                       {s.name}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-0.5">
                       {s.description}
                     </p>
                   </div>
@@ -131,33 +131,33 @@ export function EnrichmentProgress({
 
             {/* Show details when complete */}
             {status === "complete" && details && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <div className="mt-4 pt-4 border-t border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
                 <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <Info className="w-5 h-5 text-info-500 dark:text-info-400 flex-shrink-0 mt-0.5" />
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                       Enrichment Summary
                     </p>
                     <ul className="space-y-1">
                       {details.searchTermsGenerated !== undefined && (
-                        <li className="text-xs text-gray-500 dark:text-gray-400">
+                        <li className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                           • Generated {details.searchTermsGenerated} search
                           terms
                         </li>
                       )}
                       {details.additionalSearchesCompleted !== undefined && (
-                        <li className="text-xs text-gray-500 dark:text-gray-400">
+                        <li className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                           • Completed {details.additionalSearchesCompleted}{" "}
                           additional searches
                         </li>
                       )}
                       {details.fieldsUpdated !== undefined && (
-                        <li className="text-xs text-gray-500 dark:text-gray-400">
+                        <li className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                           • Updated {details.fieldsUpdated} data fields
                         </li>
                       )}
                       {details.protectedFieldsPreserved && (
-                        <li className="text-xs text-gray-500 dark:text-gray-400">
+                        <li className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                           • Protected fields:{" "}
                           {details.protectedFieldsPreserved.join(", ")}
                         </li>

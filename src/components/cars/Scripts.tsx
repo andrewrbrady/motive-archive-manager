@@ -976,19 +976,19 @@ ${template.rows
         {/* Left Column */}
         <div className="flex flex-col min-h-0">
           {/* Upload Section */}
-          <div className="flex-none px-1.5 py-0.5 border-b border-zinc-800 bg-background z-20">
+          <div className="flex-none px-1.5 py-0.5 border-b border-[hsl(var(--border))] bg-background z-20">
             <div className="flex gap-2 mb-2">
               <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
                 <DialogTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-1/2 border-neutral-800 hover:bg-neutral-900"
+                    className="w-1/2 border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
                   >
                     <Clock className="w-4 h-4 mr-2" />
                     Templates
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-neutral-900">
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-[hsl(var(--background))]">
                   <DialogHeader>
                     <DialogTitle>Script Templates</DialogTitle>
                   </DialogHeader>
@@ -1003,13 +1003,13 @@ ${template.rows
                 <DialogTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-1/2 border-neutral-800 hover:bg-neutral-900"
+                    className="w-1/2 border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     New Script
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-neutral-900">
+                <DialogContent className="bg-[hsl(var(--background))]">
                   <DialogHeader>
                     <DialogTitle>Create New Script</DialogTitle>
                   </DialogHeader>
@@ -1049,8 +1049,8 @@ ${template.rows
               onDrop={handleDrop}
               className={`border border-dashed rounded-md p-0.5 text-center transition-colors ${
                 isDragging
-                  ? "border-zinc-500 bg-zinc-800/50"
-                  : "border-zinc-800 hover:border-zinc-700"
+                  ? "border-zinc-500 bg-[hsl(var(--background))] bg-opacity-50"
+                  : "border-[hsl(var(--border))] hover:border-[hsl(var(--border-subtle))]"
               }`}
             >
               <input
@@ -1065,9 +1065,9 @@ ${template.rows
                 htmlFor="file"
                 className="flex items-center justify-center gap-1 cursor-pointer text-sm"
               >
-                <Upload className="h-3 w-3 text-zinc-400" />
-                <span className="text-zinc-400">
-                  <span className="font-medium text-zinc-300">
+                <Upload className="h-3 w-3 text-[hsl(var(--foreground-muted))]" />
+                <span className="text-[hsl(var(--foreground-muted))]">
+                  <span className="font-medium text-[hsl(var(--foreground-subtle))]">
                     Drop files or click
                   </span>{" "}
                   (.txt)
@@ -1077,22 +1077,22 @@ ${template.rows
 
             {selectedFiles.length > 0 && (
               <div className="mt-1.5 flex flex-col max-h-32">
-                <div className="text-xs text-zinc-400 px-1">
+                <div className="text-xs text-[hsl(var(--foreground-muted))] px-1">
                   Selected files:
                 </div>
                 <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 mt-1">
                   {selectedFiles.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between gap-2 text-sm px-1 py-0.5 hover:bg-zinc-800/50"
+                      className="flex items-center justify-between gap-2 text-sm px-1 py-0.5 hover:bg-[hsl(var(--background))] bg-opacity-50"
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <FileText className="h-3 w-3 text-zinc-400 flex-shrink-0" />
-                        <span className="truncate text-zinc-300">
+                        <FileText className="h-3 w-3 text-[hsl(var(--foreground-muted))] flex-shrink-0" />
+                        <span className="truncate text-[hsl(var(--foreground-subtle))]">
                           {file.name}
                         </span>
                       </div>
-                      <span className="text-xs text-zinc-500 flex-shrink-0">
+                      <span className="text-xs text-[hsl(var(--foreground-muted))] flex-shrink-0">
                         {file.size !== undefined
                           ? formatFileSize(file.size)
                           : "Unknown size"}
@@ -1100,7 +1100,7 @@ ${template.rows
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-end mt-1 pt-1 border-t border-zinc-800">
+                <div className="flex justify-end mt-1 pt-1 border-t border-[hsl(var(--border))]">
                   <Button
                     size="sm"
                     onClick={handleUpload}
@@ -1129,7 +1129,7 @@ ${template.rows
             className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-zinc-800 overscroll-none focus:outline-none focus:ring-[0.5px] focus:ring-zinc-700/50"
           >
             {error && (
-              <div className="mx-2 mt-1.5 rounded border border-red-900/50 bg-red-900/10 p-1 text-sm text-red-400">
+              <div className="mx-2 mt-1.5 rounded border border-destructive-900 border-opacity-50 bg-destructive-900/10 p-1 text-sm text-destructive-400">
                 {error}
               </div>
             )}
@@ -1139,10 +1139,10 @@ ${template.rows
                 <div className="animate-pulse space-y-2">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="flex items-center space-x-4">
-                      <div className="h-4 w-4 bg-zinc-800 rounded" />
+                      <div className="h-4 w-4 bg-[hsl(var(--background))] rounded" />
                       <div className="flex-1 space-y-1">
-                        <div className="h-3 bg-zinc-800 rounded w-3/4" />
-                        <div className="h-2 bg-zinc-800 rounded w-1/2" />
+                        <div className="h-3 bg-[hsl(var(--background))] rounded w-3/4" />
+                        <div className="h-2 bg-[hsl(var(--background))] rounded w-1/2" />
                       </div>
                     </div>
                   ))}
@@ -1153,34 +1153,34 @@ ${template.rows
                 {files.map((file) => (
                   <div
                     key={file._id}
-                    className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-zinc-800/50 px-4 -mx-4 rounded ${
-                      selectedFile?._id === file._id ? "bg-zinc-800/50" : ""
+                    className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-[hsl(var(--background))]/50 px-4 -mx-4 rounded ${
+                      selectedFile?._id === file._id ? "bg-[hsl(var(--background))] bg-opacity-50" : ""
                     }`}
                     onClick={() => handleFileClick(file)}
                   >
                     <div className="flex gap-4 min-w-0 flex-1">
-                      <FileText className="h-5 w-5 mt-0.5 text-zinc-400 flex-shrink-0" />
+                      <FileText className="h-5 w-5 mt-0.5 text-[hsl(var(--foreground-muted))] flex-shrink-0" />
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-zinc-100 hover:text-zinc-300 block truncate">
+                          <span className="font-medium text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-subtle))] block truncate">
                             {truncateFilename(file.name)}
                           </span>
                           {file.processingStatus === "pending" && (
-                            <span className="text-xs text-zinc-500">
+                            <span className="text-xs text-[hsl(var(--foreground-muted))]">
                               <Loader2 className="h-3 w-3 animate-spin inline-block mr-1" />
                               Processing
                             </span>
                           )}
                           {file.processingStatus === "failed" && (
                             <span
-                              className="text-xs text-red-400"
+                              className="text-xs text-destructive-400"
                               title={file.processingError}
                             >
                               Processing failed
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-zinc-400">
+                        <div className="text-sm text-[hsl(var(--foreground-muted))]">
                           {file.size !== undefined
                             ? formatFileSize(file.size)
                             : "Unknown size"}{" "}
@@ -1233,8 +1233,8 @@ ${template.rows
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-none px-2 py-1 border-b border-zinc-800 bg-background z-10 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-zinc-100 truncate">
+                <div className="flex-none px-2 py-1 border-b border-[hsl(var(--border))] bg-background z-10 flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-[hsl(var(--foreground))] truncate">
                     {selectedFile.name}
                   </h3>
                   <div className="flex items-center gap-2">
@@ -1243,7 +1243,7 @@ ${template.rows
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                          className="h-6 text-xs text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))]"
                           onClick={() => {
                             setIsEditing(false);
                             setSelectedFile(selectedFile);
@@ -1255,7 +1255,7 @@ ${template.rows
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                          className="h-6 text-xs text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))]"
                           onClick={() => handleSaveScript(true)}
                         >
                           <Save className="h-3 w-3 mr-1" />
@@ -1266,7 +1266,7 @@ ${template.rows
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 text-xs text-zinc-400 hover:text-zinc-300"
+                        className="h-6 text-xs text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))]"
                         onClick={handleEditClick}
                       >
                         <Edit2 className="h-3 w-3 mr-1" />
@@ -1280,7 +1280,7 @@ ${template.rows
                   <div className="p-4 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-zinc-400">
+                        <h3 className="text-sm font-medium text-[hsl(var(--foreground-muted))]">
                           Brief
                         </h3>
                         {isEditing ? (
@@ -1292,16 +1292,16 @@ ${template.rows
                               );
                             }}
                             placeholder="Add a brief description of the script here..."
-                            className="h-24 bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                            className="h-24 bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                           />
                         ) : (
-                          <p className="text-sm text-zinc-300">
+                          <p className="text-sm text-[hsl(var(--foreground-subtle))]">
                             {selectedFile.brief || "No brief provided"}
                           </p>
                         )}
                       </div>
                       <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-zinc-400">
+                        <h3 className="text-sm font-medium text-[hsl(var(--foreground-muted))]">
                           Duration
                         </h3>
                         {isEditing ? (
@@ -1318,10 +1318,10 @@ ${template.rows
                               );
                             }}
                             placeholder="00:00"
-                            className="bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                            className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                           />
                         ) : (
-                          <p className="text-sm text-zinc-300">
+                          <p className="text-sm text-[hsl(var(--foreground-subtle))]">
                             {formatDuration(selectedFile.duration || "00:00")}
                           </p>
                         )}
@@ -1331,7 +1331,7 @@ ${template.rows
                     {/* Platform and Aspect Ratio Controls */}
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-zinc-400">
+                        <h3 className="text-sm font-medium text-[hsl(var(--foreground-muted))]">
                           Platforms
                         </h3>
                         {isEditing ? (
@@ -1364,7 +1364,7 @@ ${template.rows
                             ))}
                           </div>
                         ) : (
-                          <div className="text-sm text-zinc-300">
+                          <div className="text-sm text-[hsl(var(--foreground-subtle))]">
                             {selectedFile.platforms
                               ?.map(
                                 (p) =>
@@ -1378,7 +1378,7 @@ ${template.rows
                       </div>
 
                       <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-zinc-400">
+                        <h3 className="text-sm font-medium text-[hsl(var(--foreground-muted))]">
                           Aspect Ratio
                         </h3>
                         {isEditing ? (
@@ -1390,11 +1390,11 @@ ${template.rows
                               )
                             }
                           >
-                            <SelectTrigger className="bg-neutral-800 border-neutral-700 text-neutral-100">
+                            <SelectTrigger className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent
-                              className="bg-neutral-900 border border-neutral-700 text-neutral-100 shadow-lg [&>*]:bg-neutral-900"
+                              className="bg-[hsl(var(--background))] border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] shadow-lg [&>*]:bg-[hsl(var(--background))]"
                               position="popper"
                               sideOffset={4}
                             >
@@ -1402,7 +1402,7 @@ ${template.rows
                                 <SelectItem
                                   key={ratio.value}
                                   value={ratio.value}
-                                  className="text-neutral-100 data-[highlighted]:bg-neutral-800 data-[highlighted]:text-neutral-100 bg-neutral-900 relative"
+                                  className="text-[hsl(var(--foreground))] data-[highlighted]:bg-[hsl(var(--background))] data-[highlighted]:text-[hsl(var(--foreground))] bg-[hsl(var(--background))] relative"
                                 >
                                   {ratio.label}
                                 </SelectItem>
@@ -1410,7 +1410,7 @@ ${template.rows
                             </SelectContent>
                           </Select>
                         ) : (
-                          <p className="text-sm text-zinc-300">
+                          <p className="text-sm text-[hsl(var(--foreground-subtle))]">
                             {
                               ASPECT_RATIOS.find(
                                 (ratio) =>
@@ -1422,24 +1422,24 @@ ${template.rows
                       </div>
                     </div>
 
-                    <div className="border border-neutral-800">
+                    <div className="border border-[hsl(var(--border))]">
                       <table className="w-full border-collapse">
-                        <thead className="bg-neutral-900">
+                        <thead className="bg-[hsl(var(--background))]">
                           <tr>
-                            <th className="w-28 px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                            <th className="w-28 px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                               Time
                             </th>
-                            <th className="px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                            <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                               Video
                             </th>
-                            <th className="px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                            <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                               Audio
                             </th>
-                            <th className="px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                            <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                               GFX
                             </th>
                             {isEditing && (
-                              <th className="w-10 px-2 py-2 border-b border-neutral-800"></th>
+                              <th className="w-10 px-2 py-2 border-b border-[hsl(var(--border))]"></th>
                             )}
                           </tr>
                         </thead>
@@ -1447,9 +1447,9 @@ ${template.rows
                           {(selectedFile.rows || []).map((row) => (
                             <tr
                               key={row.id}
-                              className="border-b border-neutral-800"
+                              className="border-b border-[hsl(var(--border))]"
                             >
-                              <td className="px-3 py-2 border-r border-neutral-800">
+                              <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                                 {isEditing ? (
                                   <Input
                                     value={row.time}
@@ -1460,13 +1460,13 @@ ${template.rows
                                         e.target.value
                                       )
                                     }
-                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                   />
                                 ) : (
                                   <span className="text-sm">{row.time}</span>
                                 )}
                               </td>
-                              <td className="px-3 py-2 border-r border-neutral-800">
+                              <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                                 {isEditing ? (
                                   <Input
                                     value={row.video}
@@ -1477,13 +1477,13 @@ ${template.rows
                                         e.target.value
                                       )
                                     }
-                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                   />
                                 ) : (
                                   <span className="text-sm">{row.video}</span>
                                 )}
                               </td>
-                              <td className="px-3 py-2 border-r border-neutral-800">
+                              <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                                 {isEditing ? (
                                   <Input
                                     value={row.audio}
@@ -1494,13 +1494,13 @@ ${template.rows
                                         e.target.value
                                       )
                                     }
-                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                   />
                                 ) : (
                                   <span className="text-sm">{row.audio}</span>
                                 )}
                               </td>
-                              <td className="px-3 py-2 border-r border-neutral-800">
+                              <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                                 {isEditing ? (
                                   <Input
                                     value={row.gfx}
@@ -1511,7 +1511,7 @@ ${template.rows
                                         e.target.value
                                       )
                                     }
-                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                                    className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                   />
                                 ) : (
                                   <span className="text-sm">{row.gfx}</span>
@@ -1523,7 +1523,7 @@ ${template.rows
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleDeleteRow(row.id)}
-                                    className="h-7 px-2 hover:bg-neutral-800"
+                                    className="h-7 px-2 hover:bg-[hsl(var(--background))]"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
@@ -1533,10 +1533,10 @@ ${template.rows
                           ))}
                           {(!selectedFile.rows ||
                             selectedFile.rows.length === 0) && (
-                            <tr className="border-b border-neutral-800">
+                            <tr className="border-b border-[hsl(var(--border))]">
                               <td
                                 colSpan={isEditing ? 5 : 4}
-                                className="px-3 py-4 text-center text-sm text-neutral-500"
+                                className="px-3 py-4 text-center text-sm text-[hsl(var(--foreground-muted))]"
                               >
                                 No rows yet.{" "}
                                 {isEditing && "Click 'Add Row' to get started."}
@@ -1564,7 +1564,7 @@ ${template.rows
               </div>
             )
           ) : (
-            <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+            <div className="flex items-center justify-center h-full text-[hsl(var(--foreground-muted))] text-sm">
               Select a file to view its content
             </div>
           )}

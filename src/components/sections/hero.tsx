@@ -80,24 +80,24 @@ export default function HeroSection() {
               <span className="block text-7xl font-bold leading-none tracking-tight">
                 MOTIVE
               </span>
-              <span className="block text-7xl font-light text-gray-700 leading-none tracking-tight">
+              <span className="block text-7xl font-light text-[hsl(var(--foreground))] leading-none tracking-tight">
                 ARCHIVE
               </span>
             </h1>
           </motion.div>
           <motion.span
             variants={itemVariants}
-            className="text-lg font-medium uppercase tracking-[0.2em] text-gray-500 block mb-8"
+            className="text-lg font-medium uppercase tracking-[0.2em] text-[hsl(var(--foreground-muted))] block mb-8"
           >
             The Collector&apos;s Resource
           </motion.span>
           <motion.div
             variants={itemVariants}
-            className="h-px w-24 bg-red-500 my-8"
+            className="h-px w-24 bg-destructive-500 my-8"
           />
           <motion.div
             variants={itemVariants}
-            className="text-xl text-gray-700 leading-relaxed font-light max-w-lg"
+            className="text-xl text-[hsl(var(--foreground))] leading-relaxed font-light max-w-lg"
           >
             {heroContent.description
               .split(". ")

@@ -77,7 +77,7 @@ export default function MakesPageClient({
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[var(--background-primary)]">
+    <div className="flex flex-col min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
       <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="space-y-6">

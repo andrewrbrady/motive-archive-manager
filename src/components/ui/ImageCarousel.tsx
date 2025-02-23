@@ -88,7 +88,7 @@ export const ImageCarousel: React.FC<ImageCarouselProps> = ({ images }) => {
               key={index}
               onClick={() => setCurrentIndex(index)}
               className={`w-2 h-2 rounded-full transition-all ${
-                index === currentIndex ? "bg-white scale-125" : "bg-white/50"
+                index === currentIndex ? "bg-[var(--background-primary)] scale-125" : "bg-[var(--background-primary)]/50"
               }`}
               aria-label={`Go to image ${index + 1}`}
             />

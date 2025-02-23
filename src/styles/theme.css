@@ -10,11 +10,11 @@
     --background-tertiary: var(--background-tertiary);
 
     --text-primary: var(--text-primary);
-    --text-secondary: var(--text-secondary);
+    
     --text-tertiary: var(--text-tertiary);
 
-    --border-primary: var(--background-tertiary);
-    --border-secondary: #d4d4d8;
+    
+    
 
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -28,11 +28,11 @@
     --background-tertiary: var(--background-tertiary);
 
     --text-primary: var(--background-primary);
-    --text-secondary: #a1a1aa;
+    
     --text-tertiary: var(--text-tertiary);
 
-    --border-primary: #27272a;
-    --border-secondary: #3f3f46;
+    
+    
 
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
@@ -41,11 +41,11 @@
 
   /* Accent Colors (Same for both modes) */
   :root {
-    --accent-primary: #3b82f6;
-    --accent-secondary: #1d4ed8;
-    --accent-success: #22c55e;
-    --accent-warning: #eab308;
-    --accent-error: #ef4444;
+    --accent-primary: var(--accent-primary);
+    --accent-secondary: var(--accent-secondary);
+    --accent-success: var(--accent-success);
+    --accent-warning: var(--accent-warning);
+    --accent-error: var(--accent-error);
   }
 
   /* Typography */

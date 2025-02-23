@@ -108,16 +108,16 @@ export default function UserManagement() {
         <Button
           onClick={handleCreateUser}
           variant="outline"
-          className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+          className="bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Add New User
         </Button>
       </div>
 
-      <div className="rounded-md border-[1px] border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)]">
+      <div className="rounded-md border-[1px] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)]">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-gray-200 dark:border-gray-800 hover:bg-transparent">
+            <TableRow className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-transparent">
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Roles</TableHead>
@@ -144,7 +144,7 @@ export default function UserManagement() {
               users.map((user) => (
                 <TableRow
                   key={user._id}
-                  className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                  className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
                 >
                   <TableCell className="font-medium">
                     <a
@@ -160,7 +160,7 @@ export default function UserManagement() {
                       {user.roles.map((role) => (
                         <span
                           key={role}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
                         >
                           {role.charAt(0).toUpperCase() + role.slice(1)}
                         </span>
@@ -173,7 +173,7 @@ export default function UserManagement() {
                         user.creativeRoles.map((role) => (
                           <span
                             key={role}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
                           >
                             {role
                               .split("_")
@@ -210,7 +210,7 @@ export default function UserManagement() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditUser(user)}
-                      className="border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-foreground"
+                      className="border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] hover:text-foreground"
                     >
                       Edit
                     </Button>
@@ -231,9 +231,9 @@ export default function UserManagement() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[var(--background-primary)] border-gray-200 dark:border-gray-800">
-          <DialogHeader className="border-b border-gray-200 dark:border-gray-800 pb-4">
-            <DialogTitle className="text-gray-900 dark:text-gray-100">
+        <DialogContent className="sm:max-w-[425px] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
+          <DialogHeader className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] pb-4">
+            <DialogTitle className="text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
               {selectedUser ? "Edit User" : "Create New User"}
             </DialogTitle>
           </DialogHeader>

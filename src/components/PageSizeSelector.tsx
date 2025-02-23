@@ -25,7 +25,7 @@ const PageSizeSelector = ({
     <div className="flex items-center gap-2">
       <label
         htmlFor="pageSize"
-        className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium"
+        className="text-xs uppercase tracking-wider text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] font-medium"
       >
         Items per page
       </label>
@@ -33,7 +33,7 @@ const PageSizeSelector = ({
         id="pageSize"
         value={currentPageSize}
         onChange={(e) => handlePageSizeChange(e.target.value)}
-        className="text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700"
+        className="text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))]"
       >
         {options.map((size) => (
           <option key={size} value={size}>

@@ -120,13 +120,13 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "not_started":
-        return "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100";
+        return "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]";
       case "in_progress":
         return "bg-primary/10 text-primary";
       case "done":
-        return "bg-green-100 dark:bg-green-800/20 text-green-700 dark:text-green-300";
+        return "bg-success-100 dark:bg-success-800 bg-opacity-20 text-success-700 dark:text-success-300";
       default:
-        return "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100";
+        return "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]";
     }
   };
 
@@ -179,7 +179,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
             <div className="space-y-2">
               <label
                 htmlFor="search"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
                 Search
               </label>
@@ -194,7 +194,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
             <div className="space-y-2">
               <label
                 htmlFor="status"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
                 Status
               </label>
@@ -215,7 +215,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
             <div className="space-y-2">
               <label
                 htmlFor="platform"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
                 Platform
               </label>
@@ -236,7 +236,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
             <div className="space-y-2">
               <label
                 htmlFor="type"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
                 Type
               </label>

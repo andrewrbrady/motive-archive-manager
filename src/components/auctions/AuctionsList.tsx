@@ -12,7 +12,7 @@ export function AuctionsList({ auctions }: AuctionsListProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm text-left">
-        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+        <thead className="text-xs text-[hsl(var(--foreground))] uppercase bg-[hsl(var(--background))]">
           <tr>
             <th className="px-6 py-3">Vehicle</th>
             <th className="px-6 py-3">Current Bid</th>
@@ -26,13 +26,13 @@ export function AuctionsList({ auctions }: AuctionsListProps) {
           {auctions.map((auction) => (
             <tr
               key={auction._id}
-              className="bg-white border-b hover:bg-gray-50"
+              className="bg-[var(--background-primary)] border-b hover:bg-[hsl(var(--background))]"
             >
               <td className="px-6 py-4 font-medium">
                 <Link
                   href={auction.link}
                   target="_blank"
-                  className="hover:text-blue-600"
+                  className="hover:text-info-600"
                 >
                   {auction.year} {auction.make} {auction.model}
                   {auction.trim && ` ${auction.trim}`}

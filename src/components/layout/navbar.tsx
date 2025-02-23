@@ -8,10 +8,10 @@ import { useTheme } from "@/components/ThemeProvider";
 
 // Common classes for consistent styling
 const navClasses =
-  "fixed top-0 left-0 right-0 z-50 bg-background-primary border-b border-gray-800";
+  "fixed top-0 left-0 right-0 z-50 bg-background-primary border-b border-[hsl(var(--border))]";
 const linkClasses =
-  "text-sm uppercase tracking-wider text-gray-400 hover:text-gray-300 transition-colors";
-const iconButtonClasses = "text-gray-400 hover:text-gray-300 transition-colors";
+  "text-sm uppercase tracking-wider text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
+const iconButtonClasses = "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
 
 interface NavbarProps {
   className?: string;
@@ -44,6 +44,9 @@ export default function Navbar({ className }: NavbarProps) {
               </Link>
               <Link href="/cars" className={linkClasses}>
                 Cars
+              </Link>
+              <Link href="/production" className={linkClasses}>
+                Production
               </Link>
               <Link href="/inventory" className={linkClasses}>
                 Inventory

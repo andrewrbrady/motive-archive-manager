@@ -3,13 +3,13 @@
 /* Base calendar container */
 .calendar-container {
   /* Calendar container styles */
-  @apply rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4;
+  @apply rounded-lg border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] bg-white dark:bg-[hsl(var(--background))] p-4;
   position: relative;
 }
 
 .deliverables-calendar {
   /* General calendar styles */
-  @apply text-zinc-900 dark:text-zinc-100;
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
   position: relative;
 }
 
@@ -31,24 +31,24 @@
 
 /* Header styles */
 .rbc-header {
-  @apply bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-medium py-2 border-zinc-200 dark:border-zinc-800;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] font-medium py-2 border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
 }
 
 /* Month view styles */
 .rbc-month-view {
-  @apply border-zinc-200/50 dark:border-zinc-800;
+  @apply border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-month-row {
-  @apply border-zinc-200/50 dark:border-zinc-800;
+  @apply border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-day-bg + .rbc-day-bg {
-  @apply border-l border-zinc-200/50 dark:border-zinc-800/50;
+  @apply border-l border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-month-row + .rbc-month-row {
-  @apply border-t border-zinc-200/50 dark:border-zinc-800/50;
+  @apply border-t border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-day-bg {
@@ -56,11 +56,11 @@
 }
 
 .rbc-off-range-bg {
-  @apply bg-zinc-50/50 dark:bg-zinc-900/50;
+  @apply bg-[hsl(var(--background))] bg-opacity-50 dark:bg-[hsl(var(--background))] dark:bg-opacity-50;
 }
 
 .rbc-today {
-  @apply bg-zinc-100/50 dark:bg-zinc-800/50;
+  @apply bg-[hsl(var(--background))] bg-opacity-50 dark:bg-[hsl(var(--background))] dark:bg-opacity-50;
 }
 
 /* Date number styles */
@@ -92,27 +92,27 @@
 }
 
 .not-started-event.deadline-event {
-  @apply border-red-600 dark:border-red-500;
+  @apply border-destructive/60 dark:border-destructive/50;
 }
 
 .not-started-event.release-event {
-  @apply border-red-400 dark:border-red-300;
+  @apply border-destructive/40 dark:border-destructive/30;
 }
 
 .in-progress-event.deadline-event {
-  @apply border-amber-600 dark:border-amber-500;
+  @apply border-warning/60 dark:border-warning/50;
 }
 
 .in-progress-event.release-event {
-  @apply border-amber-400 dark:border-amber-300;
+  @apply border-warning/40 dark:border-warning/30;
 }
 
 .done-event.deadline-event {
-  @apply border-green-600 dark:border-green-500;
+  @apply border-success/60 dark:border-success/50;
 }
 
 .done-event.release-event {
-  @apply border-green-400 dark:border-green-300;
+  @apply border-success/40 dark:border-success/30;
 }
 
 /* Toolbar styles */
@@ -121,19 +121,19 @@
 }
 
 .rbc-toolbar button {
-  @apply bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-1 text-sm font-medium transition-colors;
+  @apply bg-white dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md px-3 py-1 text-sm font-medium transition-colors;
 }
 
 .rbc-toolbar button:hover {
-  @apply bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
 }
 
 .rbc-toolbar button.rbc-active {
-  @apply bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))];
 }
 
 .rbc-toolbar-label {
-  @apply text-lg font-semibold text-zinc-900 dark:text-zinc-100 flex-shrink-0;
+  @apply text-lg font-semibold text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] flex-shrink-0;
 }
 
 .rbc-btn-group {
@@ -142,30 +142,30 @@
 
 /* Time grid styles */
 .rbc-time-view {
-  @apply border-zinc-200/50 dark:border-zinc-800;
+  @apply border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-time-header {
-  @apply border-zinc-200/50 dark:border-zinc-800;
+  @apply border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-time-content {
-  @apply border-zinc-200/50 dark:border-zinc-800;
+  @apply border-[hsl(var(--border))] border-opacity-50 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 .rbc-time-slot {
-  @apply text-zinc-600 dark:text-zinc-400;
+  @apply text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))];
 }
 
 /* Tooltip styles */
 .rbc-overlay {
-  @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-lg p-2 text-sm;
+  @apply bg-white dark:bg-[hsl(var(--background))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md shadow-lg p-2 text-sm;
   position: fixed !important;
   z-index: 9999 !important;
 }
 
 .rbc-overlay-header {
-  @apply text-zinc-900 dark:text-zinc-100 font-medium mb-1 pb-1 border-b border-zinc-200 dark:border-zinc-800;
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] font-medium mb-1 pb-1 border-b border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
 }
 
 /* Ensure tooltips and modals are above calendar */
@@ -203,7 +203,7 @@
 
 /* Fullscreen styles */
 .calendar-container:fullscreen {
-  @apply bg-white dark:bg-zinc-950 p-6;
+  @apply bg-white dark:bg-[hsl(var(--background))] p-6;
 }
 
 /* Ensure the calendar toolbar is visible in fullscreen */
@@ -218,34 +218,34 @@
 
 /* Fullscreen dark mode specific overrides */
 .fullscreen-calendar.dark .rbc-header {
-  @apply bg-zinc-900 text-zinc-400 border-zinc-800;
+  @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground-muted))] border-[hsl(var(--border))];
 }
 
 .fullscreen-calendar.dark .rbc-month-view,
 .fullscreen-calendar.dark .rbc-time-view {
-  @apply border-zinc-800;
+  @apply border-[hsl(var(--border))];
 }
 
 .fullscreen-calendar.dark .rbc-off-range-bg {
-  @apply bg-zinc-900/50;
+  @apply bg-[hsl(var(--background))] bg-opacity-50;
 }
 
 .fullscreen-calendar.dark .rbc-today {
-  @apply bg-zinc-800/50;
+  @apply bg-[hsl(var(--background))] bg-opacity-50;
 }
 
 .fullscreen-calendar.dark .rbc-toolbar button {
-  @apply bg-zinc-900 text-zinc-300 border-zinc-800;
+  @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground-subtle))] border-[hsl(var(--border))];
 }
 
 .fullscreen-calendar.dark .rbc-toolbar button:hover {
-  @apply bg-zinc-800 text-zinc-100;
+  @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
 }
 
 .fullscreen-calendar.dark .rbc-toolbar button.rbc-active {
-  @apply bg-zinc-800 text-zinc-100 border-zinc-700;
+  @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--border-subtle))];
 }
 
 .fullscreen-calendar.dark .rbc-toolbar-label {
-  @apply text-zinc-100;
+  @apply text-[hsl(var(--foreground))];
 }

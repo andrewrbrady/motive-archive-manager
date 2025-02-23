@@ -33,18 +33,19 @@ interface EventTemplateGanttProps {
   onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
-const EVENT_TYPE_COLORS: Record<EventType, string> = {
-  [EventType.AUCTION_SUBMISSION]: "var(--error-primary)", // Red
-  [EventType.AUCTION_LISTING]: "#F59E0B", // Amber
-  [EventType.AUCTION_END]: "#10B981", // Emerald
-  [EventType.INSPECTION]: "var(--accent-primary)", // Blue
-  [EventType.DETAIL]: "#8B5CF6", // Purple
-  [EventType.PRODUCTION]: "#EC4899", // Pink
-  [EventType.POST_PRODUCTION]: "#6366F1", // Indigo
-  [EventType.MARKETING]: "#14B8A6", // Teal
-  [EventType.PICKUP]: "#F43F5E", // Rose
-  [EventType.DELIVERY]: "#0EA5E9", // Sky
-  [EventType.OTHER]: "#6B7280", // Gray
+const statusColors = {
+  not_started: "var(--destructive)",
+  in_progress: "var(--warning)",
+  completed: "var(--success)",
+  default: "var(--zinc-500)",
+};
+
+const typeColors: Record<string, string> = {
+  photo: "var(--info)",
+  video: "var(--success)",
+  audio: "var(--warning)",
+  document: "var(--destructive)",
+  other: "var(--zinc-500)",
 };
 
 const formatEventType = (type: string) => {
@@ -52,6 +53,11 @@ const formatEventType = (type: string) => {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
+};
+
+const getEventTypeColor = (type: string): string => {
+  const baseType = type.split("_")[0].toLowerCase();
+  return typeColors[baseType] || typeColors.other;
 };
 
 export default function EventTemplateGantt({
@@ -161,7 +167,7 @@ export default function EventTemplateGantt({
   return (
     <div className="space-y-4" ref={containerRef}>
       <div className="flex flex-wrap gap-2 mb-6">
-        {Object.entries(EVENT_TYPE_COLORS).map(([type, color]) => (
+        {Object.entries(typeColors).map(([type, color]) => (
           <Badge
             key={type}
             variant="outline"
@@ -245,11 +251,13 @@ export default function EventTemplateGantt({
                               )}
                               style={
                                 {
-                                  backgroundColor:
-                                    EVENT_TYPE_COLORS[event.type],
+                                  backgroundColor: getEventTypeColor(
+                                    event.type
+                                  ),
                                   width: "100%",
-                                  "--event-color":
-                                    EVENT_TYPE_COLORS[event.type],
+                                  "--event-color": getEventTypeColor(
+                                    event.type
+                                  ),
                                 } as React.CSSProperties
                               }
                             >

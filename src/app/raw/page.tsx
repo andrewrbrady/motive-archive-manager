@@ -175,7 +175,7 @@ const RawPage: React.FC = () => {
             <h1 className="text-2xl font-bold">Raw Assets</h1>
             <Link
               href="/add-asset"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="flex items-center gap-2 px-4 py-2 bg-info-500 text-white rounded hover:bg-info-600"
             >
               <PencilIcon className="w-4 h-4" />
               Add Asset
@@ -206,30 +206,30 @@ const RawPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            <div className="bg-destructive-100 border border-destructive-400 text-destructive-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-zinc-200">
               <thead>
                 <tr>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 bg-[hsl(var(--background))] text-left text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 bg-[hsl(var(--background))] text-left text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wider">
                     Description
                   </th>
-                  <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 bg-[hsl(var(--background))] text-left text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wider">
                     Location
                   </th>
-                  <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 bg-[hsl(var(--background))] text-right text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-[var(--background-primary)] divide-y divide-zinc-200">
                 {loading ? (
                   <tr>
                     <td colSpan={4} className="text-center py-4">

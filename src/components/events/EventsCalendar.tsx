@@ -93,6 +93,31 @@ const localizer = dateFnsLocalizer({
 
 const DragAndDropCalendar = withDragAndDrop(Calendar);
 
+const statusColors = {
+  NOT_STARTED: "var(--destructive)",
+  IN_PROGRESS: "var(--warning)",
+  COMPLETED: "var(--success)",
+  CANCELLED: "var(--destructive)",
+  PENDING: "var(--info)",
+  APPROVED: "var(--success)",
+  REJECTED: "var(--destructive)",
+  default: "var(--zinc-500)",
+};
+
+const typeColors: Record<EventType, string> = {
+  [EventType.AUCTION_SUBMISSION]: "var(--destructive)",
+  [EventType.AUCTION_LISTING]: "var(--warning)",
+  [EventType.AUCTION_END]: "var(--info)",
+  [EventType.INSPECTION]: "var(--accent)",
+  [EventType.DETAIL]: "var(--secondary)",
+  [EventType.PRODUCTION]: "var(--primary)",
+  [EventType.POST_PRODUCTION]: "var(--success)",
+  [EventType.MARKETING]: "var(--info)",
+  [EventType.PICKUP]: "var(--warning)",
+  [EventType.DELIVERY]: "var(--info)",
+  [EventType.OTHER]: "var(--zinc-500)",
+};
+
 export default function EventsCalendar({
   events,
   onUpdateEvent,
@@ -157,40 +182,19 @@ export default function EventsCalendar({
     });
   }, [events, view]);
 
-  const getEventColor = (type: EventType) => {
-    switch (type) {
-      case EventType.AUCTION_SUBMISSION:
-        return "#F43F5E"; // Rose
-      case EventType.AUCTION_LISTING:
-        return "#F59E0B"; // Amber
-      case EventType.AUCTION_END:
-        return "#10B981"; // Emerald
-      case EventType.INSPECTION:
-        return "var(--accent-primary)"; // Blue
-      case EventType.DETAIL:
-        return "#8B5CF6"; // Purple
-      case EventType.PRODUCTION:
-        return "#EC4899"; // Pink
-      case EventType.POST_PRODUCTION:
-        return "#6366F1"; // Indigo
-      case EventType.MARKETING:
-        return "#14B8A6"; // Teal
-      case EventType.PICKUP:
-        return "#F43F5E"; // Rose
-      case EventType.DELIVERY:
-        return "#0EA5E9"; // Sky
-      case EventType.OTHER:
-      default:
-        return "#6B7280"; // Gray
-    }
+  const getEventColor = (type: EventType): string => {
+    return typeColors[type] || typeColors[EventType.OTHER];
   };
 
   const getEventStyle = (event: object) => {
     const typedEvent = event as ApiEvent;
     return {
       style: {
-        backgroundColor: getEventColor(typedEvent.type),
-        color: "#fff",
+        backgroundColor:
+          typeColors[typedEvent.type] ||
+          statusColors[typedEvent.status] ||
+          statusColors.default,
+        color: "var(--background-primary)",
         border: "none",
         borderRadius: "4px",
         padding: "2px 5px",
@@ -209,7 +213,7 @@ export default function EventsCalendar({
     return {
       className: cn(
         "transition-colors",
-        isToday && "today-cell bg-zinc-50 dark:bg-zinc-900"
+        isToday && "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
       ),
     };
   };

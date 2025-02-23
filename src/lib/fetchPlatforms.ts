@@ -21,7 +21,7 @@ export async function fetchPlatforms() {
       _id: platform._id.toString(),
       name: platform.name,
       platformId: platform.platformId,
-      color: "text-gray-600", // Hardcode this for now until we add to DB
+      color: "text-zinc-600", // Hardcode this for now until we add to DB
     }));
   } catch (error) {
     console.error("Error fetching platforms:", error);

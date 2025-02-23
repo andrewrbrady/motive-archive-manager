@@ -257,7 +257,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
             }
           }}
         >
-          <div className="prose prose-invert prose-table:border-zinc-800 max-w-none">
+          <div className="prose prose-invert prose-table:border-[hsl(var(--border))] max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeKatex]}
@@ -293,7 +293,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                 table: ({ children, ...props }) => (
                   <div className="my-8 overflow-x-auto">
                     <table
-                      className="min-w-full border border-zinc-800 table-auto"
+                      className="min-w-full border border-[hsl(var(--border))] table-auto"
                       {...props}
                     >
                       {children}
@@ -301,7 +301,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                   </div>
                 ),
                 thead: ({ children, ...props }) => (
-                  <thead className="bg-zinc-900" {...props}>
+                  <thead className="bg-[hsl(var(--background))]" {...props}>
                     {children}
                   </thead>
                 ),
@@ -311,14 +311,14 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                   </tbody>
                 ),
                 tr: ({ children, ...props }) => (
-                  <tr className="hover:bg-zinc-900/50" {...props}>
+                  <tr className="hover:bg-[hsl(var(--background))] bg-opacity-50" {...props}>
                     {children}
                   </tr>
                 ),
                 th: ({ children, align, ...props }) => (
                   <th
                     className={cn(
-                      "border border-zinc-800 px-4 py-2 text-left",
+                      "border border-[hsl(var(--border))] px-4 py-2 text-left",
                       align === "center" && "text-center",
                       align === "right" && "text-right"
                     )}
@@ -330,7 +330,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                 td: ({ children, align, ...props }) => (
                   <td
                     className={cn(
-                      "border border-zinc-800 px-4 py-2 text-left",
+                      "border border-[hsl(var(--border))] px-4 py-2 text-left",
                       align === "center" && "text-center",
                       align === "right" && "text-right"
                     )}
@@ -344,14 +344,14 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                     <img
                       src={src}
                       alt={alt}
-                      className="rounded-lg border border-zinc-800"
+                      className="rounded-lg border border-[hsl(var(--border))]"
                       loading="lazy"
                     />
                   );
                 },
                 blockquote({ children }) {
                   return (
-                    <blockquote className="border-l-4 border-zinc-700 pl-4 italic text-zinc-400">
+                    <blockquote className="border-l-4 border-[hsl(var(--border-subtle))] pl-4 italic text-[hsl(var(--foreground-muted))]">
                       {children}
                     </blockquote>
                   );
@@ -362,7 +362,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors"
+                      className="text-info-400 hover:text-info-300 transition-colors"
                     >
                       {children}
                     </a>

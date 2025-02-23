@@ -53,7 +53,7 @@ export default function DeliverableTooltip({
                   ? `${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model}`
                   : "Unknown Car"}
               </h4>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 {deliverable.title}
               </p>
             </div>
@@ -61,11 +61,11 @@ export default function DeliverableTooltip({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <MonitorPlay className="mr-2 h-4 w-4" />
                 {deliverable.platform}
               </div>
-              <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <User className="mr-2 h-4 w-4" />
                 {deliverable.editor}
               </div>
@@ -73,18 +73,18 @@ export default function DeliverableTooltip({
 
             <div className="space-y-1">
               {!deliverable.hideDates && (
-                <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+                <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {deliverable.isDeadline ? (
                     <>
-                      <span className="font-medium text-red-500 dark:text-red-400">
+                      <span className="font-medium text-destructive-500 dark:text-destructive-400">
                         Deadline:
                       </span>{" "}
                       {safeFormat(deliverable.edit_deadline)}
                     </>
                   ) : (
                     <>
-                      <span className="font-medium text-green-500 dark:text-green-400">
+                      <span className="font-medium text-success-500 dark:text-success-400">
                         Release:
                       </span>{" "}
                       {safeFormat(deliverable.release_date)}
@@ -93,7 +93,7 @@ export default function DeliverableTooltip({
                 </div>
               )}
               {deliverable.type !== "Photo Gallery" && (
-                <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+                <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                   <Clock className="mr-2 h-4 w-4" />
                   {formatDuration(deliverable.duration)} min
                 </div>
@@ -105,10 +105,10 @@ export default function DeliverableTooltip({
             <div
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                 deliverable.status === "not_started"
-                  ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                  ? "bg-destructive-100 text-destructive-700 dark:bg-destructive-900 dark:text-destructive-300"
                   : deliverable.status === "in_progress"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                  : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                  ? "bg-warning-100 text-warning-700 dark:bg-warning-900 dark:text-warning-300"
+                  : "bg-success-100 text-success-700 dark:bg-success-900 dark:text-success-300"
               }`}
             >
               {deliverable.status.replace("_", " ").toUpperCase()}

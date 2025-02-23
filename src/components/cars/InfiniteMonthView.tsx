@@ -127,7 +127,7 @@ export default function InfiniteMonthView({
           {Array.from({ length: startWeekDay }).map((_, index) => (
             <div
               key={`empty-start-${index}`}
-              className="h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--background-primary)]"
+              className="h-[140px] p-2 border-r border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)]"
             />
           ))}
 
@@ -164,16 +164,16 @@ export default function InfiniteMonthView({
               <div
                 key={format(day, "yyyy-MM-dd")}
                 className={cn(
-                  "h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800",
-                  isToday && "bg-slate-100 dark:bg-slate-800/25"
+                  "h-[140px] p-2 border-r border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]",
+                  isToday && "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-25"
                 )}
               >
                 <div
                   className={cn(
                     "text-sm mb-1",
                     isToday
-                      ? "text-slate-600 dark:text-slate-300 font-medium"
-                      : "text-zinc-900 dark:text-zinc-100"
+                      ? "text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))] font-medium"
+                      : "text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
                   )}
                 >
                   {format(day, "d")}
@@ -188,7 +188,7 @@ export default function InfiniteMonthView({
                         <div
                           className={cn(
                             "text-xs p-1 rounded text-white truncate transition-colors cursor-pointer",
-                            "bg-slate-500/90 hover:bg-slate-500 dark:bg-slate-600/90 dark:hover:bg-slate-600"
+                            "bg-[hsl(var(--background))] bg-opacity-90 hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]/90 dark:hover:bg-[hsl(var(--background))]"
                           )}
                         >
                           {event.title}
@@ -214,7 +214,7 @@ export default function InfiniteMonthView({
                         <div
                           className={cn(
                             "text-xs p-1 rounded text-white truncate transition-colors cursor-pointer",
-                            "bg-stone-400/90 hover:bg-stone-400 dark:bg-stone-500/90 dark:hover:bg-stone-500"
+                            "bg-[hsl(var(--background))] bg-opacity-90 hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]/90 dark:hover:bg-[hsl(var(--background))]"
                           )}
                         >
                           {event.title}
@@ -223,7 +223,7 @@ export default function InfiniteMonthView({
                     )
                   )}
                   {hasMoreEvents && (
-                    <div className="text-xs px-1 py-0.5 text-zinc-600 dark:text-zinc-400 font-medium">
+                    <div className="text-xs px-1 py-0.5 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] font-medium">
                       {dayEvents.length - MAX_EVENTS_PER_DAY} more...
                     </div>
                   )}
@@ -238,7 +238,7 @@ export default function InfiniteMonthView({
           }).map((_, index) => (
             <div
               key={`empty-end-${index}`}
-              className="h-[140px] p-2 border-r border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--background-primary)]"
+              className="h-[140px] p-2 border-r border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)]"
             />
           ))}
         </div>
@@ -248,24 +248,24 @@ export default function InfiniteMonthView({
 
   return (
     <div ref={containerRef} className={cn("h-full relative", className)}>
-      <div className="sticky top-0 z-20 bg-white dark:bg-[var(--background-primary)]">
-        <div className="py-2 px-4 border-b border-l border-r border-zinc-200 dark:border-zinc-800">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      <div className="sticky top-0 z-20 bg-[var(--background-primary)] dark:bg-[var(--background-primary)]">
+        <div className="py-2 px-4 border-b border-l border-r border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
+          <h2 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
             {format(visibleMonthDate, "MMMM yyyy")}
           </h2>
         </div>
-        <div className="grid grid-cols-7 border-b border-l border-r border-zinc-200 dark:border-zinc-800">
+        <div className="grid grid-cols-7 border-b border-l border-r border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <div
               key={day}
-              className="text-center text-sm font-medium py-2 border-r border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+              className="text-center text-sm font-medium py-2 border-r border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
             >
               {day}
             </div>
           ))}
         </div>
       </div>
-      <div className="border-l border-zinc-200 dark:border-zinc-800">
+      <div className="border-l border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
         <List
           ref={listRef}
           height={containerHeight - 84}

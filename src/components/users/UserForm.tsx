@@ -122,7 +122,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       <div className="space-y-2">
         <label
           htmlFor="name"
-          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Name
         </label>
@@ -132,14 +132,14 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           required
           placeholder="Name"
-          className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+          className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
         />
       </div>
 
       <div className="space-y-2">
         <label
           htmlFor="email"
-          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Email
         </label>
@@ -150,27 +150,27 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           required
           placeholder="Email"
-          className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+          className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
         />
       </div>
 
       <div className="space-y-2">
         <label
           htmlFor="roles"
-          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Role
         </label>
         <Select value={formData.roles?.[0]} onValueChange={handleRoleChange}>
-          <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+          <SelectTrigger className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             <SelectValue placeholder="Select a role" />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+          <SelectContent className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             {ROLES.map((role) => (
               <SelectItem
                 key={role}
                 value={role}
-                className="!bg-white dark:!bg-[var(--background-secondary)] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+                className="!bg-[var(--background-primary)] dark:!bg-[var(--background-secondary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] hover:!bg-[hsl(var(--background))] dark:hover:!bg-[hsl(var(--background))]"
               >
                 {role.charAt(0).toUpperCase() + role.slice(1)}
               </SelectItem>
@@ -182,7 +182,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       <div className="space-y-2">
         <label
           htmlFor="status"
-          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Status
         </label>
@@ -190,15 +190,15 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           defaultValue={formData.status}
           onValueChange={handleStatusChange}
         >
-          <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+          <SelectTrigger className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             <SelectValue placeholder="Select status" />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+          <SelectContent className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             {STATUS_OPTIONS.map((status) => (
               <SelectItem
                 key={status}
                 value={status}
-                className="!bg-white dark:!bg-[var(--background-secondary)] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+                className="!bg-[var(--background-primary)] dark:!bg-[var(--background-secondary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] hover:!bg-[hsl(var(--background))] dark:hover:!bg-[hsl(var(--background))]"
               >
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </SelectItem>
@@ -210,20 +210,20 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       <div className="space-y-2">
         <label
           htmlFor="creativeRoles"
-          className="text-sm font-medium text-gray-900 dark:text-gray-100"
+          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Creative Roles
         </label>
         <Select value="" onValueChange={handleCreativeRoleChange}>
-          <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+          <SelectTrigger className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             <SelectValue placeholder="Add creative role" />
           </SelectTrigger>
-          <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+          <SelectContent className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             {CREATIVE_ROLES.map((role) => (
               <SelectItem
                 key={role}
                 value={role}
-                className="!bg-white dark:!bg-[var(--background-secondary)] text-gray-900 dark:text-gray-100 hover:!bg-gray-50 dark:hover:!bg-gray-800"
+                className="!bg-[var(--background-primary)] dark:!bg-[var(--background-secondary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] hover:!bg-[hsl(var(--background))] dark:hover:!bg-[hsl(var(--background))]"
               >
                 {role
                   .split("_")
@@ -238,7 +238,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
             {formData.creativeRoles.map((role) => (
               <span
                 key={role}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:bg-[hsl(var(--background))] dark:text-[hsl(var(--foreground))]"
               >
                 {role
                   .split("_")
@@ -246,7 +246,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
                   .join(" ")}
                 <button
                   type="button"
-                  className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="ml-1 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-zinc-200"
                   onClick={() => removeCreativeRole(role)}
                 >
                   ×
@@ -262,13 +262,13 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           type="button"
           variant="outline"
           onClick={onCancel}
-          className="border-gray-200 dark:border-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+          className="border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
           Cancel
         </Button>
         <Button
           type="submit"
-          className="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900"
+          className="bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] text-white dark:text-[hsl(var(--foreground))]"
         >
           {user?._id ? "Update User" : "Create User"}
         </Button>

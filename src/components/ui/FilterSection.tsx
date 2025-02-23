@@ -13,13 +13,13 @@ export function FilterSection({
   onClearFilters = () => {},
 }: FilterSectionProps) {
   return (
-    <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800">
+    <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
       <div className="p-4">{children}</div>
       {hasActiveFilters && (
-        <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-2 flex justify-end">
+        <div className="border-t border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] px-4 py-2 flex justify-end">
           <button
             onClick={onClearFilters}
-            className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-[hsl(var(--foreground-subtle))] hover:text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground))] transition-colors"
             title="Clear all filters"
           >
             <span>Clear filters</span>
@@ -43,7 +43,7 @@ export function FilterItem({
 
 export function FilterLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+    <label className="block text-xs font-medium uppercase tracking-wide text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] mb-1">
       {children}
     </label>
   );
@@ -56,7 +56,7 @@ export function FilterSelect({
   return (
     <select
       {...props}
-      className={`block w-full text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700 px-3 py-1.5 ${className}`}
+      className={`block w-full text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] px-3 py-1.5 ${className}`}
     />
   );
 }
@@ -68,7 +68,7 @@ export function FilterInput({
   return (
     <input
       {...props}
-      className={`block w-full text-sm border border-gray-200 dark:border-gray-800 bg-white dark:bg-[var(--background-primary)] text-gray-900 dark:text-gray-100 focus:ring-0 focus:border-gray-400 dark:focus:border-gray-700 px-3 py-1.5 ${className}`}
+      className={`block w-full text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] px-3 py-1.5 ${className}`}
     />
   );
 }

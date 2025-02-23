@@ -57,7 +57,7 @@ export default function CarsPageClient({
   }).toString();
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-[var(--background-primary)]">
+    <div className="flex flex-col min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
       <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="space-y-6">
@@ -79,7 +79,7 @@ export default function CarsPageClient({
               <EditModeToggle isEditMode={isEditMode} />
               <Link
                 href="/cars/new"
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                className="p-2 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))] transition-colors rounded-full hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))]"
                 title="Add New Car"
               >
                 <Plus className="h-4 w-4" />

@@ -156,7 +156,7 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[var(--background-primary)]">
+    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
       <Navbar />
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
@@ -242,12 +242,12 @@ export default function EventsPage() {
 
           {isLoading ? (
             <div className="space-y-4">
-              <div className="w-full h-12 bg-gray-200 dark:bg-gray-800 animate-pulse rounded-lg" />
+              <div className="w-full h-12 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] animate-pulse rounded-lg" />
               <div className="space-y-2">
                 {[...Array(5)].map((_, i) => (
                   <div
                     key={i}
-                    className="w-full h-16 bg-gray-100 dark:bg-gray-900 animate-pulse rounded-lg"
+                    className="w-full h-16 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] animate-pulse rounded-lg"
                   />
                 ))}
               </div>
@@ -271,7 +271,7 @@ export default function EventsPage() {
                       {event.car ? (
                         <Link
                           href={`/cars/${event.car._id}?tab=events`}
-                          className="text-blue-600 hover:underline"
+                          className="text-info-600 hover:underline"
                         >
                           {`${event.car.year} ${event.car.make} ${event.car.model}`}
                         </Link>

@@ -443,18 +443,18 @@ export default function ScriptTemplates({
         {!selectedTemplate && (
           <div className="grid gap-4">
             {isLoading ? (
-              <div className="text-center py-4 text-neutral-400">
+              <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
                 Loading templates...
               </div>
             ) : templates.length === 0 ? (
-              <div className="text-center py-4 text-neutral-400">
+              <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
                 No templates available. Creating default templates...
               </div>
             ) : (
               templates.map((template) => (
                 <div
                   key={template._id}
-                  className="bg-neutral-900 border border-neutral-800 rounded-lg p-4"
+                  className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -462,7 +462,7 @@ export default function ScriptTemplates({
                         <Clock className="w-4 h-4" />
                         {template.name}
                       </h4>
-                      <p className="text-sm text-neutral-400 mt-1">
+                      <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
                         {template.description}
                       </p>
                     </div>
@@ -536,7 +536,7 @@ export default function ScriptTemplates({
                     })
                   }
                   placeholder="Template Description"
-                  className="text-sm text-neutral-400 bg-transparent border-0 p-0 focus-visible:ring-0 h-auto"
+                  className="text-sm text-[hsl(var(--foreground-muted))] bg-transparent border-0 p-0 focus-visible:ring-0 h-auto"
                   disabled={!isEditing}
                 />
 
@@ -602,7 +602,7 @@ export default function ScriptTemplates({
 
                 {!isEditing && (
                   <div className="flex gap-2 pt-2">
-                    <div className="text-sm text-neutral-400">
+                    <div className="text-sm text-[hsl(var(--foreground-muted))]">
                       Platforms:{" "}
                       {selectedTemplate.platforms
                         .map(
@@ -612,7 +612,7 @@ export default function ScriptTemplates({
                         )
                         .join(", ")}
                     </div>
-                    <div className="text-sm text-neutral-400">
+                    <div className="text-sm text-[hsl(var(--foreground-muted))]">
                       Aspect Ratio:{" "}
                       {
                         ASPECT_RATIOS.find(
@@ -658,77 +658,77 @@ export default function ScriptTemplates({
               </div>
             </div>
 
-            <div className="border border-neutral-800">
+            <div className="border border-[hsl(var(--border))]">
               <table className="w-full border-collapse">
-                <thead className="bg-neutral-900">
+                <thead className="bg-[hsl(var(--background))]">
                   <tr>
-                    <th className="w-28 px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                    <th className="w-28 px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                       Time
                     </th>
-                    <th className="px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                    <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                       Video
                     </th>
-                    <th className="px-3 py-2 text-left border-b border-r border-neutral-800 font-medium text-sm">
+                    <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                       Audio
                     </th>
-                    <th className="px-3 py-2 text-left border-b border-neutral-800 font-medium text-sm">
+                    <th className="px-3 py-2 text-left border-b border-[hsl(var(--border))] font-medium text-sm">
                       GFX
                     </th>
                     {isEditing && (
-                      <th className="w-10 px-2 py-2 border-b border-neutral-800"></th>
+                      <th className="w-10 px-2 py-2 border-b border-[hsl(var(--border))]"></th>
                     )}
                   </tr>
                 </thead>
                 <tbody>
                   {selectedTemplate.rows.map((row) => (
-                    <tr key={row.id} className="border-b border-neutral-800">
-                      <td className="px-3 py-2 border-r border-neutral-800">
+                    <tr key={row.id} className="border-b border-[hsl(var(--border))]">
+                      <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                         {isEditing ? (
                           <Input
                             value={row.time}
                             onChange={(e) =>
                               handleRowChange(row.id, "time", e.target.value)
                             }
-                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                           />
                         ) : (
                           <span className="text-sm">{row.time}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 border-r border-neutral-800">
+                      <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                         {isEditing ? (
                           <Input
                             value={row.video}
                             onChange={(e) =>
                               handleRowChange(row.id, "video", e.target.value)
                             }
-                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                           />
                         ) : (
                           <span className="text-sm">{row.video}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 border-r border-neutral-800">
+                      <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                         {isEditing ? (
                           <Input
                             value={row.audio}
                             onChange={(e) =>
                               handleRowChange(row.id, "audio", e.target.value)
                             }
-                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                           />
                         ) : (
                           <span className="text-sm">{row.audio}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 border-r border-neutral-800">
+                      <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                         {isEditing ? (
                           <Input
                             value={row.gfx}
                             onChange={(e) =>
                               handleRowChange(row.id, "gfx", e.target.value)
                             }
-                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-neutral-500"
+                            className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                           />
                         ) : (
                           <span className="text-sm">{row.gfx}</span>
@@ -740,7 +740,7 @@ export default function ScriptTemplates({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteRow(row.id)}
-                            className="h-7 px-2 hover:bg-neutral-800"
+                            className="h-7 px-2 hover:bg-[hsl(var(--background))]"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -750,10 +750,10 @@ export default function ScriptTemplates({
                   ))}
                   {(!selectedTemplate.rows ||
                     selectedTemplate.rows.length === 0) && (
-                    <tr className="border-b border-neutral-800">
+                    <tr className="border-b border-[hsl(var(--border))]">
                       <td
                         colSpan={isEditing ? 5 : 4}
-                        className="px-3 py-4 text-center text-sm text-neutral-500"
+                        className="px-3 py-4 text-center text-sm text-[hsl(var(--foreground-muted))]"
                       >
                         No rows yet.{" "}
                         {isEditing && "Click 'Add Row' to get started."}

@@ -342,9 +342,9 @@ export default function EventsTab({ carId }: { carId: string }) {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-2" align="start">
+                    <PopoverContent className="w-[300px] p-0" align="start">
                       <ScrollArea className="h-[200px]">
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-2 p-2 gap-2">
                           {users.map((user) => {
                             const isSelected =
                               Array.isArray(newEvent.assignees) &&
@@ -352,7 +352,6 @@ export default function EventsTab({ carId }: { carId: string }) {
                             return (
                               <button
                                 key={user._id}
-                                type="button"
                                 onClick={() => {
                                   const currentAssignees = Array.isArray(
                                     newEvent.assignees
@@ -376,7 +375,7 @@ export default function EventsTab({ carId }: { carId: string }) {
                                     });
                                   }
                                 }}
-                                className={`flex items-center space-x-2 p-2 rounded-md transition-colors text-left ${
+                                className={`flex items-center rounded-md px-3 py-2 transition-colors text-left ${
                                   isSelected
                                     ? "bg-primary/10 text-primary hover:bg-primary/20"
                                     : "hover:bg-accent"
@@ -391,7 +390,7 @@ export default function EventsTab({ carId }: { carId: string }) {
                                 >
                                   {isSelected && <Check className="h-3 w-3" />}
                                 </div>
-                                <span className="text-sm truncate">
+                                <span className="text-sm truncate ml-3">
                                   {user.name}
                                 </span>
                               </button>

@@ -12,7 +12,7 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="bg-gray-50 border-y">
+          <tr className="bg-[hsl(var(--background))] border-y">
             <th className="py-2 px-3 text-left font-medium border">Year</th>
             <th className="py-2 px-3 text-left font-medium border">Make</th>
             <th className="py-2 px-3 text-left font-medium border">Model</th>
@@ -26,11 +26,11 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
         </thead>
         <tbody>
           {cars.map((car) => (
-            <tr key={car.id} className="border-b hover:bg-gray-50">
+            <tr key={car.id} className="border-b hover:bg-[hsl(var(--background))]">
               <td className="py-2 px-3 border">
                 <Link
                   href={`/cars/${car.id}?${currentSearchParams}`}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-info-600 hover:text-info-800"
                 >
                   {car.year}
                 </Link>
@@ -56,7 +56,7 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
 
       {cars.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600">
+          <p className="text-[hsl(var(--foreground-subtle))]">
             No vehicles found matching your criteria.
           </p>
         </div>

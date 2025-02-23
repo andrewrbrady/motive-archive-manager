@@ -25,6 +25,17 @@ const PLATFORM_COLORS: Record<string, string> = {
   Other: "#6B7280",
 };
 
+const statusColors = {
+  draft: "var(--zinc-600)",
+  pending: "var(--info)",
+  approved: "var(--success)",
+  in_progress: "var(--warning)",
+  rejected: "var(--destructive)",
+  completed: "var(--success)",
+  cancelled: "var(--destructive)",
+  default: "var(--zinc-500)",
+};
+
 const getPillContent = (
   deliverable: DeliverableTemplate,
   type: "deadline" | "release"

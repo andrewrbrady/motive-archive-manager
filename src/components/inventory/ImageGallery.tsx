@@ -39,8 +39,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
           </button>
         ))}
         {images.length > 5 && (
-          <div className="flex items-center justify-center w-20 h-20 bg-gray-100 rounded-md">
-            <span className="text-sm text-gray-600">+{images.length - 5}</span>
+          <div className="flex items-center justify-center w-20 h-20 bg-[hsl(var(--background))] rounded-md">
+            <span className="text-sm text-[hsl(var(--foreground-subtle))]">+{images.length - 5}</span>
           </div>
         )}
       </div>

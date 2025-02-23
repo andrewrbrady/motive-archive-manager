@@ -39,7 +39,7 @@ export default function RecentProjectsSection() {
           transition={{ duration: 0.6 }}
           className="mb-20 max-w-4xl mx-auto text-center"
         >
-          <h2 className="text-xl md:text-2xl font-light leading-relaxed text-gray-600">
+          <h2 className="text-xl md:text-2xl font-light leading-relaxed text-[hsl(var(--foreground-subtle))]">
             <span className="font-medium">Just as any museum has a curatorial team</span> to photograph, document, archive and catalogue the works they have—
             <span className="font-medium">it is vital for the modern collector to do the same.</span>
           </h2>
@@ -84,7 +84,7 @@ export default function RecentProjectsSection() {
 
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-500 uppercase tracking-wider mb-2">
+                    <p className="text-sm text-[hsl(var(--foreground-muted))] uppercase tracking-wider mb-2">
                       {project.client}
                     </p>
                     <h3 className="text-xl font-medium">
@@ -92,9 +92,9 @@ export default function RecentProjectsSection() {
                     </h3>
                   </div>
                   
-                  <div className="h-px w-12 bg-red-500 transition-all duration-300 group-hover:w-24" />
+                  <div className="h-px w-12 bg-destructive-500 transition-all duration-300 group-hover:w-24" />
                   
-                  <p className="text-gray-600 text-sm leading-relaxed">
+                  <p className="text-[hsl(var(--foreground-subtle))] text-sm leading-relaxed">
                     {project.description}
                   </p>
                 </div>

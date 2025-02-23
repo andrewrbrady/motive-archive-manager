@@ -190,9 +190,9 @@ const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
   });
 
   return (
-    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-800">
-      <span className="text-gray-600 dark:text-gray-400">{label}</span>
-      <span className="text-gray-900 dark:text-white font-medium">
+    <div className="flex justify-between py-2 border-b border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
+      <span className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">{label}</span>
+      <span className="text-[hsl(var(--foreground))] dark:text-white font-medium">
         {typeof displayValue === "number"
           ? displayValue.toLocaleString()
           : displayValue}
@@ -213,7 +213,7 @@ const SpecificationSection = ({
 }: SpecificationSectionProps) => {
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+      <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white mb-3">
         {title}
       </h3>
       <div className="space-y-1">{children}</div>
@@ -298,7 +298,7 @@ interface InteriorFeaturesValue {
 
 // Common class names for form inputs
 const baseInputClasses =
-  "bg-white dark:bg-background-primary border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-950 dark:focus:ring-gray-300 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-background-primary";
+  "bg-[var(--background-primary)] dark:bg-background-primary border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded px-2 py-1 text-[hsl(var(--foreground))] dark:text-white focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-background-primary";
 
 // Main component definition
 const Specifications = ({
@@ -428,9 +428,9 @@ const Specifications = ({
   }, [car.client]);
 
   return (
-    <div className="dark:bg-background-primary rounded-lg border border-gray-200 dark:border-gray-800">
-      <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white uppercase">
+    <div className="dark:bg-background-primary rounded-lg border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
+      <div className="flex justify-between items-center p-4 border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
+        <h2 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
           Specifications
         </h2>
         <div className="flex items-center gap-2">
@@ -439,7 +439,7 @@ const Specifications = ({
               variant="outline"
               onClick={onEnrich}
               disabled={isEnriching || isEditMode}
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50"
+              className="flex items-center gap-2 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-zinc-50"
             >
               {isEnriching ? (
                 <>
@@ -459,14 +459,14 @@ const Specifications = ({
               <Button
                 variant="default"
                 onClick={handleSave}
-                className="bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-200"
+                className="bg-[hsl(var(--background))] text-white hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--background))]"
               >
                 Save
               </Button>
               <Button
                 variant="outline"
                 onClick={handleCancel}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50"
+                className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-zinc-50"
               >
                 Cancel
               </Button>
@@ -477,7 +477,7 @@ const Specifications = ({
               variant="outline"
               onClick={onEdit}
               disabled={isEnriching}
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-50"
+              className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-zinc-50"
             >
               <Pencil className="w-4 h-4" />
             </Button>
@@ -485,11 +485,11 @@ const Specifications = ({
         </div>
       </div>
 
-      <div className="divide-y divide-gray-200 dark:divide-gray-800">
+      <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
         {/* Basic Info */}
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Year</span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">Year</span>
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="number"
@@ -506,8 +506,8 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Make</span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">Make</span>
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="text"
@@ -522,10 +522,10 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             Model
           </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="text"
@@ -540,10 +540,10 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             Color
           </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="text"
@@ -558,10 +558,10 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             Mileage
           </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <MeasurementInputWithUnit
                 value={
@@ -581,8 +581,8 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">VIN</span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white font-mono pr-3">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">VIN</span>
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white font-mono pr-3">
             {isEditMode ? (
               <input
                 type="text"
@@ -597,10 +597,10 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             Client
           </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <select
                 value={localSpecs.client ?? ""}
@@ -624,10 +624,10 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             Location
           </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="text"
@@ -642,10 +642,10 @@ const Specifications = ({
         </div>
 
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             List Price
           </span>
-          <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
             {isEditMode ? (
               <input
                 type="number"
@@ -674,10 +674,10 @@ const Specifications = ({
 
         {car.status === "sold" && (
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
               Sold Price
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+            <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
               {isEditMode ? (
                 <input
                   type="number"
@@ -709,10 +709,10 @@ const Specifications = ({
         {car.engine && (
           <>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Engine Type
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <input
                     type="text"
@@ -728,10 +728,10 @@ const Specifications = ({
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Displacement
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
@@ -755,10 +755,10 @@ const Specifications = ({
             {car.engine.power && (
               <>
                 <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                     Power Output
                   </span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                  <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                     {car.engine.power.hp} hp / {car.engine.power.kW} kW /{" "}
                     {car.engine.power.ps} ps
                   </span>
@@ -768,10 +768,10 @@ const Specifications = ({
             {car.engine.torque &&
               (car.engine.torque["lb-ft"] > 0 || car.engine.torque.Nm > 0) && (
                 <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                     Torque
                   </span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                  <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                     {car.engine.torque["lb-ft"]} lb-ft / {car.engine.torque.Nm}{" "}
                     Nm
                   </span>
@@ -779,10 +779,10 @@ const Specifications = ({
               )}
             {car.engine.features && car.engine.features.length > 0 && (
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                   Engine Features
                 </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                   {car.engine.features.join(", ")}
                 </span>
               </div>
@@ -795,10 +795,10 @@ const Specifications = ({
           <>
             {car.manufacturing.series && (
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                   Series
                 </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                   {isEditMode ? (
                     <input
                       type="text"
@@ -824,10 +824,10 @@ const Specifications = ({
             )}
             {car.manufacturing.trim && (
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                   Trim
                 </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                   {isEditMode ? (
                     <input
                       type="text"
@@ -853,10 +853,10 @@ const Specifications = ({
             )}
             {car.manufacturing.bodyClass && (
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                   Body Class
                 </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+                <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                   {isEditMode ? (
                     <input
                       type="text"
@@ -885,10 +885,10 @@ const Specifications = ({
         {/* Additional Vehicle Info */}
         {car.doors && (
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
               Number of Doors
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+            <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
               {isEditMode ? (
                 <input
                   type="number"
@@ -906,10 +906,10 @@ const Specifications = ({
         {/* Safety Features */}
         {car.safety?.tpms && (
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
               TPMS Type
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+            <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
               {isEditMode ? (
                 <input
                   type="text"
@@ -936,10 +936,10 @@ const Specifications = ({
         {car.dimensions && (
           <>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Length
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
@@ -962,10 +962,10 @@ const Specifications = ({
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Width
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
@@ -988,10 +988,10 @@ const Specifications = ({
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Height
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
@@ -1014,10 +1014,10 @@ const Specifications = ({
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Wheelbase
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
@@ -1040,10 +1040,10 @@ const Specifications = ({
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 GVWR
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <MeasurementInputWithUnit
                     value={
@@ -1072,10 +1072,10 @@ const Specifications = ({
         {car.interior_features && (
           <>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Interior Color
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <input
                     type="text"
@@ -1093,10 +1093,10 @@ const Specifications = ({
               </span>
             </div>
             <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                 Seats
               </span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+              <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
                 {isEditMode ? (
                   <input
                     type="number"
@@ -1124,10 +1124,10 @@ const Specifications = ({
         {/* Transmission */}
         {car.transmission && (
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
               Transmission Type
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white pr-3">
+            <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white pr-3">
               {isEditMode ? (
                 <input
                   type="text"
@@ -1152,7 +1152,7 @@ const Specifications = ({
 
         {/* Description */}
         <div className="flex flex-col px-3 py-2">
-          <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+          <span className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] mb-2">
             Description
           </span>
           <div className="w-full">
@@ -1166,7 +1166,7 @@ const Specifications = ({
                 placeholder="Enter car description..."
               />
             ) : (
-              <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+              <p className="text-sm text-[hsl(var(--foreground))] dark:text-white whitespace-pre-wrap">
                 {car.description || "No description available"}
               </p>
             )}

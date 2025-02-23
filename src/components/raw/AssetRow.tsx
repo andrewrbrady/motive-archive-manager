@@ -22,12 +22,12 @@ interface AssetRowProps {
 
 const AssetRow: React.FC<AssetRowProps> = ({ asset, onDelete }) => {
   return (
-    <tr className="bg-white border-b hover:bg-gray-50">
-      <td className="px-6 py-4 font-medium text-gray-900">
+    <tr className="bg-[var(--background-primary)] border-b hover:bg-[hsl(var(--background))]">
+      <td className="px-6 py-4 font-medium text-[hsl(var(--foreground))]">
         <div className="flex items-center space-x-2">
           <Link
             href={`/raw/${asset._id}`}
-            className="flex-grow hover:text-blue-600"
+            className="flex-grow hover:text-info-600"
           >
             {asset.name}
           </Link>
@@ -37,7 +37,7 @@ const AssetRow: React.FC<AssetRowProps> = ({ asset, onDelete }) => {
         <div className="flex items-center space-x-2">
           <Link
             href={`/raw/${asset._id}`}
-            className="flex-grow hover:text-blue-600"
+            className="flex-grow hover:text-info-600"
           >
             {asset.description}
           </Link>
@@ -55,14 +55,14 @@ const AssetRow: React.FC<AssetRowProps> = ({ asset, onDelete }) => {
         <div className="flex space-x-2">
           <Link
             href={`/raw/${asset._id}`}
-            className="text-gray-500 hover:text-blue-600"
+            className="text-[hsl(var(--foreground-muted))] hover:text-info-600"
             title="Edit asset"
           >
             <PencilIcon className="h-4 w-4" />
           </Link>
           <button
             onClick={() => onDelete(asset._id)}
-            className="text-red-500 hover:text-red-700"
+            className="text-destructive-500 hover:text-destructive-700"
             title="Delete asset"
           >
             <TrashIcon className="h-4 w-4" />

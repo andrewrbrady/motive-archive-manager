@@ -24,7 +24,7 @@ const THEME_COLORS = {
   "var(--background-secondary)": "var(--background-secondary)",
   "var(--background-tertiary)": "var(--background-tertiary)",
   "var(--text-primary)": "var(--text-primary)",
-  "var(--text-secondary)": "var(--text-secondary)",
+  "text-zinc-400 dark:text-zinc-500": "text-zinc-400 dark:text-zinc-500",
   "var(--text-tertiary)": "var(--text-tertiary)",
 } as const;
 

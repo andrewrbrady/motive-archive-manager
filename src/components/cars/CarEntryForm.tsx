@@ -388,20 +388,20 @@ export default function CarEntryForm({
             {positionErrors && (
               <div className="mt-2 text-sm">
                 <p className="font-medium">Position-specific details:</p>
-                <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1">
+                <pre className="bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] p-2 rounded mt-1">
                   {positionErrors}
                 </pre>
               </div>
             )}
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+          <div className="border-t border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] pt-2">
             <p className="font-medium mb-1">Suggested correction:</p>
-            <div className="font-mono bg-gray-100 dark:bg-gray-800 p-2 rounded">
+            <div className="font-mono bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] p-2 rounded">
               {vinDiff.map((char, i) => (
                 <span
                   key={i}
                   className={
-                    char.changed ? "bg-yellow-200 dark:bg-yellow-900" : ""
+                    char.changed ? "bg-warning-200 dark:bg-warning-900" : ""
                   }
                   title={char.changed ? "Changed character" : ""}
                 >
@@ -423,13 +423,13 @@ export default function CarEntryForm({
                 toast.success("VIN updated with suggestion", { id: toastId });
                 decodeVinWithoutCorrections();
               }}
-              className="px-2 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+              className="px-2 py-1 text-sm bg-success-500 text-white rounded hover:bg-success-600"
             >
               Use Suggested
             </button>
             <button
               onClick={() => toast.dismiss(toastId)}
-              className="px-2 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+              className="px-2 py-1 text-sm bg-[hsl(var(--background))] text-white rounded hover:bg-[hsl(var(--background))]"
             >
               Keep Current
             </button>
@@ -451,7 +451,7 @@ export default function CarEntryForm({
             ))}
           </ul>
           {positionErrors && (
-            <pre className="text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1">
+            <pre className="text-sm bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] p-2 rounded mt-1">
               {positionErrors}
             </pre>
           )}
@@ -474,7 +474,7 @@ export default function CarEntryForm({
               <li key={code}>{errorMessages[code] || `Error ${code}`}</li>
             ))}
           </ul>
-          <p className="text-sm mt-2 text-red-500">
+          <p className="text-sm mt-2 text-destructive-500">
             Unable to retrieve basic vehicle information.
           </p>
         </div>,

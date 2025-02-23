@@ -187,18 +187,18 @@ const AddAssetPage: React.FC = () => {
         <h1 className="text-3xl font-bold mb-6 text-center">Add New Asset</h1>
 
         {error && (
-          <div className="mb-4 p-4 text-red-700 bg-red-100 border border-red-400 rounded">
+          <div className="mb-4 p-4 text-destructive-700 bg-destructive-100 border border-destructive-400 rounded">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-4 text-green-700 bg-green-100 border border-green-400 rounded">
+          <div className="mb-4 p-4 text-success-700 bg-success-100 border border-success-400 rounded">
             {success}
           </div>
         )}
 
-        <div className="mb-8 bg-white shadow-md rounded-lg p-6">
+        <div className="mb-8 bg-[var(--background-primary)] shadow-md rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">Batch Import</h2>
           <div className="space-y-4">
             <label className="block">
@@ -207,14 +207,14 @@ const AddAssetPage: React.FC = () => {
                 type="file"
                 accept=".csv"
                 onChange={handleCSVUpload}
-                className="mt-1 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                className="mt-1 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-info-50 file:text-info-700 hover:file:bg-info-100"
                 disabled={loading}
               />
             </label>
             {uploadProgress > 0 && (
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="w-full bg-[hsl(var(--background))] rounded-full h-2.5">
                 <div
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                  className="bg-info-600 h-2.5 rounded-full transition-all duration-500"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -224,10 +224,10 @@ const AddAssetPage: React.FC = () => {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-[hsl(var(--border-primary))]"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-gray-100 text-gray-500">
+            <span className="px-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground-muted))]">
               Or add manually
             </span>
           </div>
@@ -235,7 +235,7 @@ const AddAssetPage: React.FC = () => {
 
         <form
           onSubmit={handleSubmit}
-          className="mt-8 space-y-6 bg-white shadow-md rounded-lg p-6"
+          className="mt-8 space-y-6 bg-[var(--background-primary)] shadow-md rounded-lg p-6"
         >
           <div>
             <label className="block text-sm font-medium">Name</label>
@@ -244,7 +244,7 @@ const AddAssetPage: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-info-500"
             />
           </div>
           <div>
@@ -253,7 +253,7 @@ const AddAssetPage: React.FC = () => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
-              className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-info-500"
             />
           </div>
           <div>
@@ -269,7 +269,7 @@ const AddAssetPage: React.FC = () => {
                       handleLocationChange(index, "key", e.target.value)
                     }
                     required
-                    className="w-1/2 border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-1/2 border rounded p-3 focus:outline-none focus:ring-2 focus:ring-info-500"
                   />
                   <input
                     type="text"
@@ -279,12 +279,12 @@ const AddAssetPage: React.FC = () => {
                       handleLocationChange(index, "value", e.target.value)
                     }
                     required
-                    className="w-1/2 border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-1/2 border rounded p-3 focus:outline-none focus:ring-2 focus:ring-info-500"
                   />
                   <button
                     type="button"
                     onClick={() => removeLocation(index)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-destructive-500 hover:text-destructive-700"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
@@ -293,7 +293,7 @@ const AddAssetPage: React.FC = () => {
               <button
                 type="button"
                 onClick={addLocation}
-                className="flex items-center bg-blue-500 text-white px-2 py-2 rounded hover:bg-blue-600 transition-all duration-200"
+                className="flex items-center bg-info-500 text-white px-2 py-2 rounded hover:bg-info-600 transition-all duration-200"
               >
                 <PlusIcon className="w-4 h-4" />
               </button>
@@ -302,7 +302,7 @@ const AddAssetPage: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition ${
+            className={`w-full bg-destructive-500 text-white px-4 py-2 rounded hover:bg-destructive-600 transition ${
               loading ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >

@@ -98,7 +98,7 @@ export default async function InventoryPage({
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500 text-lg">
+                <p className="text-[hsl(var(--foreground-muted))] text-lg">
                   No vehicles found matching your criteria
                 </p>
               </div>

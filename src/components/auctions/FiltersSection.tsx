@@ -222,11 +222,11 @@ export function FiltersSection({
             id="noReserve"
             checked={filters.noReserve}
             onChange={(e) => handleFilterChange("noReserve", e.target.checked)}
-            className="h-4 w-4 text-blue-600 dark:text-blue-400 border-gray-300 dark:border-gray-700 rounded focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="h-4 w-4 text-info-600 dark:text-info-400 border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))] rounded focus:ring-info-500 dark:focus:ring-info-400"
           />
           <label
             htmlFor="noReserve"
-            className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+            className="ml-2 block text-sm text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
           >
             No Reserve Only
           </label>

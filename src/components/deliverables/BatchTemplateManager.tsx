@@ -417,7 +417,7 @@ export default function BatchTemplateManager() {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeDeliverable(index)}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-destructive-500 hover:text-destructive-700"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -487,7 +487,7 @@ export default function BatchTemplateManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => startEditing(name)}
-                            className="text-blue-500 hover:text-blue-700"
+                            className="text-info-500 hover:text-info-700"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -495,7 +495,7 @@ export default function BatchTemplateManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => duplicateTemplate(name)}
-                            className="text-green-500 hover:text-green-700"
+                            className="text-success-500 hover:text-success-700"
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -503,7 +503,7 @@ export default function BatchTemplateManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => deleteTemplate(name)}
-                            className="text-red-500 hover:text-red-700"
+                            className="text-destructive-500 hover:text-destructive-700"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

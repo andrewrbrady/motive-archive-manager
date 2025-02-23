@@ -241,20 +241,20 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const getPillColor = (field: string, value: string) => {
     const colors = {
       status: {
-        not_started: "bg-zinc-500 hover:bg-zinc-600",
-        in_progress: "bg-zinc-600 hover:bg-zinc-700",
-        done: "bg-zinc-700 hover:bg-zinc-800",
+        not_started: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
+        in_progress: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
+        done: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
       },
-      platform: "bg-zinc-600 hover:bg-zinc-700",
-      type: "bg-zinc-600 hover:bg-zinc-700",
-      editor: "bg-zinc-600 hover:bg-zinc-700",
+      platform: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
+      type: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
+      editor: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
     };
 
     if (field === "status") return colors.status[value as DeliverableStatus];
     if (field === "platform") return colors.platform;
     if (field === "type") return colors.type;
     if (field === "editor") return colors.editor;
-    return "bg-zinc-500";
+    return "bg-[hsl(var(--background))]";
   };
 
   const handleFieldChange = async (
@@ -367,7 +367,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           handleFieldChange(deliverable, field, newValue);
         }}
       >
-        <SelectTrigger className="w-[180px] border border-zinc-200 dark:border-zinc-800 bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+        <SelectTrigger className="w-[180px] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-transparent hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] transition-colors">
           <SelectValue>{currentLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -420,14 +420,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               </SelectContent>
             </Select>
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-              <Check className="h-4 w-4 text-green-500" />
+              <Check className="h-4 w-4 text-success-500" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setEditingCell(null)}
             >
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-destructive-500" />
             </Button>
           </div>
         );
@@ -456,14 +456,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               </SelectContent>
             </Select>
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-              <Check className="h-4 w-4 text-green-500" />
+              <Check className="h-4 w-4 text-success-500" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setEditingCell(null)}
             >
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-destructive-500" />
             </Button>
           </div>
         );
@@ -489,14 +489,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               </SelectContent>
             </Select>
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-              <Check className="h-4 w-4 text-green-500" />
+              <Check className="h-4 w-4 text-success-500" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setEditingCell(null)}
             >
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-destructive-500" />
             </Button>
           </div>
         );
@@ -512,14 +512,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               className="w-[180px]"
             />
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-              <Check className="h-4 w-4 text-green-500" />
+              <Check className="h-4 w-4 text-success-500" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setEditingCell(null)}
             >
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-destructive-500" />
             </Button>
           </div>
         );
@@ -536,14 +536,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               className="w-[180px]"
             />
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-              <Check className="h-4 w-4 text-green-500" />
+              <Check className="h-4 w-4 text-success-500" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setEditingCell(null)}
             >
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-destructive-500" />
             </Button>
           </div>
         );
@@ -557,14 +557,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
             className="w-[180px]"
           />
           <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-            <Check className="h-4 w-4 text-green-500" />
+            <Check className="h-4 w-4 text-success-500" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setEditingCell(null)}
           >
-            <X className="h-4 w-4 text-red-500" />
+            <X className="h-4 w-4 text-destructive-500" />
           </Button>
         </div>
       );
@@ -745,7 +745,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                             onClick={() =>
                               handleDelete(deliverable._id?.toString() || "")
                             }
-                            className="text-red-500 hover:text-red-700"
+                            className="text-destructive-500 hover:text-destructive-700"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

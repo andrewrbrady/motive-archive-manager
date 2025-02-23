@@ -427,7 +427,7 @@ export default function EventBatchManager() {
                           variant="ghost"
                           size="icon"
                           onClick={() => removeEvent(index)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-destructive-500 hover:text-destructive-700"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

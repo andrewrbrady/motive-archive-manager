@@ -171,23 +171,23 @@ export default function EventBatchTemplates({
             </div>
 
             {selectedTemplate && (
-              <div className="space-y-2 border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
+              <div className="space-y-2 border rounded-lg p-4 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]">
                 <h3 className="text-sm font-medium">Events to be created:</h3>
                 <ul className="space-y-2">
                   {templates[selectedTemplate].events.map((event, index) => (
                     <li key={index} className="text-sm flex items-start gap-2">
                       <div className="w-4 h-4 mt-1 flex-shrink-0">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                        <div className="w-2 h-2 bg-info-500 rounded-full" />
                       </div>
                       <div>
                         <span className="font-medium">
                           {event.type.replace(/_/g, " ")}
                         </span>
-                        <span className="text-gray-500 dark:text-gray-400">
+                        <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                           {" - "}
                           {event.description}
                         </span>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                           {event.daysFromStart === 0
                             ? "Starts on base date"
                             : `Starts ${event.daysFromStart} days from base date`}

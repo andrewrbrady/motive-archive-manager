@@ -107,7 +107,7 @@ export const ImageMetadataEditor: React.FC<ImageMetadataEditorProps> = ({
                 type="text"
                 value={key}
                 disabled
-                className="px-2 py-1 border rounded bg-gray-50"
+                className="px-2 py-1 border rounded bg-[hsl(var(--background))]"
               />
               <input
                 type="text"
@@ -119,7 +119,7 @@ export const ImageMetadataEditor: React.FC<ImageMetadataEditorProps> = ({
               />
               <button
                 onClick={() => handleDeleteMetadata(key as MetadataKey)}
-                className="p-1 text-red-500 hover:bg-red-50 rounded"
+                className="p-1 text-destructive-500 hover:bg-destructive-50 rounded"
                 disabled={isLoading}
               >
                 <X className="w-4 h-4" />
@@ -150,7 +150,7 @@ export const ImageMetadataEditor: React.FC<ImageMetadataEditorProps> = ({
         <button
           onClick={handleAddMetadata}
           disabled={!newKey || !newValue || isLoading}
-          className="p-1 text-blue-500 hover:bg-blue-50 rounded disabled:opacity-50"
+          className="p-1 text-info-500 hover:bg-info-50 rounded disabled:opacity-50"
         >
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin" />

@@ -17,7 +17,7 @@ export default function ViewModeSelector({ viewMode }: ViewModeSelectorProps) {
 
   return (
     <select
-      className="form-select rounded-md border-gray-300"
+      className="form-select rounded-md border-[hsl(var(--border-primary))]"
       value={viewMode}
       onChange={(e) => handleViewModeChange(e.target.value)}
     >

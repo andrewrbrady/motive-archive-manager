@@ -21,10 +21,10 @@ export function PageTitle({
         className
       )}
     >
-      <h1 className="text-lg uppercase tracking-wide font-medium text-gray-900 dark:text-gray-100">
+      <h1 className="text-lg uppercase tracking-wide font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
         {title}{" "}
         {count !== undefined && (
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
             ({count.toLocaleString()})
           </span>
         )}

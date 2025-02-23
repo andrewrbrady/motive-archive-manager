@@ -82,13 +82,13 @@ export function ImageFilterControls({
   };
 
   return (
-    <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm p-3">
-      <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-gray-800">
+    <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg shadow-sm p-3">
+      <div className="grid grid-cols-4 divide-x divide-zinc-200 dark:divide-zinc-800">
         {/* Angle Filter */}
         <div className="px-4 first:pl-0 last:pr-0">
           <div className="flex items-center gap-1.5 mb-2">
-            <Compass className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-            <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+            <Compass className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+            <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
               Angle
             </span>
           </div>
@@ -100,8 +100,8 @@ export function ImageFilterControls({
                 className={cn(
                   "px-2 py-1 rounded-md text-xs font-medium transition-colors",
                   filters.angle === angle
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                    : "bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                    ? "bg-[hsl(var(--background))] dark:bg-[var(--background-primary)] text-white dark:text-[hsl(var(--foreground))]"
+                    : "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))]"
                 )}
               >
                 {angle}
@@ -110,7 +110,7 @@ export function ImageFilterControls({
             {filters.angle && (
               <button
                 onClick={() => handleFilterChange("angle", undefined)}
-                className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                className="px-2 py-1 rounded-md text-xs font-medium bg-destructive-100 dark:bg-destructive-900 bg-opacity-30 text-destructive-600 dark:text-destructive-400 hover:bg-destructive-200 dark:hover:bg-destructive-900/50 transition-colors"
               >
                 Clear
               </button>
@@ -121,8 +121,8 @@ export function ImageFilterControls({
         {/* View Filter */}
         <div className="px-4 first:pl-0 last:pr-0">
           <div className="flex items-center gap-1.5 mb-2">
-            <Eye className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-            <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+            <Eye className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+            <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
               View
             </span>
           </div>
@@ -134,8 +134,8 @@ export function ImageFilterControls({
                 className={cn(
                   "px-2 py-1 rounded-md text-xs font-medium transition-colors",
                   filters.view === view
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                    : "bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                    ? "bg-[hsl(var(--background))] dark:bg-[var(--background-primary)] text-white dark:text-[hsl(var(--foreground))]"
+                    : "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))]"
                 )}
               >
                 {view}
@@ -144,7 +144,7 @@ export function ImageFilterControls({
             {filters.view && (
               <button
                 onClick={() => handleFilterChange("view", undefined)}
-                className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                className="px-2 py-1 rounded-md text-xs font-medium bg-destructive-100 dark:bg-destructive-900 bg-opacity-30 text-destructive-600 dark:text-destructive-400 hover:bg-destructive-200 dark:hover:bg-destructive-900/50 transition-colors"
               >
                 Clear
               </button>
@@ -155,8 +155,8 @@ export function ImageFilterControls({
         {/* Time of Day Filter */}
         <div className="px-4 first:pl-0 last:pr-0">
           <div className="flex items-center gap-1.5 mb-2">
-            <Sun className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-            <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+            <Sun className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+            <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
               Time of Day
             </span>
           </div>
@@ -168,8 +168,8 @@ export function ImageFilterControls({
                 className={cn(
                   "px-2 py-1 rounded-md text-xs font-medium transition-colors",
                   filters.tod === tod
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                    : "bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                    ? "bg-[hsl(var(--background))] dark:bg-[var(--background-primary)] text-white dark:text-[hsl(var(--foreground))]"
+                    : "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))]"
                 )}
               >
                 {tod}
@@ -178,7 +178,7 @@ export function ImageFilterControls({
             {filters.tod && (
               <button
                 onClick={() => handleFilterChange("tod", undefined)}
-                className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                className="px-2 py-1 rounded-md text-xs font-medium bg-destructive-100 dark:bg-destructive-900 bg-opacity-30 text-destructive-600 dark:text-destructive-400 hover:bg-destructive-200 dark:hover:bg-destructive-900/50 transition-colors"
               >
                 Clear
               </button>
@@ -189,8 +189,8 @@ export function ImageFilterControls({
         {/* Movement Filter */}
         <div className="px-4 first:pl-0 last:pr-0">
           <div className="flex items-center gap-1.5 mb-2">
-            <Move className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-            <span className="text-gray-500 dark:text-gray-400 uppercase text-xs font-medium">
+            <Move className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+            <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
               Movement
             </span>
           </div>
@@ -202,8 +202,8 @@ export function ImageFilterControls({
                 className={cn(
                   "px-2 py-1 rounded-md text-xs font-medium transition-colors",
                   filters.movement === movement
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                    : "bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                    ? "bg-[hsl(var(--background))] dark:bg-[var(--background-primary)] text-white dark:text-[hsl(var(--foreground))]"
+                    : "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))]"
                 )}
               >
                 {movement}
@@ -212,7 +212,7 @@ export function ImageFilterControls({
             {filters.movement && (
               <button
                 onClick={() => handleFilterChange("movement", undefined)}
-                className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                className="px-2 py-1 rounded-md text-xs font-medium bg-destructive-100 dark:bg-destructive-900 bg-opacity-30 text-destructive-600 dark:text-destructive-400 hover:bg-destructive-200 dark:hover:bg-destructive-900/50 transition-colors"
               >
                 Clear
               </button>

@@ -2,40 +2,36 @@
 
 /* Calendar container */
 .events-calendar {
-  @apply text-zinc-900 dark:text-zinc-100;
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
   position: relative;
   height: 100%;
   overflow: hidden;
-  --border-subtle: rgba(161, 161, 170, 0.15);
-  --border-very-subtle: rgba(161, 161, 170, 0.1);
 }
 
 .dark .events-calendar {
-  --border-subtle: rgba(244, 244, 245, 0.1);
-  --border-very-subtle: rgba(244, 244, 245, 0.05);
 }
 
 /* Month view optimizations */
 .events-calendar .rbc-month-view {
-  @apply border-zinc-100 dark:border-zinc-800;
+  @apply border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
   border-radius: 4px;
   border-width: 1px;
 }
 
 /* Cell borders */
 .events-calendar .rbc-month-row + .rbc-month-row {
-  @apply border-t border-zinc-200 dark:border-zinc-800;
+  @apply border-t border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .events-calendar .rbc-day-bg + .rbc-day-bg {
-  @apply border-l border-zinc-200 dark:border-zinc-800;
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 /* Header fixes */
 .events-calendar .rbc-month-header {
   display: flex !important;
   height: 32px !important;
-  @apply border-b border-zinc-200 dark:border-zinc-800;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .events-calendar .rbc-month-header .rbc-header {
@@ -43,23 +39,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
   font-size: 0.75rem;
   border: none;
 }
 
 .events-calendar .rbc-month-header .rbc-header + .rbc-header {
-  @apply border-l border-zinc-100 dark:border-zinc-800/50;
+  @apply border-l border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 
 /* Off-range day styling */
 .events-calendar .rbc-off-range-bg {
-  @apply bg-zinc-100/50 dark:bg-zinc-900/25;
+  @apply bg-[hsl(var(--background))] bg-opacity-50 dark:bg-[hsl(var(--background))] dark:bg-opacity-25;
 }
 
 /* Today cell styling */
 .events-calendar .rbc-today {
-  @apply bg-blue-50/25 dark:bg-blue-900/10;
+  background-color: hsl(var(--info) / 0.1);
+}
+
+.dark .events-calendar .rbc-today {
+  background-color: hsl(var(--info) / 0.05);
 }
 
 /* Row fix */
@@ -72,15 +72,15 @@
 
 /* Agenda view optimizations */
 .events-calendar .rbc-agenda-view {
-  @apply bg-white dark:bg-[var(--background-primary)] border-zinc-200 dark:border-zinc-800;
+  @apply bg-white dark:bg-[var(--background-primary)] border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .events-calendar .rbc-agenda-table {
-  @apply border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[var(--background-primary)];
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-table thead {
-  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium border-zinc-200 dark:border-zinc-800;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .events-calendar .rbc-agenda-table tbody {
@@ -89,16 +89,16 @@
 
 .events-calendar .rbc-agenda-table th,
 .events-calendar .rbc-agenda-table td {
-  @apply border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
   padding: 8px;
 }
 
 .events-calendar .rbc-agenda-date-cell {
-  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 font-medium;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
 }
 
 .events-calendar .rbc-agenda-time-cell {
-  @apply text-zinc-700 dark:text-zinc-300 bg-white dark:bg-[var(--background-primary)];
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] bg-white dark:bg-[var(--background-primary)];
 }
 
 .events-calendar .rbc-agenda-event-cell {
@@ -110,11 +110,11 @@
 }
 
 .events-calendar .rbc-agenda-empty {
-  @apply bg-white dark:bg-[var(--background-primary)] text-zinc-500 dark:text-zinc-400;
+  @apply bg-white dark:bg-[var(--background-primary)] text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))];
 }
 
 .events-calendar .rbc-agenda-view .rbc-header {
-  @apply bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .events-calendar .rbc-agenda-view table.rbc-agenda-table {
@@ -122,11 +122,11 @@
 }
 
 .events-calendar .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
-  @apply border-t border-zinc-200 dark:border-zinc-800;
+  @apply border-t border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .events-calendar .rbc-agenda-view table.rbc-agenda-table tbody > tr:hover td {
-  @apply bg-zinc-50 dark:bg-zinc-900;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
 }
 
 /* Event display optimizations */
@@ -194,7 +194,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  @apply text-zinc-700 dark:text-zinc-300;
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))];
 }
 
 /* Toolbar styles */
@@ -204,7 +204,7 @@
 }
 
 .events-calendar .rbc-toolbar button {
-  @apply bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-md transition-colors;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md transition-colors;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -215,11 +215,11 @@
 }
 
 .events-calendar .rbc-toolbar button:hover {
-  @apply bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
 }
 
 .events-calendar .rbc-toolbar button.rbc-active {
-  @apply bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))];
 }
 
 /* Fullscreen optimizations */
@@ -263,7 +263,7 @@
 
 /* Week view optimizations */
 .events-calendar .rbc-time-view {
-  border: 1px solid var(--border-subtle) !important;
+  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -277,14 +277,14 @@
   position: relative !important;
   z-index: 3 !important;
   background: inherit !important;
-  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-header-content {
   position: relative !important;
   z-index: 3 !important;
   min-height: fit-content !important;
-  @apply border-l border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-header-cell {
@@ -303,7 +303,7 @@
   justify-content: center !important;
   text-align: center !important;
   padding: 4px !important;
-  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-header:last-child {
@@ -311,7 +311,7 @@
 }
 
 .events-calendar .rbc-header .rbc-button-link {
-  @apply text-zinc-600 dark:text-zinc-400 text-sm font-normal;
+  @apply text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] text-sm font-normal;
   width: 100%;
   padding: 4px;
 }
@@ -323,36 +323,36 @@
   min-height: fit-content !important;
   height: auto !important;
   margin-bottom: 8px !important;
-  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-header.rbc-overflowing {
-  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-header .rbc-row-bg {
-  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-header .rbc-day-bg + .rbc-day-bg {
-  @apply border-l border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 /* Time slot and vertical border styling */
 .events-calendar .rbc-time-view .rbc-day-slot {
-  @apply border-l border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-content > .rbc-time-gutter {
-  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-time-header-gutter {
-  @apply border-r border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 .events-calendar .rbc-day-slot .rbc-time-slot {
-  @apply border-zinc-200/20 dark:border-zinc-700/20;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
   border-top: 1px solid;
   min-height: 30px;
 }
@@ -362,17 +362,17 @@
 }
 
 .events-calendar .rbc-time-slot {
-  @apply text-zinc-600 dark:text-zinc-400;
+  @apply text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))];
 }
 
 /* Time label styling */
 .events-calendar .rbc-time-slot .rbc-label {
-  @apply text-zinc-400 dark:text-zinc-600 text-xs font-normal;
+  @apply text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-subtle))] text-xs font-normal;
   padding-right: 8px;
 }
 
 .events-calendar .rbc-timeslot-group {
-  @apply border-b border-zinc-200/20 dark:border-zinc-700/20 !important;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
 }
 
 /* Event container z-index adjustments */

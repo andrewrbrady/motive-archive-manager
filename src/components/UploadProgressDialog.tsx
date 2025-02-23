@@ -54,16 +54,16 @@ export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
   const isProcessing = uploading > 0 || analyzing > 0 || pending > 0;
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-[var(--background-primary)] rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 p-4 space-y-4">
+    <div className="fixed bottom-4 right-4 w-96 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] rounded-lg shadow-lg border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
             {isProcessing ? "Uploading images..." : "Upload complete"}
           </span>
-          <div className="text-xs text-gray-500 dark:text-gray-400 space-x-2">
+          <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] space-x-2">
             {completed > 0 && <span>{completed} completed</span>}
             {errors > 0 && (
-              <span className="text-red-500 dark:text-red-400">
+              <span className="text-destructive-500 dark:text-destructive-400">
                 {errors} failed
               </span>
             )}
@@ -72,17 +72,17 @@ export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
             {pending > 0 && <span>{pending} pending</span>}
           </div>
         </div>
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
           {getOverallProgress()}% Complete
         </span>
       </div>
 
-      <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
+      <div className="w-full bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] rounded-full h-2">
         <div
           className={`h-2 rounded-full transition-all duration-300 ${
             errors > 0
-              ? "bg-red-500 dark:bg-red-600"
-              : "bg-blue-500 dark:bg-blue-600"
+              ? "bg-destructive-500 dark:bg-destructive-600"
+              : "bg-info-500 dark:bg-info-600"
           }`}
           style={{ width: `${getOverallProgress()}%` }}
         />
@@ -94,43 +94,43 @@ export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
             key={index}
             className={`flex items-center justify-between p-2 rounded-md ${
               progress.status === "error"
-                ? "bg-red-50 dark:bg-red-950/30"
+                ? "bg-destructive-50 dark:bg-destructive-950 bg-opacity-30"
                 : progress.status === "complete"
-                ? "bg-green-50 dark:bg-green-950/30"
-                : "bg-gray-50 dark:bg-gray-800/50"
+                ? "bg-success-50 dark:bg-success-950 bg-opacity-30"
+                : "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-50"
             }`}
           >
             <div className="flex items-center gap-2">
               {progress.status === "pending" && (
-                <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600" />
+                <div className="w-4 h-4 rounded-full border-2 border-[hsl(var(--border-primary))] dark:border-zinc-600" />
               )}
               {(progress.status === "uploading" ||
                 progress.status === "analyzing") && (
-                <Loader2 className="w-4 h-4 animate-spin text-blue-500 dark:text-blue-400" />
+                <Loader2 className="w-4 h-4 animate-spin text-info-500 dark:text-info-400" />
               )}
               {progress.status === "complete" && (
-                <Check className="w-4 h-4 text-green-500 dark:text-green-400" />
+                <Check className="w-4 h-4 text-success-500 dark:text-success-400" />
               )}
               {progress.status === "error" && (
-                <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />
+                <AlertTriangle className="w-4 h-4 text-destructive-500 dark:text-destructive-400" />
               )}
               <div className="flex flex-col">
-                <span className="text-sm truncate max-w-[200px] text-gray-700 dark:text-gray-300">
+                <span className="text-sm truncate max-w-[200px] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
                   {progress.fileName}
                 </span>
                 {progress.currentStep && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     {progress.currentStep}
                   </span>
                 )}
               </div>
             </div>
             {progress.error ? (
-              <span className="text-xs text-red-500 dark:text-red-400">
+              <span className="text-xs text-destructive-500 dark:text-destructive-400">
                 {progress.error}
               </span>
             ) : (
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-xs font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
                 {progress.progress}%
               </span>
             )}

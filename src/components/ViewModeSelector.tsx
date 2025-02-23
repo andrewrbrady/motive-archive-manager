@@ -18,13 +18,13 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 bg-white rounded-lg border p-1">
+    <div className="flex items-center gap-2 bg-[var(--background-primary)] rounded-lg border p-1">
       <button
         onClick={() => handleViewChange("grid")}
         className={`p-2 rounded ${
           currentView === "grid"
-            ? "bg-gray-100 text-gray-900"
-            : "text-gray-500 hover:text-gray-900"
+            ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+            : "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))]"
         }`}
         aria-label="Grid view"
       >
@@ -34,8 +34,8 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
         onClick={() => handleViewChange("list")}
         className={`p-2 rounded ${
           currentView === "list"
-            ? "bg-gray-100 text-gray-900"
-            : "text-gray-500 hover:text-gray-900"
+            ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+            : "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))]"
         }`}
         aria-label="List view"
       >

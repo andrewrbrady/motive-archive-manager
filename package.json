@@ -16,7 +16,12 @@
     "create-template": "tsx scripts/create-motive-studio-template.ts",
     "normalize:client-ids": "tsx scripts/normalize-client-ids.ts",
     "transfer-batch-templates": "tsx scripts/transfer-batch-templates.ts",
-    "validate:colors": "tsx scripts/validateColors.ts"
+    "validate:colors": "tsx scripts/validateColors.ts",
+    "theme:search": "tsx scripts/search-colors.ts",
+    "theme:convert": "tsx scripts/convert-colors.ts",
+    "theme:validate": "tsx scripts/validate-theme.ts",
+    "theme:check": "npm run theme:search && npm run theme:validate",
+    "theme:convert-semantic": "tsx scripts/convert-semantic-colors.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",

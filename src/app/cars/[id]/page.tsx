@@ -1257,7 +1257,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
-          <div className="max-w-2xl mx-auto bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded">
+          <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
             {error || "Car not found"}
           </div>
         </main>
@@ -1308,7 +1308,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 <div className="flex justify-end">
                   <button
                     onClick={() => setIsEditMode(!isEditMode)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-600 dark:text-gray-400"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
                   >
                     {isEditMode ? (
                       <>
@@ -1373,9 +1373,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
             </TabsContent>
 
             <TabsContent value="service">
-              <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+              <div className="bg-white dark:bg-[hsl(var(--background))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-lg p-6">
                 <h3 className="text-lg font-medium mb-4">Service History</h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
                   Service history feature coming soon...
                 </p>
               </div>

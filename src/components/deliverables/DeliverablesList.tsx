@@ -440,7 +440,7 @@ export default function DeliverablesList() {
                     {deliverable.car ? (
                       <Link
                         href={`/cars/${deliverable.car._id}`}
-                        className="text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                        className="text-info-600 dark:text-info-400 hover:underline truncate block"
                         title={`${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model}`}
                       >
                         {`${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model}`}
@@ -519,7 +519,7 @@ export default function DeliverablesList() {
                             deliverable.car_id.toString()
                           )
                         }
-                        className="text-red-500 hover:text-red-700"
+                        className="text-destructive-500 hover:text-destructive-700"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

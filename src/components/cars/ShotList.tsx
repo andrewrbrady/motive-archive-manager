@@ -363,13 +363,13 @@ export default function ShotList({ carId }: ShotListProps) {
           <DialogTrigger asChild>
             <Button
               variant="outline"
-              className="border-neutral-800 hover:bg-neutral-900"
+              className="border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
             >
               <FileText className="w-4 h-4 mr-2" />
               Templates
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-neutral-900">
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-[hsl(var(--background))]">
             <DialogHeader>
               <DialogTitle>Shot List Templates</DialogTitle>
             </DialogHeader>
@@ -381,13 +381,13 @@ export default function ShotList({ carId }: ShotListProps) {
           <DialogTrigger asChild>
             <Button
               variant="outline"
-              className="border-neutral-800 hover:bg-neutral-900"
+              className="border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
             >
               <Plus className="w-4 h-4 mr-2" />
               New List
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-neutral-900">
+          <DialogContent className="bg-[hsl(var(--background))]">
             <DialogHeader>
               <DialogTitle>Create New Shot List</DialogTitle>
             </DialogHeader>
@@ -448,7 +448,7 @@ export default function ShotList({ carId }: ShotListProps) {
       {isLoading ? (
         <div className="text-center py-4">Loading shot lists...</div>
       ) : shotLists.length === 0 ? (
-        <div className="text-center py-4 text-neutral-400">
+        <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
           No shot lists yet. Create a new list or use a template to get started.
         </div>
       ) : (
@@ -457,15 +457,15 @@ export default function ShotList({ carId }: ShotListProps) {
             {shotLists.map((list) => (
               <div
                 key={list.id}
-                className="bg-neutral-900 border border-neutral-800 rounded-lg p-4"
+                className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-medium">{list.name}</h4>
-                    <p className="text-sm text-neutral-400">
+                    <p className="text-sm text-[hsl(var(--foreground-muted))]">
                       {list.description}
                     </p>
-                    <p className="text-sm text-neutral-500 mt-1">
+                    <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
                       {list.shots.length} shots
                     </p>
                   </div>
@@ -473,7 +473,7 @@ export default function ShotList({ carId }: ShotListProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="hover:bg-neutral-800"
+                      className="hover:bg-[hsl(var(--background))]"
                       onClick={() => handleDeleteList(list.id)}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -483,7 +483,7 @@ export default function ShotList({ carId }: ShotListProps) {
                 <div className="mt-4">
                   <Button
                     variant="outline"
-                    className="w-full border-neutral-800 hover:bg-neutral-800"
+                    className="w-full border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
                     onClick={() => handleViewDetails(list)}
                   >
                     View Details
@@ -494,10 +494,10 @@ export default function ShotList({ carId }: ShotListProps) {
           </div>
 
           <Dialog open={showDetails} onOpenChange={handleCloseDetails}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-neutral-900">
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-[hsl(var(--background))]">
               <DialogHeader>
                 <DialogTitle>{selectedList?.name}</DialogTitle>
-                <p className="text-sm text-neutral-400">
+                <p className="text-sm text-[hsl(var(--foreground-muted))]">
                   {selectedList?.description}
                 </p>
               </DialogHeader>
@@ -512,7 +512,7 @@ export default function ShotList({ carId }: ShotListProps) {
                         Add Shot
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-neutral-900">
+                    <DialogContent className="bg-[hsl(var(--background))]">
                       <DialogHeader>
                         <DialogTitle>
                           {editingShot ? "Edit Shot" : "Add New Shot"}
@@ -531,7 +531,7 @@ export default function ShotList({ carId }: ShotListProps) {
                                 <FormLabel>Title</FormLabel>
                                 <FormControl>
                                   <Input
-                                    className="bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                                     placeholder="e.g., Front 3/4 View"
                                     {...field}
                                   />
@@ -547,7 +547,7 @@ export default function ShotList({ carId }: ShotListProps) {
                                 <FormLabel>Description</FormLabel>
                                 <FormControl>
                                   <Textarea
-                                    className="bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                                     placeholder="Describe the shot composition..."
                                     {...field}
                                   />
@@ -563,7 +563,7 @@ export default function ShotList({ carId }: ShotListProps) {
                                 <FormLabel>Angle</FormLabel>
                                 <FormControl>
                                   <Input
-                                    className="bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                                     placeholder="e.g., Low angle, eye level"
                                     {...field}
                                   />
@@ -579,7 +579,7 @@ export default function ShotList({ carId }: ShotListProps) {
                                 <FormLabel>Lighting</FormLabel>
                                 <FormControl>
                                   <Input
-                                    className="bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                                     placeholder="e.g., Natural, Studio"
                                     {...field}
                                   />
@@ -595,7 +595,7 @@ export default function ShotList({ carId }: ShotListProps) {
                                 <FormLabel>Additional Notes</FormLabel>
                                 <FormControl>
                                   <Textarea
-                                    className="bg-neutral-800 border-neutral-700 focus:border-neutral-600 focus-visible:ring-neutral-600 focus-visible:ring-1"
+                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
                                     placeholder="Any additional notes or requirements..."
                                     {...field}
                                   />
@@ -618,7 +618,7 @@ export default function ShotList({ carId }: ShotListProps) {
                   {selectedList?.shots.map((shot) => (
                     <div
                       key={shot.id}
-                      className={`bg-neutral-900 border border-neutral-800 rounded-lg p-4 ${
+                      className={`bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 ${
                         shot.completed ? "opacity-75" : ""
                       }`}
                     >
@@ -628,19 +628,19 @@ export default function ShotList({ carId }: ShotListProps) {
                             onClick={() => handleToggleComplete(shot)}
                             className={`w-5 h-5 rounded border ${
                               shot.completed
-                                ? "bg-neutral-700 border-neutral-600"
-                                : "border-neutral-700"
+                                ? "bg-[hsl(var(--background))] border-zinc-600"
+                                : "border-[hsl(var(--border-subtle))]"
                             }`}
                           >
                             {shot.completed && (
-                              <span className="text-neutral-200 flex items-center justify-center">
+                              <span className="text-zinc-200 flex items-center justify-center">
                                 ✓
                               </span>
                             )}
                           </button>
                           <div>
                             <h4 className="font-medium">{shot.title}</h4>
-                            <p className="text-sm text-neutral-400">
+                            <p className="text-sm text-[hsl(var(--foreground-muted))]">
                               {shot.description}
                             </p>
                           </div>
@@ -663,7 +663,7 @@ export default function ShotList({ carId }: ShotListProps) {
                         </div>
                       </div>
                       {(shot.angle || shot.lighting || shot.notes) && (
-                        <div className="mt-3 text-sm text-neutral-400 space-y-1">
+                        <div className="mt-3 text-sm text-[hsl(var(--foreground-muted))] space-y-1">
                           {shot.angle && <p>Angle: {shot.angle}</p>}
                           {shot.lighting && <p>Lighting: {shot.lighting}</p>}
                           {shot.notes && <p>Notes: {shot.notes}</p>}

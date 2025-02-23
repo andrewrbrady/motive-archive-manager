@@ -62,6 +62,13 @@ const localizer = dateFnsLocalizer({
 
 const DragAndDropCalendar = withDragAndDrop(Calendar);
 
+const statusColors = {
+  not_started: "var(--destructive)",
+  in_progress: "var(--warning)",
+  completed: "var(--success)",
+  default: "var(--zinc-500)",
+};
+
 export default function DeliverablesCalendar() {
   const [deliverables, setDeliverables] = useState<DeliverableWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -299,7 +306,7 @@ export default function DeliverablesCalendar() {
     return {
       className: cn(
         "transition-colors",
-        isToday && "today-cell bg-zinc-50 dark:bg-zinc-900"
+        isToday && "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
       ),
     };
   };
@@ -493,7 +500,7 @@ export default function DeliverablesCalendar() {
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="animate-pulse text-zinc-500 dark:text-zinc-400">
+        <div className="animate-pulse text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
           Loading calendar...
         </div>
       </div>
@@ -506,7 +513,7 @@ export default function DeliverablesCalendar() {
       className={cn(
         "relative calendar-container",
         isFullscreen ? "h-screen" : "h-[calc(100vh-12rem)]",
-        "bg-white dark:bg-zinc-950"
+        "bg-[var(--background-primary)] dark:bg-[hsl(var(--background))]"
       )}
     >
       <div className="mb-4 space-y-4">

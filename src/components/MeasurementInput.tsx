@@ -36,12 +36,12 @@ export default function MeasurementInput({
         value={value.value === null ? "" : value.value}
         onChange={handleValueChange}
         placeholder={placeholder}
-        className="flex-1 bg-white border rounded px-2 py-1"
+        className="flex-1 bg-[var(--background-primary)] border rounded px-2 py-1"
       />
       <select
         value={value.unit}
         onChange={handleUnitChange}
-        className="bg-white border rounded px-2 py-1 text-sm"
+        className="bg-[var(--background-primary)] border rounded px-2 py-1 text-sm"
       >
         {availableUnits.map((unit) => (
           <option key={unit} value={unit}>

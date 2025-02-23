@@ -133,8 +133,8 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
   return (
     <div>
       <div className="overflow-x-auto shadow-md rounded-lg">
-        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-          <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-background">
+        <table className="w-full text-sm text-left text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+          <thead className="text-xs text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] uppercase bg-background">
             <tr>
               <th className="px-6 py-3">Date</th>
               <th className="px-6 py-3">Merchant</th>
@@ -144,7 +144,7 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
           </thead>
           <tbody>
             {documents.map((doc) => (
-              <tr key={doc._id} className="bg-white border-b hover:bg-gray-50">
+              <tr key={doc._id} className="bg-[var(--background-primary)] border-b hover:bg-[hsl(var(--background))]">
                 <td className="px-6 py-4">
                   {format(new Date(doc.transaction.date), "MMM d, yyyy")}
                 </td>
@@ -158,7 +158,7 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
                       setDocumentToEdit(doc);
                       setIsEditModalOpen(true);
                     }}
-                    className="text-blue-600 hover:text-blue-900"
+                    className="text-info-600 hover:text-info-900"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
@@ -167,7 +167,7 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
                       setDocumentToDelete(doc._id);
                       setIsDeleteModalOpen(true);
                     }}
-                    className="text-red-600 hover:text-red-900"
+                    className="text-destructive-600 hover:text-destructive-900"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -181,33 +181,33 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
       {/* Add Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-[var(--background-primary)] rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Add New Document</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                   Merchant Name
                 </label>
                 <input
                   type="text"
                   name="merchantName"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-[hsl(var(--border-primary))] px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                   Date
                 </label>
                 <input
                   type="date"
                   name="date"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-[hsl(var(--border-primary))] px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                   Total
                 </label>
                 <input
@@ -215,20 +215,20 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
                   name="total"
                   step="0.01"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-[hsl(var(--border-primary))] px-3 py-2"
                 />
               </div>
               <div className="flex justify-end space-x-2 mt-4">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-100"
+                  className="px-4 py-2 border rounded-md hover:bg-[hsl(var(--background))]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-info-600 text-white rounded-md hover:bg-info-700"
                 >
                   Create
                 </button>
@@ -241,11 +241,11 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
       {/* Edit Modal */}
       {isEditModalOpen && documentToEdit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-[var(--background-primary)] rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Edit Document</h3>
             <form onSubmit={handleUpdate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                   Merchant Name
                 </label>
                 <input
@@ -253,11 +253,11 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
                   name="merchantName"
                   defaultValue={documentToEdit.merchant.name}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-[hsl(var(--border-primary))] px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                   Date
                 </label>
                 <input
@@ -265,11 +265,11 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
                   name="date"
                   defaultValue={documentToEdit.transaction.date.split("T")[0]}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-[hsl(var(--border-primary))] px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[hsl(var(--foreground))]">
                   Total
                 </label>
                 <input
@@ -278,20 +278,20 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
                   step="0.01"
                   defaultValue={documentToEdit.transaction.total}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-[hsl(var(--border-primary))] px-3 py-2"
                 />
               </div>
               <div className="flex justify-end space-x-2 mt-4">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border rounded-md hover:bg-gray-100"
+                  className="px-4 py-2 border rounded-md hover:bg-[hsl(var(--background))]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-info-600 text-white rounded-md hover:bg-info-700"
                 >
                   Update
                 </button>
@@ -304,22 +304,22 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-[var(--background-primary)] rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Delete Document</h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-[hsl(var(--foreground-subtle))] mb-4">
               Are you sure you want to delete this document? This action cannot
               be undone.
             </p>
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 border rounded-md hover:bg-gray-100"
+                className="px-4 py-2 border rounded-md hover:bg-[hsl(var(--background))]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="px-4 py-2 bg-destructive-600 text-white rounded-md hover:bg-destructive-700"
               >
                 Delete
               </button>

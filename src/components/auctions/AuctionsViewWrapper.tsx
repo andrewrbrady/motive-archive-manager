@@ -18,7 +18,7 @@ export function AuctionsViewWrapper({
   if (!auctions || auctions.length === 0) {
     return (
       <div className="text-center py-10">
-        <p className="text-gray-500">No auctions found</p>
+        <p className="text-[hsl(var(--foreground-muted))]">No auctions found</p>
       </div>
     );
   }

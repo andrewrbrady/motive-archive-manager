@@ -71,7 +71,7 @@ export default function UserDashboard() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="container mx-auto py-8">
-          <div className="animate-pulse text-zinc-500 dark:text-zinc-400">
+          <div className="animate-pulse text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
             Loading user data...
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function UserDashboard() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="container mx-auto py-8">
-          <div className="text-red-500">User not found</div>
+          <div className="text-destructive-500">User not found</div>
         </div>
       </div>
     );
@@ -104,7 +104,7 @@ export default function UserDashboard() {
             <CardContent className="grid gap-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h3 className="font-medium text-gray-500 dark:text-gray-400">
+                  <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     Roles
                   </h3>
                   <div className="mt-1 flex flex-wrap gap-2">
@@ -119,7 +119,7 @@ export default function UserDashboard() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-500 dark:text-gray-400">
+                  <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     Creative Roles
                   </h3>
                   <div className="mt-1 flex flex-wrap gap-2">
@@ -137,7 +137,7 @@ export default function UserDashboard() {
 
               {user.profile?.title && (
                 <div>
-                  <h3 className="font-medium text-gray-500 dark:text-gray-400">
+                  <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     Title
                   </h3>
                   <p>{user.profile.title}</p>
@@ -146,7 +146,7 @@ export default function UserDashboard() {
 
               {user.profile?.bio && (
                 <div>
-                  <h3 className="font-medium text-gray-500 dark:text-gray-400">
+                  <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     Bio
                   </h3>
                   <p>{user.profile.bio}</p>
@@ -156,7 +156,7 @@ export default function UserDashboard() {
               {user.profile?.specialties &&
                 user.profile.specialties.length > 0 && (
                   <div>
-                    <h3 className="font-medium text-gray-500 dark:text-gray-400">
+                    <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Specialties
                     </h3>
                     <div className="mt-1 flex flex-wrap gap-2">
@@ -174,7 +174,7 @@ export default function UserDashboard() {
 
               {user.profile?.portfolio_url && (
                 <div>
-                  <h3 className="font-medium text-gray-500 dark:text-gray-400">
+                  <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     Portfolio
                   </h3>
                   <a

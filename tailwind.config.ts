@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+import tailwindAnimate from "tailwindcss-animate";
+import tailwindTypography from "@tailwindcss/typography";
 
 const config = {
   darkMode: ["class"],
@@ -36,6 +38,18 @@ const config = {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
@@ -53,17 +67,17 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
         zinc: {
-          50: "#fafafa",
-          100: "#f4f4f5",
-          200: "#e4e4e7",
-          300: "#d4d4d8",
-          400: "#a1a1aa",
-          500: "#71717a",
-          600: "#52525b",
-          700: "#3f3f46",
-          800: "#27272a",
-          900: "#18181b",
-          950: "#09090b",
+          50: "hsl(var(--zinc-50))",
+          100: "hsl(var(--zinc-100))",
+          200: "hsl(var(--zinc-200))",
+          300: "hsl(var(--zinc-300))",
+          400: "hsl(var(--zinc-400))",
+          500: "hsl(var(--zinc-500))",
+          600: "hsl(var(--zinc-600))",
+          700: "hsl(var(--zinc-700))",
+          800: "hsl(var(--zinc-800))",
+          900: "hsl(var(--zinc-900))",
+          950: "hsl(var(--zinc-950))",
         },
       },
       borderRadius: {
@@ -112,9 +126,12 @@ const config = {
       opacity: {
         "50": "0.5",
       },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+      },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [tailwindAnimate, tailwindTypography],
 } satisfies Config;
 
 export default config;

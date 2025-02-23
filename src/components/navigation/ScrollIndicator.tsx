@@ -28,8 +28,8 @@ export default function ScrollIndicator({
                 absolute inset-0 rounded-full transition-all duration-300
                 ${
                   activeSection === index
-                    ? "bg-red-500 scale-100"
-                    : "bg-gray-300 scale-75 group-hover:scale-90 group-hover:bg-gray-400"
+                    ? "bg-destructive-500 scale-100"
+                    : "bg-[hsl(var(--background))] scale-75 group-hover:scale-90 group-hover:bg-[hsl(var(--background))]"
                 }
               `}
               layoutId="activeDot"

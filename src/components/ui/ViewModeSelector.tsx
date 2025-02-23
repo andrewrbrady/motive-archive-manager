@@ -19,13 +19,13 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 bg-white dark:bg-[var(--background-primary)] rounded-md border border-gray-200 dark:border-gray-800 p-1">
+    <div className="flex items-center gap-2 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] p-1">
       <button
         onClick={() => handleViewChange("grid")}
         className={`p-1.5 rounded-sm transition-colors ${
           currentView === "grid"
-            ? "bg-gray-100 dark:bg-black text-gray-900 dark:text-gray-100"
-            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "bg-[hsl(var(--background))] dark:bg-black text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+            : "text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))]"
         }`}
         title="Grid View"
       >
@@ -35,8 +35,8 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
         onClick={() => handleViewChange("list")}
         className={`p-1.5 rounded-sm transition-colors ${
           currentView === "list"
-            ? "bg-gray-100 dark:bg-black text-gray-900 dark:text-gray-100"
-            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            ? "bg-[hsl(var(--background))] dark:bg-black text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+            : "text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))]"
         }`}
         title="List View"
       >

@@ -99,7 +99,7 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-[hsl(var(--foreground-muted))]">
             Client not found.
           </div>
         </main>
@@ -137,25 +137,25 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
                 </h2>
                 <div className="space-y-2">
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Email
                     </label>
                     <p>{client.email}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Phone
                     </label>
                     <p>{client.phone}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Business Type
                     </label>
                     <p>{client.businessType}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Status
                     </label>
                     <p className="capitalize">{client.status}</p>
@@ -167,31 +167,31 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
                 <h2 className="text-lg font-semibold mb-4">Address</h2>
                 <div className="space-y-2">
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Street
                     </label>
                     <p>{client.address?.street}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       City
                     </label>
                     <p>{client.address?.city}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       State
                     </label>
                     <p>{client.address?.state}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       ZIP Code
                     </label>
                     <p>{client.address?.zipCode}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Country
                     </label>
                     <p>{client.address?.country}</p>
@@ -205,13 +205,13 @@ export default function ClientDetailsPage({ params }: ClientDetailsProps) {
                 <h2 className="text-lg font-semibold mb-4">Social Media</h2>
                 <div className="space-y-2">
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Instagram
                     </label>
                     <p>{client.socialMedia?.instagram || "Not provided"}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <label className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                       Website
                     </label>
                     <p>{client.socialMedia?.website || "Not provided"}</p>

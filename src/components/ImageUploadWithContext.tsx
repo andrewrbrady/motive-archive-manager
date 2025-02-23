@@ -133,7 +133,7 @@ export default function ImageUploadWithContext({
   return (
     <div className="space-y-6">
       {/* Image Gallery */}
-      <div className="bg-white dark:bg-[var(--background-primary)] border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+      <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4">
         <ImageGallery
           images={images}
           isEditMode={isEditMode}
@@ -168,13 +168,13 @@ export default function ImageUploadWithContext({
               <div className="w-full">
                 <label
                   htmlFor="uploadContext"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  className="block text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] mb-2"
                 >
                   Additional Context
                 </label>
                 <textarea
                   id="uploadContext"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:ring-gray-950 dark:focus:ring-gray-300 focus:border-gray-950 dark:focus:border-gray-300 dark:bg-[var(--background-primary)] dark:text-gray-300"
+                  className="w-full px-3 py-2 border border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))] rounded-md shadow-sm focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:border-zinc-950 dark:focus:border-[hsl(var(--border-primary))] dark:bg-[var(--background-primary)] dark:text-[hsl(var(--foreground-subtle))]"
                   rows={3}
                   placeholder="Add any additional details about the vehicle, location, or specific features you'd like the AI to focus on..."
                   value={context}

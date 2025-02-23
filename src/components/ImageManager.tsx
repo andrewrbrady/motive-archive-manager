@@ -71,32 +71,32 @@ export default function ImageManager({
               {uploadProgress.map((progress) => (
                 <div
                   key={progress.fileName}
-                  className="bg-gray-50 p-3 rounded-lg space-y-2"
+                  className="bg-[hsl(var(--background))] p-3 rounded-lg space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
                       {progress.fileName}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-[hsl(var(--foreground-muted))]">
                       {progress.status === "error"
                         ? "Error"
                         : `${progress.progress}%`}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div className="w-full bg-[hsl(var(--background))] rounded-full h-1.5">
                     <div
                       className={`h-1.5 rounded-full ${
                         progress.status === "error"
-                          ? "bg-red-500"
+                          ? "bg-destructive-500"
                           : progress.status === "complete"
-                          ? "bg-green-500"
-                          : "bg-blue-500"
+                          ? "bg-success-500"
+                          : "bg-info-500"
                       }`}
                       style={{ width: `${progress.progress}%` }}
                     />
                   </div>
                   {progress.status === "error" && (
-                    <p className="text-xs text-red-500">{progress.error}</p>
+                    <p className="text-xs text-destructive-500">{progress.error}</p>
                   )}
                 </div>
               ))}

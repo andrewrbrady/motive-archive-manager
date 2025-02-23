@@ -19,12 +19,12 @@ export default function ScrollDots() {
           <button
             key={index}
             onClick={() => scrollTo(index)}
-            className="relative w-3 h-3 rounded-full bg-gray-300 hover:bg-gray-400 transition-colors"
+            className="relative w-3 h-3 rounded-full bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))] transition-colors"
           >
             {currentSection === index && (
               <motion.div
                 layoutId="activeSection"
-                className="absolute inset-0 bg-red-500 rounded-full"
+                className="absolute inset-0 bg-destructive-500 rounded-full"
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
             )}

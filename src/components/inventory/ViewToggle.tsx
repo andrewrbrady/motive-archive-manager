@@ -24,8 +24,8 @@ export function ViewToggle({ currentView }: ViewToggleProps) {
         href={getViewUrl("grid")}
         className={`p-2 rounded-md ${
           currentView === "grid"
-            ? "bg-gray-100 text-gray-900"
-            : "text-gray-500 hover:text-gray-900"
+            ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+            : "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))]"
         }`}
       >
         <Squares2X2Icon className="h-5 w-5" />
@@ -34,8 +34,8 @@ export function ViewToggle({ currentView }: ViewToggleProps) {
         href={getViewUrl("list")}
         className={`p-2 rounded-md ${
           currentView === "list"
-            ? "bg-gray-100 text-gray-900"
-            : "text-gray-500 hover:text-gray-900"
+            ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+            : "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))]"
         }`}
       >
         <ListBulletIcon className="h-5 w-5" />

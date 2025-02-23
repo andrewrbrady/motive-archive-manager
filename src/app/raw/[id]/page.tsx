@@ -230,7 +230,7 @@ export default function CarPage() {
       <div className="min-h-screen">
         <Navbar />
         <div className="container mx-auto px-4 pt-24">
-          <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="max-w-2xl mx-auto bg-destructive-50 border border-destructive-200 text-destructive-700 px-4 py-3 rounded">
             {error || "Car not found"}
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function CarPage() {
       <main className="container mx-auto px-4 pt-24 pb-12">
         <button
           onClick={() => router.back()}
-          className="mb-4 px-4 py-2 text-gray-600 hover:text-gray-800 flex items-center gap-2"
+          className="mb-4 px-4 py-2 text-[hsl(var(--foreground-subtle))] hover:text-zinc-800 flex items-center gap-2"
         >
           ← Back
         </button>
@@ -255,7 +255,7 @@ export default function CarPage() {
               <h1 className="text-3xl font-bold">
                 {car.year} {car.make} {car.model}
                 {car.type && (
-                  <span className="text-sm uppercase tracking-wider text-gray-500 ml-2 font-medium">
+                  <span className="text-sm uppercase tracking-wider text-[hsl(var(--foreground-muted))] ml-2 font-medium">
                     {car.type}
                   </span>
                 )}
@@ -266,8 +266,8 @@ export default function CarPage() {
                 }
                 className={`px-4 py-2 rounded-lg ${
                   isEditMode
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "border border-gray-300 hover:border-gray-400"
+                    ? "bg-info-500 text-white hover:bg-info-600"
+                    : "border border-[hsl(var(--border-primary))] hover:border-[hsl(var(--border-primary))]"
                 }`}
               >
                 {isEditMode ? "Save Changes" : "Edit"}
@@ -309,7 +309,7 @@ export default function CarPage() {
                             setCar({ ...car, price: e.target.value })
                           }
                           placeholder="Price"
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                         />
                         <input
                           value={car.mileage}
@@ -317,7 +317,7 @@ export default function CarPage() {
                             setCar({ ...car, mileage: e.target.value })
                           }
                           placeholder="Mileage"
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                         />
                         <input
                           value={car.color}
@@ -325,7 +325,7 @@ export default function CarPage() {
                             setCar({ ...car, color: e.target.value })
                           }
                           placeholder="Color"
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                         />
                       </>
                     ) : (
@@ -355,11 +355,11 @@ export default function CarPage() {
                       onChange={(e) =>
                         setCar({ ...car, description: e.target.value })
                       }
-                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                       rows={6}
                     />
                   ) : (
-                    <p className="text-gray-700">{car.description}</p>
+                    <p className="text-[hsl(var(--foreground))]">{car.description}</p>
                   )}
                 </div>
               </div>
@@ -385,7 +385,7 @@ export default function CarPage() {
                             })
                           }
                           placeholder="Engine Type"
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                         />
                         <input
                           value={car.engine?.displacement || ""}
@@ -399,7 +399,7 @@ export default function CarPage() {
                             })
                           }
                           placeholder="Displacement"
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                         />
                         <input
                           value={car.horsepower}
@@ -411,7 +411,7 @@ export default function CarPage() {
                           }
                           type="number"
                           placeholder="Horsepower"
-                          className="w-full p-2 border border-gray-300 rounded-lg"
+                          className="w-full p-2 border border-[hsl(var(--border-primary))] rounded-lg"
                         />
                       </>
                     ) : (
