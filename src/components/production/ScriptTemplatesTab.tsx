@@ -97,7 +97,10 @@ export default function ScriptTemplatesTab() {
     if (templateId && templates.length > 0) {
       const template = templates.find((t) => t.id === templateId);
       if (template) {
-        setSelectedTemplate(template);
+        setSelectedTemplate({
+          ...template,
+          platforms: template.platforms || [],
+        });
       }
     }
   }, [searchParams, templates]);
@@ -231,6 +234,17 @@ export default function ScriptTemplatesTab() {
       console.error("Error duplicating template:", error);
       toast.error("Failed to duplicate template");
     }
+  };
+
+  const handleRowChange = (
+    index: number,
+    field: keyof ScriptRow,
+    value: string
+  ) => {
+    const currentRows = form.getValues("rows") || [];
+    const updatedRows = [...currentRows];
+    updatedRows[index][field] = value;
+    form.setValue("rows", updatedRows);
   };
 
   return (
@@ -600,88 +614,164 @@ export default function ScriptTemplatesTab() {
                           </Button>
                         </div>
                         <div className="space-y-4">
-                          {form.watch("rows")?.map((_, index) => (
-                            <div
-                              key={index}
-                              className="grid gap-4 p-4 border border-[hsl(var(--border))] rounded-lg"
-                            >
-                              <div className="flex justify-between items-center">
-                                <h5 className="font-medium">Row {index + 1}</h5>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveRow(index)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={form.control}
-                                  name={`rows.${index}.time`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Time</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          placeholder="e.g., 0:00-0:05"
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
+                          <div className="border border-[hsl(var(--border))]">
+                            <table className="w-full border-collapse">
+                              <thead className="bg-[hsl(var(--background))]">
+                                <tr>
+                                  <th className="w-28 px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
+                                    Time
+                                  </th>
+                                  <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
+                                    Video
+                                  </th>
+                                  <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
+                                    Audio
+                                  </th>
+                                  <th className="px-3 py-2 text-left border-b border-[hsl(var(--border))] font-medium text-sm">
+                                    GFX
+                                  </th>
+                                  {editingTemplate?.id ===
+                                    selectedTemplate.id && (
+                                    <th className="w-10 px-2 py-2 border-b border-[hsl(var(--border))]"></th>
                                   )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={`rows.${index}.video`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Video</FormLabel>
-                                      <FormControl>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedTemplate.rows.map((row, index) => (
+                                  <tr
+                                    key={row.id || index}
+                                    className="border-b border-[hsl(var(--border))]"
+                                  >
+                                    <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                      {editingTemplate?.id ===
+                                      selectedTemplate.id ? (
                                         <Input
-                                          placeholder="Describe the video content"
-                                          {...field}
+                                          value={row.time}
+                                          onChange={(e) =>
+                                            handleRowChange(
+                                              index,
+                                              "time",
+                                              e.target.value
+                                            )
+                                          }
+                                          className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                         />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={form.control}
-                                  name={`rows.${index}.audio`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Audio</FormLabel>
-                                      <FormControl>
+                                      ) : (
+                                        <span className="text-sm">
+                                          {row.time}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                      {editingTemplate?.id ===
+                                      selectedTemplate.id ? (
                                         <Input
-                                          placeholder="Describe the audio content"
-                                          {...field}
+                                          value={row.video}
+                                          onChange={(e) =>
+                                            handleRowChange(
+                                              index,
+                                              "video",
+                                              e.target.value
+                                            )
+                                          }
+                                          className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                         />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={`rows.${index}.gfx`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Graphics</FormLabel>
-                                      <FormControl>
+                                      ) : (
+                                        <span className="text-sm">
+                                          {row.video}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                      {editingTemplate?.id ===
+                                      selectedTemplate.id ? (
                                         <Input
-                                          placeholder="Describe the graphics"
-                                          {...field}
+                                          value={row.audio}
+                                          onChange={(e) =>
+                                            handleRowChange(
+                                              index,
+                                              "audio",
+                                              e.target.value
+                                            )
+                                          }
+                                          className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
                                         />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
+                                      ) : (
+                                        <span className="text-sm">
+                                          {row.audio}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                      {editingTemplate?.id ===
+                                      selectedTemplate.id ? (
+                                        <Input
+                                          value={row.gfx}
+                                          onChange={(e) =>
+                                            handleRowChange(
+                                              index,
+                                              "gfx",
+                                              e.target.value
+                                            )
+                                          }
+                                          className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
+                                        />
+                                      ) : (
+                                        <span className="text-sm">
+                                          {row.gfx}
+                                        </span>
+                                      )}
+                                    </td>
+                                    {editingTemplate?.id ===
+                                      selectedTemplate.id && (
+                                      <td className="px-2 py-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleRemoveRow(index)}
+                                          className="h-7 px-2 hover:bg-[hsl(var(--background))]"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                                {(!selectedTemplate.rows ||
+                                  selectedTemplate.rows.length === 0) && (
+                                  <tr className="border-b border-[hsl(var(--border))]">
+                                    <td
+                                      colSpan={
+                                        editingTemplate?.id ===
+                                        selectedTemplate.id
+                                          ? 5
+                                          : 4
+                                      }
+                                      className="px-3 py-4 text-center text-sm text-[hsl(var(--foreground-muted))]"
+                                    >
+                                      No rows yet.{" "}
+                                      {editingTemplate?.id ===
+                                        selectedTemplate.id &&
+                                        "Click 'Add Row' to get started."}
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {editingTemplate?.id === selectedTemplate.id && (
+                            <div className="p-4">
+                              <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={handleAddRow}
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Row
+                              </Button>
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     </form>
@@ -699,7 +789,7 @@ export default function ScriptTemplatesTab() {
                         <div className="flex gap-4 mt-2">
                           <div className="text-sm text-[hsl(var(--foreground-muted))]">
                             Platforms:{" "}
-                            {selectedTemplate.platforms
+                            {(selectedTemplate.platforms || [])
                               .map(
                                 (p) =>
                                   PLATFORMS.find(
@@ -750,32 +840,154 @@ export default function ScriptTemplatesTab() {
 
                     <div className="space-y-4">
                       <h3 className="text-lg font-medium">Script Rows</h3>
-                      <div className="grid gap-4">
-                        {selectedTemplate.rows.map((row, index) => (
-                          <div
-                            key={row.id}
-                            className="border border-[hsl(var(--border))] rounded-lg p-4"
-                          >
-                            <div className="grid grid-cols-[100px,1fr] gap-4">
-                              <div className="font-medium">{row.time}</div>
-                              <div className="space-y-2">
-                                <div>
-                                  <span className="font-medium">Video:</span>{" "}
-                                  {row.video}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Audio:</span>{" "}
-                                  {row.audio}
-                                </div>
-                                <div>
-                                  <span className="font-medium">Graphics:</span>{" "}
-                                  {row.gfx}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="border border-[hsl(var(--border))]">
+                        <table className="w-full border-collapse">
+                          <thead className="bg-[hsl(var(--background))]">
+                            <tr>
+                              <th className="w-28 px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
+                                Time
+                              </th>
+                              <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
+                                Video
+                              </th>
+                              <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
+                                Audio
+                              </th>
+                              <th className="px-3 py-2 text-left border-b border-[hsl(var(--border))] font-medium text-sm">
+                                GFX
+                              </th>
+                              {editingTemplate?.id === selectedTemplate.id && (
+                                <th className="w-10 px-2 py-2 border-b border-[hsl(var(--border))]"></th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedTemplate.rows.map((row, index) => (
+                              <tr
+                                key={row.id || index}
+                                className="border-b border-[hsl(var(--border))]"
+                              >
+                                <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                  {editingTemplate?.id ===
+                                  selectedTemplate.id ? (
+                                    <Input
+                                      value={row.time}
+                                      onChange={(e) =>
+                                        handleRowChange(
+                                          index,
+                                          "time",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
+                                    />
+                                  ) : (
+                                    <span className="text-sm">{row.time}</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                  {editingTemplate?.id ===
+                                  selectedTemplate.id ? (
+                                    <Input
+                                      value={row.video}
+                                      onChange={(e) =>
+                                        handleRowChange(
+                                          index,
+                                          "video",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
+                                    />
+                                  ) : (
+                                    <span className="text-sm">{row.video}</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                  {editingTemplate?.id ===
+                                  selectedTemplate.id ? (
+                                    <Input
+                                      value={row.audio}
+                                      onChange={(e) =>
+                                        handleRowChange(
+                                          index,
+                                          "audio",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
+                                    />
+                                  ) : (
+                                    <span className="text-sm">{row.audio}</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
+                                  {editingTemplate?.id ===
+                                  selectedTemplate.id ? (
+                                    <Input
+                                      value={row.gfx}
+                                      onChange={(e) =>
+                                        handleRowChange(
+                                          index,
+                                          "gfx",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="h-7 bg-transparent border-0 p-0 focus-visible:ring-0 placeholder:text-[hsl(var(--foreground-muted))]"
+                                    />
+                                  ) : (
+                                    <span className="text-sm">{row.gfx}</span>
+                                  )}
+                                </td>
+                                {editingTemplate?.id ===
+                                  selectedTemplate.id && (
+                                  <td className="px-2 py-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveRow(index)}
+                                      className="h-7 px-2 hover:bg-[hsl(var(--background))]"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                            {(!selectedTemplate.rows ||
+                              selectedTemplate.rows.length === 0) && (
+                              <tr className="border-b border-[hsl(var(--border))]">
+                                <td
+                                  colSpan={
+                                    editingTemplate?.id === selectedTemplate.id
+                                      ? 5
+                                      : 4
+                                  }
+                                  className="px-3 py-4 text-center text-sm text-[hsl(var(--foreground-muted))]"
+                                >
+                                  No rows yet.{" "}
+                                  {editingTemplate?.id ===
+                                    selectedTemplate.id &&
+                                    "Click 'Add Row' to get started."}
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
+
+                      {editingTemplate?.id === selectedTemplate.id && (
+                        <div className="p-4">
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={handleAddRow}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Row
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
