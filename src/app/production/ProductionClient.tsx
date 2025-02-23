@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import ShotListTemplatesTab from "@/components/production/ShotListTemplatesTab";
+import ScriptTemplatesTab from "@/components/production/ScriptTemplatesTab";
 
 export default function ProductionClient() {
   const router = useRouter();
@@ -55,13 +56,7 @@ export default function ProductionClient() {
             </TabsContent>
 
             <TabsContent value="scripts">
-              <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
-                <h3 className="text-lg font-medium mb-4">Script Templates</h3>
-                <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                  Manage your script templates here. Create and customize
-                  templates for different types of content.
-                </p>
-              </div>
+              <ScriptTemplatesTab />
             </TabsContent>
 
             <TabsContent value="upcoming">

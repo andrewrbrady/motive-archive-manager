@@ -18,14 +18,14 @@ export type Platform =
 export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
 export interface ScriptTemplate {
-  _id?: string;
+  id: string;
   name: string;
   description: string;
   platforms: Platform[];
   aspectRatio: AspectRatio;
   rows: ScriptRow[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function GET() {
@@ -33,7 +33,14 @@ export async function GET() {
     const db = await getDatabase();
     const templates = await db.collection("script_templates").find().toArray();
 
-    return NextResponse.json(templates);
+    // Convert _id to id for frontend compatibility
+    const formattedTemplates = templates.map((template) => ({
+      ...template,
+      id: template._id.toString(),
+      _id: undefined,
+    }));
+
+    return NextResponse.json(formattedTemplates);
   } catch (error) {
     console.error("Error fetching script templates:", error);
     return NextResponse.json(
@@ -46,36 +53,30 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, platforms, aspectRatio, rows } = body;
+    const db = await getDatabase();
 
-    if (!name || !description || !rows || !platforms || !aspectRatio) {
+    const template = {
+      ...body,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const result = await db.collection("script_templates").insertOne(template);
+    const createdTemplate = await db
+      .collection("script_templates")
+      .findOne({ _id: result.insertedId });
+
+    if (!createdTemplate) {
       return NextResponse.json(
-        {
-          error:
-            "Name, description, platforms, aspect ratio, and rows are required",
-        },
-        { status: 400 }
+        { error: "Failed to create script template" },
+        { status: 500 }
       );
     }
 
-    const db = await getDatabase();
-    const result = await db.collection("script_templates").insertOne({
-      name,
-      description,
-      platforms,
-      aspectRatio,
-      rows,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
     return NextResponse.json({
-      _id: result.insertedId.toString(),
-      name,
-      description,
-      platforms,
-      aspectRatio,
-      rows,
+      ...createdTemplate,
+      id: createdTemplate._id.toString(),
+      _id: undefined,
     });
   } catch (error) {
     console.error("Error creating script template:", error);
@@ -89,41 +90,32 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { _id, name, description, platforms, aspectRatio, rows } = body;
-
-    if (!_id || !name || !description || !rows || !platforms || !aspectRatio) {
-      return NextResponse.json(
-        {
-          error:
-            "ID, name, description, platforms, aspect ratio, and rows are required",
-        },
-        { status: 400 }
-      );
-    }
-
+    const { id, ...updateData } = body;
     const db = await getDatabase();
-    const result = await db.collection("script_templates").updateOne(
-      { _id: new ObjectId(_id) },
+
+    const result = await db.collection("script_templates").findOneAndUpdate(
+      { _id: new ObjectId(id) },
       {
         $set: {
-          name,
-          description,
-          platforms,
-          aspectRatio,
-          rows,
-          updatedAt: new Date(),
+          ...updateData,
+          updatedAt: new Date().toISOString(),
         },
-      }
+      },
+      { returnDocument: "after" }
     );
 
-    if (result.matchedCount === 0) {
+    if (!result) {
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      ...result,
+      id: result._id.toString(),
+      _id: undefined,
+    });
   } catch (error) {
     console.error("Error updating script template:", error);
     return NextResponse.json(
@@ -136,9 +128,9 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const templateId = searchParams.get("templateId");
+    const id = searchParams.get("id");
 
-    if (!templateId) {
+    if (!id) {
       return NextResponse.json(
         { error: "Template ID is required" },
         { status: 400 }
@@ -148,7 +140,7 @@ export async function DELETE(request: NextRequest) {
     const db = await getDatabase();
     const result = await db
       .collection("script_templates")
-      .deleteOne({ _id: new ObjectId(templateId) });
+      .deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(
