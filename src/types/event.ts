@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+// Types for event-related data structures
 
 export enum EventType {
   AUCTION_SUBMISSION = "AUCTION_SUBMISSION",
