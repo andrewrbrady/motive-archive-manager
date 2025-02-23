@@ -134,17 +134,16 @@ export default function ScriptTemplatesTab() {
 
   const handleSubmit = async (data: Partial<Template>) => {
     try {
-      const endpoint = editingTemplate
-        ? `/api/script-templates/${editingTemplate.id}`
-        : "/api/script-templates";
+      const endpoint = "/api/script-templates";
       const method = editingTemplate ? "PUT" : "POST";
+      const body = editingTemplate ? { ...data, id: editingTemplate.id } : data;
 
       const response = await fetch(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) throw new Error("Failed to save template");
@@ -192,24 +191,36 @@ export default function ScriptTemplatesTab() {
 
   const handleAddRow = () => {
     const currentRows = form.getValues("rows") || [];
-    form.setValue("rows", [
-      ...currentRows,
-      {
-        id: crypto.randomUUID(),
-        time: "",
-        video: "",
-        audio: "",
-        gfx: "",
-      },
-    ]);
+    const newRow = {
+      id: crypto.randomUUID(),
+      time: "",
+      video: "",
+      audio: "",
+      gfx: "",
+    };
+    form.setValue("rows", [...currentRows, newRow]);
+
+    // Update selected template state
+    if (selectedTemplate && editingTemplate?.id === selectedTemplate.id) {
+      setSelectedTemplate({
+        ...selectedTemplate,
+        rows: [...selectedTemplate.rows, newRow],
+      });
+    }
   };
 
   const handleRemoveRow = (index: number) => {
     const currentRows = form.getValues("rows") || [];
-    form.setValue(
-      "rows",
-      currentRows.filter((_, i) => i !== index)
-    );
+    const updatedRows = currentRows.filter((_, i) => i !== index);
+    form.setValue("rows", updatedRows);
+
+    // Update selected template state
+    if (selectedTemplate && editingTemplate?.id === selectedTemplate.id) {
+      setSelectedTemplate({
+        ...selectedTemplate,
+        rows: updatedRows,
+      });
+    }
   };
 
   const handleDuplicate = async (template: Template) => {
@@ -243,8 +254,19 @@ export default function ScriptTemplatesTab() {
   ) => {
     const currentRows = form.getValues("rows") || [];
     const updatedRows = [...currentRows];
-    updatedRows[index][field] = value;
+    updatedRows[index] = {
+      ...updatedRows[index],
+      [field]: value,
+    };
     form.setValue("rows", updatedRows);
+
+    // Update selected template state
+    if (selectedTemplate && editingTemplate?.id === selectedTemplate.id) {
+      setSelectedTemplate({
+        ...selectedTemplate,
+        rows: updatedRows,
+      });
+    }
   };
 
   return (
