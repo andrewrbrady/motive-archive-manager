@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, Copy } from "lucide-react";
+import { Plus, Edit, Trash2, Copy, Check, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -150,7 +150,11 @@ export default function ShotListTemplatesTab() {
   const handleEdit = (template: Template) => {
     setEditingTemplate(template);
     form.reset(template);
-    setIsCreating(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTemplate(null);
+    form.reset();
   };
 
   const handleAddShot = () => {
@@ -212,9 +216,7 @@ export default function ShotListTemplatesTab() {
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                {editingTemplate ? "Edit Template" : "Create New Template"}
-              </DialogTitle>
+              <DialogTitle>Create New Template</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form
@@ -251,120 +253,8 @@ export default function ShotListTemplatesTab() {
                     </FormItem>
                   )}
                 />
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Shots</h4>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleAddShot}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Shot
-                    </Button>
-                  </div>
-
-                  {form.watch("shots")?.map((_, index) => (
-                    <div
-                      key={index}
-                      className="space-y-4 p-4 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg"
-                    >
-                      <div className="flex justify-between items-center">
-                        <h5 className="font-medium">Shot {index + 1}</h5>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveShot(index)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name={`shots.${index}.title`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Title</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., Front 3/4 View"
-                                {...field}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`shots.${index}.description`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Description</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Describe the shot composition..."
-                                {...field}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`shots.${index}.angle`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Angle</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., Low angle, eye level"
-                                {...field}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`shots.${index}.lighting`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Lighting</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="e.g., Natural, Studio"
-                                {...field}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`shots.${index}.notes`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Additional notes or instructions..."
-                                {...field}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  ))}
-                </div>
-
                 <div className="flex justify-end">
-                  <Button type="submit">
-                    {editingTemplate ? "Update Template" : "Create Template"}
-                  </Button>
+                  <Button type="submit">Create Template</Button>
                 </div>
               </form>
             </Form>
@@ -408,67 +298,232 @@ export default function ShotListTemplatesTab() {
           <div className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
             {selectedTemplate ? (
               <div className="space-y-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-xl font-medium">
-                      {selectedTemplate.name}
-                    </h2>
-                    <p className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
-                      {selectedTemplate.description}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDuplicate(selectedTemplate)}
+                {editingTemplate?.id === selectedTemplate.id ? (
+                  <Form {...form}>
+                    <form
+                      onSubmit={form.handleSubmit(handleSubmit)}
+                      className="space-y-4"
                     >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Duplicate
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(selectedTemplate)}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(selectedTemplate.id)}
-                      className="text-destructive-500 hover:text-destructive-700 hover:bg-destructive-50 dark:hover:bg-destructive-950"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Shots</h3>
-                  <div className="grid gap-4">
-                    {selectedTemplate.shots.map((shot, index) => (
-                      <div
-                        key={index}
-                        className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4 space-y-2"
-                      >
-                        <h4 className="font-medium">{shot.title}</h4>
-                        <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                          {shot.description}
-                        </p>
-                        {(shot.angle || shot.lighting || shot.notes) && (
-                          <div className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] space-y-1 mt-2">
-                            {shot.angle && <p>Angle: {shot.angle}</p>}
-                            {shot.lighting && <p>Lighting: {shot.lighting}</p>}
-                            {shot.notes && <p>Notes: {shot.notes}</p>}
-                          </div>
-                        )}
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input
+                                    className="text-xl font-medium bg-transparent border-none focus:border-none focus-visible:ring-0 px-0"
+                                    {...field}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Textarea
+                                    className="bg-transparent border-none focus:border-none focus-visible:ring-0 px-0 resize-none"
+                                    {...field}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="submit" variant="ghost" size="sm">
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium">Shots</h4>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleAddShot}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Shot
+                          </Button>
+                        </div>
+
+                        {form.watch("shots")?.map((_, index) => (
+                          <div
+                            key={index}
+                            className="space-y-4 p-4 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg"
+                          >
+                            <div className="flex justify-between items-center">
+                              <h5 className="font-medium">Shot {index + 1}</h5>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveShot(index)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+
+                            <FormField
+                              control={form.control}
+                              name={`shots.${index}.title`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="e.g., Front 3/4 View"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`shots.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Describe the shot composition..."
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name={`shots.${index}.angle`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="e.g., Low angle, eye level"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`shots.${index}.lighting`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="e.g., Natural, Studio"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormField
+                              control={form.control}
+                              name={`shots.${index}.notes`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Additional notes or instructions..."
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </form>
+                  </Form>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h2 className="text-xl font-medium">
+                          {selectedTemplate.name}
+                        </h2>
+                        <p className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
+                          {selectedTemplate.description}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDuplicate(selectedTemplate)}
+                        >
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(selectedTemplate)}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(selectedTemplate.id)}
+                          className="text-destructive-500 hover:text-destructive-700 hover:bg-destructive-50 dark:hover:bg-destructive-950"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Shots</h3>
+                      <div className="grid gap-4">
+                        {selectedTemplate.shots.map((shot, index) => (
+                          <div
+                            key={index}
+                            className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4 space-y-2"
+                          >
+                            <h4 className="font-medium">{shot.title}</h4>
+                            <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+                              {shot.description}
+                            </p>
+                            {(shot.angle || shot.lighting || shot.notes) && (
+                              <div className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] space-y-1 mt-2">
+                                {shot.angle && <p>Angle: {shot.angle}</p>}
+                                {shot.lighting && (
+                                  <p>Lighting: {shot.lighting}</p>
+                                )}
+                                {shot.notes && <p>Notes: {shot.notes}</p>}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="text-center text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">

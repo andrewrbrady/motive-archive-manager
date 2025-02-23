@@ -17,7 +17,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, Camera, FileText, List } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Camera,
+  FileText,
+  List,
+  Check,
+  X,
+  ChevronLeft,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ShotListTemplates, { ShotTemplate } from "./ShotListTemplates";
@@ -211,7 +221,6 @@ export default function ShotList({ carId }: ShotListProps) {
 
       const updatedList = await response.json();
 
-      // Update both the lists array and the selected list
       setShotLists((lists) =>
         lists.map((list) => (list.id === selectedList.id ? updatedList : list))
       );
@@ -220,7 +229,6 @@ export default function ShotList({ carId }: ShotListProps) {
       toast.success(
         editingShot ? "Shot updated successfully" : "Shot added successfully"
       );
-      setIsAddingShot(false);
       setEditingShot(null);
       shotForm.reset();
     } catch (error) {
@@ -256,7 +264,6 @@ export default function ShotList({ carId }: ShotListProps) {
 
       const updatedList = await response.json();
 
-      // Update both the lists array and the selected list
       setShotLists((lists) =>
         lists.map((list) => (list.id === selectedList.id ? updatedList : list))
       );
@@ -272,7 +279,25 @@ export default function ShotList({ carId }: ShotListProps) {
   const handleEditShot = (shot: Shot) => {
     setEditingShot(shot);
     shotForm.reset(shot);
-    setIsAddingShot(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingShot(null);
+    shotForm.reset();
+  };
+
+  const handleAddNewShot = () => {
+    const newShot: Shot = {
+      id: crypto.randomUUID(),
+      title: "",
+      description: "",
+      angle: "",
+      lighting: "",
+      notes: "",
+      completed: false,
+    };
+    setEditingShot(newShot);
+    shotForm.reset(newShot);
   };
 
   const handleToggleComplete = async (shot: Shot) => {
@@ -453,165 +478,77 @@ export default function ShotList({ carId }: ShotListProps) {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shotLists.map((list) => (
-              <div
-                key={list.id}
-                className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium">{list.name}</h4>
-                    <p className="text-sm text-[hsl(var(--foreground-muted))]">
-                      {list.description}
-                    </p>
-                    <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
-                      {list.shots.length} shots
-                    </p>
+          {!showDetails ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {shotLists.map((list) => (
+                <div
+                  key={list.id}
+                  className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-medium">{list.name}</h4>
+                      <p className="text-sm text-[hsl(var(--foreground-muted))]">
+                        {list.description}
+                      </p>
+                      <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
+                        {list.shots.length} shots
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-[hsl(var(--background))]"
+                        onClick={() => handleDeleteList(list.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="mt-4">
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="hover:bg-[hsl(var(--background))]"
-                      onClick={() => handleDeleteList(list.id)}
+                      variant="outline"
+                      className="w-full border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
+                      onClick={() => handleViewDetails(list)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      View Details
                     </Button>
                   </div>
                 </div>
-                <div className="mt-4">
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
                   <Button
-                    variant="outline"
-                    className="w-full border-[hsl(var(--border))] hover:bg-[hsl(var(--background))]"
-                    onClick={() => handleViewDetails(list)}
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCloseDetails}
+                    className="hover:bg-[hsl(var(--background))]"
                   >
-                    View Details
+                    <ChevronLeft className="w-4 h-4 mr-2" />
+                    Back to Lists
                   </Button>
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      {selectedList?.name}
+                    </h2>
+                    <p className="text-sm text-[hsl(var(--foreground-muted))]">
+                      {selectedList?.description}
+                    </p>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <Dialog open={showDetails} onOpenChange={handleCloseDetails}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-[hsl(var(--background))]">
-              <DialogHeader>
-                <DialogTitle>{selectedList?.name}</DialogTitle>
-                <p className="text-sm text-[hsl(var(--foreground-muted))]">
-                  {selectedList?.description}
-                </p>
-              </DialogHeader>
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h4 className="font-medium">Shots</h4>
-                  <Dialog open={isAddingShot} onOpenChange={setIsAddingShot}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Shot
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-[hsl(var(--background))]">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {editingShot ? "Edit Shot" : "Add New Shot"}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <Form {...shotForm}>
-                        <form
-                          onSubmit={shotForm.handleSubmit(handleSubmitShot)}
-                          className="space-y-4"
-                        >
-                          <FormField
-                            control={shotForm.control}
-                            name="title"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Title</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
-                                    placeholder="e.g., Front 3/4 View"
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={shotForm.control}
-                            name="description"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Description</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
-                                    placeholder="Describe the shot composition..."
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={shotForm.control}
-                            name="angle"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Angle</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
-                                    placeholder="e.g., Low angle, eye level"
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={shotForm.control}
-                            name="lighting"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Lighting</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
-                                    placeholder="e.g., Natural, Studio"
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={shotForm.control}
-                            name="notes"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Additional Notes</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
-                                    placeholder="Any additional notes or requirements..."
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <div className="flex justify-end">
-                            <Button type="submit">
-                              {editingShot ? "Update Shot" : "Add Shot"}
-                            </Button>
-                          </div>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
+                  <Button onClick={handleAddNewShot}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Shot
+                  </Button>
                 </div>
 
                 <div className="grid gap-4">
@@ -620,61 +557,174 @@ export default function ShotList({ carId }: ShotListProps) {
                       key={shot.id}
                       className={`bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 ${
                         shot.completed ? "opacity-75" : ""
+                      } ${
+                        editingShot?.id === shot.id
+                          ? "ring-2 ring-[hsl(var(--border))]"
+                          : ""
                       }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleToggleComplete(shot)}
-                            className={`w-5 h-5 rounded border ${
-                              shot.completed
-                                ? "bg-[hsl(var(--background))] border-zinc-600"
-                                : "border-[hsl(var(--border-subtle))]"
-                            }`}
+                      {editingShot?.id === shot.id ? (
+                        <Form {...shotForm}>
+                          <form
+                            onSubmit={shotForm.handleSubmit(handleSubmitShot)}
+                            className="space-y-4"
                           >
-                            {shot.completed && (
-                              <span className="text-zinc-200 flex items-center justify-center">
-                                ✓
-                              </span>
-                            )}
-                          </button>
-                          <div>
-                            <h4 className="font-medium">{shot.title}</h4>
-                            <p className="text-sm text-[hsl(var(--foreground-muted))]">
-                              {shot.description}
-                            </p>
+                            <div className="flex justify-between items-start mb-4">
+                              <FormField
+                                control={shotForm.control}
+                                name="title"
+                                render={({ field }) => (
+                                  <FormItem className="flex-1 mr-4">
+                                    <FormControl>
+                                      <Input
+                                        className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
+                                        placeholder="e.g., Front 3/4 View"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="flex gap-2">
+                                <Button type="submit" variant="ghost" size="sm">
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEdit}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <FormField
+                              control={shotForm.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
+                                      placeholder="Describe the shot composition..."
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={shotForm.control}
+                                name="angle"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
+                                        placeholder="e.g., Low angle, eye level"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={shotForm.control}
+                                name="lighting"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
+                                        placeholder="e.g., Natural, Studio"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            <FormField
+                              control={shotForm.control}
+                              name="notes"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      className="bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] focus:border-[hsl(var(--border-subtle))] focus-visible:ring-zinc-600 focus-visible:ring-1"
+                                      placeholder="Any additional notes or requirements..."
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </form>
+                        </Form>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleToggleComplete(shot)}
+                                className={`w-5 h-5 rounded border ${
+                                  shot.completed
+                                    ? "bg-[hsl(var(--background))] border-zinc-600"
+                                    : "border-[hsl(var(--border-subtle))]"
+                                }`}
+                              >
+                                {shot.completed && (
+                                  <span className="text-zinc-200 flex items-center justify-center">
+                                    ✓
+                                  </span>
+                                )}
+                              </button>
+                              <div>
+                                <h4 className="font-medium">{shot.title}</h4>
+                                <p className="text-sm text-[hsl(var(--foreground-muted))]">
+                                  {shot.description}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditShot(shot)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteShot(shot.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditShot(shot)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteShot(shot.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      {(shot.angle || shot.lighting || shot.notes) && (
-                        <div className="mt-3 text-sm text-[hsl(var(--foreground-muted))] space-y-1">
-                          {shot.angle && <p>Angle: {shot.angle}</p>}
-                          {shot.lighting && <p>Lighting: {shot.lighting}</p>}
-                          {shot.notes && <p>Notes: {shot.notes}</p>}
-                        </div>
+                          {(shot.angle || shot.lighting || shot.notes) && (
+                            <div className="mt-3 text-sm text-[hsl(var(--foreground-muted))] space-y-1">
+                              {shot.angle && <p>Angle: {shot.angle}</p>}
+                              {shot.lighting && (
+                                <p>Lighting: {shot.lighting}</p>
+                              )}
+                              {shot.notes && <p>Notes: {shot.notes}</p>}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          )}
         </div>
       )}
     </div>
