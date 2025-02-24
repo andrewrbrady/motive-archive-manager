@@ -41,7 +41,7 @@ interface BaseVehicle {
   mileage?: MeasurementValue;
 }
 
-export interface InventoryItem extends BaseVehicle {
+export interface VehicleInventoryItem extends BaseVehicle {
   id: string;
   url: string;
   transmission?: string;
@@ -50,7 +50,42 @@ export interface InventoryItem extends BaseVehicle {
   images?: string[];
 }
 
-export function transformInventoryItem(item: InventoryItemRaw): InventoryItem {
+export interface StudioInventoryImage {
+  id: string;
+  url: string;
+  filename: string;
+  metadata?: {
+    description?: string;
+    tags?: string[];
+  };
+  variants?: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudioInventoryItem {
+  id: string;
+  name: string;
+  category: InventoryCategory;
+  manufacturer: string;
+  model: string;
+  serialNumber?: string;
+  purchaseDate?: Date;
+  lastMaintenanceDate?: Date;
+  condition: "excellent" | "good" | "fair" | "poor" | "needs-repair";
+  notes?: string;
+  location?: string;
+  isAvailable: boolean;
+  currentKitId?: string; // Reference to the kit if this item is part of one
+  images: StudioInventoryImage[];
+  primaryImage?: string; // URL of the primary image
+}
+
+export function transformInventoryItem(
+  item: InventoryItemRaw
+): VehicleInventoryItem {
   return {
     id: item.id,
     url: item.url,
@@ -91,3 +126,32 @@ export interface Car {
   year: number;
   vin?: string;
 }
+
+export interface Kit {
+  id: string;
+  name: string;
+  description: string;
+  items: string[]; // Array of StudioInventoryItem IDs that make up this kit
+  category: KitCategory;
+  isAvailable: boolean;
+  notes?: string;
+  location?: string;
+}
+
+export type InventoryCategory =
+  | "Camera"
+  | "Lens"
+  | "Lighting"
+  | "Audio"
+  | "Grip"
+  | "Power"
+  | "Storage"
+  | "Accessories"
+  | "Other";
+
+export type KitCategory =
+  | "Camera Package"
+  | "Lighting Package"
+  | "Audio Package"
+  | "Production Package"
+  | "Custom Package";

@@ -206,6 +206,13 @@ export default function HardDrivesTab() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedDrive(undefined);
+    setIsAddingDrive(false);
+  };
+
+  const handleAddDrive = () => {
+    setSelectedDrive(undefined);
+    setIsModalOpen(true);
+    setIsAddingDrive(true);
   };
 
   const handleDriveClick = (driveId: string) => {
@@ -218,7 +225,7 @@ export default function HardDrivesTab() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Hard Drives</h2>
-        <Button onClick={() => setIsAddingDrive(true)}>
+        <Button onClick={handleAddDrive}>
           <Plus className="w-4 h-4 mr-2" />
           Add Drive
         </Button>
@@ -446,15 +453,6 @@ export default function HardDrivesTab() {
                   <td className="py-4">{drive.location}</td>
                   <td className="py-4">{drive.rawAssetDetails?.length || 0}</td>
                   <td className="py-4 text-right space-x-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(drive);
-                      }}
-                      className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] p-1"
-                    >
-                      <PencilIcon className="w-4 h-4" />
-                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

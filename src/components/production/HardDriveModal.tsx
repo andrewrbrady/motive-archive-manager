@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HardDriveData } from "@/models/hard-drive";
-import { FolderIcon } from "lucide-react";
+import { FolderIcon, ScanIcon } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface HardDriveModalProps {
   isOpen: boolean;
@@ -38,6 +40,11 @@ export default function HardDriveModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{
+    matchedAssets: number;
+    scannedFolders: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,8 +69,10 @@ export default function HardDriveModal({
         location: "",
         notes: "",
       });
+      setScanResult(null);
+      setError(null);
     }
-  }, [drive]);
+  }, [drive, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +80,14 @@ export default function HardDriveModal({
     setError(null);
 
     try {
-      await onSave(formData);
+      // Remove any undefined or empty optional fields
+      const cleanedFormData = Object.fromEntries(
+        Object.entries(formData).filter(
+          ([_, value]) => value !== undefined && value !== ""
+        )
+      );
+
+      await onSave(cleanedFormData);
       onClose();
     } catch (error) {
       console.error("Error saving hard drive:", error);
@@ -240,243 +256,322 @@ export default function HardDriveModal({
     }
   };
 
+  const handleScan = async () => {
+    if (!formData.systemName) return;
+
+    setIsScanning(true);
+    setScanResult(null);
+    setError(null);
+
+    try {
+      // First save/update the drive and get the response
+      const saveResponse = await fetch(
+        drive ? `/api/hard-drives/${drive._id}` : "/api/hard-drives",
+        {
+          method: drive ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      if (!saveResponse.ok) {
+        throw new Error("Failed to save drive");
+      }
+
+      const savedDrive = await saveResponse.json();
+      console.log("Saved drive response:", savedDrive); // Debug log
+
+      // Extract the ID, handling both string and object formats
+      const driveId =
+        savedDrive._id?.toString() ||
+        savedDrive.id?.toString() ||
+        (typeof savedDrive === "string" ? savedDrive : null);
+      console.log("Using drive ID:", driveId); // Debug log
+
+      if (!driveId) {
+        throw new Error("No drive ID returned from save operation");
+      }
+
+      // Then perform the scan using the saved drive's ID
+      const scanResponse = await fetch("/api/hard-drives/scan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          drivePath: `/Volumes/${formData.systemName}`,
+          driveId: driveId,
+        }),
+      });
+
+      if (!scanResponse.ok) {
+        const errorData = await scanResponse.json();
+        throw new Error(errorData.error || "Failed to scan drive");
+      }
+
+      const result = await scanResponse.json();
+      setScanResult(result);
+
+      // Close the modal after successful scan
+      onClose();
+    } catch (error) {
+      console.error("Error scanning drive:", error);
+      setError(error instanceof Error ? error.message : "Failed to scan drive");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-[hsl(var(--background))/80] flex items-center justify-center z-50">
-      <div className="bg-[hsl(var(--background))] p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 border border-[hsl(var(--border))]">
-        <h2 className="text-xl font-semibold mb-4 text-[hsl(var(--foreground))]">
-          {drive ? "Edit Hard Drive" : "Add New Hard Drive"}
-        </h2>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl w-full backdrop-blur-sm">
+        <div className="bg-[hsl(var(--background))] p-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-4">
+            {drive ? "Edit Hard Drive" : "Add New Hard Drive"}
+          </h2>
 
-        {error && (
-          <div className="mb-4 p-3 bg-[hsl(var(--destructive))/10] border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] rounded">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="mb-4 p-3 bg-[hsl(var(--destructive))/10] border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] rounded">
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-              Label*
-            </label>
-            <input
-              type="text"
-              value={formData.label}
-              onChange={(e) =>
-                setFormData({ ...formData, label: e.target.value })
-              }
-              required
-              className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-              System Name
-            </label>
-            <div className="flex gap-2">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Label*</label>
               <input
                 type="text"
-                value={formData.systemName}
+                value={formData.label}
                 onChange={(e) =>
-                  setFormData({ ...formData, systemName: e.target.value })
+                  setFormData({ ...formData, label: e.target.value })
                 }
-                className="flex-1 px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                required
+                className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
               />
-              <button
-                type="button"
-                onClick={handleFolderSelect}
-                disabled={isLoading}
-                className="px-3 py-2 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded hover:bg-[hsl(var(--secondary))/90] disabled:opacity-50 flex items-center gap-2"
-              >
-                <FolderIcon className="w-4 h-4" />
-                {isLoading ? "Loading..." : "Select Drive"}
-              </button>
-              <button
-                type="button"
-                onClick={handleSystemDriveInfo}
-                disabled={isLoading}
-                className="px-3 py-2 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded hover:bg-[hsl(var(--secondary))/90] disabled:opacity-50 flex items-center gap-2"
-              >
-                {isLoading ? "Loading..." : "Get System Drive"}
-              </button>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Type*
+              <label className="block text-sm font-medium mb-1">
+                System Name
               </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.systemName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, systemName: e.target.value })
+                  }
+                  className="flex-1 px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleFolderSelect}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <FolderIcon className="w-4 h-4" />
+                  {isLoading ? "Loading..." : "Select Drive"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSystemDriveInfo}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  {isLoading ? "Loading..." : "Get System Drive"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleScan}
+                  disabled={isScanning || !formData.systemName}
+                  className="flex items-center gap-2"
+                >
+                  <ScanIcon className="w-4 h-4" />
+                  {isScanning ? "Scanning..." : "Scan"}
+                </Button>
+              </div>
+            </div>
+
+            {scanResult && (
+              <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
+                <h3 className="font-medium mb-2">Scan Results</h3>
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                  Found {scanResult.matchedAssets} matching raw assets in{" "}
+                  {scanResult.scannedFolders} folders
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Type*</label>
+                <select
+                  value={formData.type}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      type: e.target.value as "HDD" | "SSD" | "NVMe",
+                    })
+                  }
+                  required
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                >
+                  <option value="HDD">HDD</option>
+                  <option value="SSD">SSD</option>
+                  <option value="NVMe">NVMe</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Interface*
+                </label>
+                <select
+                  value={formData.interface}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      interface: e.target.value as
+                        | "USB"
+                        | "Thunderbolt"
+                        | "USB-C"
+                        | "Internal",
+                    })
+                  }
+                  required
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                >
+                  <option value="USB">USB</option>
+                  <option value="Thunderbolt">Thunderbolt</option>
+                  <option value="USB-C">USB-C</option>
+                  <option value="Internal">Internal</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Total Capacity (GB)*
+                </label>
+                <input
+                  type="number"
+                  value={formData.capacity?.total || 0}
+                  onChange={(e) =>
+                    updateCapacity("total", Number(e.target.value))
+                  }
+                  required
+                  min="0"
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Used Space (GB)
+                </label>
+                <input
+                  type="number"
+                  value={formData.capacity?.used || 0}
+                  onChange={(e) =>
+                    updateCapacity("used", Number(e.target.value))
+                  }
+                  min="0"
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Available Space (GB)
+                </label>
+                <input
+                  type="number"
+                  value={formData.capacity?.available || 0}
+                  onChange={(e) =>
+                    updateCapacity("available", Number(e.target.value))
+                  }
+                  min="0"
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Status*</label>
               <select
-                value={formData.type}
+                value={formData.status}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    type: e.target.value as "HDD" | "SSD" | "NVMe",
+                    status: e.target.value as
+                      | "Available"
+                      | "In Use"
+                      | "Archived"
+                      | "Offline",
                   })
                 }
                 required
-                className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
               >
-                <option value="HDD">HDD</option>
-                <option value="SSD">SSD</option>
-                <option value="NVMe">NVMe</option>
+                <option value="Available">Available</option>
+                <option value="In Use">In Use</option>
+                <option value="Archived">Archived</option>
+                <option value="Offline">Offline</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Interface*
-              </label>
-              <select
-                value={formData.interface}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    interface: e.target.value as
-                      | "USB"
-                      | "Thunderbolt"
-                      | "USB-C"
-                      | "Internal",
-                  })
-                }
-                required
-                className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
-              >
-                <option value="USB">USB</option>
-                <option value="Thunderbolt">Thunderbolt</option>
-                <option value="USB-C">USB-C</option>
-                <option value="Internal">Internal</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Total Capacity (GB)*
-              </label>
+              <label className="block text-sm font-medium mb-1">Location</label>
               <input
-                type="number"
-                value={formData.capacity?.total || 0}
+                type="text"
+                value={formData.location}
                 onChange={(e) =>
-                  updateCapacity("total", Number(e.target.value))
+                  setFormData({ ...formData, location: e.target.value })
                 }
-                required
-                min="0"
-                className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Used Space (GB)
-              </label>
-              <input
-                type="number"
-                value={formData.capacity?.used || 0}
-                onChange={(e) => updateCapacity("used", Number(e.target.value))}
-                min="0"
-                className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Available Space (GB)
-              </label>
-              <input
-                type="number"
-                value={formData.capacity?.available || 0}
+              <label className="block text-sm font-medium mb-1">Notes</label>
+              <textarea
+                value={formData.notes}
                 onChange={(e) =>
-                  updateCapacity("available", Number(e.target.value))
+                  setFormData({ ...formData, notes: e.target.value })
                 }
-                min="0"
-                className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                rows={3}
+                className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-              Status*
-            </label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  status: e.target.value as
-                    | "Available"
-                    | "In Use"
-                    | "Archived"
-                    | "Offline",
-                })
-              }
-              required
-              className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
-            >
-              <option value="Available">Available</option>
-              <option value="In Use">In Use</option>
-              <option value="Archived">Archived</option>
-              <option value="Offline">Offline</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-              Location
-            </label>
-            <input
-              type="text"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-              className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-              Notes
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              rows={3}
-              className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded hover:bg-[hsl(var(--secondary))/90]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded hover:bg-[hsl(var(--primary))/90] disabled:opacity-50"
-            >
-              {isSubmitting
-                ? drive
-                  ? "Saving..."
-                  : "Adding..."
-                : drive
-                ? "Save Changes"
-                : "Add Hard Drive"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? drive
+                    ? "Saving..."
+                    : "Adding..."
+                  : drive
+                  ? "Save Changes"
+                  : "Add Hard Drive"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

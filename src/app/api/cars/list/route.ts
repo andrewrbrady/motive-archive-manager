@@ -7,9 +7,62 @@ export async function GET() {
 
     const cars = await db
       .collection("cars")
-      .find({})
-      .project({ _id: 1, make: 1, model: 1, year: 1, images: 1, imageIds: 1 })
-      .sort({ make: 1, model: 1, year: -1 })
+      .aggregate([
+        { $match: {} },
+        {
+          $addFields: {
+            imageIds: {
+              $map: {
+                input: "$imageIds",
+                as: "id",
+                in: { $toObjectId: "$$id" },
+              },
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: "images",
+            localField: "imageIds",
+            foreignField: "_id",
+            as: "images",
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            make: 1,
+            model: 1,
+            year: 1,
+            images: {
+              $map: {
+                input: "$images",
+                as: "img",
+                in: {
+                  _id: { $toString: "$$img._id" },
+                  url: {
+                    $cond: {
+                      if: { $endsWith: ["$$img.url", "/public"] },
+                      then: "$$img.url",
+                      else: { $concat: ["$$img.url", "/public"] },
+                    },
+                  },
+                  filename: "$$img.filename",
+                  metadata: "$$img.metadata",
+                },
+              },
+            },
+            imageIds: {
+              $map: {
+                input: "$imageIds",
+                as: "id",
+                in: { $toString: "$$id" },
+              },
+            },
+          },
+        },
+        { $sort: { make: 1, model: 1, year: -1 } },
+      ])
       .toArray();
 
     return NextResponse.json(cars);

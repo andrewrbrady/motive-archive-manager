@@ -72,7 +72,9 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
           console.log("CarCard: Using direct image URL from new structure");
           setPrimaryImage({
             id: car.images[0]._id,
-            url: car.images[0].url,
+            url: car.images[0].url.endsWith("/public")
+              ? car.images[0].url
+              : `${car.images[0].url}/public`,
           });
           setLoading(false);
           return;

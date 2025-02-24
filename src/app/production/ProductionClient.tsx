@@ -12,6 +12,7 @@ import ShotListTemplatesTab from "@/components/production/ShotListTemplatesTab";
 import ScriptTemplatesTab from "@/components/production/ScriptTemplatesTab";
 import RawAssetsTab from "@/components/production/RawAssetsTab";
 import HardDrivesTab from "@/components/production/HardDrivesTab";
+import StudioInventoryTab from "@/components/production/StudioInventoryTab";
 
 export default function ProductionClient() {
   const router = useRouter();
@@ -107,13 +108,7 @@ export default function ProductionClient() {
             </TabsContent>
 
             <TabsContent value="studio-inventory">
-              <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
-                <h3 className="text-lg font-medium mb-4">Studio Inventory</h3>
-                <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                  Manage your studio's equipment inventory, including cameras,
-                  lenses, lights, and other gear.
-                </p>
-              </div>
+              <StudioInventoryTab />
             </TabsContent>
 
             <TabsContent value="hard-drives">

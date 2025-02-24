@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Loader2, Check, AlertTriangle } from "lucide-react";
+import { Dialog } from "@headlessui/react";
+import { Progress } from "@/components/ui/progress";
 
 interface UploadProgress {
   fileName: string;
@@ -12,131 +12,71 @@ interface UploadProgress {
 }
 
 interface UploadProgressDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
   uploadProgress: UploadProgress[];
 }
 
-export const UploadProgressDialog: React.FC<UploadProgressDialogProps> = ({
-  uploadProgress = [],
-}) => {
-  if (uploadProgress.length === 0) return null;
-
-  const getOverallProgress = () => {
-    if (uploadProgress.length === 0) return 0;
-    const totalProgress = uploadProgress.reduce(
-      (sum, item) => sum + item.progress,
-      0
-    );
-    return Math.round(totalProgress / uploadProgress.length);
-  };
-
-  const getStatusSummary = () => {
-    const completed = uploadProgress.filter(
-      (status) => status.status === "complete"
-    ).length;
-    const errors = uploadProgress.filter(
-      (status) => status.status === "error"
-    ).length;
-    const uploading = uploadProgress.filter(
-      (status) => status.status === "uploading"
-    ).length;
-    const analyzing = uploadProgress.filter(
-      (status) => status.status === "analyzing"
-    ).length;
-    const pending = uploadProgress.filter(
-      (status) => status.status === "pending"
-    ).length;
-
-    return { completed, errors, uploading, analyzing, pending };
-  };
-
-  const { completed, errors, uploading, analyzing, pending } =
-    getStatusSummary();
-  const isProcessing = uploading > 0 || analyzing > 0 || pending > 0;
+export function UploadProgressDialog({
+  isOpen,
+  onClose,
+  uploadProgress,
+}: UploadProgressDialogProps) {
+  const isComplete = uploadProgress.every((p) => p.status === "complete");
+  const hasError = uploadProgress.some((p) => p.status === "error");
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] rounded-lg shadow-lg border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-            {isProcessing ? "Uploading images..." : "Upload complete"}
-          </span>
-          <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] space-x-2">
-            {completed > 0 && <span>{completed} completed</span>}
-            {errors > 0 && (
-              <span className="text-destructive-500 dark:text-destructive-400">
-                {errors} failed
-              </span>
-            )}
-            {uploading > 0 && <span>{uploading} uploading</span>}
-            {analyzing > 0 && <span>{analyzing} analyzing</span>}
-            {pending > 0 && <span>{pending} pending</span>}
-          </div>
-        </div>
-        <span className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
-          {getOverallProgress()}% Complete
-        </span>
-      </div>
+    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+      <div
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+        aria-hidden="true"
+      />
 
-      <div className="w-full bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] rounded-full h-2">
-        <div
-          className={`h-2 rounded-full transition-all duration-300 ${
-            errors > 0
-              ? "bg-destructive-500 dark:bg-destructive-600"
-              : "bg-info-500 dark:bg-info-600"
-          }`}
-          style={{ width: `${getOverallProgress()}%` }}
-        />
-      </div>
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="mx-auto max-w-sm w-full bg-background border border-border rounded-lg p-6 shadow-lg">
+          <Dialog.Title className="text-lg font-semibold mb-4 text-foreground">
+            Uploading Images
+          </Dialog.Title>
 
-      <div className="space-y-2 max-h-60 overflow-y-auto">
-        {uploadProgress.map((progress, index) => (
-          <div
-            key={index}
-            className={`flex items-center justify-between p-2 rounded-md ${
-              progress.status === "error"
-                ? "bg-destructive-50 dark:bg-destructive-950 bg-opacity-30"
-                : progress.status === "complete"
-                ? "bg-success-50 dark:bg-success-950 bg-opacity-30"
-                : "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] bg-opacity-50"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {progress.status === "pending" && (
-                <div className="w-4 h-4 rounded-full border-2 border-[hsl(var(--border-primary))] dark:border-zinc-600" />
-              )}
-              {(progress.status === "uploading" ||
-                progress.status === "analyzing") && (
-                <Loader2 className="w-4 h-4 animate-spin text-info-500 dark:text-info-400" />
-              )}
-              {progress.status === "complete" && (
-                <Check className="w-4 h-4 text-success-500 dark:text-success-400" />
-              )}
-              {progress.status === "error" && (
-                <AlertTriangle className="w-4 h-4 text-destructive-500 dark:text-destructive-400" />
-              )}
-              <div className="flex flex-col">
-                <span className="text-sm truncate max-w-[200px] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
-                  {progress.fileName}
-                </span>
-                {progress.currentStep && (
-                  <span className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                    {progress.currentStep}
+          <div className="space-y-4">
+            {uploadProgress.map((progress) => (
+              <div key={progress.fileName} className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground">{progress.fileName}</span>
+                  <span className="text-foreground-muted">
+                    {progress.status === "complete"
+                      ? "Complete"
+                      : progress.status === "error"
+                      ? "Error"
+                      : `${Math.round(progress.progress)}%`}
                   </span>
+                </div>
+                <Progress value={progress.progress} />
+                {progress.error && (
+                  <p className="text-sm text-destructive">{progress.error}</p>
+                )}
+                {progress.currentStep && (
+                  <p className="text-sm text-foreground-muted">
+                    {progress.currentStep}
+                  </p>
                 )}
               </div>
-            </div>
-            {progress.error ? (
-              <span className="text-xs text-destructive-500 dark:text-destructive-400">
-                {progress.error}
-              </span>
-            ) : (
-              <span className="text-xs font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
-                {progress.progress}%
-              </span>
-            )}
+            ))}
           </div>
-        ))}
+
+          {(isComplete || hasError) && (
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-sm font-medium text-foreground hover:text-foreground-hover"
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </Dialog.Panel>
       </div>
-    </div>
+    </Dialog>
   );
-};
+}

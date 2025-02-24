@@ -29,6 +29,15 @@ interface CloudflareImageResponse {
   messages?: Array<{ code: number; message: string }>;
 }
 
+interface CloudflareImageUploadResult {
+  id: string;
+  filename: string;
+  uploaded: string;
+  requireSignedURLs: boolean;
+  variants: string[];
+  url: string;
+}
+
 export async function getCloudflareImageMetadata(
   imageId: string
 ): Promise<ImageMetadata | null> {
@@ -130,4 +139,34 @@ export function extractImageIdFromUrl(url: string): string | null {
   // Example URL: https://imagedelivery.net/MTt4OTd0b0w5aj/107b9558-dd06-4bbd-5fef-9c2c16bb7900/thumbnail
   const match = url.match(/\/([^\/]+)\/[^\/]+$/);
   return match ? match[1] : null;
+}
+
+export async function uploadToCloudflare(
+  file: File
+): Promise<CloudflareImageUploadResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to upload image to Cloudflare");
+  }
+
+  const result = await response.json();
+
+  // Ensure the URL is properly constructed with /public at the end
+  const imageUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${result.id}/public`;
+
+  return {
+    ...result,
+    url: imageUrl,
+    variants: ["public", "thumbnail"].map(
+      (variant) =>
+        `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${result.id}/${variant}`
+    ),
+  };
 }

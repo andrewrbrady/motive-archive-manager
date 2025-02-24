@@ -137,6 +137,15 @@ export function ImageGallery({
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>(
     {}
   );
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (uploadProgress.length > 0) {
+      setIsUploadDialogOpen(true);
+    } else {
+      setIsUploadDialogOpen(false);
+    }
+  }, [uploadProgress]);
 
   // Update effect to handle transition from no images to having images
   useEffect(() => {
@@ -569,7 +578,11 @@ export function ImageGallery({
         </div>
 
         {/* Always show upload progress dialog */}
-        <UploadProgressDialog uploadProgress={uploadProgress} />
+        <UploadProgressDialog
+          uploadProgress={uploadProgress}
+          isOpen={isUploadDialogOpen}
+          onClose={() => setIsUploadDialogOpen(false)}
+        />
       </div>
     );
   }
@@ -942,7 +955,11 @@ export function ImageGallery({
       )}
 
       {/* Upload Progress */}
-      <UploadProgressDialog uploadProgress={uploadProgress} />
+      <UploadProgressDialog
+        uploadProgress={uploadProgress}
+        isOpen={isUploadDialogOpen}
+        onClose={() => setIsUploadDialogOpen(false)}
+      />
 
       <ImageManager
         selectedImages={selectedImages.map((index) => images[index].url)}
