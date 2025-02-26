@@ -48,6 +48,43 @@
     --input: 240 4% 90%;
     --ring: 240 6% 10%;
 
+    /* Calendar Event Type Colors */
+    --event-auction-submission: 217 91% 60%; /* blue-500 */
+    --event-auction-listing: 213 94% 68%; /* blue-400 */
+    --event-auction-end: 213 97% 79%; /* blue-300 */
+    --event-inspection: 38 93% 53%; /* amber-500 */
+    --event-detail: 43 96% 56%; /* amber-400 */
+    --event-production: 160 84% 39%; /* emerald-500 */
+    --event-post-production: 158 64% 52%; /* emerald-400 */
+    --event-marketing: 330 81% 60%; /* pink-500 */
+    --event-pickup: 259 94% 51%; /* violet-500 */
+    --event-delivery: 258 90% 66%; /* violet-400 */
+    --event-other: 220 9% 46%; /* gray-500 */
+
+    /* Calendar Deliverable Type Colors */
+    --deliverable-photo-gallery: 345 82% 61%; /* rose-500 */
+    --deliverable-video: 0 84% 60%; /* red-500 */
+    --deliverable-mixed-gallery: 24 94% 53%; /* orange-500 */
+    --deliverable-video-gallery: 25 95% 64%; /* orange-400 */
+    --deliverable-still: 38 93% 53%; /* amber-500 */
+    --deliverable-graphic: 43 96% 56%; /* amber-400 */
+    --deliverable-feature: 160 84% 39%; /* emerald-500 */
+    --deliverable-promo: 158 64% 52%; /* emerald-400 */
+    --deliverable-review: 186 94% 42%; /* cyan-500 */
+    --deliverable-walkthrough: 199 89% 48%; /* sky-500 */
+    --deliverable-highlights: 217 91% 60%; /* blue-500 */
+    --deliverable-marketing-email: 259 94% 51%; /* violet-500 */
+    --deliverable-blog: 269 97% 66%; /* purple-500 */
+    --deliverable-other: 220 9% 46%; /* gray-500 */
+    --deliverable-deadline: 0 74% 50%; /* red-600 */
+    --deliverable-release: 263 70% 58%; /* violet-600 */
+
+    /* Calendar Status Colors */
+    --status-not-started: var(--destructive);
+    --status-in-progress: var(--warning);
+    --status-completed: var(--success);
+    --status-default: var(--zinc-500);
+
     /* Other */
     --radius: 0.5rem;
   }
@@ -113,7 +150,7 @@ body.landing-page {
 .rbc-calendar {
   width: 100%;
   height: 100%;
-  min-height: 580px;
+  min-height: 700px;
   display: flex;
   flex-direction: column;
 }
@@ -121,7 +158,9 @@ body.landing-page {
 .rbc-month-view {
   flex: 1;
   border: 1px solid;
-  @apply border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
 .rbc-month-row {
@@ -129,8 +168,12 @@ body.landing-page {
   flex-direction: column;
   flex: 1 0 0;
   overflow: hidden;
-  min-height: 100px;
-  @apply border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
+  min-height: 180px;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.rbc-month-row:last-child {
+  @apply border-b-0;
 }
 
 .rbc-row-content {
@@ -163,12 +206,12 @@ body.landing-page {
 }
 
 .rbc-day-bg + .rbc-day-bg {
-  @apply border-l border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 /* Fix header height */
 .rbc-header {
-  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] font-medium py-2 border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] font-medium py-2 border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
   height: 40px;
   display: flex;
   align-items: center;
@@ -177,7 +220,17 @@ body.landing-page {
 }
 
 .rbc-header + .rbc-header {
-  @apply border-l border-[hsl(var(--border))] dark:border-[hsl(var(--border))];
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+/* Today cell styling */
+.rbc-today {
+  @apply bg-[hsl(var(--background-subtle))] dark:bg-[hsl(var(--background-subtle))] bg-opacity-50 dark:bg-opacity-30;
+}
+
+/* Off-range day styling */
+.rbc-off-range-bg {
+  @apply bg-[hsl(var(--background-muted))] dark:bg-[hsl(var(--background-muted))] bg-opacity-30 dark:bg-opacity-20;
 }
 
 /* Fix event display */
@@ -206,6 +259,103 @@ body.landing-page {
   @apply shadow-md;
 }
 
+/* Week view styles */
+.rbc-time-view {
+  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 rounded-md;
+}
+
+.rbc-time-header {
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  min-height: 50px;
+}
+
+.rbc-time-header-content {
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.rbc-time-header-gutter {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+}
+
+.rbc-time-gutter {
+  @apply text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))];
+}
+
+.rbc-timeslot-group {
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.rbc-time-slot {
+  @apply text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))];
+}
+
+.rbc-day-slot .rbc-time-slot {
+  @apply border-t border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.rbc-time-content {
+  @apply border-t border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  margin-top: 2px;
+}
+
+.rbc-time-content > * + * > * {
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.rbc-current-time-indicator {
+  @apply bg-[hsl(var(--info))] dark:bg-[hsl(var(--info))];
+  height: 2px;
+}
+
+/* Fix for week view events overlapping headers */
+.rbc-time-view .rbc-allday-cell {
+  height: auto;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.rbc-time-view .rbc-row {
+  min-height: 30px;
+}
+
+.rbc-time-header-content .rbc-header {
+  font-weight: 500;
+  padding: 8px 2px;
+}
+
+.rbc-time-view .rbc-header {
+  border-bottom: none;
+}
+
+/* Agenda view styles */
+.rbc-agenda-view {
+  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 rounded-md;
+}
+
+.rbc-agenda-view table.rbc-agenda-table {
+  @apply border-0;
+}
+
+.rbc-agenda-view table.rbc-agenda-table thead > tr > th {
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))];
+}
+
+.rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.rbc-agenda-view table.rbc-agenda-table tbody > tr:last-child > td {
+  @apply border-b-0;
+}
+
+.rbc-agenda-time-cell {
+  @apply text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))];
+}
+
+.rbc-agenda-date-cell {
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+}
+
 /* Hover card styles */
 .rbc-event .hover-card-content {
   display: none;
@@ -221,22 +371,46 @@ body.landing-page {
 .rbc-toolbar {
   @apply mb-4 flex items-center justify-between gap-2;
   flex-wrap: wrap;
+  padding: 12px 8px !important;
+  margin-bottom: 8px !important;
+  border-bottom: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
 .rbc-toolbar button {
   @apply bg-white dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md px-3 py-1 text-sm font-medium transition-colors;
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  gap: 0.5rem !important;
+}
+
+.rbc-toolbar button span {
+  display: inline-block !important;
+  white-space: nowrap !important;
+}
+
+.rbc-toolbar .rbc-btn-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
 }
 
 .rbc-toolbar button:hover {
-  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+  @apply bg-[hsl(var(--background-subtle))] dark:bg-[hsl(var(--background-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
 }
 
 .rbc-toolbar button.rbc-active {
-  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))];
+  @apply bg-[hsl(var(--background-subtle))] dark:bg-[hsl(var(--background-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] border-[hsl(var(--border-primary))] dark:border-[hsl(var(--border-subtle))];
 }
 
 .rbc-toolbar-label {
   @apply text-lg font-semibold text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 10px !important;
+  font-weight: 500 !important;
 }
 
 /* Status-based colors */
@@ -278,4 +452,715 @@ body.landing-page {
 
 .dark .rbc-toolbar button.rbc-active {
   @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--border-subtle))];
+}
+
+/* Calendar Event Utility Classes */
+.calendar-event {
+  @apply rounded-md shadow-sm transition-all duration-200 text-white;
+  opacity: 0.9;
+  padding: 2px 4px;
+  min-height: 24px;
+}
+
+.calendar-event-auction {
+  background-color: hsl(var(--event-auction-submission));
+}
+
+.calendar-event-inspection {
+  background-color: hsl(var(--event-inspection));
+}
+
+.calendar-event-production {
+  background-color: hsl(var(--event-production));
+}
+
+.calendar-event-marketing {
+  background-color: hsl(var(--event-marketing));
+}
+
+.calendar-event-delivery {
+  background-color: hsl(var(--event-delivery));
+}
+
+.calendar-event-other {
+  background-color: hsl(var(--event-other));
+}
+
+/* Calendar Deliverable Utility Classes */
+.calendar-deliverable {
+  @apply rounded-md shadow-sm transition-all duration-200 text-white;
+  opacity: 0.9;
+  padding: 2px 4px;
+  min-height: 24px;
+}
+
+.calendar-deliverable-photo {
+  background-color: hsl(var(--deliverable-photo-gallery));
+}
+
+.calendar-deliverable-video {
+  background-color: hsl(var(--deliverable-video));
+}
+
+.calendar-deliverable-deadline {
+  background-color: hsl(var(--deliverable-deadline));
+}
+
+.calendar-deliverable-release {
+  background-color: hsl(var(--deliverable-release));
+}
+
+/* Status Border Utilities */
+.status-not-started {
+  border: 2px solid hsl(var(--status-not-started));
+}
+
+.status-in-progress {
+  border: 2px solid hsl(var(--status-in-progress));
+}
+
+.status-completed {
+  border: 2px solid hsl(var(--status-completed));
+}
+
+/* Events Calendar Specific Styles */
+.events-calendar .rbc-month-view {
+  @apply border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  border-radius: 4px;
+  border-width: 1px;
+}
+
+.events-calendar .rbc-month-row + .rbc-month-row {
+  @apply border-t border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.events-calendar .rbc-day-bg + .rbc-day-bg {
+  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.events-calendar .rbc-month-header {
+  display: flex !important;
+  height: 32px !important;
+  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.events-calendar .rbc-month-header .rbc-header {
+  padding: 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
+  font-size: 0.75rem;
+  border: none;
+}
+
+.events-calendar .rbc-month-header .rbc-header + .rbc-header {
+  @apply border-l border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-50;
+}
+
+.events-calendar .rbc-event {
+  min-height: 22px !important;
+  margin: 0 0 2px 0 !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  border: none !important;
+  color: white !important;
+  opacity: 0.9 !important;
+}
+
+.events-calendar .rbc-event:hover {
+  filter: brightness(105%);
+  opacity: 1 !important;
+}
+
+.events-calendar .rbc-event:active {
+  filter: brightness(95%);
+}
+
+.events-calendar .rbc-event-content {
+  padding: 2px 4px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 20px !important;
+  font-weight: 500;
+}
+
+/* Selected event styling */
+.events-calendar .rbc-selected {
+  filter: brightness(105%);
+  opacity: 1 !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Month row height optimization */
+.events-calendar .rbc-month-row {
+  min-height: 180px;
+}
+
+.events-calendar .rbc-row-content {
+  margin-top: 4px;
+}
+
+/* Date cell optimization */
+.events-calendar .rbc-date-cell {
+  padding: 1px 2px;
+  font-size: 0.75rem;
+}
+
+/* Make sure the calendar container takes up available space */
+.flex-1.overflow-hidden {
+  min-height: 700px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure the calendar fills its container */
+.events-calendar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 700px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  padding: 16px 16px 0 16px;
+}
+
+/* Make sure the month view expands to fill available space */
+.events-calendar .rbc-month-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 600px;
+}
+
+/* Ensure month rows expand proportionally */
+.events-calendar .rbc-month-row {
+  flex: 1 0 0;
+  min-height: 180px;
+}
+
+/* Ensure the content area expands properly */
+.events-calendar .rbc-row-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Week view events styling */
+.rbc-event.rbc-selected {
+  @apply shadow-md;
+}
+
+.rbc-day-slot .rbc-events-container {
+  margin-right: 0;
+}
+
+.rbc-day-slot .rbc-event {
+  border-radius: 4px;
+  padding: 2px 4px;
+  min-height: 22px;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.rbc-day-slot .rbc-event:hover {
+  filter: brightness(105%);
+  opacity: 1;
+}
+
+.rbc-day-slot .rbc-event-content {
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Improve toolbar button styling */
+.rbc-toolbar button {
+  @apply bg-white dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md px-3 py-1 text-sm font-medium transition-colors;
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  gap: 0.5rem !important;
+}
+
+.rbc-toolbar button span {
+  display: inline-block !important;
+  white-space: nowrap !important;
+}
+
+.rbc-toolbar .rbc-btn-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+}
+
+/* Events Calendar Week View Specific Styles */
+.events-calendar .rbc-time-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 600px !important;
+  border-radius: 4px;
+  overflow: hidden;
+  border: none;
+}
+
+.events-calendar .rbc-time-header {
+  flex: 0 0 auto !important;
+  min-height: 50px;
+}
+
+.events-calendar .rbc-time-header-content {
+  min-height: 50px;
+  border-left: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  height: auto !important;
+}
+
+.events-calendar .rbc-time-content {
+  flex: 1 1 auto !important;
+  min-height: 400px !important;
+  overflow-y: auto !important;
+  border-top: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  padding-top: 4px;
+}
+
+.events-calendar .rbc-time-view .rbc-allday-cell {
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+  border-bottom: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.events-calendar .rbc-time-view .rbc-row {
+  min-height: 30px;
+}
+
+.events-calendar .rbc-time-view .rbc-header {
+  border-bottom: none;
+  padding: 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
+  font-size: 0.75rem;
+}
+
+/* Improve the all-day events container */
+.events-calendar .rbc-time-view .rbc-allday-events {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: auto !important;
+}
+
+/* Make sure the all-day label is properly aligned */
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* Ensure the time header has enough space for the all-day events */
+.events-calendar .rbc-time-header {
+  min-height: 50px;
+  display: flex;
+  flex-direction: column;
+  height: auto !important;
+}
+
+/* Add a subtle indicator when there are more events to scroll */
+.events-calendar .rbc-time-view .rbc-allday-cell::-webkit-scrollbar {
+  width: 0;
+  display: none;
+}
+
+.events-calendar .rbc-time-view .rbc-allday-cell::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.events-calendar .rbc-time-view .rbc-allday-cell::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Fix for the view buttons in the toolbar */
+.rbc-btn-group button {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.rbc-btn-group button svg {
+  margin-right: 4px !important;
+  margin-bottom: 0 !important;
+}
+
+.rbc-btn-group button span {
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Fix for the top toolbar buttons */
+.rbc-toolbar
+  .rbc-btn-group:first-of-type
+  + .rbc-toolbar-label
+  + div
+  .rbc-btn-group:first-of-type
+  button {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.rbc-toolbar
+  .rbc-btn-group:first-of-type
+  + .rbc-toolbar-label
+  + div
+  .rbc-btn-group:first-of-type
+  button
+  svg,
+.rbc-toolbar
+  .rbc-btn-group:first-of-type
+  + .rbc-toolbar-label
+  + div
+  .rbc-btn-group:first-of-type
+  button
+  .lucide {
+  margin-right: 4px !important;
+  margin-bottom: 0 !important;
+}
+
+.rbc-toolbar
+  .rbc-btn-group:first-of-type
+  + .rbc-toolbar-label
+  + div
+  .rbc-btn-group:first-of-type
+  button
+  span {
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Ensure all items in the toolbar are vertically centered */
+.rbc-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 0 16px 0;
+  margin-bottom: 12px !important;
+}
+
+.rbc-toolbar .rbc-btn-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.rbc-toolbar-label {
+  @apply text-lg font-semibold text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 10px !important;
+  font-weight: 500 !important;
+}
+
+/* Ensure consistent height for all buttons in the toolbar */
+.rbc-toolbar button {
+  height: 32px !important;
+}
+
+.events-calendar .rbc-time-header {
+  min-height: 50px;
+}
+
+/* Ensure all header elements are vertically centered */
+.rbc-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+.rbc-month-header .rbc-header {
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.rbc-time-header-content .rbc-header {
+  padding: 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
+  font-size: 0.75rem;
+  border: none;
+}
+
+.rbc-time-header-content .rbc-header + .rbc-header {
+  @apply border-l border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-50;
+}
+
+.rbc-time-header-gutter {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.events-calendar .rbc-time-header {
+  min-height: 50px;
+}
+
+/* Style all-day events in the week view */
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-event {
+  margin: 1px 2px;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+}
+
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-event-content {
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+/* Add a visual indicator for the "all day" section */
+.events-calendar .rbc-time-view .rbc-time-header-content {
+  min-height: 50px;
+  border-left: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+/* Ensure the time gutter label for all-day is properly styled */
+.events-calendar .rbc-time-view .rbc-time-gutter .rbc-label {
+  font-size: 0.75rem;
+  @apply text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))];
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* Add a subtle background to the all-day section */
+.events-calendar .rbc-time-view .rbc-allday-cell {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+  border-bottom: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.events-calendar .rbc-time-view .rbc-header {
+  border-bottom: none;
+}
+
+/* Improve time-slotted events in the week view */
+.events-calendar .rbc-time-view .rbc-event {
+  border: none;
+  padding: 2px 5px;
+  margin: 0 2px;
+  border-radius: 3px;
+}
+
+.events-calendar .rbc-time-view .rbc-event-label {
+  font-size: 0.7rem;
+  padding-right: 5px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.events-calendar .rbc-time-view .rbc-event-content {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+/* Ensure time slots are properly sized */
+.events-calendar .rbc-time-view .rbc-timeslot-group {
+  min-height: 40px;
+  border-bottom: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-5 dark:border-[hsl(var(--border))] dark:border-opacity-10;
+}
+
+/* Improve time gutter appearance */
+.events-calendar .rbc-time-view .rbc-time-gutter {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+  border-right: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+/* Add more space between the all-day section and time slots */
+.events-calendar .rbc-time-view .rbc-time-content {
+  margin-top: 4px;
+}
+
+/* Ensure the current time indicator is visible */
+.events-calendar .rbc-time-view .rbc-current-time-indicator {
+  height: 2px;
+  background-color: #f43f5e;
+  opacity: 0.7;
+  z-index: 3;
+}
+
+.events-calendar .rbc-time-view .rbc-header {
+  border-bottom: none;
+}
+
+/* Ensure the time content adjusts properly */
+.events-calendar .rbc-time-view .rbc-time-content {
+  margin-top: 4px;
+  overflow-y: auto !important;
+  flex: 1 !important;
+}
+
+/* Adjust the overall time view layout */
+.events-calendar .rbc-time-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+/* Make sure the time header content expands properly */
+.events-calendar .rbc-time-view .rbc-time-header-content {
+  min-height: 50px;
+  border-left: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  height: auto !important;
+}
+
+/* Ensure the all-day events are properly spaced */
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-event {
+  margin: 2px 2px;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+}
+
+/* Add a subtle separator between all-day events and time slots */
+.events-calendar .rbc-time-view .rbc-time-header:after {
+  content: "";
+  display: block;
+  height: 1px;
+  width: 100%;
+  @apply bg-[hsl(var(--border))] bg-opacity-20 dark:bg-[hsl(var(--border))] dark:bg-opacity-30;
+  margin-top: 2px;
+}
+
+/* Ensure the time view has proper borders and styling */
+.events-calendar .rbc-time-view {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 600px !important;
+  border-radius: 4px;
+  overflow: hidden;
+  border: none;
+}
+
+/* Ensure the all-day events container has proper spacing */
+.events-calendar .rbc-time-view .rbc-allday-cell {
+  padding: 4px 0;
+  margin-bottom: 4px;
+}
+
+/* Add a subtle visual separator for the all-day section */
+.events-calendar .rbc-time-view .rbc-allday-cell:after {
+  content: "";
+  display: block;
+  height: 4px;
+  width: 100%;
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+  border-bottom: 1px solid;
+  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+/* Ensure the time content has proper spacing */
+.events-calendar .rbc-time-content {
+  padding-top: 4px;
+}
+
+/* Specific styling for the calendar in the car page */
+.events-calendar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 700px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  padding: 16px 16px 0 16px;
+}
+
+/* Clean toolbar with no border or horizontal rule */
+.events-calendar .rbc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 16px 0;
+  margin-bottom: 12px;
+  /* No border or horizontal rule */
+}
+
+.events-calendar .rbc-toolbar .rbc-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Ensure the toolbar label (date range) has proper styling */
+.events-calendar .rbc-toolbar-label {
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Ensure the filter buttons have proper spacing */
+.events-calendar .rbc-toolbar .rbc-btn-group:last-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important; /* Increase gap between filter buttons */
+}
+
+/* Add padding to the month/week view container but remove borders */
+.events-calendar .rbc-month-view,
+.events-calendar .rbc-time-view {
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  border: none !important;
 }

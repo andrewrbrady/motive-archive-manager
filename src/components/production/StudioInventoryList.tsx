@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { StudioInventoryItem } from "@/types/inventory";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Check } from "lucide-react";
+import { Edit, Trash2, MapPin, Box } from "lucide-react";
 import EditInventoryItemModal from "./EditInventoryItemModal";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LocationResponse } from "@/models/location";
 
 interface StudioInventoryListProps {
   items: StudioInventoryItem[];
@@ -29,6 +30,37 @@ export default function StudioInventoryList({
   const [editingItem, setEditingItem] = useState<StudioInventoryItem | null>(
     null
   );
+  const [locations, setLocations] = useState<Record<string, LocationResponse>>(
+    {}
+  );
+
+  // Fetch locations when component mounts
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch("/api/locations");
+      if (!response.ok) throw new Error("Failed to fetch locations");
+      const data = await response.json();
+
+      // Convert array to record for easy lookup
+      const locationsRecord: Record<string, LocationResponse> = {};
+      data.forEach((location: LocationResponse) => {
+        locationsRecord[location.id] = location;
+      });
+
+      setLocations(locationsRecord);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    }
+  };
+
+  const getLocationName = (locationId: string | undefined) => {
+    if (!locationId) return "No location";
+    return locations[locationId]?.name || "Unknown location";
+  };
 
   const handleSaveEdit = async (updatedItem: StudioInventoryItem) => {
     try {
@@ -71,96 +103,148 @@ export default function StudioInventoryList({
   return (
     <div className="space-y-2">
       {items.length === 0 ? (
-        <div className="text-center py-8 text-foreground-muted">
-          No items added yet. Click "Add Item" to get started.
+        <div className="text-center py-8 text-muted-foreground">
+          No items found. Try adjusting your filters or add new items.
         </div>
       ) : (
-        items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center gap-4 p-3 bg-background-primary dark:bg-background-primary border border-[hsl(var(--border-subtle))] rounded-lg hover:shadow-sm transition-shadow"
-          >
-            {isSelectionMode && (
-              <div className="flex-shrink-0">
-                <Checkbox
-                  checked={selectedItems.includes(item.id)}
-                  onCheckedChange={() => toggleItemSelection(item.id)}
-                  disabled={item.currentKitId !== undefined}
-                />
-              </div>
-            )}
-
-            {/* Thumbnail */}
-            <div className="relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden bg-background-secondary">
-              {item.primaryImage ? (
-                <Image
-                  src={item.primaryImage}
-                  alt={item.name}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-background-secondary text-foreground-muted">
-                  <span className="text-xs">No image</span>
-                </div>
-              )}
-            </div>
-
-            {/* Item Details */}
-            <div className="flex-grow min-w-0 flex items-center gap-4">
-              <h3 className="text-base font-medium text-foreground truncate">
-                {item.name}
-              </h3>
-              <span className="text-sm text-foreground-muted">
-                {item.category}
-              </span>
-              <span className="text-sm text-foreground-muted">
-                {item.manufacturer} {item.model}
-              </span>
-              {item.serialNumber && (
-                <span className="text-sm text-foreground-muted">
-                  S/N: {item.serialNumber}
-                </span>
-              )}
-              <span
-                className={cn(
-                  "px-2 py-0.5 rounded-full text-xs",
-                  item.isAvailable
-                    ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
-                    : "bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]"
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            {/* Table Header */}
+            <thead>
+              <tr className="text-left text-[hsl(var(--muted-foreground))] text-xs uppercase">
+                {isSelectionMode && (
+                  <th className="py-3 px-2 sticky left-0 bg-background z-10"></th>
                 )}
-              >
-                {item.isAvailable ? "Available" : "In Use"}
-              </span>
-              {item.currentKitId && (
-                <span className="text-xs text-[hsl(var(--info))]">
-                  Part of a Kit
-                </span>
-              )}
-            </div>
+                <th className="py-3 px-2 sticky left-0 bg-background z-10 w-12"></th>{" "}
+                {/* Image column */}
+                <th className="py-3 px-2 sticky left-[48px] bg-background z-10">
+                  Name
+                </th>
+                <th className="py-3 px-2">Category</th>
+                <th className="py-3 px-2">Manufacturer</th>
+                <th className="py-3 px-2">Model</th>
+                <th className="py-3 px-2">Location</th>
+                <th className="py-3 px-2">Status</th>
+                {!isSelectionMode && (
+                  <th className="py-3 px-2 text-right">Actions</th>
+                )}
+              </tr>
+            </thead>
 
-            {/* Actions */}
-            {!isSelectionMode && (
-              <div className="flex-shrink-0 flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setEditingItem(item)}
+            {/* Table Body */}
+            <tbody className="text-[hsl(var(--foreground))]">
+              {items.map((item) => (
+                <tr
+                  key={item.id}
+                  className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors"
                 >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(item.id)}
-                  className="text-destructive hover:text-destructive/90"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-        ))
+                  {isSelectionMode && (
+                    <td className="py-3 px-2 sticky left-0 bg-background z-10">
+                      <Checkbox
+                        checked={selectedItems.includes(item.id)}
+                        onCheckedChange={() => toggleItemSelection(item.id)}
+                        disabled={false}
+                      />
+                    </td>
+                  )}
+
+                  {/* Thumbnail */}
+                  <td className="py-3 px-2 sticky left-0 bg-background z-10">
+                    <div className="relative w-8 h-8 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                      {item.primaryImage ? (
+                        <Image
+                          src={item.primaryImage}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                          <span className="text-xs">No img</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Name */}
+                  <td className="py-3 px-2 sticky left-[48px] bg-background z-10">
+                    <span className="font-medium text-sm">{item.name}</span>
+                    {item.currentKitId && (
+                      <span className="ml-2 inline-flex items-center text-xs text-primary">
+                        <Box className="w-3 h-3 mr-1" />
+                        Kit
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Category */}
+                  <td className="py-3 px-2 text-sm">
+                    {item.category}
+                    {item.subCategory && (
+                      <span className="text-xs text-muted-foreground block">
+                        {item.subCategory}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Manufacturer */}
+                  <td className="py-3 px-2 text-sm">{item.manufacturer}</td>
+
+                  {/* Model */}
+                  <td className="py-3 px-2 text-sm">{item.model}</td>
+
+                  {/* Location */}
+                  <td className="py-3 px-2 text-sm">
+                    {item.location ? (
+                      <span className="inline-flex items-center">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {getLocationName(item.location)}
+                      </span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+
+                  {/* Status */}
+                  <td className="py-3 px-2">
+                    <span
+                      className={cn(
+                        "px-2 py-1 rounded text-xs",
+                        item.isAvailable
+                          ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
+                          : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                      )}
+                    >
+                      {item.isAvailable ? "Available" : "In Use"}
+                    </span>
+                  </td>
+
+                  {/* Actions */}
+                  {!isSelectionMode && (
+                    <td className="py-3 px-2 text-right">
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => setEditingItem(item)}
+                          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]"
+                          title="Edit item"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
+                          title="Delete item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {editingItem && (

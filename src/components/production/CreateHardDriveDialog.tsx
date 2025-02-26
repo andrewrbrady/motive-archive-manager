@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { HardDriveData } from "@/models/hard-drive";
+import { LocationResponse } from "@/models/location";
+import { MapPin } from "lucide-react";
 
 interface CreateHardDriveDialogProps {
   isOpen: boolean;
@@ -31,6 +33,8 @@ export default function CreateHardDriveDialog({
 }: CreateHardDriveDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [formData, setFormData] = useState<Partial<HardDriveData>>({
     label: "",
     systemName: "",
@@ -41,8 +45,29 @@ export default function CreateHardDriveDialog({
       used: 0,
     },
     status: "Available",
-    location: "",
+    locationId: "",
   });
+
+  // Fetch locations when the component mounts
+  useEffect(() => {
+    if (isOpen) {
+      fetchLocations();
+    }
+  }, [isOpen]);
+
+  const fetchLocations = async () => {
+    try {
+      setIsLoadingLocations(true);
+      const response = await fetch("/api/locations");
+      if (!response.ok) throw new Error("Failed to fetch locations");
+      const data = await response.json();
+      setLocations(data);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    } finally {
+      setIsLoadingLocations(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,13 +89,21 @@ export default function CreateHardDriveDialog({
   const handleChange = (field: string, value: any) => {
     if (field.includes(".")) {
       const [parent, child] = field.split(".");
-      setFormData((prev) => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof HardDriveData],
-          [child]: value,
-        },
-      }));
+
+      if (parent === "capacity") {
+        // Handle capacity specifically since we know its structure
+        setFormData((prev) => ({
+          ...prev,
+          capacity: {
+            total: prev.capacity?.total || 0,
+            used: prev.capacity?.used,
+            available: prev.capacity?.available,
+            ...(child === "total" ? { total: value } : {}),
+            ...(child === "used" ? { used: value } : {}),
+            ...(child === "available" ? { available: value } : {}),
+          },
+        }));
+      }
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -188,12 +221,28 @@ export default function CreateHardDriveDialog({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Location</label>
-            <Input
-              value={formData.location}
-              onChange={(e) => handleChange("location", e.target.value)}
-              placeholder="Enter location"
-              required
-            />
+            <Select
+              value={formData.locationId || "none"}
+              onValueChange={(value) =>
+                handleChange("locationId", value === "none" ? "" : value)
+              }
+              disabled={isLoadingLocations}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3 h-3" />
+                      {location.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

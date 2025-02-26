@@ -13,7 +13,7 @@ interface LintSummary {
 async function runLintAnalysis(fix: boolean = false): Promise<LintSummary> {
   const eslint = new ESLint({
     fix,
-    useEslintrc: true,
+    // useEslintrc: true,
   });
 
   try {

@@ -44,11 +44,13 @@ export async function POST(
           },
         }
       ),
-      // Add drive to each raw asset's locations
-      db.collection("raw").updateMany(
+      // Add drive to each raw asset's hardDriveIds
+      db.collection("raw_assets").updateMany(
         { _id: { $in: rawAssetObjectIds } },
         {
-          $addToSet: { locations: driveObjectId },
+          $addToSet: {
+            hardDriveIds: driveObjectId,
+          },
         }
       ),
     ];
@@ -105,11 +107,11 @@ export async function DELETE(
           $pullAll: { rawAssets: rawAssetObjectIds } as any,
         }
       ),
-      // Remove drive from each raw asset's locations
-      db.collection("raw").updateMany(
+      // Remove drive from each raw asset's hardDriveIds
+      db.collection("raw_assets").updateMany(
         { _id: { $in: rawAssetObjectIds } },
         {
-          $pull: { locations: driveObjectId } as any,
+          $pull: { hardDriveIds: driveObjectId } as any,
         }
       ),
     ];

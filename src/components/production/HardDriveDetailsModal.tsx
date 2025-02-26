@@ -5,22 +5,37 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { HardDriveIcon, PencilIcon, FolderIcon, ScanIcon } from "lucide-react";
+import {
+  HardDriveIcon,
+  PencilIcon,
+  FolderIcon,
+  ScanIcon,
+  MapPin,
+} from "lucide-react";
 import RawAssetDetailsModal from "./RawAssetDetailsModal";
-import { RawAssetData } from "@/models/raw";
+import { RawAssetData } from "@/models/raw_assets";
 import Link from "next/link";
+import { LocationResponse } from "@/models/location";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface HardDriveDetailsModalProps {
   driveId: string | null;
   onClose: () => void;
+  onDriveUpdate?: () => void;
 }
 
 interface RawAsset {
   _id: string;
   date: string;
   description: string;
-  locations: string[];
-  cars: Array<{
+  hardDriveIds: string[];
+  cars?: Array<{
     _id: string;
     make: string;
     model: string;
@@ -40,7 +55,12 @@ interface HardDrive {
   type: "HDD" | "SSD" | "NVMe";
   interface: "USB" | "Thunderbolt" | "USB-C" | "Internal";
   status: "Available" | "In Use" | "Archived" | "Offline";
-  location?: string;
+  locationId?: string;
+  locationDetails?: {
+    _id: string;
+    name: string;
+    type: string;
+  };
   notes?: string;
   rawAssets?: string[];
   rawAssetDetails: RawAsset[];
@@ -49,6 +69,7 @@ interface HardDrive {
 export default function HardDriveDetailsModal({
   driveId,
   onClose,
+  onDriveUpdate,
 }: HardDriveDetailsModalProps) {
   const [drive, setDrive] = useState<HardDrive | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<RawAssetData | null>(null);
@@ -69,6 +90,10 @@ export default function HardDriveDetailsModal({
     addedAssets: number;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
+  const [shouldRefetch, setShouldRefetch] = useState(0);
 
   // Handle opening raw asset details
   const handleAssetClick = (asset: RawAsset) => {
@@ -114,22 +139,26 @@ export default function HardDriveDetailsModal({
   };
 
   // Fetch drive labels for the selected asset
-  const fetchDriveLabels = async (locations: string[]) => {
-    const labels: Record<string, string> = {};
-    for (const id of locations) {
-      try {
-        const response = await fetch(`/api/hard-drives?id=${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.drives?.[0]?.label) {
-            labels[id] = data.drives[0].label;
-          }
-        }
-      } catch (error) {
-        console.warn(`Error fetching drive label for ${id}:`, error);
-      }
+  const fetchDriveLabels = async (hardDriveIds: string[]) => {
+    try {
+      setIsLoadingLabels(true);
+      const response = await fetch(
+        `/api/hard-drives?ids=${hardDriveIds.join(",")}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch drive labels");
+      const data = await response.json();
+
+      const labels: Record<string, string> = {};
+      data.drives.forEach((drive: any) => {
+        labels[drive._id] = drive.label;
+      });
+
+      setDriveLabels(labels);
+    } catch (error) {
+      console.error("Error fetching drive labels:", error);
+    } finally {
+      setIsLoadingLabels(false);
     }
-    return labels;
   };
 
   const handleRemoveAsset = async (assetId: string) => {
@@ -173,36 +202,49 @@ export default function HardDriveDetailsModal({
   };
 
   const handleSaveEdit = async () => {
-    if (!driveId || !editFormData) return;
+    if (!editFormData || !driveId) return;
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Create a new object without the _id field
-      const { _id, rawAssetDetails, rawAssets, ...updateData } = editFormData;
+      const payload = {
+        ...editFormData,
+        capacity: {
+          total: editFormData.capacity?.total
+            ? parseFloat(editFormData.capacity.total.toString())
+            : 0,
+          used: editFormData.capacity?.used
+            ? parseFloat(editFormData.capacity.used.toString())
+            : undefined,
+          available: editFormData.capacity?.available
+            ? parseFloat(editFormData.capacity.available.toString())
+            : undefined,
+        },
+        locationId: editFormData.locationId || undefined,
+      };
 
       const response = await fetch(`/api/hard-drives/${driveId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update drive");
+        throw new Error("Failed to update drive");
       }
 
-      const updatedDrive = await response.json();
-      setDrive(updatedDrive);
       setIsEditing(false);
-      setEditFormData(null);
+      if (onDriveUpdate) onDriveUpdate();
+
+      // Trigger refetch of drive details
+      setShouldRefetch((prev) => prev + 1);
     } catch (error) {
       console.error("Error updating drive:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to update drive"
+        error instanceof Error ? error.message : "An unknown error occurred"
       );
     } finally {
       setIsSubmitting(false);
@@ -260,7 +302,8 @@ export default function HardDriveDetailsModal({
             : driveInfo.interface.includes("USB")
             ? "USB-C"
             : "USB",
-          location: driveInfo.driveType.location || prev?.location,
+          // Try to find a matching location or keep the existing one
+          locationId: prev?.locationId || "",
           notes:
             prev?.notes ||
             `${driveInfo.driveType.mediaType || "External"} drive\n${
@@ -321,8 +364,8 @@ export default function HardDriveDetailsModal({
       // Update form with system drive information
       setEditFormData((prev) => ({
         ...prev,
-        systemName: "Macintosh HD",
-        label: prev?.label || "Macintosh HD",
+        systemName: driveInfo.systemName,
+        label: prev?.label || driveInfo.systemName,
         capacity: {
           total: Math.round(driveInfo.capacity.total),
           used: Math.round(driveInfo.capacity.used),
@@ -330,10 +373,11 @@ export default function HardDriveDetailsModal({
         },
         type: "SSD",
         interface: "Internal",
-        location: "Internal",
+        // Find a location with name "Internal" or use a default value
+        locationId: locations.find((loc) => loc.name === "Internal")?.id || "",
         notes:
           prev?.notes ||
-          `System Drive (Macintosh HD)\nFile System: ${
+          `System Drive (${driveInfo.systemName})\nFile System: ${
             driveInfo.fileSystem.type || "APFS"
           }\n${
             driveInfo.security.hasHardwareAES
@@ -394,22 +438,69 @@ export default function HardDriveDetailsModal({
     }
   };
 
+  // Add a function to fetch locations
+  const fetchLocations = async () => {
+    try {
+      setIsLoadingLocations(true);
+      const response = await fetch("/api/locations");
+      if (!response.ok) throw new Error("Failed to fetch locations");
+      const data = await response.json();
+      setLocations(data);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    } finally {
+      setIsLoadingLocations(false);
+    }
+  };
+
+  // Fetch locations when the component mounts or when editing starts
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  // Fetch drive details when driveId changes
   useEffect(() => {
     async function fetchDriveDetails() {
       if (!driveId) return;
 
       try {
+        setError(null);
+        setIsLoading(true);
+
         const response = await fetch(`/api/hard-drives/${driveId}`);
-        if (!response.ok) throw new Error("Failed to fetch drive details");
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to fetch drive details");
+        }
+
         const data = await response.json();
+
+        // Validate that the data has the expected structure
+        if (!data || typeof data !== "object") {
+          throw new Error("Invalid drive data received");
+        }
+
+        // Ensure rawAssetDetails is always an array, even if it's null or undefined
+        if (!data.rawAssetDetails) {
+          data.rawAssetDetails = [];
+        }
+
         setDrive(data);
       } catch (error) {
         console.error("Error fetching drive details:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch drive details"
+        );
+      } finally {
+        setIsLoading(false);
       }
     }
 
     fetchDriveDetails();
-  }, [driveId]);
+  }, [driveId, shouldRefetch]);
 
   if (!drive) return null;
 
@@ -440,384 +531,459 @@ export default function HardDriveDetailsModal({
     <>
       <Dialog open={!!driveId} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-6xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Left Column - Drive Stats */}
-            <div className="flex flex-col gap-6">
-              <div className="flex items-start gap-4">
-                <div className="p-4 rounded-lg bg-[hsl(var(--secondary))] flex items-center justify-center">
-                  <HardDriveIcon className="w-8 h-8" />
-                </div>
-                <div className="flex-1">
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editFormData?.label || ""}
-                      onChange={(e) =>
-                        setEditFormData((prev) =>
-                          prev ? { ...prev, label: e.target.value } : null
-                        )
-                      }
-                      className="text-2xl font-bold bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] w-full"
-                    />
-                  ) : (
-                    <h2 className="text-2xl font-bold">{drive?.label}</h2>
-                  )}
-                </div>
-                {!isEditing && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleStartEdit}
-                    className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                  >
-                    <PencilIcon className="w-4 h-4" />
-                  </Button>
-                )}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[hsl(var(--primary))]"></div>
+              <p className="mt-4 text-[hsl(var(--muted-foreground))]">
+                Loading drive details...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="rounded-full h-12 w-12 bg-red-100 flex items-center justify-center">
+                <span className="text-red-500 text-2xl">!</span>
               </div>
-
-              <div className="space-y-2">
-                {isEditing ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
+              <h3 className="mt-4 text-lg font-medium">Error Loading Drive</h3>
+              <p className="mt-2 text-[hsl(var(--muted-foreground))]">
+                {error}
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  // Close the modal
+                  handleOpenChange(false);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          ) : !drive ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-[hsl(var(--muted-foreground))]">
+                No drive data available
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  // Close the modal
+                  handleOpenChange(false);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left Column - Drive Stats */}
+              <div className="flex flex-col gap-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-4 rounded-lg bg-[hsl(var(--secondary))] flex items-center justify-center">
+                    <HardDriveIcon className="w-8 h-8" />
+                  </div>
+                  <div className="flex-1">
+                    {isEditing ? (
                       <input
                         type="text"
-                        value={editFormData?.systemName || ""}
+                        value={editFormData?.label || ""}
                         onChange={(e) =>
                           setEditFormData((prev) =>
-                            prev
-                              ? { ...prev, systemName: e.target.value }
-                              : null
+                            prev ? { ...prev, label: e.target.value } : null
                           )
                         }
-                        placeholder="System Name"
-                        className="flex-1 text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded px-2 py-1"
+                        className="text-2xl font-bold bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] w-full"
                       />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleFolderSelect}
-                        disabled={isLoading}
-                        className="h-8 px-2 flex items-center gap-1"
-                      >
-                        <FolderIcon className="w-4 h-4" />
-                        Select Drive
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleSystemDriveInfo}
-                        disabled={isLoading}
-                        className="h-8 px-2 flex items-center gap-1"
-                      >
-                        <HardDriveIcon className="w-4 h-4" />
-                        Get System Drive
-                      </Button>
-                      {editFormData?.systemName && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleScan}
-                          disabled={isScanning}
-                          className="h-8 px-2 flex items-center gap-1"
-                        >
-                          <ScanIcon className="w-4 h-4" />
-                          {isScanning ? "Scanning..." : "Scan"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {drive?.systemName && (
-                      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                        System Name: {drive.systemName}
-                      </p>
-                    )}
-                  </>
-                )}
-                {scanResult && !isEditing && (
-                  <div className="mt-2 p-2 bg-[hsl(var(--secondary))] rounded text-sm">
-                    <p>
-                      Found {scanResult.matchedAssets} matching raw assets in{" "}
-                      {scanResult.scannedFolders} folders
-                    </p>
-                    {scanResult.addedAssets > 0 && (
-                      <p className="text-[hsl(var(--success))]">
-                        Added {scanResult.addedAssets} new assets
-                      </p>
+                    ) : (
+                      <h2 className="text-2xl font-bold">{drive?.label}</h2>
                     )}
                   </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={editFormData?.status || "Available"}
-                        onChange={(e) =>
-                          setEditFormData((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  status: e.target.value as HardDrive["status"],
-                                }
-                              : null
-                          )
-                        }
-                        className="px-2 py-1 rounded text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))]"
-                      >
-                        <option value="Available">Available</option>
-                        <option value="In Use">In Use</option>
-                        <option value="Archived">Archived</option>
-                        <option value="Offline">Offline</option>
-                      </select>
-                      <select
-                        value={editFormData?.type || "HDD"}
-                        onChange={(e) =>
-                          setEditFormData((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  type: e.target.value as HardDrive["type"],
-                                }
-                              : null
-                          )
-                        }
-                        className="px-2 py-1 rounded text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))]"
-                      >
-                        <option value="HDD">HDD</option>
-                        <option value="SSD">SSD</option>
-                        <option value="NVMe">NVMe</option>
-                      </select>
-                      <select
-                        value={editFormData?.interface || "USB"}
-                        onChange={(e) =>
-                          setEditFormData((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  interface: e.target
-                                    .value as HardDrive["interface"],
-                                }
-                              : null
-                          )
-                        }
-                        className="px-2 py-1 rounded text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))]"
-                      >
-                        <option value="USB">USB</option>
-                        <option value="Thunderbolt">Thunderbolt</option>
-                        <option value="USB-C">USB-C</option>
-                        <option value="Internal">Internal</option>
-                      </select>
-                    </div>
-                  ) : (
-                    <>
-                      <Badge
-                        variant="outline"
-                        className={`${getStatusColor(drive.status)} text-white`}
-                      >
-                        {drive.status}
-                      </Badge>
-                      <Badge variant="secondary">{drive.type}</Badge>
-                      <Badge variant="secondary">{drive.interface}</Badge>
-                    </>
+                  {!isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleStartEdit}
+                      className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                    </Button>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
-                    <h3 className="font-medium mb-2">Storage</h3>
+                  {isEditing ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editFormData?.systemName || ""}
+                          onChange={(e) =>
+                            setEditFormData((prev) =>
+                              prev
+                                ? { ...prev, systemName: e.target.value }
+                                : null
+                            )
+                          }
+                          placeholder="System Name"
+                          className="flex-1 text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded px-2 py-1"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleFolderSelect}
+                          disabled={isLoading}
+                          className="h-8 px-2 flex items-center gap-1"
+                        >
+                          <FolderIcon className="w-4 h-4" />
+                          Select Drive
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSystemDriveInfo}
+                          disabled={isLoading}
+                          className="h-8 px-2 flex items-center gap-1"
+                        >
+                          <HardDriveIcon className="w-4 h-4" />
+                          Get System Drive
+                        </Button>
+                        {editFormData?.systemName && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleScan}
+                            disabled={isScanning}
+                            className="h-8 px-2 flex items-center gap-1"
+                          >
+                            <ScanIcon className="w-4 h-4" />
+                            {isScanning ? "Scanning..." : "Scan"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {drive?.systemName && (
+                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                          System Name: {drive.systemName}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {scanResult && !isEditing && (
+                    <div className="mt-2 p-2 bg-[hsl(var(--secondary))] rounded text-sm">
+                      <p>
+                        Found {scanResult.matchedAssets} matching raw assets in{" "}
+                        {scanResult.scannedFolders} folders
+                      </p>
+                      {scanResult.addedAssets > 0 && (
+                        <p className="text-[hsl(var(--success))]">
+                          Added {scanResult.addedAssets} new assets
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
                     {isEditing ? (
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-sm text-[hsl(var(--muted-foreground))]">
-                            Total (GB)
-                          </label>
-                          <input
-                            type="number"
-                            value={editFormData?.capacity?.total || 0}
-                            onChange={(e) =>
-                              setEditFormData((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      capacity: {
-                                        total: Number(e.target.value),
-                                        used: prev.capacity?.used || 0,
-                                        available:
-                                          prev.capacity?.available || 0,
-                                      },
-                                    }
-                                  : null
-                              )
-                            }
-                            className="w-full px-2 py-1 mt-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-[hsl(var(--muted-foreground))]">
-                            Used (GB)
-                          </label>
-                          <input
-                            type="number"
-                            value={editFormData?.capacity?.used || 0}
-                            onChange={(e) =>
-                              setEditFormData((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      capacity: {
-                                        total: prev.capacity?.total || 0,
-                                        used: Number(e.target.value),
-                                        available:
-                                          prev.capacity?.available || 0,
-                                      },
-                                    }
-                                  : null
-                              )
-                            }
-                            className="w-full px-2 py-1 mt-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-[hsl(var(--muted-foreground))]">
-                            Available (GB)
-                          </label>
-                          <input
-                            type="number"
-                            value={editFormData?.capacity?.available || 0}
-                            onChange={(e) =>
-                              setEditFormData((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      capacity: {
-                                        total: prev.capacity?.total || 0,
-                                        used: prev.capacity?.used || 0,
-                                        available: Number(e.target.value),
-                                      },
-                                    }
-                                  : null
-                              )
-                            }
-                            className="w-full px-2 py-1 mt-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
-                          />
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={editFormData?.status || "Available"}
+                          onChange={(e) =>
+                            setEditFormData((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    status: e.target
+                                      .value as HardDrive["status"],
+                                  }
+                                : null
+                            )
+                          }
+                          className="px-2 py-1 rounded text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))]"
+                        >
+                          <option value="Available">Available</option>
+                          <option value="In Use">In Use</option>
+                          <option value="Archived">Archived</option>
+                          <option value="Offline">Offline</option>
+                        </select>
+                        <select
+                          value={editFormData?.type || "HDD"}
+                          onChange={(e) =>
+                            setEditFormData((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    type: e.target.value as HardDrive["type"],
+                                  }
+                                : null
+                            )
+                          }
+                          className="px-2 py-1 rounded text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))]"
+                        >
+                          <option value="HDD">HDD</option>
+                          <option value="SSD">SSD</option>
+                          <option value="NVMe">NVMe</option>
+                        </select>
+                        <select
+                          value={editFormData?.interface || "USB"}
+                          onChange={(e) =>
+                            setEditFormData((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    interface: e.target
+                                      .value as HardDrive["interface"],
+                                  }
+                                : null
+                            )
+                          }
+                          className="px-2 py-1 rounded text-sm bg-[hsl(var(--background))] border border-[hsl(var(--border))]"
+                        >
+                          <option value="USB">USB</option>
+                          <option value="Thunderbolt">Thunderbolt</option>
+                          <option value="USB-C">USB-C</option>
+                          <option value="Internal">Internal</option>
+                        </select>
                       </div>
                     ) : (
-                      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                        {formatCapacity(drive.capacity)}
-                      </p>
+                      <>
+                        <Badge
+                          variant="outline"
+                          className={`${getStatusColor(
+                            drive.status
+                          )} text-white`}
+                        >
+                          {drive.status}
+                        </Badge>
+                        <Badge variant="secondary">{drive.type}</Badge>
+                        <Badge variant="secondary">{drive.interface}</Badge>
+                      </>
                     )}
                   </div>
 
-                  <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
-                    <h3 className="font-medium mb-2">Location</h3>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editFormData?.location || ""}
-                        onChange={(e) =>
-                          setEditFormData((prev) =>
-                            prev ? { ...prev, location: e.target.value } : null
-                          )
-                        }
-                        className="w-full px-2 py-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
-                      />
-                    ) : (
-                      <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                        {drive.location || "No location specified"}
-                      </p>
-                    )}
-                  </div>
+                  <div className="space-y-2">
+                    <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
+                      <h3 className="font-medium mb-2">Storage</h3>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-sm text-[hsl(var(--muted-foreground))]">
+                              Total (GB)
+                            </label>
+                            <input
+                              type="number"
+                              value={editFormData?.capacity?.total || 0}
+                              onChange={(e) =>
+                                setEditFormData((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        capacity: {
+                                          total: Number(e.target.value),
+                                          used: prev.capacity?.used || 0,
+                                          available:
+                                            prev.capacity?.available || 0,
+                                        },
+                                      }
+                                    : null
+                                )
+                              }
+                              className="w-full px-2 py-1 mt-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm text-[hsl(var(--muted-foreground))]">
+                              Used (GB)
+                            </label>
+                            <input
+                              type="number"
+                              value={editFormData?.capacity?.used || 0}
+                              onChange={(e) =>
+                                setEditFormData((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        capacity: {
+                                          total: prev.capacity?.total || 0,
+                                          used: Number(e.target.value),
+                                          available:
+                                            prev.capacity?.available || 0,
+                                        },
+                                      }
+                                    : null
+                                )
+                              }
+                              className="w-full px-2 py-1 mt-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm text-[hsl(var(--muted-foreground))]">
+                              Available (GB)
+                            </label>
+                            <input
+                              type="number"
+                              value={editFormData?.capacity?.available || 0}
+                              onChange={(e) =>
+                                setEditFormData((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        capacity: {
+                                          total: prev.capacity?.total || 0,
+                                          used: prev.capacity?.used || 0,
+                                          available: Number(e.target.value),
+                                        },
+                                      }
+                                    : null
+                                )
+                              }
+                              className="w-full px-2 py-1 mt-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                          {formatCapacity(drive.capacity)}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
-                    <h3 className="font-medium mb-2">Notes</h3>
-                    {isEditing ? (
-                      <textarea
-                        value={editFormData?.notes || ""}
-                        onChange={(e) =>
-                          setEditFormData((prev) =>
-                            prev ? { ...prev, notes: e.target.value } : null
-                          )
-                        }
-                        rows={3}
-                        className="w-full px-2 py-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
-                      />
-                    ) : (
-                      <p className="text-sm text-[hsl(var(--muted-foreground))] whitespace-pre-line">
-                        {drive.notes || "No notes"}
-                      </p>
-                    )}
+                    <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
+                      <h3 className="font-medium mb-2">Location</h3>
+                      {isEditing ? (
+                        <Select
+                          value={editFormData?.locationId || "none"}
+                          onValueChange={(value) =>
+                            setEditFormData((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    locationId: value === "none" ? "" : value,
+                                  }
+                                : null
+                            )
+                          }
+                          disabled={isLoadingLocations}
+                        >
+                          <SelectTrigger className="w-full bg-[hsl(var(--background))]">
+                            <SelectValue placeholder="Select a location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3 h-3" />
+                                  {location.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                          {drive.locationDetails ? (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {drive.locationDetails.name}
+                            </span>
+                          ) : (
+                            "No location specified"
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-[hsl(var(--secondary))] p-4 rounded-lg">
+                      <h3 className="font-medium mb-2">Notes</h3>
+                      {isEditing ? (
+                        <textarea
+                          value={editFormData?.notes || ""}
+                          onChange={(e) =>
+                            setEditFormData((prev) =>
+                              prev ? { ...prev, notes: e.target.value } : null
+                            )
+                          }
+                          rows={3}
+                          className="w-full px-2 py-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded"
+                        />
+                      ) : (
+                        <p className="text-sm text-[hsl(var(--muted-foreground))] whitespace-pre-line">
+                          {drive.notes || "No notes"}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Right Column - Raw Assets */}
-            <div className="flex flex-col">
-              <h3 className="text-lg font-medium mb-4">Raw Assets</h3>
-              <ScrollArea className="flex-1 max-h-[calc(100vh-24rem)] pr-4">
-                <div className="space-y-4">
-                  {drive?.rawAssetDetails.map((asset) => (
-                    <div
-                      key={asset._id}
-                      className="block w-full text-left border border-[hsl(var(--border))] rounded-lg p-3 hover:bg-[hsl(var(--accent))] transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => handleAssetClick(asset)}
-                          className="flex items-center flex-1"
-                        >
-                          <p className="font-medium min-w-[120px] text-sm">
-                            {asset.date}
-                          </p>
-                          <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
-                            {asset.cars.map((car) => (
-                              <Badge
-                                key={car._id}
-                                variant="outline"
-                                className="whitespace-nowrap"
-                              >
-                                {car.year} {car.make} {car.model}
-                              </Badge>
-                            ))}
-                          </div>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveAsset(asset._id);
-                          }}
-                          className="ml-2 p-2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+              {/* Right Column - Raw Assets */}
+              <div className="flex flex-col">
+                <h3 className="text-lg font-medium mb-4">Raw Assets</h3>
+                <ScrollArea className="flex-1 max-h-[calc(100vh-24rem)] pr-4">
+                  <div className="space-y-4">
+                    {drive?.rawAssetDetails.map((asset) => (
+                      <div
+                        key={asset._id}
+                        className="block w-full text-left border border-[hsl(var(--border))] rounded-lg p-3 hover:bg-[hsl(var(--accent))] transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => handleAssetClick(asset)}
+                            className="flex items-center flex-1"
                           >
-                            <path d="M3 6h18" />
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          </svg>
-                        </button>
+                            <p className="font-medium min-w-[120px] text-sm">
+                              {asset.date}
+                            </p>
+                            <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
+                              {asset.cars &&
+                                asset.cars.map((car) => (
+                                  <Badge
+                                    key={car._id}
+                                    variant="outline"
+                                    className="whitespace-nowrap"
+                                  >
+                                    {car.year} {car.make} {car.model}
+                                  </Badge>
+                                ))}
+                            </div>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAsset(asset._id);
+                            }}
+                            className="ml-2 p-2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end mt-6 gap-2">
             {isEditing ? (
@@ -845,8 +1011,8 @@ export default function HardDriveDetailsModal({
 
       <RawAssetDetailsModal
         isOpen={!!selectedAsset}
-        onClose={handleAssetClose}
         asset={selectedAsset || undefined}
+        onClose={handleAssetClose}
         driveLabels={driveLabels}
       />
     </>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { HardDrive } from "@/models/hard-drive";
+import { toObjectId } from "@/lib/mongodb-types";
 
 interface RawAssetWithCars {
   _id: ObjectId;
@@ -14,9 +15,19 @@ interface RawAssetWithCars {
   }>;
 }
 
-interface AggregationResult extends HardDrive {
+interface HardDriveDocument extends Omit<HardDrive, "rawAssets"> {
   _id: ObjectId;
+  rawAssets: ObjectId[];
+}
+
+interface AggregationResult extends HardDriveDocument {
   rawAssetDetails: RawAssetWithCars[];
+  locationDetails?: Array<{
+    _id: ObjectId;
+    name: string;
+    type: string;
+    [key: string]: any;
+  }>;
 }
 
 export async function GET(
@@ -28,7 +39,7 @@ export async function GET(
     const db = client.db();
 
     const hardDrive = await db
-      .collection<HardDrive>("hard_drives")
+      .collection<HardDriveDocument>("hard_drives")
       .findOne({ _id: new ObjectId(params.id) });
 
     if (!hardDrive) {
@@ -38,6 +49,47 @@ export async function GET(
       );
     }
 
+    // Safeguard: Check if rawAssets array contains valid ObjectIds
+    // and filter out any invalid ones before proceeding with the pipeline
+    let validRawAssets: ObjectId[] = [];
+    if (
+      hardDrive.rawAssets &&
+      Array.isArray(hardDrive.rawAssets) &&
+      hardDrive.rawAssets.length > 0
+    ) {
+      validRawAssets = hardDrive.rawAssets.filter((assetId) => {
+        try {
+          // Check if it's a valid ObjectId and not null/undefined
+          return (
+            assetId !== null &&
+            assetId !== undefined &&
+            ObjectId.isValid(assetId.toString())
+          );
+        } catch (error) {
+          console.error(`Invalid raw asset ID: ${assetId}`, error);
+          return false;
+        }
+      });
+
+      // If we filtered out any invalid IDs, update the hard drive
+      if (validRawAssets.length !== hardDrive.rawAssets.length) {
+        console.log(
+          `Filtered out ${
+            hardDrive.rawAssets.length - validRawAssets.length
+          } invalid raw asset IDs from hard drive ${params.id}`
+        );
+        await db
+          .collection("hard_drives")
+          .updateOne(
+            { _id: new ObjectId(params.id) },
+            { $set: { rawAssets: validRawAssets } }
+          );
+
+        // Update the hardDrive object to use the valid assets
+        hardDrive.rawAssets = validRawAssets;
+      }
+    }
+
     const pipeline = [
       {
         $match: {
@@ -45,11 +97,36 @@ export async function GET(
         },
       },
       {
+        $addFields: {
+          locationObjectId: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ["$locationId", null] },
+                  { $ne: ["$locationId", ""] },
+                  { $ne: ["$locationId", undefined] },
+                ],
+              },
+              then: { $toObjectId: "$locationId" },
+              else: null,
+            },
+          },
+        },
+      },
+      {
         $lookup: {
-          from: "raw",
+          from: "raw_assets",
           localField: "rawAssets",
           foreignField: "_id",
           as: "rawAssetDetails",
+        },
+      },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "locationObjectId",
+          foreignField: "_id",
+          as: "locationDetails",
         },
       },
       {
@@ -81,8 +158,10 @@ export async function GET(
           type: { $first: "$type" },
           interface: { $first: "$interface" },
           status: { $first: "$status" },
-          location: { $first: "$location" },
+          locationId: { $first: "$locationId" },
+          locationDetails: { $first: "$locationDetails" },
           notes: { $first: "$notes" },
+          rawAssets: { $first: "$rawAssets" },
           rawAssetDetails: {
             $push: {
               $cond: {
@@ -97,40 +176,62 @@ export async function GET(
     ];
 
     const result = await db
-      .collection<HardDrive>("hard_drives")
+      .collection<HardDriveDocument>("hard_drives")
       .aggregate<AggregationResult>(pipeline)
       .toArray();
 
-    if (!result[0]) {
+    if (result.length === 0) {
       return NextResponse.json(
         { error: "Hard drive not found" },
         { status: 404 }
       );
     }
 
-    // Convert ObjectIds to strings in the response and handle null/undefined values
-    const formattedResult = {
-      ...result[0],
-      _id: result[0]._id.toString(),
-      rawAssetDetails: (result[0].rawAssetDetails || [])
-        .filter((asset) => asset && asset._id) // Filter out null/undefined assets
-        .map((asset) => ({
-          ...asset,
-          _id: asset._id.toString(),
-          cars: (asset.cars || [])
-            .filter((car) => car && car._id) // Filter out null/undefined cars
-            .map((car) => ({
-              ...car,
-              _id: car._id.toString(),
-            })),
-        })),
-    };
+    const drive = result[0];
 
-    return NextResponse.json(formattedResult);
+    return NextResponse.json({
+      ...drive,
+      _id: drive._id.toString(),
+      rawAssets: drive.rawAssets
+        ?.filter((id) => id !== null && id !== undefined)
+        .map((id: ObjectId) => id.toString()),
+      locationDetails: drive.locationDetails?.[0]
+        ? {
+            ...drive.locationDetails[0],
+            _id: drive.locationDetails[0]._id.toString(),
+          }
+        : null,
+      rawAssetDetails:
+        drive.rawAssetDetails
+          ?.filter(
+            (asset) =>
+              asset !== null &&
+              asset !== undefined &&
+              asset._id !== null &&
+              asset._id !== undefined
+          )
+          .map((asset) => ({
+            ...asset,
+            _id: asset._id.toString(),
+            cars:
+              asset.cars
+                ?.filter(
+                  (car) =>
+                    car !== null &&
+                    car !== undefined &&
+                    car._id !== null &&
+                    car._id !== undefined
+                )
+                .map((car) => ({
+                  ...car,
+                  _id: car._id.toString(),
+                })) || [],
+          })) || [],
+    });
   } catch (error) {
-    console.error("Error fetching hard drive details:", error);
+    console.error("Error fetching hard drive:", error);
     return NextResponse.json(
-      { error: "Failed to fetch hard drive details" },
+      { error: "Failed to fetch hard drive" },
       { status: 500 }
     );
   }
@@ -181,9 +282,38 @@ export async function PUT(
       }
     }
 
+    // Convert locationId to ObjectId if provided
+    if (data.locationId) {
+      try {
+        // Check if locationId is a valid non-empty string
+        if (
+          typeof data.locationId === "string" &&
+          data.locationId.trim() !== ""
+        ) {
+          data.locationId = new ObjectId(data.locationId);
+        } else {
+          // If it's an empty string or invalid, set to null
+          data.locationId = null;
+        }
+      } catch (error) {
+        console.error("Invalid location ID:", error);
+        data.locationId = null;
+      }
+    }
+
     // Convert raw asset IDs to ObjectIds if provided
     if (data.rawAssets) {
-      data.rawAssets = data.rawAssets.map((id: string) => new ObjectId(id));
+      data.rawAssets = data.rawAssets
+        .filter((id: string) => id !== null && id !== undefined)
+        .map((id: string) => {
+          try {
+            return new ObjectId(id);
+          } catch (error) {
+            console.error(`Invalid raw asset ID in PUT request: ${id}`, error);
+            return null;
+          }
+        })
+        .filter((id: ObjectId | null) => id !== null);
     }
 
     // Update drive
@@ -204,30 +334,92 @@ export async function PUT(
       );
     }
 
-    // Fetch updated drive with raw asset details
-    const [updatedDrive] = await db
-      .collection("hard_drives")
-      .aggregate([
-        { $match: { _id: new ObjectId(params.id) } },
-        {
-          $lookup: {
-            from: "raw",
-            localField: "rawAssets",
-            foreignField: "_id",
-            as: "rawAssetDetails",
+    // Fetch updated drive with raw asset details and location details
+    const pipeline = [
+      {
+        $match: {
+          _id: new ObjectId(params.id),
+        },
+      },
+      {
+        $addFields: {
+          locationObjectId: {
+            $cond: {
+              if: {
+                $and: [
+                  { $ne: ["$locationId", null] },
+                  { $ne: ["$locationId", ""] },
+                  { $ne: ["$locationId", undefined] },
+                ],
+              },
+              then: { $toObjectId: "$locationId" },
+              else: null,
+            },
           },
         },
-      ])
+      },
+      {
+        $lookup: {
+          from: "raw_assets",
+          localField: "rawAssets",
+          foreignField: "_id",
+          as: "rawAssetDetails",
+        },
+      },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "locationObjectId",
+          foreignField: "_id",
+          as: "locationDetails",
+        },
+      },
+    ];
+
+    const [updatedDrive] = await db
+      .collection("hard_drives")
+      .aggregate(pipeline)
       .toArray();
 
     return NextResponse.json({
       ...updatedDrive,
       _id: updatedDrive._id.toString(),
-      rawAssets: updatedDrive.rawAssets?.map((id: ObjectId) => id.toString()),
-      rawAssetDetails: updatedDrive.rawAssetDetails?.map((asset: any) => ({
-        ...asset,
-        _id: asset._id.toString(),
-      })),
+      rawAssets:
+        updatedDrive.rawAssets
+          ?.filter((id: any) => id !== null && id !== undefined)
+          .map((id: ObjectId) => id.toString()) || [],
+      locationDetails: updatedDrive.locationDetails?.[0]
+        ? {
+            ...updatedDrive.locationDetails[0],
+            _id: updatedDrive.locationDetails[0]._id.toString(),
+          }
+        : null,
+      rawAssetDetails:
+        updatedDrive.rawAssetDetails
+          ?.filter(
+            (asset: any) =>
+              asset !== null &&
+              asset !== undefined &&
+              asset._id !== null &&
+              asset._id !== undefined
+          )
+          .map((asset: any) => ({
+            ...asset,
+            _id: asset._id.toString(),
+            cars:
+              asset.cars
+                ?.filter(
+                  (car: any) =>
+                    car !== null &&
+                    car !== undefined &&
+                    car._id !== null &&
+                    car._id !== undefined
+                )
+                .map((car: any) => ({
+                  ...car,
+                  _id: car._id.toString(),
+                })) || [],
+          })) || [],
     });
   } catch (error) {
     console.error("Error updating hard drive:", error);

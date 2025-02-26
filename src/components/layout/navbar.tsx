@@ -70,6 +70,9 @@ export default function Navbar({ className }: NavbarProps) {
               <Link href="/makes" className={linkClasses}>
                 Makes
               </Link>
+              <Link href="/locations" className={linkClasses}>
+                Locations
+              </Link>
             </div>
           </div>
           <div className="flex items-center space-x-6">

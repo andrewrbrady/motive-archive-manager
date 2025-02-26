@@ -5,11 +5,11 @@ import { useParams } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import { ImageGallery } from "@/components/ImageGallery";
 import VehicleDetails from "@/components/inventory/VehicleDetails";
-import { InventoryItem } from "@/components/inventory/types";
+import { VehicleInventoryItem } from "@/components/inventory/types";
 
 export default function InventoryItemPage() {
   const params = useParams();
-  const [item, setItem] = React.useState<InventoryItem | null>(null);
+  const [item, setItem] = React.useState<VehicleInventoryItem | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -58,7 +58,7 @@ export default function InventoryItemPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <ImageGallery
-            images={(item.images || []).map((url) => ({
+            images={(item.images || []).map((url: string) => ({
               id: url,
               url,
               filename: url.split("/").pop() || "",

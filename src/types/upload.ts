@@ -1,4 +1,9 @@
-import { ImageMetadata } from "./car";
+// Define ImageMetadata interface directly instead of importing it
+export interface ImageMetadata {
+  description?: string;
+  tags?: string[];
+  [key: string]: any;
+}
 
 export interface UploadProgress {
   fileName: string;

@@ -7,7 +7,7 @@ import Pagination from "@/components/Pagination";
 import Navbar from "@/components/layout/navbar";
 import { InventoryCard } from "@/components/inventory/InventoryCard";
 import {
-  InventoryItem,
+  VehicleInventoryItem,
   InventoryPageProps,
   transformInventoryItem,
   InventoryItemRaw,
@@ -92,7 +92,7 @@ export default async function InventoryPage({
                     : "flex flex-col space-y-4"
                 }`}
               >
-                {results.map((item: InventoryItem) => (
+                {results.map((item: VehicleInventoryItem) => (
                   <InventoryCard key={item.id} item={item} view={view} />
                 ))}
               </div>

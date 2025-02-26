@@ -1,9 +1,9 @@
 import React from "react";
 import Link from "next/link";
-import { InventoryItem } from "@/types/inventory";
+import { VehicleInventoryItem } from "@/types/inventory";
 
 interface VehicleDetailsProps {
-  item: InventoryItem;
+  item: VehicleInventoryItem;
 }
 
 export default function VehicleDetails({ item }: VehicleDetailsProps) {
@@ -25,7 +25,9 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
       <div className="grid grid-cols-2 gap-4">
         {item.price && (
           <div>
-            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">Price</dt>
+            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+              Price
+            </dt>
             <dd className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
               ${item.price.toLocaleString()}
             </dd>
@@ -56,7 +58,9 @@ export default function VehicleDetails({ item }: VehicleDetailsProps) {
 
         {item.dealer && (
           <div>
-            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">Dealer</dt>
+            <dt className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+              Dealer
+            </dt>
             <dd className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
               {item.dealer}
             </dd>

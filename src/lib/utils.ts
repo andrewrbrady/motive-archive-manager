@@ -124,3 +124,24 @@ export function getApiUrl(path: string): string {
     return `${baseUrl}/api/${cleanPath}`;
   }
 }
+
+/**
+ * Formats a date into a readable string format
+ * @param date The date to format
+ * @returns Formatted date string
+ */
+export function formatDate(date: Date | string | number | undefined): string {
+  if (!date) return "";
+
+  const dateObj = date instanceof Date ? date : new Date(date);
+
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) return "";
+
+  // Format: Month Day, Year
+  return dateObj.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}

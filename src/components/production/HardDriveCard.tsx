@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { HardDriveIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { HardDriveIcon, PencilIcon, Trash2Icon, MapPin } from "lucide-react";
 import { HardDriveData } from "@/models/hard-drive";
 import { Button } from "@/components/ui/button";
 import { ObjectId } from "mongodb";
@@ -10,6 +10,7 @@ interface HardDriveCardProps {
   drive: HardDriveData & {
     _id?: ObjectId;
     rawAssetDetails?: { _id: string; date: string; description: string }[];
+    locationDetails?: { _id: string; name: string; type: string };
   };
   onEdit: () => void;
   onDelete: () => void;
@@ -102,23 +103,28 @@ export default function HardDriveCard({
             </div>
           </div>
         )}
+        {drive.locationDetails && (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Location:</span>
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {drive.locationDetails.name}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Status:</span>
           <span
-            className={`px-2 py-0.5 rounded text-xs ${
+            className={`px-1.5 py-0.5 rounded-full text-xs ${
               drive.status === "Available"
-                ? "bg-success/10 text-success"
+                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                 : drive.status === "In Use"
-                ? "bg-primary/10 text-primary"
-                : "bg-muted text-muted-foreground"
+                ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                : "bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400"
             }`}
           >
             {drive.status}
           </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Location:</span>
-          <span>{drive.location}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Raw Assets:</span>

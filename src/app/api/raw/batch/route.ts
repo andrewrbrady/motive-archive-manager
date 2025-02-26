@@ -6,7 +6,7 @@ export async function PUT(request: Request) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    const rawCollection = db.collection("raw");
+    const rawCollection = db.collection("raw_assets");
 
     const { ids, carIds } = await request.json();
 

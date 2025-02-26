@@ -188,3 +188,17 @@ export function toOrdinal(value: number): string {
   if (j === 3 && k !== 13) return `${value}rd`;
   return `${value}th`;
 }
+
+/**
+ * Formats a number as currency (USD by default)
+ */
+export function formatCurrency(
+  value: number,
+  currency = "USD",
+  locale = "en-US"
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency,
+  }).format(value);
+}

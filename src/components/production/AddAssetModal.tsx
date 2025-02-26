@@ -12,7 +12,7 @@ interface AddAssetModalProps {
   onAdd: (asset: {
     date: string;
     description: string;
-    locations: string[];
+    hardDriveIds: string[];
     cars: any[];
     carIds: string[];
   }) => void;
@@ -31,13 +31,13 @@ export default function AddAssetModal({
   const [formData, setFormData] = useState<{
     date: string;
     description: string;
-    locations: string[];
+    hardDriveIds: string[];
     cars: any[];
     carIds: string[];
   }>({
     date: "",
     description: "",
-    locations: [],
+    hardDriveIds: [],
     cars: [],
     carIds: [],
   });
@@ -93,7 +93,7 @@ export default function AddAssetModal({
     try {
       await onAdd({
         ...formData,
-        locations: selectedDrives.map((drive) => drive._id),
+        hardDriveIds: selectedDrives.map((drive) => drive._id),
       });
       onClose();
     } catch (error) {

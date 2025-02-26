@@ -65,10 +65,62 @@ export interface StudioInventoryImage {
   updatedAt: string;
 }
 
+// Maintenance record interface
+export interface MaintenanceRecord {
+  id: string;
+  date: Date;
+  type: "routine" | "repair" | "inspection";
+  description: string;
+  performedBy: string;
+  cost?: number;
+  notes?: string;
+}
+
+// Checkout record interface
+export interface CheckoutRecord {
+  id: string;
+  checkedOutBy: string;
+  checkedOutDate: Date;
+  expectedReturnDate?: Date;
+  actualReturnDate?: Date;
+  condition: "excellent" | "good" | "fair" | "poor" | "needs-repair";
+  notes?: string;
+  project?: string;
+}
+
+// Receipt interface
+export interface Receipt {
+  id: string;
+  date: Date;
+  type: "purchase" | "service" | "warranty";
+  amount: number;
+  vendor: string;
+  fileUrl?: string;
+}
+
+export type InventoryCategory =
+  | "Camera"
+  | "Lens"
+  | "Lighting"
+  | "Audio"
+  | "Grip"
+  | "Power"
+  | "Storage"
+  | "Accessories"
+  | "Other";
+
+export type KitCategory =
+  | "Camera Package"
+  | "Lighting Package"
+  | "Audio Package"
+  | "Grip Package"
+  | "Custom";
+
 export interface StudioInventoryItem {
   id: string;
   name: string;
   category: InventoryCategory;
+  subCategory?: string;
   manufacturer: string;
   model: string;
   serialNumber?: string;
@@ -78,9 +130,23 @@ export interface StudioInventoryItem {
   notes?: string;
   location?: string;
   isAvailable: boolean;
-  currentKitId?: string; // Reference to the kit if this item is part of one
-  images: StudioInventoryImage[];
-  primaryImage?: string; // URL of the primary image
+  currentKitId?: string;
+  images?: string[];
+  primaryImage?: string;
+  purchasePrice?: number;
+  currentValue?: number;
+  depreciationRate?: number;
+  insuranceValue?: number;
+  tags: string[];
+  powerRequirements?: string;
+  dimensions?: string;
+  manualUrl?: string;
+  warrantyExpirationDate?: Date;
+  serviceProvider?: string;
+  serviceContactInfo?: string;
+  checkedOutTo?: string | null;
+  checkoutDate?: Date;
+  expectedReturnDate?: Date;
 }
 
 export function transformInventoryItem(
@@ -127,31 +193,38 @@ export interface Car {
   vin?: string;
 }
 
+export interface KitCheckoutRecord {
+  checkedOutBy: string;
+  checkedOutTo: string;
+  checkedOutDate: Date;
+  expectedReturnDate: Date;
+  actualReturnDate?: Date;
+  notes?: string;
+}
+
+export interface FormattedKitItem {
+  id: string;
+  name: string;
+  category: string;
+  manufacturer: string;
+  model: string;
+  isAvailable: boolean;
+  kitStatus: string | null;
+  primaryImage?: string;
+}
+
 export interface Kit {
   id: string;
   name: string;
-  description: string;
-  items: string[]; // Array of StudioInventoryItem IDs that make up this kit
-  category: KitCategory;
-  isAvailable: boolean;
-  notes?: string;
-  location?: string;
+  description?: string;
+  status?: "available" | "checked-out" | "in-use" | "maintenance";
+  items: string[];
+  itemDetails?: FormattedKitItem[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
+  checkedOutTo?: string;
+  checkoutDate?: Date;
+  expectedReturnDate?: Date;
+  checkoutHistory?: KitCheckoutRecord[];
 }
-
-export type InventoryCategory =
-  | "Camera"
-  | "Lens"
-  | "Lighting"
-  | "Audio"
-  | "Grip"
-  | "Power"
-  | "Storage"
-  | "Accessories"
-  | "Other";
-
-export type KitCategory =
-  | "Camera Package"
-  | "Lighting Package"
-  | "Audio Package"
-  | "Production Package"
-  | "Custom Package";

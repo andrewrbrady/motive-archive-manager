@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { InventoryItem } from "@/types/inventory";
+import { VehicleInventoryItem } from "@/types/inventory";
 import { VehicleCard } from "@/components/ui/VehicleCard";
 
 interface InventoryCardProps {
-  item: InventoryItem;
+  item: VehicleInventoryItem;
   view: "grid" | "list";
 }
 

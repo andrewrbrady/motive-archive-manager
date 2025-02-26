@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { HardDrive, HardDriveData } from "@/models/hard-drive";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { toObjectId } from "@/lib/mongodb-types";
 
 type PipelineStage = {
   $match?: any;
@@ -14,6 +15,7 @@ type PipelineStage = {
     foreignField: string;
     as: string;
   };
+  $addFields?: any;
 };
 
 export async function GET(request: Request) {
@@ -24,6 +26,7 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status");
     const id = searchParams.get("id");
+    const location = searchParams.get("location") || "";
     const includeAssets = searchParams.get("include_assets") === "true";
     const skip = (page - 1) * limit;
 
@@ -38,7 +41,6 @@ export async function GET(request: Request) {
       query.$or = [
         { label: searchRegex },
         { systemName: searchRegex },
-        { location: searchRegex },
         { notes: searchRegex },
       ];
     }
@@ -53,44 +55,95 @@ export async function GET(request: Request) {
         query.label = id;
       }
     }
+    if (location) {
+      query.locationId = location;
+    }
 
     // Get total count for pagination
     const totalCount = await collection.countDocuments(query);
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Build pipeline
-    const pipeline: PipelineStage[] = [
-      { $match: query },
-      { $sort: { updatedAt: -1 } },
-      { $skip: skip },
-      { $limit: limit },
-    ];
+    // Fetch hard drives directly
+    const hardDrives = await collection
+      .find(query)
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
 
-    // Add raw asset lookup if requested
+    // Format basic drive data
+    const formattedDrives = hardDrives.map((drive) => {
+      const formattedDrive: any = {
+        ...drive,
+        _id: drive._id.toString(),
+        rawAssets: drive.rawAssets?.map((id: ObjectId) => id.toString()) || [],
+        locationDetails: null,
+        rawAssetDetails: [],
+      };
+      return formattedDrive;
+    });
+
+    // If we need to include assets or location details
     if (includeAssets) {
-      pipeline.push({
-        $lookup: {
-          from: "raw",
-          localField: "rawAssets",
-          foreignField: "_id",
-          as: "rawAssetDetails",
-        },
-      });
+      // Process each drive
+      for (const drive of formattedDrives) {
+        // Add location details if locationId exists and is not empty
+        if (drive.locationId && drive.locationId !== "") {
+          try {
+            const locationDetails = await db.collection("locations").findOne({
+              _id: new ObjectId(drive.locationId),
+            });
+
+            if (locationDetails) {
+              drive.locationDetails = {
+                ...locationDetails,
+                _id: locationDetails._id.toString(),
+              };
+            }
+          } catch (error) {
+            console.error(
+              `Error fetching location details for drive ${drive._id}:`,
+              error
+            );
+          }
+        }
+
+        // Add raw asset details if requested and rawAssets exist
+        if (drive.rawAssets && drive.rawAssets.length > 0) {
+          try {
+            const rawAssetIds = drive.rawAssets
+              .map((id: string) => {
+                try {
+                  return new ObjectId(id);
+                } catch (error) {
+                  console.error(`Invalid ObjectId: ${id}`);
+                  return null;
+                }
+              })
+              .filter(Boolean);
+
+            if (rawAssetIds.length > 0) {
+              const rawAssetDetails = await db
+                .collection("raw_assets")
+                .find({
+                  _id: { $in: rawAssetIds },
+                })
+                .toArray();
+
+              drive.rawAssetDetails = rawAssetDetails.map((asset: any) => ({
+                ...asset,
+                _id: asset._id.toString(),
+              }));
+            }
+          } catch (error) {
+            console.error(
+              `Error fetching raw asset details for drive ${drive._id}:`,
+              error
+            );
+          }
+        }
+      }
     }
-
-    // Fetch hard drives
-    const hardDrives = await collection.aggregate(pipeline).toArray();
-
-    // Format response
-    const formattedDrives = hardDrives.map((drive) => ({
-      ...drive,
-      _id: drive._id.toString(),
-      rawAssets: drive.rawAssets?.map((id: ObjectId) => id.toString()),
-      rawAssetDetails: drive.rawAssetDetails?.map((asset: any) => ({
-        ...asset,
-        _id: asset._id.toString(),
-      })),
-    }));
 
     return NextResponse.json({
       drives: formattedDrives,
@@ -110,9 +163,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
+    console.log("Received data:", JSON.stringify(data, null, 2));
 
     // Validate required fields
     if (!data.label || !data.capacity?.total || !data.type || !data.interface) {
+      console.log("Missing required fields:", {
+        label: !!data.label,
+        "capacity.total": !!data.capacity?.total,
+        type: !!data.type,
+        interface: !!data.interface,
+      });
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -122,8 +182,9 @@ export async function POST(request: Request) {
     // Check for duplicate label
     const existingDrive = await HardDrive.findByLabel(data.label);
     if (existingDrive) {
+      console.log(`A hard drive with label "${data.label}" already exists`);
       return NextResponse.json(
-        { error: "A hard drive with this label already exists" },
+        { error: `A hard drive with label "${data.label}" already exists` },
         { status: 400 }
       );
     }
@@ -134,8 +195,25 @@ export async function POST(request: Request) {
         data.systemName
       );
       if (existingBySystemName) {
+        console.log(
+          `A hard drive with system name "${data.systemName}" already exists`
+        );
         return NextResponse.json(
-          { error: "A hard drive with this system name already exists" },
+          {
+            error: `A hard drive with system name "${data.systemName}" already exists`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Convert locationId to ObjectId if provided
+    if (data.locationId) {
+      try {
+        data.locationId = data.locationId.toString();
+      } catch (error) {
+        return NextResponse.json(
+          { error: "Invalid location ID" },
           { status: 400 }
         );
       }

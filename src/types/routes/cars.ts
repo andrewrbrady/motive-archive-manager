@@ -1,20 +1,78 @@
 import { ObjectId } from "mongodb";
-import {
-  APIResponse,
-  PaginatedResponse,
-  RouteHandler,
-  RouteParamsWithId,
-  SearchParams,
-} from "../api";
-import {
-  Car,
-  CarDocument,
-  Dimensions,
-  Manufacturing,
-  SafetyFeatures,
-} from "../car";
 import { MeasurementValue } from "../measurements";
 import { ImageMetadata } from "@/lib/cloudflare";
+
+// Define missing types that were imported from "../car" and "../api"
+interface Dimensions {
+  length?: number;
+  width?: number;
+  height?: number;
+  unit?: string;
+}
+
+interface Manufacturing {
+  country?: string;
+  factory?: string;
+  date?: string;
+}
+
+interface SafetyFeatures {
+  airbags?: boolean;
+  abs?: boolean;
+  stabilityControl?: boolean;
+  blindSpotMonitoring?: boolean;
+  laneDepartureWarning?: boolean;
+  [key: string]: boolean | undefined;
+}
+
+interface Car {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
+  vin?: string;
+  specifications?: {
+    engine?: string;
+    transmission?: string;
+    drivetrain?: string;
+    fuelType?: string;
+    [key: string]: string | undefined;
+  };
+}
+
+// API types
+interface APIResponse<T> {
+  data: T;
+  success: boolean;
+  message?: string;
+}
+
+export type PaginatedResponse<T> = {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+interface RouteHandler<T, P = object> {
+  GET?: (params: P) => Promise<T>;
+  POST?: (params: P, body: any) => Promise<T>;
+  PUT?: (params: P, body: any) => Promise<T>;
+  DELETE?: (params: P) => Promise<T>;
+}
+
+interface RouteParamsWithId {
+  params: {
+    id: string;
+  };
+}
+
+interface SearchParams {
+  page?: string;
+  pageSize?: string;
+  sort?: string;
+  [key: string]: string | undefined;
+}
 
 /**
  * Parameters for car search/filtering
@@ -77,7 +135,7 @@ export interface CarClientInfo {
   businessType: string;
 }
 
-export interface CreateCarClientInfo extends Omit<CarClientInfo, "_id"> {}
+export type CreateCarClientInfo = Omit<CarClientInfo, "_id">;
 
 /**
  * MongoDB car document type

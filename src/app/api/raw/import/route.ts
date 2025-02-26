@@ -8,18 +8,18 @@ export async function POST(request: Request) {
   try {
     const client = await clientPromise;
     const db = client.db();
-    const rawCollection = db.collection("raw");
+    const rawCollection = db.collection("raw_assets");
     const hardDrivesCollection = db.collection("hard_drives");
 
     const data = await request.json();
     console.log("Received CSV data:", data);
 
-    const assets: (Partial<RawAsset> & { locations: ObjectId[] })[] = [];
+    const assets: (Partial<RawAsset> & { hardDriveIds: ObjectId[] })[] = [];
     const now = new Date().toISOString();
 
     // Process each row and handle hard drives
     for (const row of data) {
-      // Filter out empty locations and clean up the values
+      // Filter out empty hardDriveIds and clean up the values
       const locationLabels = [
         row["location 1"],
         row["location 2"],
@@ -29,10 +29,10 @@ export async function POST(request: Request) {
         .filter(Boolean)
         .map((location) => location.trim());
 
-      console.log("Processing row with locations:", locationLabels);
+      console.log("Processing row with hard drive labels:", locationLabels);
 
       // Array to store the hard drive ObjectIds
-      const locationIds: ObjectId[] = [];
+      const hardDriveIds: ObjectId[] = [];
 
       // For each location, check if we need to create a hard drive
       for (const label of locationLabels) {
@@ -77,15 +77,15 @@ export async function POST(request: Request) {
           console.log("Found existing drive:", driveId.toString());
         }
 
-        locationIds.push(driveId);
+        hardDriveIds.push(driveId);
       }
 
       // Create the raw asset with ObjectIds instead of labels
-      const asset: Partial<RawAsset> & { locations: ObjectId[] } = {
+      const asset: Partial<RawAsset> & { hardDriveIds: ObjectId[] } = {
         date: row.date,
         client: row.client || undefined,
         description: row.description,
-        locations: locationIds, // Store the ObjectIds instead of labels
+        hardDriveIds: hardDriveIds, // Store the ObjectIds instead of labels
         createdAt: now,
         updatedAt: now,
       };
@@ -107,12 +107,12 @@ export async function POST(request: Request) {
       console.log(
         "Updating hard drives for asset:",
         assetId.toString(),
-        "with locations:",
-        assetData.locations
+        "with hard drive IDs:",
+        assetData.hardDriveIds
       );
 
-      // Update each hard drive that corresponds to this asset's locations
-      for (const driveId of assetData.locations) {
+      // Update each hard drive that corresponds to this asset's hard drive IDs
+      for (const driveId of assetData.hardDriveIds) {
         console.log(
           "Updating drive:",
           driveId.toString(),

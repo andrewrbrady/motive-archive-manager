@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { XIcon, HardDriveIcon, Search } from "lucide-react";
-import { RawAssetData } from "@/models/raw";
+import { RawAssetData } from "@/models/raw_assets";
 import { HardDriveData } from "@/models/hard-drive";
 import CarSelector from "@/components/CarSelector";
 import { ObjectId } from "@/lib/types";
@@ -28,7 +28,7 @@ export default function EditRawAssetModal({
   const [formData, setFormData] = useState<Partial<RawAssetData>>({
     date: "",
     description: "",
-    locations: [],
+    hardDriveIds: [],
     cars: [],
   });
   const [selectedCars, setSelectedCars] = useState<any[]>([]);
@@ -38,6 +38,21 @@ export default function EditRawAssetModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingDrives, setIsLoadingDrives] = useState(false);
+
+  // Reset form data when modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        date: "",
+        description: "",
+        hardDriveIds: [],
+        cars: [],
+      });
+      setSelectedCars([]);
+      setSelectedDrives([]);
+      setError(null);
+    }
+  }, [isOpen]);
 
   // Fetch hard drives
   useEffect(() => {
@@ -78,15 +93,15 @@ export default function EditRawAssetModal({
       // Fetch selected drives
       const fetchSelectedDrives = async () => {
         try {
-          // Ensure location IDs are strings
-          const locationIds = (asset.locations || []).map((id) =>
+          // Ensure hardDriveIds are strings
+          const hardDriveIds = (asset.hardDriveIds || []).map((id) =>
             typeof id === "string" ? id : (id as any).toString()
           );
 
-          const promises = locationIds.map(async (locationId) => {
-            const response = await fetch(`/api/hard-drives/${locationId}`);
+          const promises = hardDriveIds.map(async (hardDriveId) => {
+            const response = await fetch(`/api/hard-drives/${hardDriveId}`);
             if (!response.ok) {
-              console.error(`Failed to fetch drive ${locationId}`);
+              console.error(`Failed to fetch drive ${hardDriveId}`);
               return null;
             }
             const data = await response.json();
@@ -106,14 +121,14 @@ export default function EditRawAssetModal({
         }
       };
 
-      if (asset.locations?.length) {
+      if (asset.hardDriveIds?.length) {
         fetchSelectedDrives();
       }
     } else {
       setFormData({
         date: "",
         description: "",
-        locations: [],
+        hardDriveIds: [],
         cars: [],
       });
       setSelectedCars([]);
@@ -131,7 +146,7 @@ export default function EditRawAssetModal({
         ...formData,
         carIds: selectedCars.map((car) => car._id),
         cars: selectedCars,
-        locations: selectedDrives.map((drive) => drive._id),
+        hardDriveIds: selectedDrives.map((drive) => drive._id),
       });
       onClose();
     } catch (error) {

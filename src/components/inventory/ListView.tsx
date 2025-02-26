@@ -1,9 +1,9 @@
 import React from "react";
 import Link from "next/link";
-import { InventoryItem } from "@/types/inventory";
+import { VehicleInventoryItem } from "@/types/inventory";
 
 interface ListViewProps {
-  cars: InventoryItem[];
+  cars: VehicleInventoryItem[];
   currentSearchParams: string;
 }
 
@@ -26,7 +26,10 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
         </thead>
         <tbody>
           {cars.map((car) => (
-            <tr key={car.id} className="border-b hover:bg-[hsl(var(--background))]">
+            <tr
+              key={car.id}
+              className="border-b hover:bg-[hsl(var(--background))]"
+            >
               <td className="py-2 px-3 border">
                 <Link
                   href={`/cars/${car.id}?${currentSearchParams}`}

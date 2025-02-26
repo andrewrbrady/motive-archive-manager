@@ -1,5 +1,5 @@
 import React from "react";
-import { RawAssetData } from "@/models/raw";
+import { RawAssetData } from "@/models/raw_assets";
 import {
   FolderIcon,
   XIcon,
@@ -111,20 +111,20 @@ export default function RawAssetDetailsModal({
 
             <div>
               <h3 className="text-lg font-medium mb-4">Storage Locations</h3>
-              {asset.locations && asset.locations.length > 0 ? (
+              {asset.hardDriveIds && asset.hardDriveIds.length > 0 ? (
                 <div className="space-y-2">
-                  {asset.locations.map((location, index) => {
-                    const locationId = location.toString();
+                  {asset.hardDriveIds.map((hardDriveId, index) => {
+                    const hardDriveIdStr = hardDriveId.toString();
                     return (
                       <button
                         key={index}
-                        onClick={(e) => handleDriveClick(locationId, e)}
+                        onClick={(e) => handleDriveClick(hardDriveIdStr, e)}
                         className="w-full p-3 border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--accent))] transition-colors text-left"
                       >
                         <div className="flex items-center gap-2">
                           <HardDriveIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
                           <span className="font-medium">
-                            {driveLabels[locationId] || locationId}
+                            {driveLabels[hardDriveIdStr] || hardDriveIdStr}
                           </span>
                           <ExternalLinkIcon className="w-4 h-4 ml-auto text-[hsl(var(--muted-foreground))]" />
                         </div>

@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // Find raw assets with matching date patterns
     const matchingRawAssets = await db
-      .collection("raw")
+      .collection("raw_assets")
       .find({ date: { $in: datePatternFolders } })
       .toArray();
 
@@ -49,12 +49,15 @@ export async function POST(request: Request) {
 
     // Update raw assets with the drive location
     const updatePromises = matchingRawAssets.map((asset) => {
-      const locations = asset.locations || [];
-      if (!locations.includes(driveId)) {
-        locations.push(driveId);
+      const hardDriveIds = asset.hardDriveIds || [];
+      if (!hardDriveIds.includes(driveId)) {
+        hardDriveIds.push(driveId);
         return db
-          .collection("raw")
-          .updateOne({ _id: asset._id }, { $set: { locations: locations } });
+          .collection("raw_assets")
+          .updateOne(
+            { _id: asset._id },
+            { $set: { hardDriveIds: hardDriveIds } }
+          );
       }
       return Promise.resolve();
     });

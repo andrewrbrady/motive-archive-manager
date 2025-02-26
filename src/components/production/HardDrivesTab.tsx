@@ -1,5 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { HardDriveIcon, PencilIcon, Trash2Icon, PlusIcon } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  HardDriveIcon,
+  PencilIcon,
+  Trash2Icon,
+  PlusIcon,
+  MapPin,
+  Search,
+  Filter,
+  Info,
+} from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { HardDriveData } from "@/models/hard-drive";
 import HardDriveModal from "./HardDriveModal";
@@ -7,6 +16,18 @@ import HardDriveDetailsModal from "./HardDriveDetailsModal";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { LocationResponse } from "@/models/location";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 
 interface RawAssetDetail {
   _id: string;
@@ -16,6 +37,11 @@ interface RawAssetDetail {
 
 interface HardDriveWithDetails extends HardDriveData {
   rawAssetDetails?: RawAssetDetail[];
+  locationDetails?: {
+    _id: string;
+    name: string;
+    type: string;
+  };
 }
 
 const LIMIT_OPTIONS = [10, 25, 50, 100];
@@ -48,6 +74,13 @@ export default function HardDrivesTab() {
   const currentView = (searchParams.get("view") as "grid" | "list") || "list";
   const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
   const [isAddingDrive, setIsAddingDrive] = useState(false);
+  const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [hardDriveIds, setHardDriveIds] = useState<
+    { _id: string; label: string }[]
+  >([]);
+  const [driveToDelete, setDriveToDelete] =
+    useState<HardDriveWithDetails | null>(null);
 
   // Handle Escape key press
   useEffect(() => {
@@ -68,6 +101,22 @@ export default function HardDrivesTab() {
     };
   }, [isDetailsModalOpen, isModalOpen]);
 
+  // Fetch locations when component mounts
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch("/api/locations");
+      if (!response.ok) throw new Error("Failed to fetch locations");
+      const data = await response.json();
+      setLocations(data);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    }
+  };
+
   const updateUrlParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "hard-drives");
@@ -84,11 +133,15 @@ export default function HardDrivesTab() {
   const fetchDrives = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/hard-drives?page=${currentPage}&search=${encodeURIComponent(
-          searchTerm
-        )}&limit=${itemsPerPage}&include_assets=true`
-      );
+      let url = `/api/hard-drives?page=${currentPage}&search=${encodeURIComponent(
+        searchTerm
+      )}&limit=${itemsPerPage}&include_assets=true`;
+
+      if (selectedLocation) {
+        url += `&location=${selectedLocation}`;
+      }
+
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch hard drives");
       const data = await response.json();
       setDrives(data.drives);
@@ -103,7 +156,7 @@ export default function HardDrivesTab() {
 
   useEffect(() => {
     fetchDrives();
-  }, [currentPage, itemsPerPage, searchTerm]);
+  }, [currentPage, itemsPerPage, searchTerm, selectedLocation]);
 
   useEffect(() => {
     const selectedDriveId = searchParams.get("drive");
@@ -130,6 +183,13 @@ export default function HardDrivesTab() {
     setSearchTerm(value);
     setCurrentPage(1);
     updateUrlParams({ search: value || null, page: "1" });
+  };
+
+  const handleLocationChange = (value: string) => {
+    const locationValue = value === "all" ? "" : value;
+    setSelectedLocation(locationValue);
+    setCurrentPage(1);
+    updateUrlParams({ location: locationValue || null, page: "1" });
   };
 
   const handlePageChange = (page: number) => {
@@ -201,6 +261,7 @@ export default function HardDrivesTab() {
     setIsDetailsModalOpen(false);
     setSelectedDriveForDetails(undefined);
     updateUrlParams({ drive: null });
+    fetchDrives();
   };
 
   const handleCloseModal = () => {
@@ -245,6 +306,29 @@ export default function HardDrivesTab() {
             className="w-full px-4 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
           />
         </div>
+
+        <div className="w-64">
+          <Select
+            value={selectedLocation || "all"}
+            onValueChange={handleLocationChange}
+          >
+            <SelectTrigger className="bg-[hsl(var(--background))]">
+              <SelectValue placeholder="Filter by location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3 h-3" />
+                    {location.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <select
           value={itemsPerPage}
           onChange={(e) => handleLimitChange(Number(e.target.value))}
@@ -351,14 +435,20 @@ export default function HardDrivesTab() {
                     {drive.status}
                   </span>
                 </div>
-                {drive.location && (
+                {drive.locationDetails && (
                   <div className="flex justify-between">
                     <span className="text-[hsl(var(--muted-foreground))]">
                       Location:
                     </span>
-                    <span>{drive.location}</span>
+                    <span>{drive.locationDetails.name}</span>
                   </div>
                 )}
+                <div className="flex justify-between">
+                  <span className="text-[hsl(var(--muted-foreground))]">
+                    Raw Assets:
+                  </span>
+                  <span>{drive.rawAssetDetails?.length || 0}</span>
+                </div>
               </div>
             </div>
           ))}
@@ -450,7 +540,11 @@ export default function HardDrivesTab() {
                       {drive.status}
                     </span>
                   </td>
-                  <td className="py-4">{drive.location}</td>
+                  <td className="py-4">
+                    {drive.locationDetails
+                      ? drive.locationDetails.name
+                      : "No location"}
+                  </td>
                   <td className="py-4">{drive.rawAssetDetails?.length || 0}</td>
                   <td className="py-4 text-right space-x-2">
                     <button
@@ -505,6 +599,7 @@ export default function HardDrivesTab() {
         <HardDriveDetailsModal
           driveId={selectedDriveId}
           onClose={handleCloseDetails}
+          onDriveUpdate={fetchDrives}
         />
       )}
     </div>

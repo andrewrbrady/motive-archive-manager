@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     client = await getClient();
     const db = client.db(dbName);
-    const collection = db.collection("raw");
+    const collection = db.collection("raw_assets");
 
     // Build search query
     const searchQuery = search
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     client = await getClient();
     const db = client.db(dbName);
-    const collection = db.collection("raw");
+    const collection = db.collection("raw_assets");
 
     // Add timestamp to the document
     const document = {

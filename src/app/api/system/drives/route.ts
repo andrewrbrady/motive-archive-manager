@@ -30,11 +30,37 @@ async function getDriveInfo(path: string) {
         return Math.round((bytes / (1024 * 1024 * 1024)) * 100) / 100;
       };
 
+      // Try to get the actual volume name using diskutil
+      let volumeName = "Macintosh HD"; // Default fallback
+      try {
+        // Get the mount point from df output to find the correct volume
+        const mountPoint = dfLines[1].split(/\s+/).pop() || "/";
+
+        // Get info about the mounted volume
+        const diskutilOutput = await execAsync(`diskutil info "${mountPoint}"`);
+        const diskutilLines = diskutilOutput.stdout.split("\n");
+
+        // Find the volume name
+        for (const line of diskutilLines) {
+          if (line.includes("Volume Name:")) {
+            const extractedName = line.split(":")[1]?.trim();
+            if (extractedName) {
+              volumeName = extractedName;
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(
+          "Failed to get volume name from diskutil, using default name",
+          error
+        );
+      }
+
       // For system paths, return basic information without trying to access the directory
       return {
         filesystem,
-        systemName:
-          path === "/" ? "Macintosh HD" : path.split("/").pop() || filesystem,
+        systemName: volumeName,
         mountPoint: path,
         capacity: {
           total: convertKBtoGB(blocks),
@@ -46,7 +72,7 @@ async function getDriveInfo(path: string) {
           mediaType: "System Drive",
           isSSD: true, // Most modern Macs use SSDs
           isRemovable: false,
-          location: "Internal",
+          locationId: "internal", // Default locationId for internal drives
         },
         interface: "Internal",
         security: {
@@ -141,7 +167,7 @@ async function getDriveInfo(path: string) {
             mediaType,
             isSSD,
             isRemovable,
-            location: deviceLocation,
+            locationId: deviceLocation,
           },
           interface: protocol,
           security: {
@@ -223,7 +249,7 @@ async function getBasicDriveInfo(
       mediaType: "Network Share",
       isSSD: false,
       isRemovable: false,
-      location: filesystem,
+      locationId: filesystem,
     },
     interface: protocol,
     security: {
@@ -249,8 +275,13 @@ export async function GET(request: Request) {
       );
     }
 
-    // Ensure the path starts with /Volumes/ for external drives
-    const drivePath = path.startsWith("/Volumes/") ? path : `/Volumes/${path}`;
+    // Only modify paths that aren't the root or system paths
+    const drivePath =
+      path === "/" || path.startsWith("/System")
+        ? path
+        : path.startsWith("/Volumes/")
+        ? path
+        : `/Volumes/${path}`;
 
     const driveInfo = await getDriveInfo(drivePath);
     return NextResponse.json(driveInfo);

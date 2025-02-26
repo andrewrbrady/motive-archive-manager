@@ -4,7 +4,7 @@ import React from "react";
 import { Auction } from "@/models/auction";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/number-utils";
 
 interface AuctionsGridProps {
   auctions: Auction[];

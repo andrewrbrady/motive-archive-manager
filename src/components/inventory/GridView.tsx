@@ -1,9 +1,9 @@
 import React from "react";
 import { InventoryCard } from "./InventoryCard";
-import { InventoryItem } from "@/types/inventory";
+import { VehicleInventoryItem } from "@/types/inventory";
 
 interface GridViewProps {
-  cars: InventoryItem[];
+  cars: VehicleInventoryItem[];
 }
 
 export function GridView({ cars }: GridViewProps) {

@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
     // Find raw assets with matching date patterns
     const matchingRawAssets = await db
-      .collection("raw")
+      .collection("raw_assets")
       .find({ date: { $in: datePatternFolders } })
       .toArray();
     console.log("Matching raw assets:", matchingRawAssets.length);
@@ -99,12 +99,12 @@ export async function POST(request: Request) {
           { $set: { rawAssets: updatedRawAssets } }
         ),
 
-      // Update each raw asset to include this drive in its locations
+      // Update each raw asset to include this drive in its hardDriveIds
       ...matchingRawAssets.map((asset) =>
-        db.collection("raw").updateOne(
+        db.collection("raw_assets").updateOne(
           { _id: asset._id },
           {
-            $addToSet: { locations: drive._id }, // Use addToSet to avoid duplicates
+            $addToSet: { hardDriveIds: drive._id }, // Use addToSet to avoid duplicates
           }
         )
       ),

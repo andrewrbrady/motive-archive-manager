@@ -19,7 +19,7 @@ async function main() {
   try {
     // Get all raw assets
     console.log("Fetching raw assets...");
-    const rawCollection = db.collection("raw");
+    const rawCollection = db.collection("raw_assets");
     const count = await rawCollection.countDocuments();
     console.log(`Total raw assets in collection: ${count}`);
 
@@ -31,15 +31,16 @@ async function main() {
 
     // Build the location -> assets mapping
     console.log("Processing raw assets to extract storage locations...");
-    let assetsWithLocations = 0;
+    let assetsWithHardDrives = 0;
     rawAssets.forEach((asset) => {
-      if (asset.locations && Array.isArray(asset.locations)) {
-        assetsWithLocations++;
-        asset.locations.forEach((location: string) => {
-          const trimmedLocation = location.trim();
-          if (trimmedLocation) {
-            const existingAssets = locationAssetsMap.get(trimmedLocation) || [];
-            locationAssetsMap.set(trimmedLocation, [
+      if (asset.hardDriveIds && Array.isArray(asset.hardDriveIds)) {
+        assetsWithHardDrives++;
+        asset.hardDriveIds.forEach((hardDriveId: string) => {
+          const trimmedHardDriveId = hardDriveId.trim();
+          if (trimmedHardDriveId) {
+            const existingAssets =
+              locationAssetsMap.get(trimmedHardDriveId) || [];
+            locationAssetsMap.set(trimmedHardDriveId, [
               ...existingAssets,
               asset._id,
             ]);
@@ -48,7 +49,7 @@ async function main() {
       }
     });
 
-    console.log(`Found ${assetsWithLocations} assets with locations`);
+    console.log(`Found ${assetsWithHardDrives} assets with hard drives`);
     console.log(`Found ${locationAssetsMap.size} unique storage locations`);
 
     if (locationAssetsMap.size === 0) {

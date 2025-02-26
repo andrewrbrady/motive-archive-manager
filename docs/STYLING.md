@@ -110,6 +110,389 @@ Our application follows a minimalist, content-focused design approach with a dar
 --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 ```
 
+## Spreadsheet-Style List Layouts
+
+Our application prioritizes a spreadsheet-like appearance for data-heavy views, providing a consistent and familiar interface for users working with large datasets.
+
+### Table Structure
+
+```css
+/* Table Container */
+.table-container {
+  @apply w-full overflow-x-auto;
+}
+
+/* Table */
+.table {
+  @apply w-full border-collapse;
+}
+
+/* Table Header */
+.table-header {
+  @apply text-left text-xs uppercase text-muted-foreground sticky top-0 bg-background z-10;
+}
+
+/* Table Header Cell */
+.table-header-cell {
+  @apply py-3 px-2 font-medium;
+}
+
+/* Table Row */
+.table-row {
+  @apply border-t border-border hover:bg-accent transition-colors;
+}
+
+/* Table Cell */
+.table-cell {
+  @apply py-3 px-2 text-sm;
+}
+
+/* Sticky Columns */
+.sticky-left {
+  @apply sticky left-0 bg-background z-10;
+}
+```
+
+### Implementation Guidelines
+
+1. **Horizontal Scrolling**: Always implement horizontal scrolling for tables with many columns
+
+   ```jsx
+   <div className="overflow-x-auto">
+     <table className="w-full">{/* Table content */}</table>
+   </div>
+   ```
+
+2. **Sticky Columns**: Make identifier columns (like checkboxes, images, and names) sticky for better usability
+
+   ```jsx
+   <th className="sticky left-0 bg-background z-10">Name</th>
+   ```
+
+3. **Compact Design**: Use smaller text and padding for dense data displays
+
+   ```jsx
+   <td className="py-3 px-2 text-sm">Content</td>
+   ```
+
+4. **Row Separation**: Use subtle borders between rows for clear visual separation
+
+   ```jsx
+   <tr className="border-t border-[hsl(var(--border))]">
+   ```
+
+5. **Row Hover States**: Implement hover states for better row tracking
+
+   ```jsx
+   <tr className="hover:bg-[hsl(var(--accent))] transition-colors">
+   ```
+
+6. **Status Indicators**: Use color-coded badges for status indicators
+
+   ```jsx
+   <span
+     className={cn(
+       "px-2 py-1 rounded text-xs",
+       isAvailable
+         ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
+         : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+     )}
+   >
+     {statusText}
+   </span>
+   ```
+
+7. **Action Buttons**: Place action buttons in the rightmost column
+
+   ```jsx
+   <td className="text-right">
+     <div className="flex justify-end space-x-2">
+       <button className="text-muted-foreground hover:text-primary">
+         <Edit className="w-4 h-4" />
+       </button>
+     </div>
+   </td>
+   ```
+
+8. **Empty States**: Provide helpful empty states when no data is available
+   ```jsx
+   {items.length === 0 ? (
+     <div className="text-center py-8 text-muted-foreground">
+       No items found. Try adjusting your filters or add new items.
+     </div>
+   ) : (
+     // Table content
+   )}
+   ```
+
+### Visual Hierarchy
+
+- Use smaller font sizes (`text-sm` or `text-xs`) for table content to maximize data density
+- Maintain consistent vertical padding (`py-3`) and horizontal padding (`px-2`) for all cells
+- Use subtle background color differences to distinguish header rows
+- Implement sticky headers for long tables that require vertical scrolling
+- Use monospace fonts for numerical data columns to maintain alignment
+
+### Responsive Considerations
+
+- On smaller screens, prioritize horizontal scrolling over responsive reflow
+- Consider implementing column visibility toggles for complex tables
+- Ensure touch targets remain accessible on mobile devices
+
+## Calendar Styling
+
+The application uses a flat color scheme for organizing calendar events and deliverables, making it easier to visually group and identify items. All calendar colors are defined as CSS variables in `src/app/globals.css` and can be customized from there.
+
+### Calendar Components
+
+The calendar functionality has been refactored into reusable components:
+
+1. **BaseCalendar**: A generic, reusable calendar component that handles core functionality like rendering, drag-and-drop, and filtering.
+2. **MotiveCalendar**: A specialized calendar for Motive's events and deliverables, built on top of BaseCalendar.
+
+These components are located in `src/components/calendar/` and can be imported from the index file:
+
+```jsx
+import { BaseCalendar, MotiveCalendar } from "@/components/calendar";
+```
+
+### Color Variables
+
+The following CSS variables are defined for calendar styling:
+
+#### Event Type Colors
+
+```css
+--event-auction-submission: 340 80% 55%; /* Auction submission events */
+--event-auction-listing: 340 70% 50%; /* Auction listing events */
+--event-auction-end: 340 60% 45%; /* Auction end events */
+--event-inspection: 220 70% 50%; /* Inspection events */
+--event-detail: 190 90% 50%; /* Detail events */
+--event-production: 150 60% 40%; /* Production events */
+--event-post-production: 150 50% 35%; /* Post-production events */
+--event-marketing: 45 100% 50%; /* Marketing events */
+--event-pickup: 280 70% 45%; /* Pickup events */
+--event-delivery: 320 70% 45%; /* Delivery events */
+--event-other: 200 30% 60%; /* Other events */
+```
+
+#### Deliverable Type Colors
+
+```css
+--deliverable-photo-gallery: 200 70% 50%; /* Photo gallery deliverables */
+--deliverable-video: 150 60% 50%; /* Video deliverables */
+--deliverable-mixed-gallery: 220 60% 50%; /* Mixed gallery deliverables */
+--deliverable-video-gallery: 180 60% 45%; /* Video gallery deliverables */
+--deliverable-still: 240 60% 55%; /* Still deliverables */
+--deliverable-graphic: 280 60% 50%; /* Graphic deliverables */
+--deliverable-feature: 320 60% 50%; /* Feature deliverables */
+--deliverable-promo: 340 70% 50%; /* Promo deliverables */
+--deliverable-review: 20 80% 50%; /* Review deliverables */
+--deliverable-walkthrough: 40 70% 50%; /* Walkthrough deliverables */
+--deliverable-highlights: 60 80% 50%; /* Highlights deliverables */
+--deliverable-marketing-email: 80 70% 50%; /* Marketing email deliverables */
+--deliverable-blog: 100 60% 50%; /* Blog deliverables */
+--deliverable-other: 200 30% 60%; /* Other deliverables */
+--deliverable-deadline: 15 80% 50%; /* Deadline indicators */
+--deliverable-release: 200 80% 50%; /* Release indicators */
+```
+
+#### Status Colors
+
+```css
+--status-not-started: 0 70% 50%; /* Not started status */
+--status-in-progress: 40 100% 50%; /* In progress status */
+--status-completed: 120 60% 50%; /* Completed status */
+--status-default: 200 30% 60%; /* Default status */
+```
+
+### Using the Calendar Components
+
+To use the MotiveCalendar component:
+
+```jsx
+<MotiveCalendar
+  carId={carId}
+  events={events}
+  deliverables={deliverables}
+  onEventDrop={handleEventDrop}
+  onEventResize={handleEventResize}
+  onSelectEvent={handleSelectEvent}
+  showFilterControls={true}
+  showVisibilityControls={true}
+/>
+```
+
+For more customization, you can use the BaseCalendar component directly:
+
+```jsx
+<BaseCalendar
+  events={calendarEvents}
+  eventPropGetter={getEventStyle}
+  onEventDrop={handleEventDrop}
+  onEventResize={handleEventResize}
+  onSelectEvent={handleSelectEvent}
+  showFilterControls={true}
+  showVisibilityControls={true}
+  filterOptions={filterOptions}
+/>
+```
+
+### Implementation Guidelines
+
+1. **Color Grouping**: Use event type colors as the primary visual grouping mechanism.
+2. **Status Indicators**: Use status colors for borders to indicate progress.
+3. **Consistent Text Color**: Ensure text has sufficient contrast against background colors.
+4. **Visual Hierarchy**: Use opacity and size to create visual hierarchy.
+5. **Tooltips**: Provide detailed information via tooltips on hover.
+6. **Filtering Options**: Allow users to filter by event type, deliverable type, etc.
+
+### Accessibility Considerations
+
+1. **Color Contrast**: Ensure sufficient contrast between text and background colors.
+2. **Alternative Indicators**: Don't rely solely on color to convey information.
+3. **Keyboard Navigation**: Ensure all calendar interactions are keyboard accessible.
+4. **Screen Reader Support**: Use appropriate ARIA attributes for screen reader support.
+
+For more details on the calendar components, see the documentation in `src/components/calendar/README.md`.
+
+```css
+/* Event Type Colors - Use these for primary event categorization */
+--event-auction-submission: 217 91% 60%; /* blue-500 */
+--event-auction-listing: 213 94% 68%; /* blue-400 */
+--event-auction-end: 213 97% 79%; /* blue-300 */
+--event-inspection: 38 93% 53%; /* amber-500 */
+--event-detail: 43 96% 56%; /* amber-400 */
+--event-production: 160 84% 39%; /* emerald-500 */
+--event-post-production: 158 64% 52%; /* emerald-400 */
+--event-marketing: 330 81% 60%; /* pink-500 */
+--event-pickup: 259 94% 51%; /* violet-500 */
+--event-delivery: 258 90% 66%; /* violet-400 */
+--event-other: 220 9% 46%; /* gray-500 */
+```
+
+### Deliverable Type Colors
+
+```css
+/* Deliverable Type Colors - Use these for deliverable categorization */
+--deliverable-photo-gallery: 345 82% 61%; /* rose-500 */
+--deliverable-video: 0 84% 60%; /* red-500 */
+--deliverable-mixed-gallery: 24 94% 53%; /* orange-500 */
+--deliverable-video-gallery: 25 95% 64%; /* orange-400 */
+--deliverable-still: 38 93% 53%; /* amber-500 */
+--deliverable-graphic: 43 96% 56%; /* amber-400 */
+--deliverable-feature: 160 84% 39%; /* emerald-500 */
+--deliverable-promo: 158 64% 52%; /* emerald-400 */
+--deliverable-review: 186 94% 42%; /* cyan-500 */
+--deliverable-walkthrough: 199 89% 48%; /* sky-500 */
+--deliverable-highlights: 217 91% 60%; /* blue-500 */
+--deliverable-marketing-email: 259 94% 51%; /* violet-500 */
+--deliverable-blog: 269 97% 66%; /* purple-500 */
+--deliverable-other: 220 9% 46%; /* gray-500 */
+--deliverable-deadline: 0 74% 50%; /* red-600 */
+--deliverable-release: 263 70% 58%; /* violet-600 */
+```
+
+### Status Colors
+
+```css
+/* Status Colors - Use these as secondary indicators (e.g., borders) */
+--status-not-started: var(--destructive);
+--status-in-progress: var(--warning);
+--status-completed: var(--success);
+--status-default: var(--zinc-500);
+```
+
+### Implementation Guidelines
+
+1. **Color Grouping**: Use flat colors to group similar items by type
+
+   ```jsx
+   <div
+     style={{
+       backgroundColor: `hsl(var(--event-${event.type.toLowerCase()}))`,
+       color: "white",
+       border: `2px solid hsl(var(--status-${event.status.toLowerCase()}))`,
+     }}
+   >
+     {event.title}
+   </div>
+   ```
+
+2. **Status Indicators**: Use borders to indicate status as a secondary visual cue
+
+   ```jsx
+   <div className={`calendar-event calendar-event-${type} status-${status}`}>
+     {item.title}
+   </div>
+   ```
+
+3. **Consistent Text Color**: Use white text on all colored backgrounds for readability
+
+4. **Visual Hierarchy**: Primary categorization (type) should be more prominent than secondary indicators (status)
+
+5. **Opacity**: Use consistent opacity (0.9) for calendar items to maintain a cohesive look
+
+6. **Tooltips**: Implement tooltips for additional information on hover
+
+7. **Filtering**: Allow users to filter by both primary (type) and secondary (status) categories
+
+### Utility Classes
+
+For convenience, the following utility classes are available in `globals.css`:
+
+```css
+/* Base event class */
+.calendar-event {
+  @apply rounded-md shadow-sm transition-all duration-200 text-white;
+  opacity: 0.9;
+  padding: 2px 4px;
+  min-height: 24px;
+}
+
+/* Event type classes */
+.calendar-event-auction {
+  background-color: hsl(var(--event-auction-submission));
+}
+.calendar-event-inspection {
+  background-color: hsl(var(--event-inspection));
+}
+.calendar-event-production {
+  background-color: hsl(var(--event-production));
+}
+/* ... other event types ... */
+
+/* Deliverable classes */
+.calendar-deliverable {
+  /* base styles */
+}
+.calendar-deliverable-photo {
+  background-color: hsl(var(--deliverable-photo-gallery));
+}
+.calendar-deliverable-video {
+  background-color: hsl(var(--deliverable-video));
+}
+/* ... other deliverable types ... */
+
+/* Status border classes */
+.status-not-started {
+  border: 2px solid hsl(var(--status-not-started));
+}
+.status-in-progress {
+  border: 2px solid hsl(var(--status-in-progress));
+}
+.status-completed {
+  border: 2px solid hsl(var(--status-completed));
+}
+```
+
+### Accessibility Considerations
+
+- Ensure sufficient contrast between text and background colors
+- Provide alternative ways to distinguish items beyond color (e.g., icons, patterns)
+- Include text labels in addition to color coding
+- Test color combinations with color blindness simulators
+
 ## Component Styling
 
 ### Buttons
@@ -168,6 +551,88 @@ Our application follows a minimalist, content-focused design approach with a dar
   text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary 
   focus:ring-offset-2 dark:focus:ring-offset-background-primary;
 }
+```
+
+### Modals
+
+Modals should follow our monochromatic color pattern and maintain a consistent appearance throughout the application.
+
+```css
+/* Modal Overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-background/80 backdrop-blur-sm z-50;
+}
+
+/* Modal Container */
+.modal-container {
+  @apply fixed inset-0 flex items-center justify-center p-4 z-50;
+}
+
+/* Modal Panel */
+.modal-panel {
+  @apply mx-auto max-w-md w-full bg-background border border-border rounded-lg shadow-lg;
+}
+
+/* Modal Header */
+.modal-header {
+  @apply text-xl font-semibold px-6 py-4 border-b border-border flex items-center justify-between;
+}
+
+/* Modal Body */
+.modal-body {
+  @apply p-6;
+}
+
+/* Modal Footer */
+.modal-footer {
+  @apply px-6 py-4 border-t border-border flex justify-end gap-2 bg-muted/50;
+}
+```
+
+#### Modal Implementation Example
+
+When implementing modals, follow this structure to maintain consistency:
+
+```jsx
+<Dialog open={isOpen} onClose={onClose} className="relative z-50">
+  {/* Backdrop */}
+  <div
+    className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+    aria-hidden="true"
+  />
+
+  {/* Modal container */}
+  <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+    <Dialog.Panel className="mx-auto max-w-md w-full bg-background border border-border rounded-lg shadow-lg">
+      {/* Header */}
+      <div className="text-xl font-semibold px-6 py-4 border-b border-border flex items-center justify-between">
+        Modal Title
+        <Button
+          type="button"
+          onClick={onClose}
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Body */}
+      <div className="p-6">Modal content goes here</div>
+
+      {/* Footer */}
+      <div className="px-6 py-4 border-t border-border flex justify-end gap-2 bg-muted/50">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button type="button" onClick={handleSubmit}>
+          Confirm
+        </Button>
+      </div>
+    </Dialog.Panel>
+  </div>
+</Dialog>
 ```
 
 ## Layout Guidelines

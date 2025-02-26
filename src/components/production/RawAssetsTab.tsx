@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { RawAssetData } from "@/models/raw";
+import { RawAssetData } from "@/models/raw_assets";
 import {
   PencilIcon,
   FolderIcon,
@@ -25,9 +25,9 @@ interface RawAsset {
   _id: string;
   date: string;
   description: string;
-  locations: string[];
+  hardDriveIds: string[];
   carIds?: string[];
-  cars: Array<{
+  cars?: Array<{
     _id: string;
     make: string;
     model: string;
@@ -108,19 +108,39 @@ export default function RawAssetsTab() {
         if (asset) {
           if (isEdit) {
             setSelectedAssetId(asset._id);
-            setIsEditModalOpen(true);
+            // Only set the asset data if the edit modal is not already open
+            // This prevents overwriting the current edit with stale data
+            if (!isEditModalOpen) {
+              const rawAssetData: RawAssetData = {
+                _id: asset._id as unknown as ObjectId,
+                date: asset.date,
+                description: asset.description,
+                hardDriveIds: asset.hardDriveIds.map(
+                  (id) => id as unknown as ObjectId
+                ),
+                carIds: asset.carIds,
+                cars: asset.cars || [],
+              };
+              setSelectedAssetForDetails(rawAssetData);
+              setIsEditModalOpen(true);
+            }
           } else {
-            setSelectedAssetForDetails({
-              _id: asset._id as unknown as ObjectId,
-              date: asset.date,
-              description: asset.description,
-              locations: asset.locations.map((id) => id as unknown as ObjectId),
-              carIds: asset.carIds,
-              cars: asset.cars,
-              createdAt: asset.createdAt,
-              updatedAt: asset.updatedAt,
-            });
-            setIsDetailsModalOpen(true);
+            // Only set the details if the details modal is not already open
+            if (!isDetailsModalOpen) {
+              setSelectedAssetForDetails({
+                _id: asset._id as unknown as ObjectId,
+                date: asset.date,
+                description: asset.description,
+                hardDriveIds: asset.hardDriveIds.map(
+                  (id) => id as unknown as ObjectId
+                ),
+                carIds: asset.carIds,
+                cars: asset.cars || [],
+                createdAt: asset.createdAt,
+                updatedAt: asset.updatedAt,
+              });
+              setIsDetailsModalOpen(true);
+            }
           }
         }
       } else {
@@ -130,8 +150,15 @@ export default function RawAssetsTab() {
             const response = await fetch(`/api/raw/${selectedAssetId}`);
             if (!response.ok) throw new Error("Failed to fetch asset");
             const asset = await response.json();
-            setSelectedAssetForDetails(asset);
-            setIsDetailsModalOpen(true);
+
+            // Only set the asset data if the relevant modal is not already open
+            if (isEdit && !isEditModalOpen) {
+              setSelectedAssetForDetails(asset);
+              setIsEditModalOpen(true);
+            } else if (!isEdit && !isDetailsModalOpen) {
+              setSelectedAssetForDetails(asset);
+              setIsDetailsModalOpen(true);
+            }
           } catch (error) {
             console.error("Error fetching asset:", error);
           }
@@ -139,7 +166,7 @@ export default function RawAssetsTab() {
         fetchAsset();
       }
     }
-  }, [searchParams, assets]);
+  }, [searchParams, assets, isEditModalOpen, isDetailsModalOpen]);
 
   const fetchDriveLabels = useCallback(async (id: string) => {
     try {
@@ -173,13 +200,13 @@ export default function RawAssetsTab() {
       setAssets(data.assets);
       setTotalPages(data.totalPages);
 
-      // Fetch drive labels for all locations
-      const allLocationIds = data.assets.flatMap((asset: RawAsset) =>
-        asset.locations.map((loc: string) => loc)
+      // Fetch drive labels for all hardDriveIds
+      const allHardDriveIds = data.assets.flatMap((asset: RawAsset) =>
+        asset.hardDriveIds.map((loc: string) => loc)
       );
-      const labels = await Promise.all(allLocationIds.map(fetchDriveLabels));
+      const labels = await Promise.all(allHardDriveIds.map(fetchDriveLabels));
       const driveLabels = labels.reduce((acc, label, index) => {
-        acc[allLocationIds[index]] = label;
+        acc[allHardDriveIds[index]] = label;
         return acc;
       }, {} as Record<string, string>);
       setDriveLabels(driveLabels);
@@ -238,9 +265,9 @@ export default function RawAssetsTab() {
       _id: asset._id as unknown as ObjectId,
       date: asset.date,
       description: asset.description,
-      locations: asset.locations.map((id) => id as unknown as ObjectId),
+      hardDriveIds: asset.hardDriveIds.map((id) => id as unknown as ObjectId),
       carIds: asset.carIds,
-      cars: asset.cars,
+      cars: asset.cars || [],
       createdAt: asset.createdAt,
       updatedAt: asset.updatedAt,
     });
@@ -255,23 +282,30 @@ export default function RawAssetsTab() {
   };
 
   const handleEdit = (asset: RawAsset) => {
-    const rawAssetData: RawAssetData = {
-      _id: asset._id as unknown as ObjectId,
-      date: asset.date,
-      description: asset.description,
-      locations: asset.locations.map((id) => id as unknown as ObjectId),
-      carIds: asset.carIds,
-      cars: asset.cars,
-    };
-    setSelectedAssetId(asset._id);
-    setSelectedAssetForDetails(rawAssetData);
-    setIsEditModalOpen(true);
-    updateUrlParams({ asset: asset._id?.toString() || null, edit: "true" });
+    // First, reset the previous asset data
+    setSelectedAssetForDetails(undefined);
+
+    // Then set the new asset data after a small delay to ensure the reset takes effect
+    setTimeout(() => {
+      const rawAssetData: RawAssetData = {
+        _id: asset._id as unknown as ObjectId,
+        date: asset.date,
+        description: asset.description,
+        hardDriveIds: asset.hardDriveIds.map((id) => id as unknown as ObjectId),
+        carIds: asset.carIds,
+        cars: asset.cars || [],
+      };
+      setSelectedAssetId(asset._id);
+      setSelectedAssetForDetails(rawAssetData);
+      setIsEditModalOpen(true);
+      updateUrlParams({ asset: asset._id?.toString() || null, edit: "true" });
+    }, 50);
   };
 
   const handleCloseModal = () => {
     setIsEditModalOpen(false);
     setSelectedAssetId(null);
+    setSelectedAssetForDetails(undefined);
     updateUrlParams({ asset: null });
   };
 
@@ -346,7 +380,7 @@ export default function RawAssetsTab() {
   const handleAddAsset = async (assetData: {
     date: string;
     description: string;
-    locations: string[];
+    hardDriveIds: string[];
   }) => {
     try {
       const response = await fetch("/api/raw", {
@@ -458,28 +492,29 @@ export default function RawAssetsTab() {
                   <td className="py-4">{asset.description}</td>
                   <td className="py-4">
                     <div className="flex flex-wrap gap-2">
-                      {asset.cars.map((car) => (
-                        <span
-                          key={car._id}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded text-sm border border-[hsl(var(--border))] shadow-sm"
-                        >
-                          <CarIcon className="w-3 h-3" />
-                          {car.year} {car.make} {car.model}
-                        </span>
-                      ))}
+                      {asset.cars &&
+                        asset.cars.map((car) => (
+                          <span
+                            key={car._id}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded text-sm border border-[hsl(var(--border))] shadow-sm"
+                          >
+                            <CarIcon className="w-3 h-3" />
+                            {car.year} {car.make} {car.model}
+                          </span>
+                        ))}
                     </div>
                   </td>
                   <td className="py-4">
                     <div className="flex flex-wrap gap-2">
-                      {asset.locations.map((location, index) => {
-                        const locationId = location.toString();
+                      {asset.hardDriveIds.map((hardDriveId, index) => {
+                        const hardDriveIdStr = hardDriveId.toString();
                         return (
                           <span
                             key={index}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded text-sm border border-[hsl(var(--border))] shadow-sm"
                           >
                             <HardDriveIcon className="w-3 h-3" />
-                            {driveLabels[locationId] || "Unknown Drive"}
+                            {driveLabels[hardDriveIdStr] || "Unknown Drive"}
                           </span>
                         );
                       })}

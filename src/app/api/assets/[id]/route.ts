@@ -18,7 +18,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     console.log(`Fetching asset with ID: ${id}`);
 
     const db = await getDatabase();
-    const asset = await db.collection("raw").findOne({
+    const asset = await db.collection("raw_assets").findOne({
       _id: new ObjectId(id),
     });
 
@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const db = await getDatabase();
-    const updateResult = await db.collection("raw").updateOne(
+    const updateResult = await db.collection("raw_assets").updateOne(
       { _id: new ObjectId(id) },
       {
         $set: {
@@ -87,7 +87,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     const id = params.id;
     const db = await getDatabase();
 
-    const deleteResult = await db.collection("raw").deleteOne({
+    const deleteResult = await db.collection("raw_assets").deleteOne({
       _id: new ObjectId(id),
     });
 

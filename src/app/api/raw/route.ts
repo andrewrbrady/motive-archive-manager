@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { RawAsset, RawAssetData } from "../../../models/raw";
+import { RawAsset, RawAssetData } from "../../../models/raw_assets";
 import { ObjectId } from "mongodb";
 
 export async function GET(request: Request) {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
     const client = await clientPromise;
     const db = client.db();
-    const rawCollection = db.collection("raw");
+    const rawCollection = db.collection("raw_assets");
 
     // Build query
     const query: any = {};
@@ -104,7 +104,7 @@ export async function GET(request: Request) {
 
       // Add storage location search if we found matching drives
       if (matchingDriveIds.length > 0) {
-        query.$or.push({ locations: { $in: matchingDriveIds } });
+        query.$or.push({ hardDriveIds: { $in: matchingDriveIds } });
       }
     }
 
@@ -182,13 +182,13 @@ export async function POST(request: Request) {
     const {
       date,
       description,
-      locations,
+      hardDriveIds,
       carIds = [],
       cars = [],
     } = await request.json();
 
     // Validate required fields
-    if (!date || !description || !locations) {
+    if (!date || !description || !hardDriveIds) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400 }
@@ -196,10 +196,13 @@ export async function POST(request: Request) {
     }
 
     // Create new raw asset
+    const client = await clientPromise;
+    const db = client.db();
+    const rawCollection = db.collection("raw_assets");
     const newAsset = await RawAsset.create({
       date,
       description,
-      locations,
+      hardDriveIds,
       carIds,
       cars,
     });
@@ -218,7 +221,7 @@ export async function DELETE() {
   try {
     const client = await clientPromise;
     const db = client.db();
-    const rawCollection = db.collection("raw");
+    const rawCollection = db.collection("raw_assets");
 
     await rawCollection.deleteMany({});
 

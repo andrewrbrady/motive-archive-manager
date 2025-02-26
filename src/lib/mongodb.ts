@@ -7,7 +7,13 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI;
-const options: MongoClientOptions = {};
+const options: MongoClientOptions = {
+  maxPoolSize: 150, // Increase from default (100)
+  minPoolSize: 5, // Keep some connections ready
+  maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
+  connectTimeoutMS: 10000, // Connection timeout
+  socketTimeoutMS: 45000, // Socket timeout for operations
+};
 
 // Get database name from environment or use default
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -45,7 +51,10 @@ export async function dbConnect() {
     };
 
     cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
-      console.log("New Mongoose connection established");
+      console.log(
+        "New Mongoose connection established with pool size:",
+        options.maxPoolSize
+      );
       return mongoose;
     });
   }
@@ -85,7 +94,12 @@ if (process.env.NODE_ENV === "development") {
 export async function connectToDatabase() {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
-  console.log("Connected to database:", db.databaseName);
+  console.log(
+    "Connected to database:",
+    db.databaseName,
+    "with pool size:",
+    options.maxPoolSize
+  );
   return { client, db };
 }
 

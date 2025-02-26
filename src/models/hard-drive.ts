@@ -15,7 +15,7 @@ interface HardDriveDocument extends Document {
   type: "HDD" | "SSD" | "NVMe";
   interface: "USB" | "Thunderbolt" | "USB-C" | "Internal";
   status: "Available" | "In Use" | "Archived" | "Offline";
-  location?: string;
+  locationId?: string;
   notes?: string;
   lastChecked?: Date;
   rawAssets: MongoObjectId[];
@@ -37,7 +37,7 @@ export interface HardDriveData {
   type: "HDD" | "SSD" | "NVMe";
   interface: "USB" | "Thunderbolt" | "USB-C" | "Internal";
   status: "Available" | "In Use" | "Archived" | "Offline";
-  location?: string;
+  locationId?: string;
   notes?: string;
   lastChecked?: Date;
   rawAssets: ObjectId[];
@@ -55,7 +55,7 @@ export class HardDrive {
     const now = new Date();
 
     const result = await db
-      .collection<HardDriveDocument>("hard-drives")
+      .collection<HardDriveDocument>("hard_drives")
       .insertOne({
         ...data,
         rawAssets: data.rawAssets?.map(toObjectId) || [],
@@ -76,7 +76,7 @@ export class HardDrive {
     const db = client.db();
 
     const result = await db
-      .collection<HardDriveDocument>("hard-drives")
+      .collection<HardDriveDocument>("hard_drives")
       .findOne({
         _id: toObjectId(id),
       });
@@ -95,7 +95,7 @@ export class HardDrive {
     const db = client.db();
 
     const result = await db
-      .collection<HardDriveDocument>("hard-drives")
+      .collection<HardDriveDocument>("hard_drives")
       .findOne({ label });
 
     if (!result) return null;
@@ -112,7 +112,7 @@ export class HardDrive {
     const db = client.db();
 
     const result = await db
-      .collection<HardDriveDocument>("hard-drives")
+      .collection<HardDriveDocument>("hard_drives")
       .findOne({ systemName });
 
     if (!result) return null;
@@ -131,7 +131,7 @@ export class HardDrive {
     const client = await clientPromise;
     const db = client.db();
 
-    return await db.collection<HardDriveDocument>("hard-drives").updateOne(
+    return await db.collection<HardDriveDocument>("hard_drives").updateOne(
       { _id: toObjectId(id) },
       {
         $set: {
@@ -151,7 +151,7 @@ export class HardDrive {
     const client = await clientPromise;
     const db = client.db();
 
-    return await db.collection<HardDriveDocument>("hard-drives").updateOne(
+    return await db.collection<HardDriveDocument>("hard_drives").updateOne(
       { _id: toObjectId(id) },
       {
         $addToSet: { rawAssets: toObjectId(rawAssetId) },
@@ -168,7 +168,7 @@ export class HardDrive {
     const db = client.db();
 
     return await db
-      .collection<HardDriveDocument>("hard-drives")
+      .collection<HardDriveDocument>("hard_drives")
       .updateOne({ _id: toObjectId(id) }, {
         $pull: { rawAssets: toObjectId(rawAssetId) },
         $set: { updatedAt: new Date() },
@@ -180,7 +180,7 @@ export class HardDrive {
     const db = client.db();
 
     const results = await db
-      .collection<HardDriveDocument>("hard-drives")
+      .collection<HardDriveDocument>("hard_drives")
       .find({ rawAssets: toObjectId(rawAssetId) })
       .toArray();
 
