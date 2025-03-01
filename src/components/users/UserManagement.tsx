@@ -18,6 +18,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
+import { SearchBar } from "@/components/ui/SearchBar";
+import { FilterContainer } from "@/components/ui/FilterContainer";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { UserPlus } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface User {
   _id: string;
@@ -31,13 +36,41 @@ interface User {
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    filterUsers();
+  }, [users, searchQuery]);
+
+  const filterUsers = () => {
+    if (!searchQuery.trim()) {
+      setFilteredUsers(users);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = users.filter(
+      (user) =>
+        user.name.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        user.roles.some((role) => role.toLowerCase().includes(query)) ||
+        user.creativeRoles.some((role) => role.toLowerCase().includes(query))
+    );
+
+    setFilteredUsers(filtered);
+  };
+
+  const resetSearch = () => {
+    setSearchQuery("");
+  };
 
   const fetchUsers = async () => {
     try {
@@ -48,6 +81,7 @@ export default function UserManagement() {
       }
       const data = await response.json();
       setUsers(Array.isArray(data) ? data : []);
+      setFilteredUsers(Array.isArray(data) ? data : []);
     } catch (error) {
       toast({
         title: "Error",
@@ -55,6 +89,7 @@ export default function UserManagement() {
         variant: "destructive",
       });
       setUsers([]);
+      setFilteredUsers([]);
     } finally {
       setIsLoading(false);
     }
@@ -102,19 +137,27 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Users</h2>
+    <div className="space-y-4">
+      <FilterContainer>
+        <div className="flex-1 min-w-[200px]">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onReset={resetSearch}
+            placeholder="Search users..."
+          />
+        </div>
         <Button
           onClick={handleCreateUser}
           variant="outline"
-          className="bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+          className="border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]"
         >
-          Add New User
+          <UserPlus className="w-4 h-4 mr-2" />
+          Add User
         </Button>
-      </div>
+      </FilterContainer>
 
-      <div className="rounded-md border-[1px] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)]">
+      <ListContainer>
         <Table>
           <TableHeader>
             <TableRow className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-transparent">
@@ -130,18 +173,18 @@ export default function UserManagement() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4">
-                  <span className="text-muted-foreground">Loading...</span>
+                <TableCell colSpan={7} className="text-center py-4">
+                  <LoadingSpinner text="Loading users..." size={20} />
                 </TableCell>
               </TableRow>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4">
+                <TableCell colSpan={7} className="text-center py-4">
                   <span className="text-muted-foreground">No users found</span>
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow
                   key={user._id}
                   className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
@@ -228,7 +271,7 @@ export default function UserManagement() {
             )}
           </TableBody>
         </Table>
-      </div>
+      </ListContainer>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[425px] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">

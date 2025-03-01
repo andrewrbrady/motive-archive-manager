@@ -31,6 +31,7 @@ import {
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ShotListTemplates, { ShotTemplate } from "./ShotListTemplates";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface Shot extends ShotTemplate {
   id: string;
@@ -471,7 +472,9 @@ export default function ShotList({ carId }: ShotListProps) {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-4">Loading shot lists...</div>
+        <div className="text-center py-4">
+          <LoadingSpinner text="Loading shot lists..." />
+        </div>
       ) : shotLists.length === 0 ? (
         <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
           No shot lists yet. Create a new list or use a template to get started.

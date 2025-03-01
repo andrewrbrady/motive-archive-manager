@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Car } from "@/types/car";
 import { Search, X } from "lucide-react";
 import _ from "lodash";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface CarSelectorProps {
   selectedCars: Car[];
@@ -98,8 +99,8 @@ export default function CarSelector({
         {showSuggestions && (searchTerm || loading) && (
           <div className="absolute z-10 w-full mt-1 bg-[hsl(var(--background))] rounded-lg shadow-lg border border-[hsl(var(--border))] max-h-60 overflow-auto">
             {loading ? (
-              <div className="px-4 py-2 text-[hsl(var(--foreground-muted))]">
-                Loading...
+              <div className="px-4 py-2 flex justify-center">
+                <LoadingSpinner size={16} text="Loading..." />
               </div>
             ) : suggestions.length > 0 ? (
               suggestions.map((car) => (

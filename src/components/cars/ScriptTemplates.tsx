@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 export type Platform =
   | "instagram_reels"
@@ -443,8 +444,8 @@ export default function ScriptTemplates({
         {!selectedTemplate && (
           <div className="grid gap-4">
             {isLoading ? (
-              <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
-                Loading templates...
+              <div className="text-center py-4">
+                <LoadingSpinner text="Loading templates..." />
               </div>
             ) : templates.length === 0 ? (
               <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
@@ -671,7 +672,7 @@ export default function ScriptTemplates({
                     <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                       Audio
                     </th>
-                    <th className="px-3 py-2 text-left border-b border-[hsl(var(--border))] font-medium text-sm">
+                    <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                       GFX
                     </th>
                     {isEditing && (
@@ -681,7 +682,10 @@ export default function ScriptTemplates({
                 </thead>
                 <tbody>
                   {selectedTemplate.rows.map((row) => (
-                    <tr key={row.id} className="border-b border-[hsl(var(--border))]">
+                    <tr
+                      key={row.id}
+                      className="border-b border-[hsl(var(--border))]"
+                    >
                       <td className="px-3 py-2 border-r border-[hsl(var(--border))]">
                         {isEditing ? (
                           <Input

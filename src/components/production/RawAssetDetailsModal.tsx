@@ -2,159 +2,349 @@ import React from "react";
 import { RawAssetData } from "@/models/raw_assets";
 import {
   FolderIcon,
-  XIcon,
   CarIcon,
   HardDriveIcon,
   ExternalLinkIcon,
+  CalendarIcon,
+  ClockIcon,
+  InfoIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
+import { UrlModal } from "@/components/ui/url-modal";
+import { useUrlParams } from "@/hooks/useUrlParams";
 
 interface RawAssetDetailsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
   asset: RawAssetData | undefined;
   driveLabels: Record<string, string>;
+  onClose: () => void;
+  isOpen?: boolean;
 }
 
 export default function RawAssetDetailsModal({
-  isOpen,
-  onClose,
   asset,
   driveLabels,
+  onClose,
+  isOpen,
 }: RawAssetDetailsModalProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const { updateParams, getParam } = useUrlParams();
 
-  if (!isOpen || !asset) return null;
+  if (!asset) return null;
 
   const handleDriveClick = (driveId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log("Navigating to hard drive:", driveId);
 
-    // Close the current modal first
+    // First close the current modal to prevent any state conflicts
     onClose();
 
-    // Get all current URL parameters
-    const params = new URLSearchParams(searchParams.toString());
+    // Then update the URL directly for immediate effect
+    const url = new URL(window.location.href);
 
-    // Preserve the template parameter if it exists
-    const template = params.get("template");
+    // Set only the parameters we want - keep the tab and drive ID
+    url.searchParams.set("tab", "hard-drives");
+    url.searchParams.set("drive", driveId);
 
-    // Create new params with only what we need
-    const newParams = new URLSearchParams();
-    if (template) newParams.set("template", template);
-    newParams.set("tab", "hard-drives");
-    newParams.set("drive", driveId);
+    // Preserve template if it exists
+    const template = getParam("template");
+    if (template) {
+      url.searchParams.set("template", template);
+    }
 
-    // Navigate with the new parameters
-    router.replace(`/production?${newParams.toString()}`);
+    // Preserve other important parameters except asset
+    ["page", "limit", "search", "location", "view"].forEach((param) => {
+      const value = getParam(param);
+      if (value && param !== "asset") {
+        url.searchParams.set(param, value);
+      }
+    });
+
+    console.log("Setting URL directly to:", url.toString());
+    window.history.pushState({}, "", url.toString());
+
+    // Finally update the Next.js router state to keep it in sync
+    setTimeout(() => {
+      console.log("Updating Next.js router for hard drive:", driveId);
+      updateParams(
+        {
+          tab: "hard-drives",
+          drive: driveId,
+          asset: null, // Explicitly remove the asset parameter
+        },
+        {
+          // Preserve other important parameters
+          preserveParams: [
+            "template",
+            "page",
+            "limit",
+            "search",
+            "location",
+            "view",
+          ],
+          clearOthers: false, // Important: Keep existing parameters to maintain context
+        }
+      );
+      console.log("Next.js router update completed for hard drive");
+    }, 200); // Increased timeout for better reliability
+  };
+
+  const handleCarClick = (carId: string | any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClose();
+
+    // Ensure we have a string ID
+    const carIdStr =
+      typeof carId === "object" && carId.toString ? carId.toString() : carId;
+
+    // Navigate to the car detail page
+    router.push(`/cars/${carIdStr}`);
+  };
+
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatTime = (date: Date | undefined) => {
+    if (!date) return "";
+    return new Date(date).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getTimeAgo = (date: Date | undefined) => {
+    if (!date) return "";
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
   };
 
   return (
-    <div className="fixed inset-0 bg-[hsl(var(--background))/95] backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
-      <div className="bg-[hsl(var(--background))] p-6 rounded-lg shadow-xl max-w-4xl w-full mx-4 border border-[hsl(var(--border))] relative">
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center gap-3">
-            <FolderIcon className="w-6 h-6" />
-            <div>
-              <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
-                {asset.date}
-              </h2>
-              <p className="text-[hsl(var(--muted-foreground))]">
-                {asset.description}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-          >
-            <XIcon className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-4">Cars</h3>
-              {asset.cars && asset.cars.length > 0 ? (
-                <div className="space-y-2">
-                  {asset.cars.map((car) => (
-                    <div
-                      key={car._id}
-                      className="p-3 border border-[hsl(var(--border))] rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <CarIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-                        <span className="font-medium">
-                          {car.year} {car.make} {car.model}
-                        </span>
-                      </div>
-                      {(car.series || car.trim || car.color) && (
-                        <div className="mt-2 text-sm text-[hsl(var(--muted-foreground))] space-y-1">
-                          {car.series && <div>Series: {car.series}</div>}
-                          {car.trim && <div>Trim: {car.trim}</div>}
-                          {car.color && <div>Color: {car.color}</div>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-[hsl(var(--muted-foreground))] text-center py-8 border border-dashed border-[hsl(var(--border))] rounded-lg">
-                  <CarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No cars associated with this asset.</p>
+    <UrlModal
+      paramName="asset"
+      paramValue={asset._id?.toString()}
+      onClose={onClose}
+      preserveParams={[
+        "tab",
+        "page",
+        "limit",
+        "search",
+        "location",
+        "view",
+        "template",
+      ]}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-medium mb-4 flex items-center">
+              <FolderIcon className="w-5 h-5 mr-2" />
+              Asset Details
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-[hsl(var(--muted-foreground))] text-sm mb-1">
+                  Description
+                </p>
+                <p className="text-[hsl(var(--foreground))]">
+                  {asset.description}
+                </p>
+              </div>
+              <div>
+                <p className="text-[hsl(var(--muted-foreground))] text-sm mb-1">
+                  Date
+                </p>
+                <p className="text-[hsl(var(--foreground))]">{asset.date}</p>
+              </div>
+              {asset.createdAt && (
+                <div>
+                  <p className="text-[hsl(var(--muted-foreground))] text-sm mb-1">
+                    Created
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                    <span>
+                      {formatDate(asset.createdAt)}{" "}
+                      <span className="text-[hsl(var(--muted-foreground))]">
+                        {formatTime(asset.createdAt)}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-[hsl(var(--muted-foreground))] text-sm">
+                    <ClockIcon className="w-3 h-3" />
+                    <span>{getTimeAgo(asset.createdAt)}</span>
+                  </div>
                 </div>
               )}
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium mb-4">Storage Locations</h3>
-              {asset.hardDriveIds && asset.hardDriveIds.length > 0 ? (
-                <div className="space-y-2">
-                  {asset.hardDriveIds.map((hardDriveId, index) => {
-                    const hardDriveIdStr = hardDriveId.toString();
-                    return (
-                      <button
-                        key={index}
-                        onClick={(e) => handleDriveClick(hardDriveIdStr, e)}
-                        className="w-full p-3 border border-[hsl(var(--border))] rounded-lg hover:bg-[hsl(var(--accent))] transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <HardDriveIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-                          <span className="font-medium">
-                            {driveLabels[hardDriveIdStr] || hardDriveIdStr}
-                          </span>
-                          <ExternalLinkIcon className="w-4 h-4 ml-auto text-[hsl(var(--muted-foreground))]" />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-[hsl(var(--muted-foreground))] text-center py-8 border border-dashed border-[hsl(var(--border))] rounded-lg">
-                  <HardDriveIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No storage locations associated with this asset.</p>
+              {asset.updatedAt && asset.updatedAt !== asset.createdAt && (
+                <div>
+                  <p className="text-[hsl(var(--muted-foreground))] text-sm mb-1">
+                    Last Updated
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                    <span>
+                      {formatDate(asset.updatedAt)}{" "}
+                      <span className="text-[hsl(var(--muted-foreground))]">
+                        {formatTime(asset.updatedAt)}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-[hsl(var(--muted-foreground))] text-sm">
+                    <ClockIcon className="w-3 h-3" />
+                    <span>{getTimeAgo(asset.updatedAt)}</span>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
           <div>
-            <h3 className="text-lg font-medium mb-4">Additional Information</h3>
-            <div className="space-y-4">
-              <div className="p-4 border border-[hsl(var(--border))] rounded-lg">
-                <h4 className="text-sm font-medium text-[hsl(var(--muted-foreground))] mb-2">
-                  Asset ID
-                </h4>
-                <p className="font-mono text-sm">{asset._id?.toString()}</p>
-              </div>
-              {/* Add more metadata sections here as needed */}
+            <h3 className="text-lg font-medium mb-4 flex items-center">
+              <HardDriveIcon className="w-5 h-5 mr-2" />
+              Storage Locations
+            </h3>
+            <div className="space-y-2">
+              {asset.hardDriveIds && asset.hardDriveIds.length > 0 ? (
+                asset.hardDriveIds.map((driveId) => (
+                  <div
+                    key={driveId.toString()}
+                    className="flex items-center justify-between p-3 bg-[hsl(var(--background-secondary))] rounded-md hover:bg-[hsl(var(--background-secondary))]/80 cursor-pointer transition-colors"
+                    onClick={(e) => handleDriveClick(driveId.toString(), e)}
+                  >
+                    <div className="flex items-center">
+                      <HardDriveIcon className="w-4 h-4 mr-2 text-[hsl(var(--muted-foreground))]" />
+                      <span className="text-sm">
+                        {driveLabels[driveId.toString()] ||
+                          `Drive ${driveId.toString().slice(0, 8)}...`}
+                      </span>
+                    </div>
+                    <ExternalLinkIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                  </div>
+                ))
+              ) : (
+                <p className="text-[hsl(var(--muted-foreground))]">
+                  No storage locations assigned
+                </p>
+              )}
             </div>
           </div>
         </div>
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-medium mb-4 flex items-center">
+              <CarIcon className="w-5 h-5 mr-2" />
+              Associated Cars
+            </h3>
+            <div className="space-y-2">
+              {asset.cars && asset.cars.length > 0 ? (
+                asset.cars.map((car) => (
+                  <div
+                    key={car._id.toString()}
+                    className="flex items-center justify-between p-3 bg-[hsl(var(--background-secondary))] rounded-md hover:bg-[hsl(var(--background-secondary))]/80 cursor-pointer transition-colors"
+                    onClick={(e) => handleCarClick(car._id, e)}
+                  >
+                    <div className="flex items-center">
+                      <CarIcon className="w-4 h-4 mr-2 text-[hsl(var(--muted-foreground))]" />
+                      <span>
+                        {car.year} {car.make} {car.model}
+                      </span>
+                    </div>
+                    <ExternalLinkIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                  </div>
+                ))
+              ) : (
+                <p className="text-[hsl(var(--muted-foreground))]">
+                  No cars associated with this asset
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-medium mb-4 flex items-center">
+              <InfoIcon className="w-5 h-5 mr-2" />
+              Actions
+            </h3>
+            <button
+              onClick={() => {
+                console.log("Editing asset:", asset._id);
+
+                // First update the URL directly for immediate effect
+                const url = new URL(window.location.href);
+                url.searchParams.set("tab", "raw-assets");
+                url.searchParams.set(
+                  "asset",
+                  asset._id ? asset._id.toString() : ""
+                );
+                url.searchParams.set("edit", "true");
+
+                // Preserve other important parameters
+                [
+                  "page",
+                  "limit",
+                  "search",
+                  "location",
+                  "view",
+                  "template",
+                ].forEach((param) => {
+                  const value = getParam(param);
+                  if (value) {
+                    url.searchParams.set(param, value);
+                  }
+                });
+
+                console.log("Setting URL directly to:", url.toString());
+                window.history.pushState({}, "", url.toString());
+
+                // Then close the current modal
+                onClose();
+
+                // Finally update the Next.js router state to keep it in sync
+                // Use setTimeout to ensure the direct URL update has time to take effect
+                setTimeout(() => {
+                  console.log(
+                    "Updating Next.js router for editing asset:",
+                    asset._id
+                  );
+                  updateParams(
+                    {
+                      tab: "raw-assets",
+                      asset: asset._id ? asset._id.toString() : "",
+                      edit: "true",
+                    },
+                    {
+                      // Preserve other important parameters
+                      preserveParams: [
+                        "page",
+                        "limit",
+                        "search",
+                        "location",
+                        "view",
+                        "template",
+                      ],
+                      context: "tab:raw-assets",
+                    }
+                  );
+                  console.log(
+                    "Next.js router update completed for editing asset"
+                  );
+                }, 100);
+              }}
+              className="px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded hover:bg-[hsl(var(--primary))/90] transition-colors"
+            >
+              Edit Asset
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </UrlModal>
   );
 }

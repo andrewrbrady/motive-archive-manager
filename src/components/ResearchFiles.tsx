@@ -13,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import MarkdownViewer from "./MarkdownViewer";
 import { ModelSelector, ModelType } from "@/components/ModelSelector";
 import dynamic from "next/dynamic";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 // Dynamically import MarkdownEditor with no SSR
 const MarkdownEditor = dynamic(() => import("./MarkdownEditor"), {
@@ -778,18 +779,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               </div>
 
               {isLoadingFiles ? (
-                <div className="p-2">
-                  <div className="animate-pulse space-y-2">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="flex items-center space-x-4">
-                        <div className="h-4 w-4 bg-[hsl(var(--background))] rounded" />
-                        <div className="flex-1 space-y-1">
-                          <div className="h-3 bg-[hsl(var(--background))] rounded w-3/4" />
-                          <div className="h-2 bg-[hsl(var(--background))] rounded w-1/2" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="p-2 flex justify-center">
+                  <LoadingSpinner size={24} text="Loading files..." />
                 </div>
               ) : (
                 <>
@@ -797,7 +788,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
                     <div
                       key={file._id}
                       className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-[hsl(var(--background))]/50 px-4 -mx-4 rounded ${
-                        selectedFile?._id === file._id ? "bg-[hsl(var(--background))] bg-opacity-50" : ""
+                        selectedFile?._id === file._id
+                          ? "bg-[hsl(var(--background))] bg-opacity-50"
+                          : ""
                       }`}
                       onClick={() => handleFileClick(file)}
                     >
@@ -861,7 +854,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
           {selectedFile ? (
             isLoadingContent ? (
               <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <LoadingSpinner size={24} text="Loading content..." />
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">

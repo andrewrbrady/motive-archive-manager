@@ -6,6 +6,7 @@ import { Deliverable } from "@/types/deliverable";
 import { toast } from "sonner";
 import { MotiveCalendar } from "@/components/calendar";
 import { Loader2 } from "lucide-react";
+import { LoadingContainer } from "@/components/ui/loading";
 
 interface CalendarTabProps {
   carId: string;
@@ -77,9 +78,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
   return (
     <div className="flex h-full w-full flex-col">
       {isLoading ? (
-        <div className="flex h-full w-full items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingContainer fullHeight size={32} text="Loading calendar..." />
       ) : (
         <div className="flex h-full w-full flex-1 flex-col">
           <MotiveCalendar

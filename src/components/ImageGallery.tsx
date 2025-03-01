@@ -21,6 +21,7 @@ import { UploadProgressDialog } from "./UploadProgressDialog";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import Image from "next/image";
 import ImageManager from "./ImageManager";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface ImageMetadata {
   angle?: string;
@@ -477,10 +478,12 @@ export function ImageGallery({
             >
               {uploading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-                  <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase tracking-wide text-sm font-medium">
-                    Uploading Images...
-                  </span>
+                  <LoadingSpinner
+                    size={32}
+                    text="Uploading Images..."
+                    textPosition="bottom"
+                    gap={4}
+                  />
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
@@ -514,8 +517,7 @@ export function ImageGallery({
                   >
                     {uploading ? (
                       <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Uploading...
+                        <LoadingSpinner size={14} text="Uploading..." />
                       </>
                     ) : (
                       <>
@@ -543,8 +545,7 @@ export function ImageGallery({
                     >
                       {uploading ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Uploading...
+                          <LoadingSpinner size={14} text="Uploading..." />
                         </>
                       ) : (
                         <>
@@ -791,8 +792,7 @@ export function ImageGallery({
                 >
                   {uploading ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      Uploading...
+                      <LoadingSpinner size={14} text="Uploading..." />
                     </>
                   ) : (
                     <>

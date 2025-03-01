@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { RawAssetData } from "@/models/raw_assets";
 import {
   PencilIcon,
@@ -18,6 +18,10 @@ import ImportRawAssetsModal from "./ImportRawAssetsModal";
 import { Button } from "@/components/ui/button";
 import AddAssetModal from "./AddAssetModal";
 import { ObjectId } from "@/lib/types";
+import { useUrlParams } from "@/hooks/useUrlParams";
+import { PaginationWithUrl } from "@/components/ui/pagination-with-url";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { LoadingContainer } from "@/components/ui/loading-container";
 
 const LIMIT_OPTIONS = [10, 25, 50, 100];
 
@@ -38,22 +42,28 @@ interface RawAsset {
 }
 
 export default function RawAssetsTab() {
-  const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { getParam, updateParams } = useUrlParams();
   const [assets, setAssets] = useState<RawAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return getParam("search") || "";
+  });
+
   const [currentPage, setCurrentPage] = useState(() => {
-    const page = searchParams.get("page");
+    const page = getParam("page");
     return page ? parseInt(page) : 1;
   });
+
   const [totalPages, setTotalPages] = useState(1);
+
   const [itemsPerPage, setItemsPerPage] = useState(() => {
-    const limit = searchParams.get("limit");
+    const limit = getParam("limit");
     return limit ? parseInt(limit) : 10;
   });
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
@@ -69,42 +79,38 @@ export default function RawAssetsTab() {
   useEffect(() => {
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        if (isDetailsModalOpen) {
-          handleCloseDetails();
-        }
+        // Only handle the edit modal here - the details modal handles its own escape key
         if (isEditModalOpen) {
           handleCloseModal();
         }
       }
     };
 
-    document.addEventListener("keydown", handleEscapeKey);
+    window.addEventListener("keydown", handleEscapeKey);
     return () => {
-      document.removeEventListener("keydown", handleEscapeKey);
+      window.removeEventListener("keydown", handleEscapeKey);
     };
-  }, [isDetailsModalOpen, isEditModalOpen]);
+  }, [isEditModalOpen]);
 
-  const updateUrlParams = (updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null) {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
-    router.replace(`${pathname}?${params.toString()}`);
-  };
-
-  // Handle selected asset from URL for both edit and details
+  // Validate current page when total pages changes
   useEffect(() => {
-    const selectedAssetId = searchParams.get("asset");
-    const isEdit = searchParams.get("edit") === "true";
+    if (currentPage > totalPages && totalPages > 0) {
+      handlePageChange(1);
+    }
+  }, [totalPages]);
+
+  // Enhanced effect to handle asset parameter from URL, especially when coming from other tabs
+  useEffect(() => {
+    const selectedAssetId = getParam("asset");
+    const isEdit = getParam("edit") === "true";
 
     if (selectedAssetId) {
+      console.log("RawAssetsTab - Found asset param in URL:", selectedAssetId);
+
       // If we have assets loaded, find the asset and show modal
       if (assets.length > 0) {
-        const asset = assets.find((a) => a._id?.toString() === selectedAssetId);
+        const asset = assets.find((a) => a._id === selectedAssetId);
+
         if (asset) {
           if (isEdit) {
             setSelectedAssetId(asset._id);
@@ -140,33 +146,29 @@ export default function RawAssetsTab() {
                 updatedAt: asset.updatedAt,
               });
               setIsDetailsModalOpen(true);
+              console.log("Opening details modal for asset:", asset._id);
             }
           }
+        } else {
+          console.log("Asset not found in loaded assets, fetching from API");
+          // Asset not found in currently loaded assets, fetch it directly
+          fetchAssetById(selectedAssetId);
         }
       } else {
         // If assets aren't loaded yet, fetch the specific asset
-        const fetchAsset = async () => {
-          try {
-            const response = await fetch(`/api/raw/${selectedAssetId}`);
-            if (!response.ok) throw new Error("Failed to fetch asset");
-            const asset = await response.json();
-
-            // Only set the asset data if the relevant modal is not already open
-            if (isEdit && !isEditModalOpen) {
-              setSelectedAssetForDetails(asset);
-              setIsEditModalOpen(true);
-            } else if (!isEdit && !isDetailsModalOpen) {
-              setSelectedAssetForDetails(asset);
-              setIsDetailsModalOpen(true);
-            }
-          } catch (error) {
-            console.error("Error fetching asset:", error);
-          }
-        };
-        fetchAsset();
+        console.log("Assets not loaded yet, fetching specific asset");
+        fetchAssetById(selectedAssetId);
       }
     }
-  }, [searchParams, assets, isEditModalOpen, isDetailsModalOpen]);
+  }, [assets, getParam]);
+
+  // Handle addAsset parameter from URL
+  useEffect(() => {
+    const addAsset = getParam("addAsset");
+    if (addAsset === "true" && !isAddingAsset) {
+      setIsAddingAsset(true);
+    }
+  }, [getParam, isAddingAsset]);
 
   const fetchDriveLabels = useCallback(async (id: string) => {
     try {
@@ -225,18 +227,26 @@ export default function RawAssetsTab() {
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
-    updateUrlParams({ search: value || null, page: "1" });
+    updateParams({
+      search: value || null,
+      page: "1",
+    });
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    updateUrlParams({ page: page.toString() });
+    updateParams({
+      page: page.toString(),
+    });
   };
 
   const handleLimitChange = (limit: number) => {
     setItemsPerPage(limit);
     setCurrentPage(1);
-    updateUrlParams({ limit: limit.toString(), page: "1" });
+    updateParams({
+      limit: limit.toString(),
+      page: "1",
+    });
   };
 
   const handleDeleteAll = async () => {
@@ -261,6 +271,13 @@ export default function RawAssetsTab() {
   };
 
   const handleViewDetails = (asset: RawAsset) => {
+    // Update URL parameters
+    updateParams({
+      asset: asset._id?.toString() || null,
+      edit: null,
+    });
+
+    // Then set the asset data and open the modal
     setSelectedAssetForDetails({
       _id: asset._id as unknown as ObjectId,
       date: asset.date,
@@ -272,13 +289,28 @@ export default function RawAssetsTab() {
       updatedAt: asset.updatedAt,
     });
     setIsDetailsModalOpen(true);
-    updateUrlParams({ asset: asset._id?.toString() || null, edit: null });
   };
 
   const handleCloseDetails = () => {
+    console.log("Closing raw asset details modal");
+
+    // Close the modal first
     setIsDetailsModalOpen(false);
+
+    // Reset the state
     setSelectedAssetForDetails(undefined);
-    updateUrlParams({ asset: null, edit: null });
+
+    // Update URL params - preserve the tab parameter to stay on the raw-assets tab
+    updateParams(
+      {
+        asset: null,
+        edit: null,
+      },
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        clearOthers: false,
+      }
+    );
   };
 
   const handleEdit = (asset: RawAsset) => {
@@ -298,7 +330,7 @@ export default function RawAssetsTab() {
       setSelectedAssetId(asset._id);
       setSelectedAssetForDetails(rawAssetData);
       setIsEditModalOpen(true);
-      updateUrlParams({ asset: asset._id?.toString() || null, edit: "true" });
+      updateParams({ asset: asset._id?.toString() || null, edit: "true" });
     }, 50);
   };
 
@@ -306,7 +338,7 @@ export default function RawAssetsTab() {
     setIsEditModalOpen(false);
     setSelectedAssetId(null);
     setSelectedAssetForDetails(undefined);
-    updateUrlParams({ asset: null });
+    updateParams({ asset: null });
   };
 
   const handleSave = async (assetData: Partial<RawAssetData>) => {
@@ -372,9 +404,8 @@ export default function RawAssetsTab() {
   };
 
   const handleAssetClick = (assetId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("asset", assetId);
-    router.replace(`${pathname}?${params.toString()}`);
+    // Instead of showing a modal, navigate to the raw asset details page
+    router.push(`/raw/${assetId}`);
   };
 
   const handleAddAsset = async (assetData: {
@@ -402,6 +433,96 @@ export default function RawAssetsTab() {
     }
   };
 
+  // Add a function to handle opening the add asset modal
+  const handleAddAssetClick = () => {
+    updateParams({
+      addAsset: "true",
+    });
+    setIsAddingAsset(true);
+  };
+
+  // Handle closing the add asset modal
+  const handleCloseAddAsset = () => {
+    setIsAddingAsset(false);
+    updateParams({
+      addAsset: null,
+    });
+  };
+
+  // Function to fetch a specific asset by ID
+  const fetchAssetById = async (assetId: string) => {
+    console.log("Fetching asset by ID:", assetId);
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/raw/${assetId}`);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch asset");
+      }
+
+      const asset = await response.json();
+      console.log("Fetched asset data:", asset);
+
+      // Transform the asset data to the expected format
+      const rawAssetData: RawAssetData = {
+        _id: asset._id as unknown as ObjectId,
+        date: asset.date,
+        description: asset.description,
+        hardDriveIds: asset.hardDriveIds.map(
+          (id: string) => id as unknown as ObjectId
+        ),
+        carIds: asset.carIds,
+        cars: asset.cars || [],
+        createdAt: asset.createdAt,
+        updatedAt: asset.updatedAt,
+      };
+
+      // Check if edit mode or view mode
+      const isEdit = getParam("edit") === "true";
+
+      if (isEdit && !isEditModalOpen) {
+        setSelectedAssetId(assetId);
+        setSelectedAssetForDetails(rawAssetData);
+        setIsEditModalOpen(true);
+        console.log("Opening edit modal for asset:", assetId);
+      } else if (!isEdit && !isDetailsModalOpen) {
+        setSelectedAssetForDetails(rawAssetData);
+        setIsDetailsModalOpen(true);
+        console.log("Opening details modal for asset:", assetId);
+      }
+
+      // If we had to fetch a single asset, also fetch drive labels for it
+      if (asset.hardDriveIds && asset.hardDriveIds.length > 0) {
+        fetchDriveLabelsForAsset(asset.hardDriveIds);
+      }
+    } catch (err) {
+      console.error("Error fetching asset:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch asset");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to fetch drive labels for a specific asset
+  const fetchDriveLabelsForAsset = async (hardDriveIds: string[]) => {
+    try {
+      const response = await fetch(
+        `/api/hard-drives?ids=${hardDriveIds.join(",")}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch drive labels");
+      const data = await response.json();
+
+      const labels: Record<string, string> = {};
+      data.drives.forEach((drive: any) => {
+        labels[drive._id] = drive.label;
+      });
+
+      setDriveLabels(labels);
+    } catch (error) {
+      console.error("Error fetching drive labels:", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -420,7 +541,7 @@ export default function RawAssetsTab() {
             <FolderIcon className="w-4 h-4" />
             Import CSV
           </button>
-          <Button onClick={() => setIsAddingAsset(true)}>
+          <Button onClick={handleAddAssetClick}>
             <Plus className="w-4 h-4 mr-2" />
             Add Asset
           </Button>
@@ -450,22 +571,28 @@ export default function RawAssetsTab() {
         </select>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto shadow-md rounded-lg border border-[hsl(var(--border))]">
         <table className="w-full">
           <thead>
             <tr className="text-left text-[hsl(var(--muted-foreground))] text-xs uppercase">
-              <th className="py-3">Date</th>
-              <th className="py-3">Description</th>
-              <th className="py-3">Cars</th>
-              <th className="py-3">Storage Locations</th>
-              <th className="py-3 text-right">Actions</th>
+              <th className="py-3 px-2">Date</th>
+              <th className="py-3 px-2">Description</th>
+              <th className="py-3 px-2">Cars</th>
+              <th className="py-3 px-2">Storage Locations</th>
+              <th className="py-3 px-2 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="text-[hsl(var(--foreground))]">
             {loading ? (
               <tr>
+                <td colSpan={5} className="py-8">
+                  <LoadingContainer text="Loading assets..." />
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
                 <td colSpan={5} className="text-center py-4">
-                  Loading...
+                  {error}
                 </td>
               </tr>
             ) : assets.length === 0 ? (
@@ -478,10 +605,10 @@ export default function RawAssetsTab() {
               assets.map((asset) => (
                 <tr
                   key={asset._id}
-                  className="border-t border-[hsl(var(--border))] cursor-pointer hover:bg-[hsl(var(--accent))]"
+                  className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
                   onClick={() => handleAssetClick(asset._id)}
                 >
-                  <td className="py-4">
+                  <td className="py-3 px-2">
                     <Link
                       href={`/raw/${asset._id}`}
                       className="text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))/90]"
@@ -489,14 +616,14 @@ export default function RawAssetsTab() {
                       {asset.date}
                     </Link>
                   </td>
-                  <td className="py-4">{asset.description}</td>
-                  <td className="py-4">
+                  <td className="py-3 px-2 text-sm">{asset.description}</td>
+                  <td className="py-3 px-2">
                     <div className="flex flex-wrap gap-2">
                       {asset.cars &&
                         asset.cars.map((car) => (
                           <span
                             key={car._id}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded text-sm border border-[hsl(var(--border))] shadow-sm"
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
                           >
                             <CarIcon className="w-3 h-3" />
                             {car.year} {car.make} {car.model}
@@ -504,14 +631,14 @@ export default function RawAssetsTab() {
                         ))}
                     </div>
                   </td>
-                  <td className="py-4">
+                  <td className="py-3 px-2">
                     <div className="flex flex-wrap gap-2">
                       {asset.hardDriveIds.map((hardDriveId, index) => {
                         const hardDriveIdStr = hardDriveId.toString();
                         return (
                           <span
                             key={index}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded text-sm border border-[hsl(var(--border))] shadow-sm"
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
                           >
                             <HardDriveIcon className="w-3 h-3" />
                             {driveLabels[hardDriveIdStr] || "Unknown Drive"}
@@ -520,29 +647,27 @@ export default function RawAssetsTab() {
                       })}
                     </div>
                   </td>
-                  <td className="py-4 text-right">
+                  <td className="py-3 px-2 text-right">
                     <div className="flex justify-end space-x-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleEdit(asset);
                         }}
-                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]"
+                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
                         title="Edit asset"
                       >
-                        <PencilIcon className="h-4 w-4" />
+                        <PencilIcon className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (asset._id) {
-                            handleDeleteAsset(asset._id);
-                          }
+                          handleDeleteAsset(asset._id);
                         }}
-                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
+                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
                         title="Delete asset"
                       >
-                        <Trash2Icon className="h-4 w-4" />
+                        <Trash2Icon className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -554,40 +679,21 @@ export default function RawAssetsTab() {
       </div>
 
       {!loading && assets.length > 0 && (
-        <div className="flex justify-center items-center gap-2 mt-4">
-          <button
-            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded disabled:opacity-50 hover:bg-[hsl(var(--secondary))/90]"
-          >
-            Previous
-          </button>
-          <span className="text-[hsl(var(--muted-foreground))]">
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={() =>
-              handlePageChange(Math.min(totalPages, currentPage + 1))
-            }
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded disabled:opacity-50 hover:bg-[hsl(var(--secondary))/90]"
-          >
-            Next
-          </button>
-        </div>
+        <PaginationWithUrl
+          totalPages={totalPages}
+          defaultPage={currentPage}
+          defaultPageSize={itemsPerPage}
+          onPageChange={handlePageChange}
+          context="tab:raw-assets"
+          preserveParams={["tab", "search"]}
+          pageSizeOptions={LIMIT_OPTIONS}
+        />
       )}
-
-      <RawAssetDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={handleCloseDetails}
-        asset={selectedAssetForDetails}
-        driveLabels={driveLabels}
-      />
 
       {isAddingAsset && (
         <AddAssetModal
           isOpen={isAddingAsset}
-          onClose={() => setIsAddingAsset(false)}
+          onClose={handleCloseAddAsset}
           onAdd={handleAddAsset}
         />
       )}

@@ -5,6 +5,7 @@ import { XIcon, UploadIcon } from "lucide-react";
 import Papa from "papaparse";
 import { StudioInventoryItem, InventoryCategory } from "@/types/inventory";
 import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface ImportInventoryModalProps {
   isOpen: boolean;
@@ -271,7 +272,14 @@ export default function ImportInventoryModal({
               Cancel
             </Button>
             <Button type="submit" disabled={!file || loading}>
-              {loading ? "Importing..." : "Import Data"}
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <LoadingSpinner size={14} />
+                  <span>Importing...</span>
+                </div>
+              ) : (
+                "Import Data"
+              )}
             </Button>
           </div>
         </form>

@@ -5,25 +5,65 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, MapPin } from "lucide-react";
 import { LocationResponse } from "@/models/location";
 import LocationsTable from "@/components/locations/LocationsTable";
 import AddLocationModal from "@/components/locations/AddLocationModal";
 import EditLocationModal from "@/components/locations/EditLocationModal";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { SearchBar } from "@/components/ui/SearchBar";
+import { FilterContainer } from "@/components/ui/FilterContainer";
+import { ListContainer } from "@/components/ui/ListContainer";
 
-export default function LocationsClient() {
+export interface LocationsClientProps {
+  hideNavbar?: boolean;
+}
+
+export default function LocationsClient({
+  hideNavbar = false,
+}: LocationsClientProps) {
   const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [filteredLocations, setFilteredLocations] = useState<
+    LocationResponse[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] =
     useState<LocationResponse | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchLocations();
   }, []);
+
+  useEffect(() => {
+    filterLocations();
+  }, [locations, searchQuery]);
+
+  const filterLocations = () => {
+    if (!searchQuery.trim()) {
+      setFilteredLocations(locations);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = locations.filter(
+      (location) =>
+        location.name.toLowerCase().includes(query) ||
+        location.city?.toLowerCase().includes(query) ||
+        location.state?.toLowerCase().includes(query) ||
+        location.address?.toLowerCase().includes(query)
+    );
+
+    setFilteredLocations(filtered);
+  };
+
+  const resetSearch = () => {
+    setSearchQuery("");
+  };
 
   const fetchLocations = async () => {
     try {
@@ -32,6 +72,7 @@ export default function LocationsClient() {
       if (!response.ok) throw new Error("Failed to fetch locations");
       const data = await response.json();
       setLocations(data);
+      setFilteredLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
     } finally {
@@ -114,33 +155,41 @@ export default function LocationsClient() {
     setIsDeleteModalOpen(true);
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <PageTitle title="Locations">
-            <div className="flex items-center gap-4 ml-auto">
-              <Button onClick={() => setIsAddModalOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Location
-              </Button>
-            </div>
-          </PageTitle>
-
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <p>Loading locations...</p>
-            </div>
-          ) : (
-            <LocationsTable
-              locations={locations}
-              onEdit={openEditModal}
-              onDelete={openDeleteModal}
-            />
-          )}
+  // Content without navbar/footer
+  const content = (
+    <div className="space-y-4">
+      <FilterContainer>
+        <div className="flex-1 min-w-[200px]">
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onReset={resetSearch}
+            placeholder="Search locations..."
+          />
         </div>
-      </main>
+        <Button
+          onClick={() => setIsAddModalOpen(true)}
+          variant="outline"
+          className="border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]"
+        >
+          <MapPin className="w-4 h-4 mr-2" />
+          Add Location
+        </Button>
+      </FilterContainer>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner text="Loading locations..." size={24} />
+        </div>
+      ) : (
+        <ListContainer>
+          <LocationsTable
+            locations={filteredLocations}
+            onEdit={openEditModal}
+            onDelete={openDeleteModal}
+          />
+        </ListContainer>
+      )}
 
       {isAddModalOpen && (
         <AddLocationModal
@@ -174,7 +223,19 @@ export default function LocationsClient() {
           message={`Are you sure you want to delete the location "${selectedLocation.name}"? This action cannot be undone.`}
         />
       )}
+    </div>
+  );
 
+  // If hideNavbar is true, return just the content
+  if (hideNavbar) {
+    return content;
+  }
+
+  // Otherwise return the full page with navbar and footer
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="container mx-auto px-4 py-8">{content}</main>
       <Footer />
     </div>
   );

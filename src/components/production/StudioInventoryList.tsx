@@ -107,7 +107,7 @@ export default function StudioInventoryList({
           No items found. Try adjusting your filters or add new items.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto shadow-md rounded-lg border border-[hsl(var(--border))]">
           <table className="w-full">
             {/* Table Header */}
             <thead>
@@ -170,7 +170,7 @@ export default function StudioInventoryList({
                   <td className="py-3 px-2 sticky left-[48px] bg-background z-10">
                     <span className="font-medium text-sm">{item.name}</span>
                     {item.currentKitId && (
-                      <span className="ml-2 inline-flex items-center text-xs text-primary">
+                      <span className="ml-2 inline-flex items-center text-xs text-[hsl(var(--primary))]">
                         <Box className="w-3 h-3 mr-1" />
                         Kit
                       </span>
@@ -181,7 +181,7 @@ export default function StudioInventoryList({
                   <td className="py-3 px-2 text-sm">
                     {item.category}
                     {item.subCategory && (
-                      <span className="text-xs text-muted-foreground block">
+                      <span className="text-xs text-[hsl(var(--muted-foreground))] block">
                         {item.subCategory}
                       </span>
                     )}
@@ -201,7 +201,9 @@ export default function StudioInventoryList({
                         {getLocationName(item.location)}
                       </span>
                     ) : (
-                      "-"
+                      <span className="text-[hsl(var(--muted-foreground))]">
+                        -
+                      </span>
                     )}
                   </td>
 
@@ -209,10 +211,10 @@ export default function StudioInventoryList({
                   <td className="py-3 px-2">
                     <span
                       className={cn(
-                        "px-2 py-1 rounded text-xs",
+                        "px-2 py-1 rounded-md text-xs",
                         item.isAvailable
                           ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
-                          : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                          : "bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]"
                       )}
                     >
                       {item.isAvailable ? "Available" : "In Use"}
@@ -225,14 +227,14 @@ export default function StudioInventoryList({
                       <div className="flex justify-end space-x-2">
                         <button
                           onClick={() => setEditingItem(item)}
-                          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]"
+                          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
                           title="Edit item"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
+                          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
                           title="Delete item"
                         >
                           <Trash2 className="w-4 h-4" />

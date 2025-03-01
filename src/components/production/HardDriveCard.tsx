@@ -5,6 +5,7 @@ import { HardDriveIcon, PencilIcon, Trash2Icon, MapPin } from "lucide-react";
 import { HardDriveData } from "@/models/hard-drive";
 import { Button } from "@/components/ui/button";
 import { ObjectId } from "mongodb";
+import { cn } from "@/lib/utils";
 
 interface HardDriveCardProps {
   drive: HardDriveData & {
@@ -23,114 +24,148 @@ export default function HardDriveCard({
   onDelete,
   onClick,
 }: HardDriveCardProps) {
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case "Available":
+        return "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]";
+      case "In Use":
+        return "bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]";
+      case "Archived":
+        return "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]";
+      case "Offline":
+        return "bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]";
+      default:
+        return "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]";
+    }
+  };
+
+  const formatCapacity = (
+    total: number,
+    used?: number
+  ): { text: string; percent?: number } => {
+    if (used !== undefined) {
+      const usedGB = Math.round(used);
+      const totalGB = Math.round(total);
+      const percent = Math.round((usedGB / totalGB) * 100);
+      return {
+        text: `${usedGB}GB / ${totalGB}GB (${percent}%)`,
+        percent,
+      };
+    }
+    return { text: `${Math.round(total)}GB` };
+  };
+
+  const capacityInfo = formatCapacity(
+    drive.capacity.total,
+    drive.capacity.used
+  );
+
   return (
     <div
-      className="p-4 bg-card border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      className="border border-[hsl(var(--border))] rounded-lg p-4 hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
       onClick={onClick}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-2">
-          <HardDriveIcon className="w-4 h-4" />
-          <h3 className="font-medium">{drive.label}</h3>
-          {drive.systemName && (
-            <span className="text-muted-foreground text-sm">
-              ({drive.systemName})
-            </span>
-          )}
+          <HardDriveIcon className="w-5 h-5 text-[hsl(var(--foreground))]" />
+          <div>
+            <h3 className="font-medium text-base">{drive.label}</h3>
+            {drive.systemName && (
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                {drive.systemName}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
+        <div className="flex gap-1">
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onEdit();
             }}
+            className="p-1 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+            aria-label="Edit drive"
           >
             <PencilIcon className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </button>
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
             }}
+            className="p-1 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+            aria-label="Delete drive"
           >
             <Trash2Icon className="w-4 h-4" />
-          </Button>
+          </button>
         </div>
       </div>
 
-      <div className="mt-4 space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Type:</span>
-          <span>{drive.type}</span>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+            Type
+          </p>
+          <p className="text-sm">{drive.type}</p>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Interface:</span>
-          <span>{drive.interface}</span>
+        <div>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+            Interface
+          </p>
+          <p className="text-sm">{drive.interface}</p>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Capacity:</span>
-          <span>{drive.capacity.total}GB</span>
-        </div>
-        {drive.capacity.used !== undefined && (
-          <div className="space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Used:</span>
-              <span>
-                {Math.round((drive.capacity.used / drive.capacity.total) * 100)}
-                %
-              </span>
-            </div>
-            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+      </div>
+
+      <div className="mb-3">
+        <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+          Capacity
+        </p>
+        <div className="space-y-1">
+          <p className="text-sm">{capacityInfo.text}</p>
+          {capacityInfo.percent !== undefined && (
+            <div className="w-full bg-[hsl(var(--secondary))] rounded-full h-1">
               <div
-                className={`h-full rounded-full transition-all ${
-                  (drive.capacity.used / drive.capacity.total) * 100 > 90
-                    ? "bg-destructive"
-                    : (drive.capacity.used / drive.capacity.total) * 100 > 75
-                    ? "bg-warning"
-                    : "bg-primary"
-                }`}
-                style={{
-                  width: `${Math.min(
-                    (drive.capacity.used / drive.capacity.total) * 100,
-                    100
-                  )}%`,
-                }}
-              />
+                className="bg-[hsl(var(--primary))] h-1 rounded-full"
+                style={{ width: `${Math.min(capacityInfo.percent, 100)}%` }}
+              ></div>
             </div>
-          </div>
-        )}
-        {drive.locationDetails && (
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Location:</span>
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {drive.locationDetails.name}
-            </span>
-          </div>
-        )}
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Status:</span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+            Status
+          </p>
           <span
-            className={`px-1.5 py-0.5 rounded-full text-xs ${
-              drive.status === "Available"
-                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                : drive.status === "In Use"
-                ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400"
-            }`}
+            className={cn(
+              "inline-block px-2 py-1 text-xs rounded-md",
+              getStatusClass(drive.status)
+            )}
           >
             {drive.status}
           </span>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Raw Assets:</span>
-          <span>{drive.rawAssetDetails?.length || 0}</span>
+        <div>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+            Assets
+          </p>
+          <p className="text-sm">{drive.rawAssetDetails?.length || 0} assets</p>
         </div>
       </div>
+
+      {drive.locationDetails && (
+        <div className="mt-3">
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+            Location
+          </p>
+          <p className="text-sm flex items-center">
+            <MapPin className="w-3 h-3 mr-1" />
+            {drive.locationDetails.name}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

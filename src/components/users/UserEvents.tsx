@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
 import { EventType, EventStatus } from "@/types/event";
 import { RefreshCw } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface Event {
   id: string;
@@ -147,22 +148,18 @@ export default function UserEvents({ userName }: UserEventsProps) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Assigned Events</CardTitle>
-          <CardDescription>Loading events...</CardDescription>
-        </CardHeader>
+        <CardContent className="flex items-center gap-2">
+          <LoadingSpinner size={14} />
+          <span>Loading events...</span>
+        </CardContent>
       </Card>
     );
   }
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Assigned Events</CardTitle>
-            <CardDescription>Events assigned to this user</CardDescription>
-          </div>
+      <CardContent>
+        <div className="flex justify-end mb-4">
           <Button
             variant="outline"
             size="icon"
@@ -173,8 +170,6 @@ export default function UserEvents({ userName }: UserEventsProps) {
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
-      </CardHeader>
-      <CardContent>
         {/* Filters */}
         <div className="mb-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -269,7 +264,7 @@ export default function UserEvents({ userName }: UserEventsProps) {
                     <TableCell>{formatStatus(event.type)}</TableCell>
                     <TableCell>
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                        className={`px-2 py-1 rounded-md text-xs ${getStatusColor(
                           event.status
                         )}`}
                       >
@@ -277,11 +272,11 @@ export default function UserEvents({ userName }: UserEventsProps) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      {format(new Date(event.start), "MMM d, yyyy h:mm a")}
+                      {format(new Date(event.start), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>
                       {event.end
-                        ? format(new Date(event.end), "MMM d, yyyy h:mm a")
+                        ? format(new Date(event.end), "MMM d, yyyy")
                         : "N/A"}
                     </TableCell>
                   </TableRow>

@@ -8,8 +8,10 @@ import {
   Search,
   Filter,
   Info,
+  Edit,
+  Trash2,
 } from "lucide-react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { HardDriveData } from "@/models/hard-drive";
 import HardDriveModal from "./HardDriveModal";
 import HardDriveDetailsModal from "./HardDriveDetailsModal";
@@ -28,6 +30,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
+import { useUrlParams } from "@/hooks/useUrlParams";
+import { PaginationWithUrl } from "@/components/ui/pagination-with-url";
+import { toast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { LoadingContainer } from "@/components/ui/loading-container";
 
 interface RawAssetDetail {
   _id: string;
@@ -47,22 +55,28 @@ interface HardDriveWithDetails extends HardDriveData {
 const LIMIT_OPTIONS = [10, 25, 50, 100];
 
 export default function HardDrivesTab() {
-  const router = useRouter();
   const pathname = usePathname();
+  const { getParam, updateParams } = useUrlParams();
   const searchParams = useSearchParams();
   const [drives, setDrives] = useState<HardDriveWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return getParam("search") || "";
+  });
+
   const [currentPage, setCurrentPage] = useState(() => {
-    const page = searchParams.get("page");
+    const page = getParam("page");
     return page ? parseInt(page) : 1;
   });
+
   const [totalPages, setTotalPages] = useState(1);
+
   const [itemsPerPage, setItemsPerPage] = useState(() => {
-    const limit = searchParams.get("limit");
+    const limit = getParam("limit");
     return limit ? parseInt(limit) : 25;
   });
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDrive, setSelectedDrive] = useState<
     HardDriveWithDetails | undefined
@@ -71,16 +85,22 @@ export default function HardDrivesTab() {
   const [selectedDriveForDetails, setSelectedDriveForDetails] = useState<
     HardDriveWithDetails | undefined
   >();
-  const currentView = (searchParams.get("view") as "grid" | "list") || "list";
+
+  const currentView = (getParam("view") as "grid" | "list") || "list";
   const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
   const [isAddingDrive, setIsAddingDrive] = useState(false);
   const [locations, setLocations] = useState<LocationResponse[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<string>(() => {
+    return getParam("location") || "";
+  });
+
   const [hardDriveIds, setHardDriveIds] = useState<
     { _id: string; label: string }[]
   >([]);
   const [driveToDelete, setDriveToDelete] =
     useState<HardDriveWithDetails | null>(null);
+
+  const router = useRouter();
 
   // Handle Escape key press
   useEffect(() => {
@@ -106,6 +126,13 @@ export default function HardDrivesTab() {
     fetchLocations();
   }, []);
 
+  // Validate current page when total pages changes
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      handlePageChange(1);
+    }
+  }, [totalPages]);
+
   const fetchLocations = async () => {
     try {
       const response = await fetch("/api/locations");
@@ -115,19 +142,6 @@ export default function HardDrivesTab() {
     } catch (error) {
       console.error("Error fetching locations:", error);
     }
-  };
-
-  const updateUrlParams = (updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "hard-drives");
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null) {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
-    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const fetchDrives = async () => {
@@ -158,49 +172,194 @@ export default function HardDrivesTab() {
     fetchDrives();
   }, [currentPage, itemsPerPage, searchTerm, selectedLocation]);
 
+  // Handle selected drive from URL
   useEffect(() => {
-    const selectedDriveId = searchParams.get("drive");
+    const selectedDriveId = getParam("drive");
+    const template = getParam("template");
+
     if (selectedDriveId && drives.length > 0) {
       const drive = drives.find((d) => d._id?.toString() === selectedDriveId);
+
       if (drive) {
-        setSelectedDriveForDetails(drive);
-        setIsDetailsModalOpen(true);
+        // Only set the details if the details modal is not already open
+        if (!isDetailsModalOpen) {
+          setSelectedDriveForDetails(drive);
+          setIsDetailsModalOpen(true);
+        }
       }
     }
-  }, [searchParams, drives]);
+  }, [drives, getParam, isDetailsModalOpen]);
 
   useEffect(() => {
-    const driveId = searchParams.get("drive");
+    const driveId = getParam("drive");
     if (driveId) {
       setSelectedDriveId(driveId);
     } else {
       setSelectedDriveId(null);
       handleCloseDetails();
     }
-  }, [searchParams]);
+  }, [getParam]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
-    updateUrlParams({ search: value || null, page: "1" });
+    updateParams({
+      search: value || null,
+      page: "1",
+    });
   };
 
   const handleLocationChange = (value: string) => {
     const locationValue = value === "all" ? "" : value;
     setSelectedLocation(locationValue);
     setCurrentPage(1);
-    updateUrlParams({ location: locationValue || null, page: "1" });
+    updateParams({
+      location: locationValue || null,
+      page: "1",
+    });
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    updateUrlParams({ page: page.toString() });
+    updateParams({
+      page: page.toString(),
+    });
   };
 
   const handleLimitChange = (limit: number) => {
     setItemsPerPage(limit);
     setCurrentPage(1);
-    updateUrlParams({ limit: limit.toString(), page: "1" });
+    updateParams({
+      limit: limit.toString(),
+      page: "1",
+    });
+  };
+
+  const handleViewChange = (view: "grid" | "list") => {
+    updateParams({
+      view,
+    });
+  };
+
+  const handleViewDetails = (drive: HardDriveWithDetails) => {
+    // Instead of showing a modal, navigate to the hard drive details page
+    router.push(`/hard-drives/${drive._id?.toString()}`);
+  };
+
+  // Function to fetch drive details by ID
+  const fetchDriveDetailsById = async (driveId: string) => {
+    try {
+      console.log("Fetching drive details for ID:", driveId);
+      setLoading(true);
+      const response = await fetch(`/api/hard-drives/${driveId}`);
+      if (!response.ok) {
+        throw new Error(`Error fetching drive details: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log("Fetched drive details:", data);
+      setSelectedDriveForDetails(data);
+      setIsDetailsModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching drive details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch drive details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseDetails = () => {
+    // Get the current template parameter
+    const template = getParam("template");
+
+    console.log("handleCloseDetails called");
+
+    // First update the component state
+    setIsDetailsModalOpen(false);
+    setSelectedDriveForDetails(undefined);
+    setSelectedDriveId(null);
+
+    console.log("Component state updated: selectedDriveId set to null");
+
+    // Then update the URL directly for immediate effect
+    const url = new URL(window.location.href);
+    url.searchParams.delete("drive");
+    console.log("Removed drive parameter from URL");
+
+    if (template) {
+      url.searchParams.set("template", template);
+    }
+
+    // Preserve other parameters
+    ["tab", "page", "limit", "search", "location", "view"].forEach((param) => {
+      const value = getParam(param);
+      if (value && param !== "drive") {
+        url.searchParams.set(param, value);
+      }
+    });
+
+    console.log("Setting URL directly to:", url.toString());
+    window.history.pushState({}, "", url.toString());
+
+    // Also update the Next.js router state to keep it in sync
+    console.log("Updating Next.js router to remove drive parameter");
+    updateParams(
+      {
+        drive: null,
+        template: template || null,
+      },
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        context: "tab:hard-drives",
+      }
+    );
+
+    console.log("handleCloseDetails completed");
+  };
+
+  const handleCloseModal = () => {
+    // Get the current template parameter
+    const template = getParam("template");
+
+    setIsModalOpen(false);
+    setSelectedDrive(undefined);
+    setIsAddingDrive(false);
+
+    // Update URL parameters, preserving the template parameter if it exists
+    updateParams(
+      {
+        createDrive: null,
+        template: template || null,
+      },
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        context: "tab:hard-drives",
+      }
+    );
+  };
+
+  const handleAddDrive = () => {
+    // Get the current template parameter
+    const template = getParam("template");
+
+    setSelectedDrive(undefined);
+    setIsModalOpen(true);
+    setIsAddingDrive(true);
+
+    // Update URL parameters, preserving the template parameter if it exists
+    updateParams(
+      {
+        createDrive: "true",
+        template: template || null,
+      },
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        context: "modal:create-drive",
+      }
+    );
   };
 
   const handleDelete = async (driveId: string) => {
@@ -251,41 +410,83 @@ export default function HardDrivesTab() {
     setIsModalOpen(true);
   };
 
-  const handleViewDetails = (drive: HardDriveWithDetails) => {
-    setSelectedDriveForDetails(drive);
-    setIsDetailsModalOpen(true);
-    updateUrlParams({ drive: drive._id?.toString() || null });
-  };
+  // Handle createDrive parameter from URL
+  useEffect(() => {
+    const createDrive = getParam("createDrive");
+    if (createDrive === "true" && !isModalOpen) {
+      setSelectedDrive(undefined);
+      setIsModalOpen(true);
+      setIsAddingDrive(true);
+    }
+  }, [getParam, isModalOpen]);
 
-  const handleCloseDetails = () => {
-    setIsDetailsModalOpen(false);
-    setSelectedDriveForDetails(undefined);
-    updateUrlParams({ drive: null });
-    fetchDrives();
-  };
+  // Ensure tab parameter is set when component mounts
+  useEffect(() => {
+    // Make sure the tab parameter is set to hard-drives
+    const tab = getParam("tab");
+    if (tab !== "hard-drives") {
+      updateParams(
+        { tab: "hard-drives" },
+        {
+          preserveParams: ["page", "limit", "search", "location", "view"],
+          clearOthers: false,
+        }
+      );
+    }
+  }, []);
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedDrive(undefined);
-    setIsAddingDrive(false);
-  };
+  // Add a useEffect to log when selectedDriveId changes
+  useEffect(() => {
+    console.log("selectedDriveId changed:", selectedDriveId);
+  }, [selectedDriveId]);
 
-  const handleAddDrive = () => {
-    setSelectedDrive(undefined);
-    setIsModalOpen(true);
-    setIsAddingDrive(true);
-  };
+  // Log before rendering
+  useEffect(() => {
+    console.log(
+      "Before rendering HardDriveDetailsModal - selectedDriveId:",
+      selectedDriveId
+    );
+  }, [selectedDriveId]);
 
-  const handleDriveClick = (driveId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("drive", driveId);
-    router.replace(`?${params.toString()}`);
-  };
+  // Synchronize component state with URL parameters
+  useEffect(() => {
+    const driveParam = getParam("drive");
+    console.log("URL drive parameter changed:", driveParam);
+
+    if (driveParam) {
+      console.log("Setting selectedDriveId from URL parameter:", driveParam);
+
+      // Always update the selectedDriveId when the URL parameter changes
+      setSelectedDriveId(driveParam);
+      setIsDetailsModalOpen(true);
+
+      // Always fetch drive details when navigating to this tab with a drive parameter
+      console.log("Fetching drive details for:", driveParam);
+      fetchDriveDetailsById(driveParam);
+    } else if (!driveParam && selectedDriveId) {
+      // Only clear the state if this wasn't triggered by our own handleViewDetails function
+      // This prevents the immediate closing of the modal after setting the URL parameter
+      console.log("Checking if we should clear selectedDriveId");
+
+      // Add a small delay to avoid race conditions with URL updates
+      const timeoutId = setTimeout(() => {
+        // Check again if the parameter is still not present
+        const currentDriveParam = getParam("drive");
+        if (!currentDriveParam) {
+          console.log("Clearing selectedDriveId as URL parameter is empty");
+          setSelectedDriveId(null);
+          setIsDetailsModalOpen(false);
+          setSelectedDriveForDetails(undefined);
+        }
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchParams, selectedDriveId, getParam, fetchDriveDetailsById]);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Hard Drives</h2>
         <Button onClick={handleAddDrive}>
           <Plus className="w-4 h-4 mr-2" />
           Add Drive
@@ -343,7 +544,9 @@ export default function HardDrivesTab() {
       </div>
 
       {loading ? (
-        <div className="text-center py-4">Loading...</div>
+        <LoadingContainer text="Loading drives..." />
+      ) : error ? (
+        <div className="text-center py-4 text-destructive">{error}</div>
       ) : drives.length === 0 ? (
         <div className="text-center py-4">No hard drives found</div>
       ) : currentView === "grid" ? (
@@ -351,8 +554,11 @@ export default function HardDrivesTab() {
           {drives.map((drive) => (
             <div
               key={drive._id?.toString()}
-              className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 cursor-pointer hover:bg-[hsl(var(--accent))] transition-colors"
-              onClick={() => handleViewDetails(drive)}
+              className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 cursor-pointer hover:bg-[hsl(var(--accent))/10] shadow-sm transition-colors"
+              onClick={(e) => {
+                console.log("Grid item clicked for drive:", drive);
+                handleViewDetails(drive);
+              }}
             >
               <div className="flex items-center gap-2 mb-3">
                 <HardDriveIcon className="w-5 h-5" />
@@ -454,43 +660,46 @@ export default function HardDrivesTab() {
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto shadow-md rounded-lg border border-[hsl(var(--border))]">
           <table className="w-full">
             <thead>
               <tr className="text-left text-[hsl(var(--muted-foreground))] text-xs uppercase">
-                <th className="py-3">Label</th>
-                <th className="py-3">Type</th>
-                <th className="py-3">Interface</th>
-                <th className="py-3">Capacity</th>
-                <th className="py-3">Status</th>
-                <th className="py-3">Location</th>
-                <th className="py-3">Raw Assets</th>
-                <th className="py-3 text-right">Actions</th>
+                <th className="py-3 px-2">Label</th>
+                <th className="py-3 px-2">Type</th>
+                <th className="py-3 px-2">Interface</th>
+                <th className="py-3 px-2">Capacity</th>
+                <th className="py-3 px-2">Status</th>
+                <th className="py-3 px-2">Location</th>
+                <th className="py-3 px-2">Raw Assets</th>
+                <th className="py-3 px-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="text-[hsl(var(--foreground))]">
               {drives.map((drive) => (
                 <tr
                   key={drive._id?.toString()}
-                  className="border-t border-[hsl(var(--border))] cursor-pointer hover:bg-[hsl(var(--accent))]"
-                  onClick={() => handleViewDetails(drive)}
+                  className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    console.log("Table row clicked for drive:", drive);
+                    handleViewDetails(drive);
+                  }}
                 >
-                  <td className="py-4">
+                  <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
                       <HardDriveIcon className="w-4 h-4" />
-                      <span>{drive.label}</span>
+                      <span className="text-sm">{drive.label}</span>
                       {drive.systemName && (
-                        <span className="text-[hsl(var(--muted-foreground))] text-sm">
+                        <span className="text-[hsl(var(--muted-foreground))] text-xs">
                           ({drive.systemName})
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="py-4">{drive.type}</td>
-                  <td className="py-4">{drive.interface}</td>
-                  <td className="py-4">
+                  <td className="py-3 px-2 text-sm">{drive.type}</td>
+                  <td className="py-3 px-2 text-sm">{drive.interface}</td>
+                  <td className="py-3 px-2">
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center justify-between text-xs">
                         <span>{drive.capacity.total}GB</span>
                         {drive.capacity.used !== undefined && (
                           <span className="text-[hsl(var(--muted-foreground))]">
@@ -502,60 +711,81 @@ export default function HardDrivesTab() {
                         )}
                       </div>
                       {drive.capacity.used !== undefined && (
-                        <div className="w-full h-1.5 bg-[hsl(var(--muted))] rounded-full overflow-hidden">
+                        <div className="w-full bg-[hsl(var(--secondary))] rounded-full h-1">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              (drive.capacity.used / drive.capacity.total) *
-                                100 >
-                              90
-                                ? "bg-[hsl(var(--destructive))]"
-                                : (drive.capacity.used / drive.capacity.total) *
-                                    100 >
-                                  75
-                                ? "bg-[hsl(var(--warning))]"
-                                : "bg-[hsl(var(--primary))]"
-                            }`}
+                            className="bg-[hsl(var(--primary))] h-1 rounded-full"
                             style={{
                               width: `${Math.min(
-                                (drive.capacity.used / drive.capacity.total) *
-                                  100,
+                                Math.round(
+                                  (drive.capacity.used / drive.capacity.total) *
+                                    100
+                                ),
                                 100
                               )}%`,
                             }}
-                          />
+                          ></div>
                         </div>
                       )}
                     </div>
                   </td>
-                  <td className="py-4">
+                  <td className="py-3 px-2">
                     <span
-                      className={`px-2 py-1 rounded text-sm ${
+                      className={cn(
+                        "px-2 py-1 rounded-md text-xs",
                         drive.status === "Available"
                           ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
                           : drive.status === "In Use"
-                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
-                          : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-                      }`}
+                          ? "bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]"
+                          : drive.status === "Archived"
+                          ? "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"
+                          : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                      )}
                     >
                       {drive.status}
                     </span>
                   </td>
-                  <td className="py-4">
-                    {drive.locationDetails
-                      ? drive.locationDetails.name
-                      : "No location"}
+                  <td className="py-3 px-2 text-sm">
+                    {drive.locationDetails ? (
+                      <span className="inline-flex items-center">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {drive.locationDetails.name}
+                      </span>
+                    ) : (
+                      <span className="text-[hsl(var(--muted-foreground))]">
+                        -
+                      </span>
+                    )}
                   </td>
-                  <td className="py-4">{drive.rawAssetDetails?.length || 0}</td>
-                  <td className="py-4 text-right space-x-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(drive._id!.toString());
-                      }}
-                      className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] p-1"
-                    >
-                      <Trash2Icon className="w-4 h-4" />
-                    </button>
+                  <td className="py-3 px-2">
+                    <span className="inline-flex items-center px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs">
+                      {drive.rawAssetDetails?.length || 0} assets
+                    </span>
+                  </td>
+                  <td className="py-3 px-2 text-right">
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(drive);
+                        }}
+                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+                        title="Edit drive"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (drive._id) {
+                            setDriveToDelete(drive);
+                          }
+                        }}
+                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+                        title="Delete drive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -565,27 +795,15 @@ export default function HardDrivesTab() {
       )}
 
       {!loading && drives.length > 0 && (
-        <div className="flex justify-center items-center gap-2 mt-4">
-          <button
-            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded disabled:opacity-50 hover:bg-[hsl(var(--secondary))/90]"
-          >
-            Previous
-          </button>
-          <span className="text-[hsl(var(--muted-foreground))]">
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={() =>
-              handlePageChange(Math.min(totalPages, currentPage + 1))
-            }
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded disabled:opacity-50 hover:bg-[hsl(var(--secondary))/90]"
-          >
-            Next
-          </button>
-        </div>
+        <PaginationWithUrl
+          totalPages={totalPages}
+          defaultPage={currentPage}
+          defaultPageSize={itemsPerPage}
+          onPageChange={handlePageChange}
+          context="tab:hard-drives"
+          preserveParams={["tab", "search", "location", "view"]}
+          pageSizeOptions={LIMIT_OPTIONS}
+        />
       )}
 
       <HardDriveModal
@@ -594,14 +812,6 @@ export default function HardDrivesTab() {
         onSave={handleSave}
         drive={selectedDrive}
       />
-
-      {selectedDriveId && (
-        <HardDriveDetailsModal
-          driveId={selectedDriveId}
-          onClose={handleCloseDetails}
-          onDriveUpdate={fetchDrives}
-        />
-      )}
     </div>
   );
 }

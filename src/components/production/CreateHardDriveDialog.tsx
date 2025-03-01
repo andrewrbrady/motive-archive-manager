@@ -19,6 +19,7 @@ import {
 import { HardDriveData } from "@/models/hard-drive";
 import { LocationResponse } from "@/models/location";
 import { MapPin } from "lucide-react";
+import { UrlModal } from "@/components/ui/url-modal";
 
 interface CreateHardDriveDialogProps {
   isOpen: boolean;
@@ -96,11 +97,9 @@ export default function CreateHardDriveDialog({
           ...prev,
           capacity: {
             total: prev.capacity?.total || 0,
-            used: prev.capacity?.used,
-            available: prev.capacity?.available,
+            used: prev.capacity?.used || 0,
             ...(child === "total" ? { total: value } : {}),
             ...(child === "used" ? { used: value } : {}),
-            ...(child === "available" ? { available: value } : {}),
           },
         }));
       }
@@ -113,150 +112,158 @@ export default function CreateHardDriveDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add Hard Drive</DialogTitle>
-        </DialogHeader>
+    <UrlModal
+      paramName="createDrive"
+      paramValue="true"
+      onClose={onClose}
+      title="Add Hard Drive"
+      preserveParams={["tab", "page", "limit", "search", "status"]}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Label</label>
+          <Input
+            value={formData.label}
+            onChange={(e) => handleChange("label", e.target.value)}
+            placeholder="Enter label"
+            required
+          />
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Label</label>
-            <Input
-              value={formData.label}
-              onChange={(e) => handleChange("label", e.target.value)}
-              placeholder="Enter label"
-              required
-            />
-          </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">System Name</label>
+          <Input
+            value={formData.systemName}
+            onChange={(e) => handleChange("systemName", e.target.value)}
+            placeholder="Enter system name"
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">System Name</label>
-            <Input
-              value={formData.systemName}
-              onChange={(e) => handleChange("systemName", e.target.value)}
-              placeholder="Enter system name"
-            />
-          </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Type</label>
+          <Select
+            value={formData.type}
+            onValueChange={(value) => handleChange("type", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="HDD">HDD</SelectItem>
+              <SelectItem value="SSD">SSD</SelectItem>
+              <SelectItem value="NVMe">NVMe</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Type</label>
-            <Select
-              value={formData.type}
-              onValueChange={(value) => handleChange("type", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="HDD">HDD</SelectItem>
-                <SelectItem value="SSD">SSD</SelectItem>
-                <SelectItem value="NVMe">NVMe</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Interface</label>
+          <Select
+            value={formData.interface}
+            onValueChange={(value) => handleChange("interface", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select interface" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USB">USB</SelectItem>
+              <SelectItem value="SATA">SATA</SelectItem>
+              <SelectItem value="NVMe">NVMe</SelectItem>
+              <SelectItem value="Thunderbolt">Thunderbolt</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Interface</label>
-            <Select
-              value={formData.interface}
-              onValueChange={(value) => handleChange("interface", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select interface" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="USB">USB</SelectItem>
-                <SelectItem value="SATA">SATA</SelectItem>
-                <SelectItem value="NVMe">NVMe</SelectItem>
-                <SelectItem value="Thunderbolt">Thunderbolt</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Total Capacity (GB)</label>
+          <Input
+            type="number"
+            value={formData.capacity?.total}
+            onChange={(e) =>
+              handleChange("capacity.total", parseInt(e.target.value))
+            }
+            placeholder="Enter total capacity"
+            required
+            min="0"
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Total Capacity (GB)</label>
-            <Input
-              type="number"
-              value={formData.capacity?.total}
-              onChange={(e) =>
-                handleChange("capacity.total", parseInt(e.target.value))
-              }
-              placeholder="Enter total capacity"
-              required
-              min="0"
-            />
-          </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Used Capacity (GB)</label>
+          <Input
+            type="number"
+            value={formData.capacity?.used}
+            onChange={(e) =>
+              handleChange("capacity.used", parseInt(e.target.value))
+            }
+            placeholder="Enter used capacity"
+            min="0"
+            max={formData.capacity?.total}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Used Capacity (GB)</label>
-            <Input
-              type="number"
-              value={formData.capacity?.used}
-              onChange={(e) =>
-                handleChange("capacity.used", parseInt(e.target.value))
-              }
-              placeholder="Enter used capacity"
-              min="0"
-              max={formData.capacity?.total}
-            />
-          </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Status</label>
+          <Select
+            value={formData.status}
+            onValueChange={(value) => handleChange("status", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Available">Available</SelectItem>
+              <SelectItem value="In Use">In Use</SelectItem>
+              <SelectItem value="Archived">Archived</SelectItem>
+              <SelectItem value="Damaged">Damaged</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Status</label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) => handleChange("status", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Available">Available</SelectItem>
-                <SelectItem value="In Use">In Use</SelectItem>
-                <SelectItem value="Offline">Offline</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Location</label>
-            <Select
-              value={formData.locationId || "none"}
-              onValueChange={(value) =>
-                handleChange("locationId", value === "none" ? "" : value)
-              }
-              disabled={isLoadingLocations}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {locations.map((location) => (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Location</label>
+          <Select
+            value={formData.locationId}
+            onValueChange={(value) => handleChange("locationId", value)}
+            disabled={isLoadingLocations}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select location" />
+            </SelectTrigger>
+            <SelectContent>
+              {isLoadingLocations ? (
+                <SelectItem value="loading" disabled>
+                  Loading locations...
+                </SelectItem>
+              ) : locations.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  No locations found
+                </SelectItem>
+              ) : (
+                locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3 h-3" />
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-2" />
                       {location.name}
                     </div>
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <div className="text-red-500 text-sm">{error}</div>}
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? "Creating..." : "Create"}
+          </Button>
+        </div>
+      </form>
+    </UrlModal>
   );
 }

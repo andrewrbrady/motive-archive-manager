@@ -8,6 +8,7 @@ import EventBatchManager from "@/components/events/EventBatchManager";
 import CreateEventButton from "@/components/events/CreateEventButton";
 import { Button } from "@/components/ui/button";
 import { CalendarDays } from "lucide-react";
+import { LoadingContainer } from "@/components/ui/loading";
 
 interface EventsTabProps {
   carId: string;
@@ -91,7 +92,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
   };
 
   if (isLoading) {
-    return <div>Loading events...</div>;
+    return <LoadingContainer text="Loading events..." />;
   }
 
   return (

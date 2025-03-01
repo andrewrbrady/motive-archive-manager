@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface User {
   _id: string;
@@ -142,7 +143,9 @@ export default function CheckoutModal({
                     <SelectContent>
                       {isLoadingUsers ? (
                         <SelectItem value="loading" disabled>
-                          Loading users...
+                          <div className="flex items-center">
+                            <LoadingSpinner size={14} text="Loading users..." />
+                          </div>
                         </SelectItem>
                       ) : users.length > 0 ? (
                         users.map((user) => (

@@ -49,29 +49,14 @@ export default function Navbar({ className }: NavbarProps) {
               <Link href="/production" className={linkClasses}>
                 Production
               </Link>
-              <Link href="/inventory" className={linkClasses}>
-                Inventory
+              <Link href="/market" className={linkClasses}>
+                Market
               </Link>
-              <Link href="/auctions" className={linkClasses}>
-                Auctions
+              <Link href="/schedule" className={linkClasses}>
+                Schedule
               </Link>
-              <Link href="/deliverables" className={linkClasses}>
-                Deliverables
-              </Link>
-              <Link href="/events" className={linkClasses}>
-                Events
-              </Link>
-              <Link href="/users" className={linkClasses}>
-                Users
-              </Link>
-              <Link href="/clients" className={linkClasses}>
-                Clients
-              </Link>
-              <Link href="/makes" className={linkClasses}>
-                Makes
-              </Link>
-              <Link href="/locations" className={linkClasses}>
-                Locations
+              <Link href="/admin" className={linkClasses}>
+                Admin
               </Link>
             </div>
           </div>

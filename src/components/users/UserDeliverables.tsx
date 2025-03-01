@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface Car {
   _id: string;
@@ -156,22 +157,16 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Assigned Deliverables</CardTitle>
-          <CardDescription>Loading deliverables...</CardDescription>
-        </CardHeader>
+        <CardContent className="flex items-center gap-2">
+          <LoadingSpinner size={14} />
+          <span>Loading deliverables...</span>
+        </CardContent>
       </Card>
     );
   }
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Assigned Deliverables</CardTitle>
-        <CardDescription>
-          Content deliverables assigned to this user
-        </CardDescription>
-      </CardHeader>
       <CardContent>
         {/* Filters */}
         <div className="mb-6 space-y-4">

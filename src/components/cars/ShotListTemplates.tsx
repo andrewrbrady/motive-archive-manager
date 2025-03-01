@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Edit, Trash2, Save, Copy } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 export interface ShotTemplate {
   title: string;
@@ -344,7 +345,9 @@ export default function ShotListTemplates({
             <h3 className="text-lg font-semibold">Available Templates</h3>
           )}
           {isLoading ? (
-            <div className="text-center py-4">Loading templates...</div>
+            <div className="text-center py-4">
+              <LoadingSpinner text="Loading templates..." />
+            </div>
           ) : templates.length === 0 ? (
             <div className="text-center py-4 text-muted-foreground">
               No templates available.{" "}

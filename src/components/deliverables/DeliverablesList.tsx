@@ -39,6 +39,7 @@ import {
 } from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
 import BatchTemplateManager from "./BatchTemplateManager";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface Car {
   _id: string;
@@ -251,8 +252,7 @@ export default function DeliverablesList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Deliverables</h2>
+      <div className="flex justify-end items-center">
         <div className="flex gap-2">
           <BatchTemplateManager />
           <NewDeliverableForm onDeliverableCreated={fetchDeliverables} />
@@ -396,7 +396,7 @@ export default function DeliverablesList() {
                   colSpan={isBatchEditing ? 12 : 11}
                   className="text-center py-8"
                 >
-                  Loading deliverables...
+                  <LoadingSpinner text="Loading deliverables..." />
                 </TableCell>
               </TableRow>
             ) : deliverables.length === 0 ? (

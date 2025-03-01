@@ -17,6 +17,7 @@ import EditClientDialog from "./EditClientDialog";
 import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
 import { useToast } from "@/components/ui/use-toast";
 import ClientsFilters from "./ClientsFilters";
+import { LoadingContainer } from "@/components/ui/loading";
 
 const BUSINESS_TYPES = [
   "Dealership",
@@ -124,9 +125,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center py-8">Loading...</div>
-    );
+    return <LoadingContainer text="Loading clients..." size={24} />;
   }
 
   if (clients.length === 0) {

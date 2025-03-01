@@ -1,0 +1,18 @@
+# Node.js Configuration Rules
+
+## Development Server
+
+- DO NOT run `npm run dev` as the user already has it running in a separate window
+- For testing changes, rely on the user's existing development server
+- Focus on making code changes without attempting to restart the server
+
+## Build Process
+
+- Use `npm run build` only when explicitly requested
+- Prefer making changes to the codebase without rebuilding
+
+## Dependencies
+
+- When adding new dependencies, use `npm install --save` for runtime dependencies
+- Use `npm install --save-dev` for development dependencies
+- Always specify exact versions when suggesting new dependencies

@@ -90,7 +90,7 @@ export default function KitsList({
   };
 
   return (
-    <div className="rounded-md border overflow-hidden">
+    <div className="shadow-md rounded-lg border border-[hsl(var(--border))] overflow-hidden">
       <div className="overflow-x-auto">
         <Table className="min-w-full">
           <TableHeader className="bg-muted/50">

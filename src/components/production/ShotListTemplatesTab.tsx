@@ -21,6 +21,8 @@ import { Plus, Edit, Trash2, Copy, Check, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { LoadingContainer } from "@/components/ui/loading-container";
 
 export interface ShotTemplate {
   title: string;
@@ -206,7 +208,6 @@ export default function ShotListTemplatesTab() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Shot List Templates</h3>
         <Dialog open={isCreating} onOpenChange={setIsCreating}>
           <DialogTrigger asChild>
             <Button>
@@ -263,7 +264,7 @@ export default function ShotListTemplatesTab() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-4">Loading templates...</div>
+        <LoadingContainer text="Loading templates..." />
       ) : templates.length === 0 ? (
         <div className="text-center py-4 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
           No templates yet. Create a new template to get started.

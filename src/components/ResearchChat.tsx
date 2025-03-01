@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface Message {
   role: "user" | "assistant";
@@ -82,7 +82,7 @@ export default function ResearchChat({ carId }: ResearchChatProps) {
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-lg p-3">
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <LoadingSpinner size={20} />
                 </div>
               </div>
             )}
@@ -99,7 +99,7 @@ export default function ResearchChat({ carId }: ResearchChatProps) {
           className="flex-1"
         />
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+          {isLoading ? <LoadingSpinner size={16} /> : "Send"}
         </Button>
       </form>
     </div>

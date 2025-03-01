@@ -97,12 +97,12 @@ export default function UserDashboard() {
         <div className="space-y-8">
           {/* User Profile Card */}
           <Card>
-            <CardHeader>
-              <CardTitle>{user.name}</CardTitle>
-              <CardDescription>{user.email}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-              <div className="grid grid-cols-2 gap-4">
+            <CardHeader className="flex flex-row items-start justify-between">
+              <div>
+                <CardTitle>{user.name}</CardTitle>
+                <CardDescription>{user.email}</CardDescription>
+              </div>
+              <div className="flex flex-row gap-4">
                 <div>
                   <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                     Roles
@@ -134,7 +134,8 @@ export default function UserDashboard() {
                   </div>
                 </div>
               </div>
-
+            </CardHeader>
+            <CardContent className="grid gap-4 pt-0">
               {user.profile?.title && (
                 <div>
                   <h3 className="font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">

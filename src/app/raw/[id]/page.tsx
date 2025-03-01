@@ -3,265 +3,667 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
-import ImageGallery from "@/components/ImageGallery";
-import { Loader2 } from "lucide-react";
-import { RawAsset } from "@/types/inventory";
-import { Car } from "@/types/car";
-import CarSelector from "@/components/CarSelector";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/use-toast";
+import {
+  Loader2,
+  Pencil,
+  HardDriveIcon,
+  Unlink,
+  Plus,
+  Trash2,
+  ArrowLeft,
+  Paperclip,
+  Clock,
+} from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
-interface RawAssetFormProps {
+interface RawAsset {
+  _id?: string;
+  title: string;
+  description?: string;
+  type: string;
+  status: string;
+  tags?: string[];
+  date?: string;
+  metadata?: {
+    format?: string;
+    duration?: number;
+    dimensions?: {
+      width?: number;
+      height?: number;
+    };
+    frameRate?: number;
+    other?: Record<string, any>;
+  };
+  dateCreated?: string;
+  dateImported?: string;
+  hardDriveIds?: string[];
+  notes?: string;
+  location?: string;
+}
+
+interface HardDrive {
+  _id: string;
+  label: string;
+  systemName?: string;
+  type: string;
+  status: string;
+  capacity: {
+    total: number;
+    used?: number;
+  };
+}
+
+interface LocationData {
+  _id: string;
+  name: string;
+  type: string;
+}
+
+interface RawAssetDetailsProps {
   params: {
     id: string;
   };
 }
 
-// Use a simpler type structure for the form
-type FormRawAsset = {
-  _id: string;
-  date: string;
-  description: string;
-  client: string;
-  locations: string[];
-  carIds: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export default function RawAssetForm({ params }: RawAssetFormProps) {
+export default function RawAssetDetails({ params }: RawAssetDetailsProps) {
   const router = useRouter();
-  const isNew = params.id === "new";
-
-  const [asset, setAsset] = useState<FormRawAsset>({
-    _id: "",
-    date: "",
-    description: "",
-    client: "",
-    locations: [],
-    carIds: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  const [selectedCars, setSelectedCars] = useState<Car[]>([]);
-  const [loading, setLoading] = useState(!isNew);
+  const [asset, setAsset] = useState<RawAsset | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hardDrives, setHardDrives] = useState<HardDrive[]>([]);
+  const [locations, setLocations] = useState<Record<string, LocationData>>({});
+  const [removingDriveId, setRemovingDriveId] = useState<string | null>(null);
+  const [isRemovingDrive, setIsRemovingDrive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch asset data
   useEffect(() => {
-    if (!isNew) {
+    const fetchAsset = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/raw/${params.id}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch asset: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setAsset(data);
+
+        // If the asset has hard drives, fetch them
+        if (data.hardDriveIds && data.hardDriveIds.length > 0) {
+          await fetchLinkedHardDrives(data.hardDriveIds);
+        }
+
+        // If the asset has a location, store it for later reference
+        if (data.location) {
+          await fetchLocations();
+        }
+      } catch (err) {
+        console.error("Error fetching asset details:", err);
+        setError("Failed to load asset details. Please try again later.");
+        toast({
+          title: "Error",
+          description: "Failed to load asset details",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.id) {
       fetchAsset();
     }
   }, [params.id]);
 
-  const fetchAsset = async () => {
+  // Fetch hard drives linked to this asset
+  const fetchLinkedHardDrives = async (hardDriveIds: string[]) => {
     try {
-      const response = await fetch(`/api/raw/${params.id}`);
-      if (!response.ok) throw new Error("Failed to fetch asset");
-      const data = await response.json();
+      const promises = hardDriveIds.map((id) =>
+        fetch(`/api/hard-drives/${id}`).then((res) => {
+          if (!res.ok) {
+            console.warn(`Failed to fetch hard drive ${id}`);
+            return null;
+          }
+          return res.json();
+        })
+      );
 
-      // Ensure all locations are strings
-      const locations = Array.isArray(data.locations)
-        ? data.locations.map((loc: unknown) => String(loc))
-        : [];
-
-      setAsset({
-        _id: String(data._id || ""),
-        date: String(data.date || ""),
-        description: String(data.description || ""),
-        client: String(data.client || ""),
-        locations,
-        carIds: Array.isArray(data.carIds) ? data.carIds.map(String) : [],
-        createdAt: data.createdAt || new Date().toISOString(),
-        updatedAt: data.updatedAt || new Date().toISOString(),
+      const results = await Promise.all(promises);
+      const validDrives = results.filter(Boolean) as HardDrive[];
+      setHardDrives(validDrives);
+    } catch (err) {
+      console.error("Error fetching linked hard drives:", err);
+      toast({
+        title: "Warning",
+        description: "Failed to load some linked hard drives",
+        variant: "destructive",
       });
+    }
+  };
 
-      // Fetch associated cars
-      if (data.carIds?.length) {
-        const carsResponse = await fetch(
-          `/api/cars/batch?ids=${data.carIds.join(",")}`
-        );
-        if (carsResponse.ok) {
-          const carsData = await carsResponse.json();
-          setSelectedCars(carsData.cars);
-        }
+  // Fetch location information
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch("/api/locations");
+      if (!response.ok) {
+        throw new Error("Failed to fetch locations");
       }
-    } catch (err) {
-      console.error("Error fetching asset:", err);
-      setError("Failed to fetch asset");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+      const data = await response.json();
+      const locationsMap: Record<string, LocationData> = {};
 
-    try {
-      const method = isNew ? "POST" : "PUT";
-      const url = isNew ? "/api/raw" : `/api/raw/${params.id}`;
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...asset,
-          carIds: selectedCars.map((car) => car._id),
-        }),
+      data.locations.forEach((loc: LocationData) => {
+        locationsMap[loc._id] = loc;
       });
 
-      if (!response.ok) throw new Error("Failed to save asset");
-
-      router.push("/raw");
+      setLocations(locationsMap);
     } catch (err) {
-      console.error("Error saving asset:", err);
-      setError("Failed to save asset");
+      console.error("Error fetching locations:", err);
     }
   };
 
+  // Handle removing a hard drive
+  const handleRemoveHardDrive = async () => {
+    if (!removingDriveId || !asset?._id) return;
+
+    setIsRemovingDrive(true);
+
+    try {
+      const response = await fetch(
+        `/api/hard-drives/${removingDriveId}/assets/${asset._id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to remove asset from hard drive");
+      }
+
+      // Update UI by removing the hard drive from the list
+      setHardDrives((drives) =>
+        drives.filter((drive) => drive._id !== removingDriveId)
+      );
+
+      // Update the asset's hardDriveIds
+      if (asset.hardDriveIds) {
+        setAsset({
+          ...asset,
+          hardDriveIds: asset.hardDriveIds.filter(
+            (id) => id !== removingDriveId
+          ),
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: "Asset removed from hard drive",
+      });
+    } catch (err) {
+      console.error("Error removing asset from hard drive:", err);
+      toast({
+        title: "Error",
+        description: "Failed to remove asset from hard drive",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRemovingDrive(false);
+      setRemovingDriveId(null);
+    }
+  };
+
+  // Handle navigation to edit page
+  const handleEdit = () => {
+    if (asset?._id) {
+      router.push(`/raw/${asset._id}/edit`);
+    }
+  };
+
+  // Format asset type for display
+  const formatAssetType = (type: string) => {
+    // Handle undefined or null type
+    if (!type) {
+      return "Unknown";
+    }
+
+    switch (type) {
+      case "video":
+        return "Video";
+      case "audio":
+        return "Audio";
+      case "image":
+        return "Image";
+      case "document":
+        return "Document";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  // Format asset status for display
+  const getStatusBadge = (status: string) => {
+    let variant = "default";
+
+    // Check if status is defined before calling toLowerCase
+    if (!status) {
+      return <Badge variant="outline">Unknown</Badge>;
+    }
+
+    switch (status.toLowerCase()) {
+      case "ingest":
+        variant = "secondary";
+        break;
+      case "processing":
+        variant = "default";
+        break;
+      case "ready":
+        variant = "success";
+        break;
+      case "archived":
+        variant = "outline";
+        break;
+      case "error":
+        variant = "destructive";
+        break;
+    }
+    return <Badge variant={variant as any}>{status}</Badge>;
+  };
+
+  // Format date for display
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+
+    try {
+      const date = new Date(dateString);
+      return format(date, "MMM d, yyyy h:mm a");
+    } catch (e) {
+      return "Invalid date";
+    }
+  };
+
+  // Format duration for display
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return "N/A";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${remainingSeconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      return `${remainingSeconds}s`;
+    }
+  };
+
+  // Loading state
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !asset) {
+    return (
+      <div className="container mx-auto p-6">
         <Navbar />
-        <main className="flex-1 container mx-auto px-4 py-8">
-          <div className="text-center">Loading...</div>
-        </main>
+        <div className="mt-8 p-6 bg-background-secondary rounded-lg text-center">
+          <h2 className="text-xl font-semibold mb-4">
+            {error || "Asset not found"}
+          </h2>
+          <Button variant="outline" onClick={() => router.push("/production")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Production
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="container mx-auto p-6">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">
-            {isNew ? "Add Raw Asset" : "Edit Raw Asset"}
-          </h1>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Date (YYMMDD)
-              </label>
-              <input
-                type="text"
-                value={asset.date}
-                onChange={(e) => setAsset({ ...asset, date: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
-                pattern="\d{6}"
-                required
-              />
+      <div className="mt-8 mb-4">
+        <Button
+          variant="outline"
+          onClick={() => router.push("/production")}
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Production
+        </Button>
+
+        <div className="bg-[hsl(var(--background))] rounded-lg p-6">
+          <div className="flex flex-col space-y-8">
+            {/* Header with title and actions */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex flex-col">
+                <h1 className="text-2xl font-semibold">
+                  {asset.title || asset.description || "Untitled Asset"}
+                </h1>
+                <div className="flex items-center gap-2 mt-2">
+                  {getStatusBadge(asset.status)}
+                  <span className="text-sm text-muted-foreground">
+                    {formatAssetType(asset.type)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleEdit}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Description
-              </label>
-              <input
-                type="text"
-                value={asset.description}
-                onChange={(e) =>
-                  setAsset({ ...asset, description: e.target.value })
-                }
-                className="w-full px-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
-                required
-              />
-            </div>
+            {/* Asset Information Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column: Basic Information and Technical Details */}
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Basic Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Date
+                      </h4>
+                      <p>
+                        {asset.date
+                          ? formatDate(asset.date)
+                          : "No date provided."}
+                      </p>
+                    </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Client
-              </label>
-              <input
-                type="text"
-                value={asset.client}
-                onChange={(e) => setAsset({ ...asset, client: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
-              />
-            </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Description
+                      </h4>
+                      <p>{asset.description || "No description provided."}</p>
+                    </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Storage Locations
-              </label>
-              <div className="space-y-2">
-                {asset.locations.map((location, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => {
-                        const newLocations = [...asset.locations] as string[];
-                        newLocations[index] = e.target.value;
-                        setAsset({ ...asset, locations: newLocations });
-                      }}
-                      className="flex-1 px-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newLocations = asset.locations.filter(
-                          (_, i) => i !== index
-                        );
-                        setAsset({ ...asset, locations: newLocations });
-                      }}
-                      className="px-3 py-2 text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))] rounded"
-                    >
-                      Remove
-                    </button>
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Tags
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {asset.tags && asset.tags.length > 0 ? (
+                          asset.tags.map((tag, index) => (
+                            <Badge key={index} variant="outline">
+                              {tag}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            No tags
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Location
+                      </h4>
+                      <p>
+                        {asset.location && locations[asset.location]
+                          ? locations[asset.location].name
+                          : "No location assigned"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Notes
+                      </h4>
+                      <p>{asset.notes || "No notes."}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Technical Details */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Technical Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {asset.metadata?.format && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                          Format
+                        </h4>
+                        <p>{asset.metadata.format}</p>
+                      </div>
+                    )}
+
+                    {asset.metadata?.duration !== undefined && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                          Duration
+                        </h4>
+                        <p>{formatDuration(asset.metadata.duration)}</p>
+                      </div>
+                    )}
+
+                    {asset.metadata?.dimensions && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                          Dimensions
+                        </h4>
+                        <p>
+                          {asset.metadata.dimensions.width || "?"} ×{" "}
+                          {asset.metadata.dimensions.height || "?"}
+                        </p>
+                      </div>
+                    )}
+
+                    {asset.metadata?.frameRate && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                          Frame Rate
+                        </h4>
+                        <p>{asset.metadata.frameRate} fps</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Date Created
+                      </h4>
+                      <p>{formatDate(asset.dateCreated)}</p>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                        Date Imported
+                      </h4>
+                      <p>{formatDate(asset.dateImported)}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: Storage Information */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Storage</CardTitle>
+                    <CardDescription>
+                      Hard drives where this asset is stored
+                    </CardDescription>
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAsset({
-                      ...asset,
-                      locations: [...asset.locations, ""] as string[],
-                    })
-                  }
-                  className="px-4 py-2 text-[hsl(var(--info))] hover:bg-[hsl(var(--info))] hover:text-[hsl(var(--info-foreground))] rounded"
-                >
-                  Add Location
-                </button>
-              </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (asset._id) {
+                        router.push(`/raw/${asset._id}/add-storage`);
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Drive
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {hardDrives.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Label</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Capacity</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {hardDrives.map((drive) => (
+                          <TableRow key={drive._id}>
+                            <TableCell>
+                              <div className="font-medium">
+                                <Link href={`/hard-drives/${drive._id}`}>
+                                  {drive.label}
+                                </Link>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {drive.systemName || ""}
+                              </div>
+                            </TableCell>
+                            <TableCell>{drive.type}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{drive.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {drive.capacity.total} GB
+                              {drive.capacity.used !== undefined &&
+                                ` (${drive.capacity.used} GB used)`}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      setRemovingDriveId(drive._id)
+                                    }
+                                  >
+                                    <Unlink className="h-4 w-4" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>
+                                      Remove from Hard Drive
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                      Are you sure you want to remove this asset
+                                      from the hard drive "{drive.label}
+                                      "? This will only unlink the reference; it
+                                      won't delete any files from the drive.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <DialogFooter>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => setRemovingDriveId(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      onClick={handleRemoveHardDrive}
+                                      disabled={isRemovingDrive}
+                                    >
+                                      {isRemovingDrive ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Removing...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Unlink className="h-4 w-4 mr-2" />
+                                          Remove
+                                        </>
+                                      )}
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <HardDriveIcon className="h-8 w-8 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium">
+                        No hard drives linked
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-1 mb-4">
+                        This asset is not linked to any hard drives yet
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (asset._id) {
+                            router.push(`/raw/${asset._id}/add-storage`);
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add to Drive
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
-                Associated Cars
-              </label>
-              <CarSelector
-                selectedCars={selectedCars}
-                onSelect={setSelectedCars}
-              />
-            </div>
-
-            {error && (
-              <div className="bg-destructive-100 border border-destructive-400 text-destructive-700 px-4 py-3 rounded">
-                {error}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/raw")}
-                className="px-4 py-2 border border-[hsl(var(--border))] rounded hover:bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[hsl(var(--info))] text-[hsl(var(--info-foreground))] rounded hover:bg-[hsl(var(--info))]"
-              >
-                {isNew ? "Create" : "Save"}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Tab } from "@headlessui/react";
 import { StudioInventoryItem, Kit } from "@/types/inventory";
 import AddInventoryItemModal from "./AddInventoryItemModal";
 import CreateKitModal from "./CreateKitModal";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Plus,
   Check,
@@ -32,6 +33,7 @@ import { useToast } from "@/components/ui/use-toast";
 import BulkEditModal from "./BulkEditModal";
 import BulkCheckoutModal from "./BulkCheckoutModal";
 import ImportInventoryModal from "./ImportInventoryModal";
+import { LoadingContainer } from "@/components/ui/loading-container";
 
 export default function StudioInventoryTab() {
   const { toast } = useToast();
@@ -871,17 +873,12 @@ export default function StudioInventoryTab() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <LoadingContainer text="Loading inventory..." />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Studio Inventory</h2>
         {!isSelectionMode && (
           <div className="flex gap-2">
             {selectedView === "items" ? (
@@ -1084,59 +1081,36 @@ export default function StudioInventoryTab() {
         </div>
       )}
 
-      <Tab.Group>
-        <Tab.List className="flex space-x-1 rounded-lg bg-muted p-1 gap-1">
-          <Tab
-            className={({ selected }: { selected: boolean }) =>
-              `w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-colors
-              ${
-                selected
-                  ? "bg-background text-foreground shadow"
-                  : "text-muted-foreground hover:bg-background/[0.12] hover:text-foreground"
-              }`
-            }
-            onClick={() => setSelectedView("items")}
-          >
-            Individual Items
-          </Tab>
-          <Tab
-            className={({ selected }: { selected: boolean }) =>
-              `w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-colors
-              ${
-                selected
-                  ? "bg-background text-foreground shadow"
-                  : "text-muted-foreground hover:bg-background/[0.12] hover:text-foreground"
-              }`
-            }
-            onClick={() => setSelectedView("kits")}
-          >
-            Kits
-          </Tab>
-        </Tab.List>
-        <Tab.Panels className="mt-4">
-          <Tab.Panel>
-            <StudioInventoryList
-              items={filteredItems}
-              onItemUpdate={handleItemUpdate}
-              onItemDelete={handleItemDelete}
-              selectedItems={selectedItems}
-              onSelectedItemsChange={setSelectedItems}
-              isSelectionMode={isSelectionMode}
-            />
-          </Tab.Panel>
-          <Tab.Panel>
-            <KitsList
-              kits={filteredKits}
-              onEdit={handleEditKit}
-              onDelete={handleDeleteKitConfirm}
-              onView={handleViewKit}
-              onCheckout={handleKitCheckout}
-              onCheckin={handleKitCheckin}
-              selectionMode={false}
-            />
-          </Tab.Panel>
-        </Tab.Panels>
-      </Tab.Group>
+      <Tabs
+        defaultValue="items"
+        onValueChange={(value) => setSelectedView(value as "items" | "kits")}
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="items">Individual Items</TabsTrigger>
+          <TabsTrigger value="kits">Kits</TabsTrigger>
+        </TabsList>
+        <TabsContent value="items">
+          <StudioInventoryList
+            items={filteredItems}
+            onItemUpdate={handleItemUpdate}
+            onItemDelete={handleItemDelete}
+            selectedItems={selectedItems}
+            onSelectedItemsChange={setSelectedItems}
+            isSelectionMode={isSelectionMode}
+          />
+        </TabsContent>
+        <TabsContent value="kits">
+          <KitsList
+            kits={filteredKits}
+            onEdit={handleEditKit}
+            onDelete={handleDeleteKitConfirm}
+            onView={handleViewKit}
+            onCheckout={handleKitCheckout}
+            onCheckin={handleKitCheckin}
+            selectionMode={false}
+          />
+        </TabsContent>
+      </Tabs>
 
       <AddInventoryItemModal
         isOpen={isAddItemModalOpen}

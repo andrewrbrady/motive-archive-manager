@@ -13,7 +13,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "flex h-10 items-center justify-start rounded-md bg-[var(--background-secondary)] p-1 text-[var(--text-disabled)] w-full",
+      "flex h-10 items-center justify-start rounded-md bg-[hsl(var(--secondary))] p-1 text-[hsl(var(--muted-foreground))] w-full gap-1 overflow-visible",
       className
     )}
     {...props}
@@ -28,10 +28,11 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=active]:bg-[var(--background-tertiary)] data-[state=active]:text-white",
-      "data-[state=active]:ring-2 data-[state=active]:ring-zinc-200 dark:data-[state=active]:ring-zinc-800",
-      "hover:text-[var(--text-primary)]",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
+      "data-[state=active]:bg-[hsl(var(--background))] data-[state=active]:text-[hsl(var(--foreground))] data-[state=active]:shadow",
+      "data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:pb-1 relative",
+      "data-[state=inactive]:text-[hsl(var(--muted-foreground))]",
+      "hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))]",
       className
     )}
     {...props}
@@ -46,7 +47,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-2 ring-offset-[var(--background-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--background-tertiary)] focus-visible:ring-offset-2",
+      "mt-4 ring-offset-[hsl(var(--background))] focus-visible:outline-none",
       className
     )}
     {...props}

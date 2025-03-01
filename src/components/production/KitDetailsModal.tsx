@@ -1,12 +1,4 @@
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -14,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDate } from "@/lib/utils";
 import { Kit } from "@/types/inventory";
 import { Package, Calendar, User, Clock } from "lucide-react";
+import { UrlModal } from "@/components/ui/url-modal";
 
 interface KitDetailsModalProps {
   isOpen: boolean;
@@ -27,16 +20,15 @@ export default function KitDetailsModal({
   kit,
 }: KitDetailsModalProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            {kit.name}
-          </DialogTitle>
-          <DialogDescription>{kit.description}</DialogDescription>
-        </DialogHeader>
-
+    <UrlModal
+      paramName="kit"
+      paramValue={kit.id}
+      onClose={onClose}
+      title={kit.name}
+      preserveParams={["tab", "page", "limit", "search", "status"]}
+      className="max-w-3xl"
+    >
+      <div className="max-h-[70vh] flex flex-col">
         <div className="flex flex-wrap gap-2 my-2">
           {kit.status && (
             <Badge
@@ -55,130 +47,145 @@ export default function KitDetailsModal({
           <Badge variant="outline">{kit.items?.length || 0} items</Badge>
         </div>
 
-        {kit.checkedOutTo && (
-          <div className="bg-muted/30 p-3 rounded-md my-2">
-            <h3 className="text-sm font-medium mb-2">Checkout Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Checked Out To:</span>
-                <span>{kit.checkedOutTo}</span>
-              </div>
-              {kit.checkoutDate && (
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Checkout Date:</span>
-                  <span>{formatDate(kit.checkoutDate)}</span>
-                </div>
-              )}
-              {kit.expectedReturnDate && (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Expected Return:</span>
-                  <span>{formatDate(kit.expectedReturnDate)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <p className="text-[hsl(var(--muted-foreground))] mb-4">
+          {kit.description}
+        </p>
 
-        <Separator className="my-2" />
-
-        <div className="flex-1 overflow-hidden">
-          <h3 className="text-sm font-medium mb-2">Items in Kit</h3>
-          <ScrollArea className="h-[300px] rounded-md border p-2">
-            {kit.itemDetails && kit.itemDetails.length > 0 ? (
-              <div className="space-y-2">
-                {kit.itemDetails.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 p-2 border rounded-md"
-                  >
-                    {item.primaryImage ? (
-                      <div className="h-12 w-12 relative rounded-md overflow-hidden bg-muted">
-                        <img
-                          src={item.primaryImage}
-                          alt={item.name}
-                          className="object-cover h-full w-full"
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-12 w-12 flex items-center justify-center rounded-md bg-muted">
-                        <Package className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{item.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {item.category} • {item.manufacturer} {item.model}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={
-                        item.isAvailable
-                          ? "bg-green-100 text-green-800"
-                          : "bg-orange-100 text-orange-800"
-                      }
-                    >
-                      {item.isAvailable ? "Available" : "Unavailable"}
-                    </Badge>
+        <ScrollArea className="flex-1 pr-4">
+          {kit.checkedOutTo && (
+            <div className="bg-muted/30 p-3 rounded-md my-2">
+              <h3 className="text-sm font-medium mb-2">Checkout Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Checked Out To:</span>
+                  <span>{kit.checkedOutTo}</span>
+                </div>
+                {kit.checkoutDate && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Checkout Date:</span>
+                    <span>{formatDate(kit.checkoutDate)}</span>
                   </div>
-                ))}
+                )}
+                {kit.expectedReturnDate && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Expected Return:</span>
+                    <span>{formatDate(kit.expectedReturnDate)}</span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                No items in this kit
-              </div>
-            )}
-          </ScrollArea>
-        </div>
+            </div>
+          )}
 
-        {kit.checkoutHistory && kit.checkoutHistory.length > 0 && (
-          <>
-            <Separator className="my-2" />
-            <div>
-              <h3 className="text-sm font-medium mb-2">Checkout History</h3>
-              <ScrollArea className="h-[150px] rounded-md border p-2">
+          <Separator className="my-2" />
+
+          <div className="flex-1 overflow-hidden">
+            <h3 className="text-sm font-medium mb-2">Items in Kit</h3>
+            <ScrollArea className="h-[300px] rounded-md border p-2">
+              {kit.itemDetails && kit.itemDetails.length > 0 ? (
                 <div className="space-y-2">
-                  {kit.checkoutHistory.map((record, index) => (
-                    <div key={index} className="p-2 border rounded-md text-sm">
-                      <div className="flex items-center gap-2">
-                        <User className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-medium">Checked Out To:</span>
-                        <span>{record.checkedOutTo}</span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mt-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">Checkout Date:</span>
-                          <span>{formatDate(record.checkedOutDate)}</span>
+                  {kit.itemDetails.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 p-2 border rounded-md"
+                    >
+                      {item.primaryImage ? (
+                        <div className="h-12 w-12 relative rounded-md overflow-hidden bg-muted">
+                          <img
+                            src={item.primaryImage}
+                            alt={item.name}
+                            className="object-cover h-full w-full"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">Expected Return:</span>
-                          <span>{formatDate(record.expectedReturnDate)}</span>
+                      ) : (
+                        <div className="h-12 w-12 flex items-center justify-center rounded-md bg-muted">
+                          <Package className="h-6 w-6 text-muted-foreground" />
                         </div>
-                        {record.actualReturnDate && (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-medium">Actual Return:</span>
-                            <span>{formatDate(record.actualReturnDate)}</span>
-                          </div>
-                        )}
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.name}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {item.category} • {item.manufacturer} {item.model}
+                        </p>
                       </div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          item.isAvailable
+                            ? "bg-green-100 text-green-800"
+                            : "bg-orange-100 text-orange-800"
+                        }
+                      >
+                        {item.isAvailable ? "Available" : "Unavailable"}
+                      </Badge>
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
-            </div>
-          </>
-        )}
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No items in this kit
+                </div>
+              )}
+            </ScrollArea>
+          </div>
 
-        <DialogFooter className="mt-4">
-          <Button onClick={onClose}>Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {kit.checkoutHistory && kit.checkoutHistory.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <div>
+                <h3 className="text-sm font-medium mb-2">Checkout History</h3>
+                <ScrollArea className="h-[150px] rounded-md border p-2">
+                  <div className="space-y-2">
+                    {kit.checkoutHistory.map((record, index) => (
+                      <div
+                        key={index}
+                        className="p-2 border rounded-md text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-medium">Checked Out To:</span>
+                          <span>{record.checkedOutTo}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mt-1">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-medium">Checkout Date:</span>
+                            <span>{formatDate(record.checkedOutDate)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-medium">
+                              Expected Return:
+                            </span>
+                            <span>{formatDate(record.expectedReturnDate)}</span>
+                          </div>
+                          {record.actualReturnDate && (
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              <span className="font-medium">
+                                Actual Return:
+                              </span>
+                              <span>{formatDate(record.actualReturnDate)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </>
+          )}
+        </ScrollArea>
+
+        <div className="mt-4 pt-4 border-t flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </UrlModal>
   );
 }

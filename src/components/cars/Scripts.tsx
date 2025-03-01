@@ -9,6 +9,9 @@ import {
   Clock,
   Save,
   Copy,
+  PlusCircle,
+  Play,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
@@ -45,6 +48,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/MarkdownEditor";
 import { useRouter, useSearchParams } from "next/navigation";
+import { LoadingSpinner, LoadingContainer } from "@/components/ui/loading";
 
 // Import the ScriptTemplate type
 interface ScriptRow {
@@ -1108,7 +1112,7 @@ ${template.rows
                     className="h-6 px-2"
                   >
                     {uploading ? (
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      <LoadingSpinner size={12} />
                     ) : (
                       <Upload className="h-3 w-3 mr-1" />
                     )}
@@ -1136,17 +1140,7 @@ ${template.rows
 
             {isLoadingFiles ? (
               <div className="p-2">
-                <div className="animate-pulse space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center space-x-4">
-                      <div className="h-4 w-4 bg-[hsl(var(--background))] rounded" />
-                      <div className="flex-1 space-y-1">
-                        <div className="h-3 bg-[hsl(var(--background))] rounded w-3/4" />
-                        <div className="h-2 bg-[hsl(var(--background))] rounded w-1/2" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <LoadingContainer text="Loading files..." size={20} />
               </div>
             ) : (
               <>
@@ -1154,7 +1148,9 @@ ${template.rows
                   <div
                     key={file._id}
                     className={`group py-4 flex items-start justify-between cursor-pointer hover:bg-[hsl(var(--background))]/50 px-4 -mx-4 rounded ${
-                      selectedFile?._id === file._id ? "bg-[hsl(var(--background))] bg-opacity-50" : ""
+                      selectedFile?._id === file._id
+                        ? "bg-[hsl(var(--background))] bg-opacity-50"
+                        : ""
                     }`}
                     onClick={() => handleFileClick(file)}
                   >
@@ -1229,7 +1225,7 @@ ${template.rows
           {selectedFile ? (
             isLoadingContent ? (
               <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <LoadingSpinner size={24} text="Loading content..." />
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">

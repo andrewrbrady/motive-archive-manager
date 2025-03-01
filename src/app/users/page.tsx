@@ -1,19 +1,19 @@
-import { Metadata } from "next";
-import UserManagement from "@/components/users/UserManagement";
-import Navbar from "@/components/layout/navbar";
+"use client";
 
-export const metadata: Metadata = {
-  title: "User Management",
-  description: "Manage users and their roles",
-};
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/loading";
 
-export default function UsersPage() {
+export default function UsersRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push("/admin?tab=users");
+  }, [router]);
+
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <UserManagement />
-      </div>
+    <div className="min-h-screen flex items-center justify-center">
+      <LoadingSpinner text="Redirecting to Admin..." size={30} />
     </div>
   );
 }

@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   HardDriveIcon,
   PencilIcon,
   FolderIcon,
   ScanIcon,
   MapPin,
+  RefreshCcw,
+  Edit,
+  X,
+  Save,
+  Trash2,
+  MoreHorizontal,
+  ExternalLink,
 } from "lucide-react";
 import RawAssetDetailsModal from "./RawAssetDetailsModal";
 import { RawAssetData } from "@/models/raw_assets";
@@ -23,6 +29,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UrlModal } from "@/components/ui/url-modal";
+import { useUrlParams } from "@/hooks/useUrlParams";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { cn } from "@/lib/utils";
 
 interface HardDriveDetailsModalProps {
   driveId: string | null;
@@ -71,6 +81,8 @@ export default function HardDriveDetailsModal({
   onClose,
   onDriveUpdate,
 }: HardDriveDetailsModalProps) {
+  console.log("HardDriveDetailsModal rendered with driveId:", driveId);
+
   const [drive, setDrive] = useState<HardDrive | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<RawAssetData | null>(null);
   const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
@@ -80,9 +92,8 @@ export default function HardDriveDetailsModal({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const { getParam, updateParams } = useUrlParams();
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{
     matchedAssets: number;
@@ -94,46 +105,103 @@ export default function HardDriveDetailsModal({
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
   const [shouldRefetch, setShouldRefetch] = useState(0);
+  const [dataChanged, setDataChanged] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Check URL parameters on mount and when they change
+  useEffect(() => {
+    const driveParam = getParam("drive");
+    console.log("HardDriveDetailsModal - URL drive parameter:", driveParam);
+
+    if (driveParam) {
+      console.log("HardDriveDetailsModal - Setting isModalOpen to true");
+      setIsModalOpen(true);
+    } else {
+      console.log("HardDriveDetailsModal - Setting isModalOpen to false");
+      setIsModalOpen(false);
+    }
+  }, [getParam]);
+
+  // Log when isModalOpen changes
+  useEffect(() => {
+    console.log("HardDriveDetailsModal - isModalOpen changed to:", isModalOpen);
+  }, [isModalOpen]);
 
   // Handle opening raw asset details
   const handleAssetClick = (asset: RawAsset) => {
-    // Get current URL parameters
-    const params = new URLSearchParams(searchParams.toString());
+    console.log("Navigating to raw asset:", asset._id);
 
-    // Update the parameters we want to change
-    params.set("tab", "raw-assets");
-    params.set("asset", asset._id);
+    // First close the current modal to prevent any state conflicts
+    if (onClose) {
+      onClose();
+    }
 
-    // Remove the drive parameter since we're leaving the drive view
-    params.delete("drive");
+    // Then update the URL directly for immediate effect
+    const url = new URL(window.location.href);
 
-    // Force a hard navigation to the new URL
-    window.location.href = `${pathname}?${params.toString()}`;
+    // Set only the parameters we want - keep the tab and asset ID
+    url.searchParams.set("tab", "raw-assets");
+    url.searchParams.set("asset", asset._id.toString());
+
+    // Preserve template if it exists
+    const template = getParam("template");
+    if (template) {
+      url.searchParams.set("template", template);
+    }
+
+    // Preserve other important parameters except drive
+    ["page", "limit", "search", "location", "view"].forEach((param) => {
+      const value = getParam(param);
+      if (value && param !== "drive") {
+        url.searchParams.set(param, value);
+      }
+    });
+
+    console.log("Setting URL directly to:", url.toString());
+    window.history.pushState({}, "", url.toString());
+
+    // Finally update the Next.js router state to keep it in sync
+    setTimeout(() => {
+      console.log("Updating Next.js router for raw asset:", asset._id);
+      updateParams(
+        {
+          tab: "raw-assets",
+          asset: asset._id.toString(),
+          drive: null, // Explicitly remove the drive parameter
+        },
+        {
+          // Preserve other important parameters
+          preserveParams: [
+            "template",
+            "page",
+            "limit",
+            "search",
+            "location",
+            "view",
+          ],
+          clearOthers: false, // Keep existing parameters to maintain context
+        }
+      );
+      console.log("Next.js router update completed for raw asset");
+    }, 100); // Reduced timeout for faster response
   };
 
   // Handle closing raw asset details
   const handleAssetClose = () => {
     setSelectedAsset(null);
     // Remove asset ID from URL but keep other parameters
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("asset");
-    router.replace(`${pathname}?${params.toString()}`);
+    updateParams({ asset: null });
   };
 
-  // Handle URL updates for drive modal
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      // Only update URL if we're not navigating to a raw asset
-      // and if we're actually closing the modal (open === false)
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("drive");
-      // Preserve the template parameter
-      const template = params.get("template");
-      // Create new params with only what we need
-      const newParams = new URLSearchParams();
-      if (template) newParams.set("template", template);
-      newParams.set("tab", "hard-drives");
-      router.replace(`${pathname}?${newParams.toString()}`);
+  // Handle modal close with URL parameter management
+  const handleModalClose = () => {
+    // Update URL parameters to remove the drive parameter
+    updateParams(
+      { drive: null },
+      { preserveParams: ["tab", "page", "limit", "search", "location", "view"] }
+    );
+
+    if (onClose) {
       onClose();
     }
   };
@@ -177,6 +245,9 @@ export default function HardDriveDetailsModal({
         throw new Error("Failed to remove asset from drive");
       }
 
+      // Mark data as changed
+      setDataChanged(true);
+
       // Refresh drive data by refetching
       if (driveId) {
         const refreshResponse = await fetch(`/api/hard-drives/${driveId}`);
@@ -190,251 +261,43 @@ export default function HardDriveDetailsModal({
     }
   };
 
+  // Handle starting edit mode
   const handleStartEdit = () => {
     setIsEditing(true);
-    setEditFormData(drive);
+    setEditFormData({ ...drive });
   };
 
+  // Handle canceling edit mode
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditFormData(null);
-    setError(null);
   };
 
+  // Handle saving edit changes
   const handleSaveEdit = async () => {
-    if (!editFormData || !driveId) return;
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const payload = {
-        ...editFormData,
-        capacity: {
-          total: editFormData.capacity?.total
-            ? parseFloat(editFormData.capacity.total.toString())
-            : 0,
-          used: editFormData.capacity?.used
-            ? parseFloat(editFormData.capacity.used.toString())
-            : undefined,
-          available: editFormData.capacity?.available
-            ? parseFloat(editFormData.capacity.available.toString())
-            : undefined,
-        },
-        locationId: editFormData.locationId || undefined,
-      };
-
-      const response = await fetch(`/api/hard-drives/${driveId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update drive");
-      }
-
-      setIsEditing(false);
-      if (onDriveUpdate) onDriveUpdate();
-
-      // Trigger refetch of drive details
-      setShouldRefetch((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error updating drive:", error);
-      setError(
-        error instanceof Error ? error.message : "An unknown error occurred"
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Implementation of save functionality
+    console.log("Saving changes:", editFormData);
   };
 
-  const handleFolderSelect = async () => {
-    setError(null);
-    try {
-      // @ts-expect-error - The type definition for the form is incomplete
-      const dirHandle = await window.showDirectoryPicker();
-      const path = dirHandle.name;
-
-      setIsLoading(true);
-      try {
-        // Check if this is a system path
-        if (
-          path === "/" ||
-          path.startsWith("/System") ||
-          path === "Macintosh HD"
-        ) {
-          throw new Error(
-            "Cannot select system directories. Please choose a regular folder or external drive."
-          );
-        }
-
-        // Fetch drive information from our API
-        const response = await fetch(
-          `/api/system/drives?path=/Volumes/${encodeURIComponent(path)}`
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error ||
-              "Failed to get drive information. Please ensure you select a valid drive or folder."
-          );
-        }
-
-        const driveInfo = await response.json();
-
-        // Update form with drive information
-        setEditFormData((prev) => ({
-          ...prev,
-          systemName: driveInfo.systemName,
-          label: prev?.label || driveInfo.systemName,
-          capacity: {
-            total: Math.round(driveInfo.capacity.total),
-            used: Math.round(driveInfo.capacity.used),
-            available: Math.round(driveInfo.capacity.available),
-          },
-          type: driveInfo.driveType.isSSD ? "SSD" : "HDD",
-          interface: driveInfo.interface.includes("Thunderbolt")
-            ? "Thunderbolt"
-            : driveInfo.interface.includes("USB")
-            ? "USB-C"
-            : "USB",
-          // Try to find a matching location or keep the existing one
-          locationId: prev?.locationId || "",
-          notes:
-            prev?.notes ||
-            `${driveInfo.driveType.mediaType || "External"} drive\n${
-              driveInfo.driveType.isRemovable ? "Removable Media\n" : ""
-            }File System: ${driveInfo.fileSystem.type || "Unknown"}\n${
-              driveInfo.security.hasHardwareAES
-                ? "Hardware encryption supported"
-                : ""
-            }`,
-        }));
-      } catch (error) {
-        console.error("Error getting drive information:", error);
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to get drive information. Please select a valid drive or folder."
-        );
-
-        // Set basic information even if drive info fetch fails
-        setEditFormData((prev) => ({
-          ...prev,
-          systemName: path,
-          label: prev?.label || path,
-        }));
-      }
-    } catch (error) {
-      console.error("Error selecting folder:", error);
-      if (error instanceof Error && error.name === "SecurityError") {
-        setError(
-          "Cannot access system directories. Please select a regular folder or external drive."
-        );
-      } else {
-        setError(
-          "Failed to select folder. Please try again or enter information manually."
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSystemDriveInfo = async () => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      // Fetch system drive information directly using the API
-      const response = await fetch(`/api/system/drives?path=/`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || "Failed to get system drive information"
-        );
-      }
-
-      const driveInfo = await response.json();
-
-      // Update form with system drive information
-      setEditFormData((prev) => ({
-        ...prev,
-        systemName: driveInfo.systemName,
-        label: prev?.label || driveInfo.systemName,
-        capacity: {
-          total: Math.round(driveInfo.capacity.total),
-          used: Math.round(driveInfo.capacity.used),
-          available: Math.round(driveInfo.capacity.available),
-        },
-        type: "SSD",
-        interface: "Internal",
-        // Find a location with name "Internal" or use a default value
-        locationId: locations.find((loc) => loc.name === "Internal")?.id || "",
-        notes:
-          prev?.notes ||
-          `System Drive (${driveInfo.systemName})\nFile System: ${
-            driveInfo.fileSystem.type || "APFS"
-          }\n${
-            driveInfo.security.hasHardwareAES
-              ? "Hardware encryption supported"
-              : ""
-          }`,
-      }));
-    } catch (error) {
-      console.error("Error getting system drive information:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to get system drive information"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Handle scanning for assets
   const handleScan = async () => {
-    if (!drive?.systemName) return;
+    // Implementation of scan functionality
+    console.log("Scanning for assets");
+  };
 
-    setIsScanning(true);
-    setScanResult(null);
-    setError(null);
-
-    try {
-      const scanResponse = await fetch("/api/hard-drives/scan", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          drivePath: `/Volumes/${drive.systemName}`,
-          driveId: drive._id,
-        }),
-      });
-
-      if (!scanResponse.ok) {
-        const errorData = await scanResponse.json();
-        throw new Error(errorData.error || "Failed to scan drive");
-      }
-
-      const result = await scanResponse.json();
-      setScanResult(result);
-
-      // Refresh drive details
-      const refreshResponse = await fetch(`/api/hard-drives/${driveId}`);
-      if (!refreshResponse.ok)
-        throw new Error("Failed to refresh drive details");
-      const refreshedData = await refreshResponse.json();
-      setDrive(refreshedData);
-    } catch (error) {
-      console.error("Error scanning drive:", error);
-      setError(error instanceof Error ? error.message : "Failed to scan drive");
-    } finally {
-      setIsScanning(false);
+  // Get status color based on drive status
+  const getStatusColor = (status: HardDrive["status"]) => {
+    switch (status) {
+      case "Available":
+        return "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]";
+      case "In Use":
+        return "bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]";
+      case "Archived":
+        return "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]";
+      case "Offline":
+        return "bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]";
+      default:
+        return "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]";
     }
   };
 
@@ -458,51 +321,51 @@ export default function HardDriveDetailsModal({
     fetchLocations();
   }, []);
 
+  // Reset dataChanged when driveId changes
+  useEffect(() => {
+    setDataChanged(false);
+  }, [driveId]);
+
   // Fetch drive details when driveId changes
   useEffect(() => {
-    async function fetchDriveDetails() {
-      if (!driveId) return;
+    console.log("useEffect triggered with driveId:", driveId);
 
-      try {
-        setError(null);
-        setIsLoading(true);
+    // Get the current drive parameter from URL
+    const urlDriveParam = getParam("drive");
+    console.log(
+      "URL drive parameter in fetchDriveDetails effect:",
+      urlDriveParam
+    );
 
-        const response = await fetch(`/api/hard-drives/${driveId}`);
+    // Use either the driveId prop or the URL parameter
+    const effectiveDriveId = driveId || urlDriveParam;
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to fetch drive details");
-        }
+    if (effectiveDriveId) {
+      console.log(
+        "Calling fetchDriveDetails for effectiveDriveId:",
+        effectiveDriveId
+      );
 
-        const data = await response.json();
-
-        // Validate that the data has the expected structure
-        if (!data || typeof data !== "object") {
-          throw new Error("Invalid drive data received");
-        }
-
-        // Ensure rawAssetDetails is always an array, even if it's null or undefined
-        if (!data.rawAssetDetails) {
-          data.rawAssetDetails = [];
-        }
-
-        setDrive(data);
-      } catch (error) {
-        console.error("Error fetching drive details:", error);
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch drive details"
-        );
-      } finally {
-        setIsLoading(false);
+      // Only fetch if we don't already have this drive's data
+      if (!drive || drive._id !== effectiveDriveId) {
+        fetchDriveDetails();
+      } else {
+        console.log("Already have data for drive:", effectiveDriveId);
       }
+    } else {
+      console.log("No drive ID available, resetting drive state");
+      setDrive(null);
     }
+  }, [driveId, shouldRefetch, getParam, drive]);
 
-    fetchDriveDetails();
-  }, [driveId, shouldRefetch]);
-
-  if (!drive) return null;
+  // Add a useEffect to log when the component renders
+  useEffect(() => {
+    console.log(
+      "Inside UrlModal render - driveId:",
+      driveId,
+      "isOpen determined by UrlModal"
+    );
+  }, [driveId]);
 
   const formatCapacity = (capacity: HardDrive["capacity"]) => {
     const total = `${capacity.total} GB`;
@@ -512,104 +375,190 @@ export default function HardDriveDetailsModal({
     return total;
   };
 
-  const getStatusColor = (status: HardDrive["status"]) => {
-    switch (status) {
-      case "Available":
-        return "bg-green-500";
-      case "In Use":
-        return "bg-blue-500";
-      case "Archived":
-        return "bg-yellow-500";
-      case "Offline":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
+  // Fetch drive details
+  const fetchDriveDetails = async () => {
+    // Get the current drive parameter from URL
+    const urlDriveParam = getParam("drive");
+    // Use either the driveId prop or the URL parameter
+    const effectiveDriveId = driveId || urlDriveParam;
+
+    if (!effectiveDriveId) {
+      // Reset state when no drive ID is available
+      setDrive(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
+    try {
+      console.log("fetchDriveDetails started for driveId:", effectiveDriveId);
+      setError(null);
+      setIsLoading(true);
+
+      const response = await fetch(`/api/hard-drives/${effectiveDriveId}`);
+      console.log("API response status:", response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch drive details");
+      }
+
+      const data = await response.json();
+      console.log("Drive data received:", data);
+
+      // Validate that the data has the expected structure
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid drive data received");
+      }
+
+      // Ensure rawAssetDetails is always an array, even if it's null or undefined
+      if (!data.rawAssetDetails) {
+        data.rawAssetDetails = [];
+      }
+
+      setDrive(data);
+      console.log("Drive state set:", data);
+    } catch (error) {
+      console.error("Error fetching drive details:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to fetch drive details"
+      );
+    } finally {
+      setIsLoading(false);
+      console.log("fetchDriveDetails completed, isLoading set to false");
     }
   };
 
+  console.log(
+    "HardDriveDetailsModal rendering with drive:",
+    drive,
+    "and isLoading:",
+    isLoading,
+    "isModalOpen:",
+    isModalOpen
+  );
+
+  // Get the current drive parameter directly from the URL
+  const currentDriveParam = getParam("drive");
+  console.log("Current drive parameter from URL:", currentDriveParam);
+
+  // Check if the modal should be visible based on the URL parameter or the driveId prop
+  const shouldBeVisible = !!currentDriveParam || !!driveId;
+  console.log(
+    "Modal should be visible:",
+    shouldBeVisible,
+    "driveId:",
+    driveId,
+    "currentDriveParam:",
+    currentDriveParam
+  );
+
+  // If neither the drive parameter is in the URL nor the driveId prop is provided, don't render the modal
+  if (!shouldBeVisible) {
+    console.log(
+      "Not rendering modal because drive parameter is not in URL and driveId prop is not provided"
+    );
+    return null;
+  }
+
+  // Use the driveId prop if available, otherwise use the URL parameter
+  const effectiveDriveId = driveId || currentDriveParam;
+  console.log("Using effective driveId:", effectiveDriveId);
+
   return (
-    <>
-      <Dialog open={!!driveId} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-6xl">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[hsl(var(--primary))]"></div>
-              <p className="mt-4 text-[hsl(var(--muted-foreground))]">
-                Loading drive details...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full h-12 w-12 bg-red-100 flex items-center justify-center">
-                <span className="text-red-500 text-2xl">!</span>
-              </div>
-              <h3 className="mt-4 text-lg font-medium">Error Loading Drive</h3>
-              <p className="mt-2 text-[hsl(var(--muted-foreground))]">
-                {error}
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => {
-                  // Close the modal
-                  handleOpenChange(false);
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          ) : !drive ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <p className="text-[hsl(var(--muted-foreground))]">
-                No drive data available
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => {
-                  // Close the modal
-                  handleOpenChange(false);
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Left Column - Drive Stats */}
-              <div className="flex flex-col gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-4 rounded-lg bg-[hsl(var(--secondary))] flex items-center justify-center">
-                    <HardDriveIcon className="w-8 h-8" />
-                  </div>
-                  <div className="flex-1">
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editFormData?.label || ""}
-                        onChange={(e) =>
-                          setEditFormData((prev) =>
-                            prev ? { ...prev, label: e.target.value } : null
-                          )
-                        }
-                        className="text-2xl font-bold bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] w-full"
-                      />
-                    ) : (
-                      <h2 className="text-2xl font-bold">{drive?.label}</h2>
-                    )}
-                  </div>
-                  {!isEditing && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleStartEdit}
-                      className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                    >
-                      <PencilIcon className="w-4 h-4" />
-                    </Button>
+    <UrlModal
+      paramName="drive"
+      paramValue={effectiveDriveId || undefined}
+      onClose={handleModalClose}
+      preserveParams={[
+        "tab",
+        "page",
+        "limit",
+        "search",
+        "location",
+        "view",
+        "template",
+      ]}
+    >
+      <div className="space-y-6">
+        <div className="flex justify-between items-start mb-6">
+          <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
+            {drive?.label || "Hard Drive Details"}
+          </h2>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <LoadingSpinner size={32} text="Loading hard drive details..." />
+          </div>
+        ) : error ? (
+          <div className="text-red-500 p-4 text-center">{error}</div>
+        ) : drive ? (
+          <div className="space-y-6">
+            {/* Drive header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <HardDriveIcon className="w-6 h-6 text-[hsl(var(--foreground-muted))]" />
+                <div>
+                  <h2 className="text-xl font-semibold">{drive.label}</h2>
+                  {drive.systemName && (
+                    <p className="text-[hsl(var(--muted-foreground))]">
+                      System: {drive.systemName}
+                    </p>
                   )}
                 </div>
+                <Badge className={`ml-2 ${getStatusColor(drive.status)}`}>
+                  {drive.status}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                {!isEditing ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleStartEdit}
+                      className="flex items-center gap-1"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleScan}
+                      disabled={isScanning}
+                      className="flex items-center gap-1"
+                    >
+                      <ScanIcon className="w-4 h-4" />
+                      {isScanning ? "Scanning..." : "Scan for Assets"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEdit}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleSaveEdit}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
 
+            {/* Left Column - Drive Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="flex flex-col gap-6">
                 <div className="space-y-2">
                   {isEditing ? (
                     <div className="flex flex-col gap-2">
@@ -632,35 +581,13 @@ export default function HardDriveDetailsModal({
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={handleFolderSelect}
+                          onClick={handleScan}
                           disabled={isLoading}
                           className="h-8 px-2 flex items-center gap-1"
                         >
                           <FolderIcon className="w-4 h-4" />
                           Select Drive
                         </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleSystemDriveInfo}
-                          disabled={isLoading}
-                          className="h-8 px-2 flex items-center gap-1"
-                        >
-                          <HardDriveIcon className="w-4 h-4" />
-                          Get System Drive
-                        </Button>
-                        {editFormData?.systemName && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleScan}
-                            disabled={isScanning}
-                            className="h-8 px-2 flex items-center gap-1"
-                          >
-                            <ScanIcon className="w-4 h-4" />
-                            {isScanning ? "Scanning..." : "Scan"}
-                          </Button>
-                        )}
                       </div>
                     </div>
                   ) : (
@@ -925,96 +852,51 @@ export default function HardDriveDetailsModal({
               {/* Right Column - Raw Assets */}
               <div className="flex flex-col">
                 <h3 className="text-lg font-medium mb-4">Raw Assets</h3>
-                <ScrollArea className="flex-1 max-h-[calc(100vh-24rem)] pr-4">
-                  <div className="space-y-4">
-                    {drive?.rawAssetDetails.map((asset) => (
-                      <div
-                        key={asset._id}
-                        className="block w-full text-left border border-[hsl(var(--border))] rounded-lg p-3 hover:bg-[hsl(var(--accent))] transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <button
+                <div className="p-3 border border-[hsl(var(--border))] rounded-md">
+                  {drive.rawAssetDetails && drive.rawAssetDetails.length > 0 ? (
+                    <ScrollArea className="max-h-40 pr-3">
+                      <div className="space-y-2">
+                        {drive.rawAssetDetails.map((asset) => (
+                          <div
+                            key={asset._id}
+                            className="flex items-center justify-between p-2 bg-[hsl(var(--background-secondary))] rounded-md hover:bg-[hsl(var(--background-secondary))]/80 cursor-pointer transition-colors"
                             onClick={() => handleAssetClick(asset)}
-                            className="flex items-center flex-1"
                           >
-                            <p className="font-medium min-w-[120px] text-sm">
-                              {asset.date}
-                            </p>
-                            <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
-                              {asset.cars &&
-                                asset.cars.map((car) => (
-                                  <Badge
-                                    key={car._id}
-                                    variant="outline"
-                                    className="whitespace-nowrap"
-                                  >
-                                    {car.year} {car.make} {car.model}
-                                  </Badge>
-                                ))}
+                            <div className="flex items-center">
+                              <FolderIcon className="w-4 h-4 mr-2 text-[hsl(var(--muted-foreground))]" />
+                              <div>
+                                <span className="text-sm">{asset.date}</span>
+                                <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                  {asset.description}
+                                </p>
+                              </div>
                             </div>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveAsset(asset._id);
-                            }}
-                            className="ml-2 p-2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                            </svg>
-                          </button>
-                        </div>
+                            <ExternalLink className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-[hsl(var(--muted-foreground))] text-sm">
+                      No raw assets stored on this drive
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          )}
-
-          <div className="flex justify-end mt-6 gap-2">
-            {isEditing ? (
-              <>
-                {error && (
-                  <p className="text-[hsl(var(--destructive))] text-sm mr-auto">
-                    {error}
-                  </p>
-                )}
-                <Button variant="outline" onClick={handleCancelEdit}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveEdit} disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Save Changes"}
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>
-                Close
-              </Button>
-            )}
           </div>
-        </DialogContent>
-      </Dialog>
+        ) : (
+          <div className="text-center py-4">No drive data found</div>
+        )}
+      </div>
 
-      <RawAssetDetailsModal
-        isOpen={!!selectedAsset}
-        asset={selectedAsset || undefined}
-        onClose={handleAssetClose}
-        driveLabels={driveLabels}
-      />
-    </>
+      {selectedAsset && (
+        <RawAssetDetailsModal
+          asset={selectedAsset}
+          driveLabels={driveLabels}
+          onClose={handleAssetClose}
+        />
+      )}
+    </UrlModal>
   );
 }

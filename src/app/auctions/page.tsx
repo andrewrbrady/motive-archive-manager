@@ -3,8 +3,6 @@ import { fetchAuctions, type AuctionFilters } from "@/lib/fetchAuctions";
 import { fetchMakes } from "@/lib/fetchMakes";
 import { fetchPlatforms } from "@/lib/fetchPlatforms";
 import Pagination from "@/components/Pagination";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
 import { FiltersSection } from "@/components/auctions/FiltersSection";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import { AuctionsViewWrapper } from "@/components/auctions/AuctionsViewWrapper";
@@ -78,67 +76,38 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   console.log("Page - Filters:", filters);
 
-  const [auctionsResponse, makes, platforms] = await Promise.all([
+  // Fetch auctions, makes, and platforms
+  const [auctionsData, makes, platforms] = await Promise.all([
     fetchAuctions(page, filters, pageSize),
     fetchMakes(),
     fetchPlatforms(),
   ]);
 
-  const { auctions, total } = auctionsResponse;
-  console.log("Page - Received auctions:", auctions?.length, "Total:", total);
+  const { auctions, total } = auctionsData;
 
-  const totalPages = Math.ceil(total / pageSize);
-
+  // Return the page
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <nav className="fixed top-0 w-full z-50 bg-background shadow-md">
-        <Navbar />
-      </nav>
-
-      <main className="flex-1 w-full pt-20">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col space-y-6">
-            <PageTitle title="Auctions" count={total}>
-              <ViewModeSelector currentView={view} />
-            </PageTitle>
-
-            <FiltersSection
-              currentFilters={{
-                make: params.make || "",
-                platformId: params.platformId || "",
-                minYear: params.minYear || "",
-                maxYear: params.maxYear || "",
-                noReserve: params.noReserve === "true",
-                endDate: params.endDate || "",
-              }}
-              makes={makes}
-              platforms={platforms}
-            />
-
-            {total > pageSize && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                pageSize={pageSize}
-              />
-            )}
-
-            <AuctionsViewWrapper
-              auctions={auctions}
-              view={view as "grid" | "list"}
-            />
-
-            {total > pageSize && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                pageSize={pageSize}
-              />
-            )}
-          </div>
+    <div className="flex flex-col space-y-6">
+      <PageTitle title="Auctions" count={total}>
+        <div className="flex items-center gap-4">
+          <ViewModeSelector currentView={view} />
         </div>
-      </main>
-      <Footer />
+      </PageTitle>
+
+      <FiltersSection
+        platforms={platforms}
+        makes={makes}
+        currentFilters={{
+          platformId: params.platformId || "",
+          make: params.make || "",
+          minYear: params.minYear || "",
+          maxYear: params.maxYear || "",
+          endDate: params.endDate || "",
+          noReserve: params.noReserve === "true",
+        }}
+      />
+
+      <AuctionsViewWrapper auctions={auctions} view={view} />
     </div>
   );
 }

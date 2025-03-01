@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Just make sure we don't interfere with API routes
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
+  // Handle direct access to old routes that now redirect to admin tabs
+  if (pathname === "/users") {
+    return NextResponse.redirect(new URL("/admin?tab=users", request.url));
+  }
+
+  if (pathname === "/clients") {
+    return NextResponse.redirect(new URL("/admin?tab=clients", request.url));
+  }
+
+  if (pathname === "/locations") {
+    return NextResponse.redirect(new URL("/admin?tab=locations", request.url));
+  }
+
   // Get the origin from the request headers
   const origin = request.headers.get("origin") || "*";
 
@@ -36,5 +56,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: ["/api/:path*", "/users", "/clients", "/locations", "/admin"],
 };

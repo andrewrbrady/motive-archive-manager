@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { LoadingContainer } from "@/components/ui/loading-container";
 
 type Platform = "instagram_reels" | "youtube_shorts" | "youtube" | "stream_otv";
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
@@ -272,7 +274,6 @@ export default function ScriptTemplatesTab() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Script Templates</h3>
         <Dialog open={isCreating} onOpenChange={setIsCreating}>
           <DialogTrigger asChild>
             <Button>
@@ -480,7 +481,7 @@ export default function ScriptTemplatesTab() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-4">Loading templates...</div>
+        <LoadingContainer text="Loading templates..." />
       ) : templates.length === 0 ? (
         <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
           No templates yet. Create a new template to get started.

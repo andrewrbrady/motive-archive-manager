@@ -705,3 +705,216 @@ When implementing modals, follow this structure to maintain consistency:
 - Create custom components for frequently used patterns
 - Maintain consistent class ordering in components
 - Document any deviations from these guidelines
+
+# Motive Archive Styling Guidelines
+
+This document outlines the styling patterns and vertical spacing guidelines to maintain consistency across the Motive Archive application.
+
+## Layout Structure
+
+### Page Containers
+
+All pages should follow this basic structure:
+
+```tsx
+<div className="min-h-screen bg-background">
+  <Navbar />
+  <main className="container mx-auto px-4 py-8">
+    <div className="space-y-6">
+      {/* Page title */}
+      {/* Page content */}
+    </div>
+  </main>
+  <Footer />
+</div>
+```
+
+### Important Classes
+
+- `min-h-screen`: Ensures the page takes at least the full height of the viewport
+- `container mx-auto`: Centers content and provides max-width constraints
+- `px-4`: Provides horizontal padding
+- `py-8`: Provides vertical padding (top and bottom)
+- `space-y-6`: Adds vertical spacing between immediate children
+
+## Vertical Spacing
+
+### Core Spacing Values
+
+- `space-y-6`: Standard spacing between major page sections (title to content, sections to sections)
+- `space-y-4`: Spacing between related components within a section
+- `mb-6`: Bottom margin for section dividers like tab lists
+- `gap-6`: Gap between grid items (for grid layouts)
+- `py-8`: Vertical padding for page containers
+
+### Specific Component Spacing
+
+| Component               | Recommended Spacing        |
+| ----------------------- | -------------------------- |
+| Page Title to Content   | `space-y-6`                |
+| TabsList to TabsContent | `mb-6`                     |
+| Between form fields     | `space-y-4`                |
+| Grid items              | `gap-6`                    |
+| List items              | `space-y-6` or `space-y-4` |
+
+## Component Templates
+
+### Page Title
+
+Always use the `PageTitle` component for page headers:
+
+```tsx
+<PageTitle title="Page Name" count={optionalCount}>
+  {/* Optional right-aligned content */}
+</PageTitle>
+```
+
+### Tabs
+
+For tabbed interfaces, maintain consistent spacing between tabs and content:
+
+```tsx
+<Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+  <TabsList className="mb-4 w-full bg-background-secondary/50 dark:bg-background-secondary/25 p-1 gap-1">
+    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
+    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="tab1" className="space-y-4">
+    {/* Tab 1 content */}
+  </TabsContent>
+
+  <TabsContent value="tab2" className="space-y-4">
+    {/* Tab 2 content */}
+  </TabsContent>
+</Tabs>
+```
+
+#### Tab Spacing Guidelines
+
+- Use `mb-4` for spacing between tabs and tab content
+- Use `gap-1` for spacing between individual tab triggers
+- Apply consistent `space-y-4` to tab content for vertical rhythm
+- Avoid redundant titles within tab content when the tab name already provides context
+
+### Content Containers
+
+For content areas, use consistent spacing:
+
+```tsx
+<div className="space-y-6">
+  <div className="space-y-4">{/* Content group 1 */}</div>
+
+  <div className="space-y-4">{/* Content group 2 */}</div>
+</div>
+```
+
+### Lists and Grids
+
+For grid layouts:
+
+```tsx
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {/* Grid items */}
+</div>
+```
+
+For list layouts:
+
+```tsx
+<div className="flex flex-col space-y-6">{/* List items */}</div>
+```
+
+## Color Usage
+
+Always use the design system color tokens rather than hard-coded colors:
+
+```css
+/* Correct */
+className="text-[hsl(var(--foreground-muted))]"
+
+/* Incorrect */
+className="text-gray-500"
+```
+
+### Background Color Rules
+
+- Component backgrounds should match the page background (use `bg-[hsl(var(--background))]`) instead of different colors
+- Do not use `bg-[hsl(var(--background-secondary))]` for card backgrounds in full page views, as this creates visual inconsistency
+- Only use `bg-[hsl(var(--background-secondary))]` for truly elevated components like modals, dropdowns, and cards within cards
+- When unsure about which background color to use, default to `bg-[hsl(var(--background))]` to maintain visual consistency
+
+```tsx
+/* Correct */
+<div className="bg-[hsl(var(--background))] rounded-lg p-6">
+  {/* Page content */}
+</div>
+
+/* Incorrect */
+<div className="bg-[hsl(var(--background-secondary))] rounded-lg p-6">
+  {/* Page content */}
+</div>
+```
+
+## Responsive Design
+
+- Use responsive class variants (`md:`, `lg:`, etc.) to adjust layouts at different breakpoints
+- Prefer mobile-first approach
+- Ensure all main layouts work properly on small screens
+
+## Accessibility
+
+- Maintain appropriate color contrast using the design system tokens
+- Use proper semantic HTML elements
+- Include appropriate ARIA attributes where necessary
+
+By following these guidelines, we can maintain a consistent, clean, and professional appearance throughout the application.
+
+### Action Buttons
+
+For action buttons (like "Add" buttons), use consistent styling with appropriate icons:
+
+```tsx
+<Button
+  variant="outline"
+  className="border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+  onClick={handleAction}
+>
+  <Icon className="h-4 w-4 mr-2" />
+  <span>Action Label</span>
+</Button>
+```
+
+#### Action Button Guidelines
+
+- Use context-appropriate icons from Lucide React (e.g., `<UserPlus />` for adding users)
+- Maintain consistent button styling across the application
+- Use `variant="outline"` for secondary actions
+- Include icon with `mr-2` spacing from text
+- Set consistent icon sizing with `h-4 w-4`
+- Keep action labels concise (e.g., "Add User" rather than "Add New User")
+
+### Admin Dashboard Layout
+
+In admin interfaces with search and action buttons:
+
+```tsx
+<div className="flex items-center justify-between mb-4">
+  <SearchBar placeholder="Search..." onChange={handleSearch} />
+  <Button variant="outline" className="border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+    <Icon className="h-4 w-4 mr-2" />
+    <span>Add Item</span>
+  </Button>
+</div>
+
+<div className="space-y-4">
+  {/* Content */}
+</div>
+```
+
+#### Admin Layout Guidelines
+
+- Place action buttons on the same horizontal line as search inputs
+- Use `flex items-center justify-between` for horizontal alignment with space between
+- Apply consistent bottom margin (`mb-4`) to the control container
+- Use contextually appropriate icons for different sections

@@ -5,9 +5,10 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Car } from "@/types/car";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface CarImage {
   _id: string;
@@ -166,10 +167,12 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       <div className="relative aspect-[16/9]">
         {loading ? (
           <div className="w-full h-full bg-background-primary/50 flex flex-col items-center justify-center gap-4">
-            <Loader2 className="w-8 h-8 text-text-secondary animate-spin" />
-            <span className="text-sm font-medium text-text-secondary">
-              Loading...
-            </span>
+            <LoadingSpinner
+              size={32}
+              text="Loading..."
+              textPosition="bottom"
+              gap={4}
+            />
           </div>
         ) : primaryImage ? (
           <Image
