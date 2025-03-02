@@ -23,6 +23,7 @@ interface PageProps {
     noReserve?: string;
     view?: string;
     pageSize?: string;
+    tab?: string; // Add tab parameter for market page integration
   };
 }
 
@@ -85,14 +86,19 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   const { auctions, total } = auctionsData;
 
+  // Check if we're on the market page or auctions page
+  const isMarketPage = params.tab !== undefined;
+
   // Return the page
   return (
     <div className="flex flex-col space-y-6">
-      <PageTitle title="Auctions" count={total}>
-        <div className="flex items-center gap-4">
-          <ViewModeSelector currentView={view} />
-        </div>
-      </PageTitle>
+      {!isMarketPage && (
+        <PageTitle title="Auctions" count={total}>
+          <div className="flex items-center gap-4">
+            <ViewModeSelector currentView={view} />
+          </div>
+        </PageTitle>
+      )}
 
       <FiltersSection
         platforms={platforms}

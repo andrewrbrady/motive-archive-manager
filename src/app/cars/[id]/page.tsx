@@ -19,6 +19,7 @@ import ResearchFiles from "@/components/ResearchFiles";
 import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import { ImageGalleryEnhanced } from "@/components/cars/ImageGalleryEnhanced";
 import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
@@ -538,6 +539,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
     status: "pending",
   });
   const [additionalContext, setAdditionalContext] = useState("");
+  const [imagesLoading, setImagesLoading] = useState(true);
 
   type NestedFields =
     | "engine"
@@ -771,6 +773,19 @@ export default function CarPage({ params }: { params: { id: string } }) {
       fetchCarData();
     }
   }, [id]);
+
+  // Add a new effect to handle image loading state
+  useEffect(() => {
+    if (car && car.images) {
+      setImagesLoading(true);
+      // Set a timeout to simulate loading if images load too quickly
+      const timer = setTimeout(() => {
+        setImagesLoading(false);
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [car?.images]);
 
   // Sync URL with active tab
   useEffect(() => {
@@ -1312,136 +1327,161 @@ export default function CarPage({ params }: { params: { id: string } }) {
             className="mb-6"
           />
 
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="mb-6 w-full bg-background-secondary/50 dark:bg-background-secondary/25 p-1 gap-1">
-              <TabsTrigger value="gallery">Image Gallery</TabsTrigger>
-              <TabsTrigger value="specs">Specifications</TabsTrigger>
-              <TabsTrigger value="production">Production</TabsTrigger>
-              <TabsTrigger value="bat">BaT Listing</TabsTrigger>
-              <TabsTrigger value="captions">Social Media</TabsTrigger>
-              <TabsTrigger value="service">Service History</TabsTrigger>
-              <TabsTrigger value="research">Research</TabsTrigger>
-              <TabsTrigger value="article">Article</TabsTrigger>
-              <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
-              <TabsTrigger value="events">Events</TabsTrigger>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="gallery">
-              <div className="space-y-4">
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setIsEditMode(!isEditMode)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
-                  >
-                    {isEditMode ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        Done
-                      </>
-                    ) : (
-                      <>
-                        <Pencil className="w-4 h-4" />
-                        Edit Gallery
-                      </>
+          <CustomTabs
+            items={[
+              {
+                value: "gallery",
+                label: "Image Gallery",
+                content: (
+                  <div className="space-y-4">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
+                      >
+                        {isEditMode ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Done
+                          </>
+                        ) : (
+                          <>
+                            <Pencil className="w-4 h-4" />
+                            Edit Gallery
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    {isEditMode && (
+                      <ImageUploadWithContext
+                        images={
+                          car.images?.map((img) => ({
+                            id: img._id,
+                            url: img.url.endsWith("/public")
+                              ? img.url
+                              : `${img.url}/public`,
+                            filename: img.filename,
+                            metadata: img.metadata || {},
+                            variants: {},
+                            createdAt:
+                              img.createdAt || new Date().toISOString(),
+                            updatedAt:
+                              img.updatedAt || new Date().toISOString(),
+                          })) || []
+                        }
+                        isEditMode={isEditMode}
+                        onRemoveImage={handleRemoveImage}
+                        onImagesChange={handleImageUpload}
+                        uploading={uploadingImages}
+                        uploadProgress={uploadProgress}
+                        showMetadata={true}
+                        showFilters={true}
+                        title={`${car.year} ${car.make} ${car.model}`}
+                        onContextChange={setAdditionalContext}
+                        carId={id}
+                      />
                     )}
-                  </button>
-                </div>
-                <ImageUploadWithContext
-                  images={
-                    car.images?.map((img) => ({
-                      id: img._id,
-                      url: img.url.endsWith("/public")
-                        ? img.url
-                        : `${img.url}/public`,
-                      filename: img.filename,
-                      metadata: img.metadata || {},
-                      variants: {},
-                      createdAt: img.createdAt || new Date().toISOString(),
-                      updatedAt: img.updatedAt || new Date().toISOString(),
-                    })) || []
-                  }
-                  isEditMode={isEditMode}
-                  onRemoveImage={handleRemoveImage}
-                  onImagesChange={handleImageUpload}
-                  uploading={uploadingImages}
-                  uploadProgress={uploadProgress}
-                  showMetadata={true}
-                  showFilters={true}
-                  title={`${car.year} ${car.make} ${car.model}`}
-                  onContextChange={setAdditionalContext}
-                  carId={id}
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="specs">
-              <Specifications
-                car={toCarFormData(car)}
-                isEditMode={isSpecsEditMode}
-                onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
-                onSave={async (editedSpecs) => {
-                  await handleSpecsEdit(editedSpecs as CarData);
-                }}
-                editedSpecs={editedSpecs}
-                onInputChange={(field, value, nestedField) =>
-                  handleInputChange(field, value, nestedField)
-                }
-                onMeasurementChange={handleMeasurementChange}
-                onPowerChange={handlePowerChange}
-                onTorqueChange={handleTorqueChange}
-                onEnrich={handleEnrichData}
-                isEnriching={isEnriching}
-              />
-            </TabsContent>
-
-            <TabsContent value="production">
-              <ProductionTab carId={car._id} />
-            </TabsContent>
-
-            <TabsContent value="bat">
-              <BaTListingGenerator carDetails={toBaTCarDetails(car)} />
-            </TabsContent>
-
-            <TabsContent value="captions">
-              <CaptionGenerator carDetails={carDetails} />
-            </TabsContent>
-
-            <TabsContent value="service">
-              <div className="bg-white dark:bg-[hsl(var(--background))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-lg p-6">
-                <h3 className="text-lg font-medium mb-4">Service History</h3>
-                <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                  Service history feature coming soon...
-                </p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="research">
-              <ResearchFiles carId={car._id} />
-            </TabsContent>
-
-            <TabsContent value="article">
-              <ArticleGenerator
-                car={fromCarFormData(toCarFormData(car), car) as BaseCar}
-              />
-            </TabsContent>
-
-            <TabsContent value="deliverables" className="mt-6">
-              <DeliverablesTab carId={params.id} />
-            </TabsContent>
-
-            <TabsContent value="events" className="mt-6">
-              <EventsTab
-                carId={typeof params.id === "string" ? params.id : params.id[0]}
-              />
-            </TabsContent>
-
-            <TabsContent value="calendar" className="mt-6">
-              <CalendarTab
-                carId={typeof params.id === "string" ? params.id : params.id[0]}
-              />
-            </TabsContent>
-          </Tabs>
+                    <ImageGalleryEnhanced
+                      images={
+                        car.images?.map((img) => ({
+                          id: img._id,
+                          url: img.url.endsWith("/public")
+                            ? img.url
+                            : `${img.url}/public`,
+                          filename: img.filename,
+                          metadata: img.metadata || {},
+                          variants: {},
+                          createdAt: img.createdAt || new Date().toISOString(),
+                          updatedAt: img.updatedAt || new Date().toISOString(),
+                        })) || []
+                      }
+                      isLoading={imagesLoading}
+                    />
+                  </div>
+                ),
+              },
+              {
+                value: "specs",
+                label: "Specifications",
+                content: (
+                  <Specifications
+                    car={toCarFormData(car)}
+                    isEditMode={isSpecsEditMode}
+                    onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
+                    onSave={async (editedSpecs) => {
+                      await handleSpecsEdit(editedSpecs as CarData);
+                    }}
+                    editedSpecs={editedSpecs}
+                    onInputChange={(field, value, nestedField) =>
+                      handleInputChange(field, value, nestedField)
+                    }
+                    onMeasurementChange={handleMeasurementChange}
+                    onPowerChange={handlePowerChange}
+                    onTorqueChange={handleTorqueChange}
+                    onEnrich={handleEnrichData}
+                    isEnriching={isEnriching}
+                  />
+                ),
+              },
+              {
+                value: "production",
+                label: "Production",
+                content: <ProductionTab carId={id} />,
+              },
+              {
+                value: "bat",
+                label: "BaT Listing",
+                content: (
+                  <BaTListingGenerator carDetails={toBaTCarDetails(car)} />
+                ),
+              },
+              {
+                value: "captions",
+                label: "Social Media",
+                content: <CaptionGenerator carDetails={carDetails} />,
+              },
+              {
+                value: "service",
+                label: "Service History",
+                content: (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Service history coming soon
+                  </div>
+                ),
+              },
+              {
+                value: "research",
+                label: "Research",
+                content: <ResearchFiles carId={id} />,
+              },
+              {
+                value: "article",
+                label: "Article",
+                content: (
+                  <ArticleGenerator
+                    car={fromCarFormData(toCarFormData(car), car) as BaseCar}
+                  />
+                ),
+              },
+              {
+                value: "deliverables",
+                label: "Deliverables",
+                content: <DeliverablesTab carId={id} />,
+              },
+              {
+                value: "events",
+                label: "Events",
+                content: <EventsTab carId={id} />,
+              },
+              {
+                value: "calendar",
+                label: "Calendar",
+                content: <CalendarTab carId={id} />,
+              },
+            ]}
+            defaultValue={activeTab}
+            basePath={`/cars/${id}`}
+          />
         </div>
       </main>
       <Footer />

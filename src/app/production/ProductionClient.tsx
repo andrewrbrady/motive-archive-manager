@@ -16,11 +16,13 @@ import StudioInventoryTab from "@/components/production/StudioInventoryTab";
 import { useUrlParams } from "@/hooks/useUrlParams";
 import { cleanupUrlParameters, getCurrentContext } from "@/utils/urlCleanup";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 
 export default function ProductionClient() {
   const pathname = usePathname();
   const { getParam, updateParams } = useUrlParams();
   const [activeTab, setActiveTab] = useState<string>("shot-lists");
+  const [showNewTemplateModal, setShowNewTemplateModal] = useState(false);
 
   // Effect to sync with URL params - runs only once on mount
   useEffect(() => {
@@ -69,70 +71,58 @@ export default function ProductionClient() {
       <Navbar />
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <PageTitle title="Production Management">
-            <div className="flex items-center gap-4 ml-auto">
-              <Button>
+          <PageTitle title="Production">
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowNewTemplateModal(true)}
+                className="flex items-center"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 New Template
               </Button>
             </div>
           </PageTitle>
 
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="mb-6 w-full">
-              <TabsTrigger value="shot-lists">Shot List Templates</TabsTrigger>
-              <TabsTrigger value="scripts">Script Templates</TabsTrigger>
-              <TabsTrigger value="raw-assets">Raw Assets</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming Productions</TabsTrigger>
-              <TabsTrigger value="studio-inventory">
-                Studio Inventory
-              </TabsTrigger>
-              <TabsTrigger value="hard-drives">Hard Drives</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="shot-lists">
-              <ShotListTemplatesTab />
-            </TabsContent>
-
-            <TabsContent value="scripts">
-              <ScriptTemplatesTab />
-            </TabsContent>
-
-            <TabsContent value="raw-assets">
-              <RawAssetsTab />
-            </TabsContent>
-
-            <TabsContent value="upcoming">
-              <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
-                <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                  View and manage upcoming production events associated with
-                  cars.
-                </p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="upcoming">
-              <div className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
-                {/* Loading state would be here - demonstrating the pattern */}
-                {false ? (
-                  <LoadingContainer text="Loading upcoming productions..." />
-                ) : (
-                  <p className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                    View and manage upcoming production events associated with
-                    cars.
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="studio-inventory">
-              <StudioInventoryTab />
-            </TabsContent>
-
-            <TabsContent value="hard-drives">
-              <HardDrivesTab />
-            </TabsContent>
-          </Tabs>
+          <CustomTabs
+            items={[
+              {
+                value: "shot-lists",
+                label: "Shot List Templates",
+                content: <ShotListTemplatesTab />,
+              },
+              {
+                value: "scripts",
+                label: "Script Templates",
+                content: <ScriptTemplatesTab />,
+              },
+              {
+                value: "raw-assets",
+                label: "Raw Assets",
+                content: <RawAssetsTab />,
+              },
+              {
+                value: "upcoming",
+                label: "Upcoming Productions",
+                content: (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Upcoming productions feature coming soon
+                  </div>
+                ),
+              },
+              {
+                value: "studio-inventory",
+                label: "Studio Inventory",
+                content: <StudioInventoryTab />,
+              },
+              {
+                value: "hard-drives",
+                label: "Hard Drives",
+                content: <HardDrivesTab />,
+              },
+            ]}
+            defaultValue={activeTab}
+            basePath="/production"
+          />
         </div>
       </main>
       <Footer />

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Navbar from "@/components/layout/navbar";
+import MarketTabs from "@/components/market/MarketTabs";
 
 export const metadata: Metadata = {
   title: "Market | Motive Archive",
@@ -11,8 +13,12 @@ export default function MarketLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[hsl(var(--background-primary))]">
-      {children}
-    </main>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="container mx-auto px-4 py-8">
+        <MarketTabs />
+        {children}
+      </main>
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import { useUrlParams } from "@/hooks/useUrlParams";
 import { cleanupUrlParameters } from "@/utils/urlCleanup";
 
@@ -54,25 +55,27 @@ export default function ScheduleClient() {
         <div className="space-y-6">
           <PageTitle title="Schedule" />
 
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="mb-6 w-full bg-background-secondary/50 dark:bg-background-secondary/25 p-1 gap-1">
-              <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
-              <TabsTrigger value="events">Events</TabsTrigger>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="deliverables">
-              <DeliverablesList />
-            </TabsContent>
-
-            <TabsContent value="events">
-              <EventsContent />
-            </TabsContent>
-
-            <TabsContent value="calendar" className="mt-6">
-              <CalendarContent />
-            </TabsContent>
-          </Tabs>
+          <CustomTabs
+            items={[
+              {
+                value: "deliverables",
+                label: "Deliverables",
+                content: <DeliverablesList />,
+              },
+              {
+                value: "events",
+                label: "Events",
+                content: <EventsContent />,
+              },
+              {
+                value: "calendar",
+                label: "Calendar",
+                content: <CalendarContent />,
+              },
+            ]}
+            defaultValue={activeTab}
+            basePath="/schedule"
+          />
         </div>
       </main>
       <Footer />

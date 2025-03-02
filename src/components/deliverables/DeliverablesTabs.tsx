@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import DeliverablesList from "@/components/deliverables/DeliverablesList";
 import DeliverablesCalendar from "@/components/deliverables/DeliverablesCalendar";
 
@@ -17,17 +18,22 @@ export default function DeliverablesTabs() {
   };
 
   return (
-    <Tabs value={view} onValueChange={handleTabChange} className="w-full">
-      <TabsList>
-        <TabsTrigger value="list">List View</TabsTrigger>
-        <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-      </TabsList>
-      <TabsContent value="list" className="mt-6">
-        <DeliverablesList />
-      </TabsContent>
-      <TabsContent value="calendar" className="mt-6">
-        <DeliverablesCalendar />
-      </TabsContent>
-    </Tabs>
+    <CustomTabs
+      items={[
+        {
+          value: "list",
+          label: "List View",
+          content: <DeliverablesList />,
+        },
+        {
+          value: "calendar",
+          label: "Calendar View",
+          content: <DeliverablesCalendar />,
+        },
+      ]}
+      defaultValue={view}
+      basePath="/deliverables"
+      className="w-full"
+    />
   );
 }

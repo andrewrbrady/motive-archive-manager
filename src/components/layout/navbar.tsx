@@ -55,6 +55,9 @@ export default function Navbar({ className }: NavbarProps) {
               <Link href="/schedule" className={linkClasses}>
                 Schedule
               </Link>
+              <Link href="/copywriting" className={linkClasses}>
+                Copywriting
+              </Link>
               <Link href="/admin" className={linkClasses}>
                 Admin
               </Link>

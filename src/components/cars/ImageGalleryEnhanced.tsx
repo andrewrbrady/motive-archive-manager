@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ZoomIn, Loader2 } from "lucide-react";
 import { transformImageUrl, imagePresets } from "@/lib/imageTransform";
 import Image from "next/image";
 
@@ -23,10 +23,12 @@ interface ImageGalleryProps {
     createdAt: string;
     updatedAt: string;
   }[];
+  isLoading?: boolean;
 }
 
 export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   images,
+  isLoading = false,
 }) => {
   // Sort images by filename
   const sortedImages = [...images].sort((a, b) =>
@@ -39,6 +41,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   const [startX, setStartX] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isMainVisible, setIsMainVisible] = useState(true);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [mainImageLoaded, setMainImageLoaded] = useState(false);
   const [activeFilters, setActiveFilters] = useState<{
     angle?: string;
     view?: string;
@@ -49,22 +53,77 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   const imagesPerRow = 3;
   const rowsPerPage = 5;
 
+  // Reset image loaded state when images change
+  useEffect(() => {
+    setImagesLoaded(false);
+    setMainImageLoaded(false);
+  }, [images]);
+
   // Get unique filter values
   const filterOptions = sortedImages.reduce(
     (acc, img) => {
-      if (img.metadata.angle && !acc.angles.includes(img.metadata.angle)) {
+      if (
+        img.metadata.angle &&
+        !acc.angles.includes(img.metadata.angle) &&
+        ![
+          "not applicable",
+          "n/a",
+          "N/A",
+          "na",
+          "none",
+          "Not Applicable",
+          "unknown",
+          "Unknown",
+        ].includes(img.metadata.angle.toLowerCase())
+      ) {
         acc.angles.push(img.metadata.angle);
       }
-      if (img.metadata.view && !acc.views.includes(img.metadata.view)) {
+      if (
+        img.metadata.view &&
+        !acc.views.includes(img.metadata.view) &&
+        ![
+          "not applicable",
+          "n/a",
+          "N/A",
+          "na",
+          "none",
+          "Not Applicable",
+          "unknown",
+          "Unknown",
+        ].includes(img.metadata.view.toLowerCase())
+      ) {
         acc.views.push(img.metadata.view);
       }
       if (
         img.metadata.movement &&
-        !acc.movements.includes(img.metadata.movement)
+        !acc.movements.includes(img.metadata.movement) &&
+        ![
+          "not applicable",
+          "n/a",
+          "N/A",
+          "na",
+          "none",
+          "Not Applicable",
+          "unknown",
+          "Unknown",
+        ].includes(img.metadata.movement.toLowerCase())
       ) {
         acc.movements.push(img.metadata.movement);
       }
-      if (img.metadata.tod && !acc.tods.includes(img.metadata.tod)) {
+      if (
+        img.metadata.tod &&
+        !acc.tods.includes(img.metadata.tod) &&
+        ![
+          "not applicable",
+          "n/a",
+          "N/A",
+          "na",
+          "none",
+          "Not Applicable",
+          "unknown",
+          "Unknown",
+        ].includes(img.metadata.tod.toLowerCase())
+      ) {
         acc.tods.push(img.metadata.tod);
       }
       return acc;
@@ -330,22 +389,39 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
               isMainVisible ? "opacity-100" : "opacity-0"
             }`}
           >
-            {filteredImages.length > 0 ? (
+            {isLoading ? (
+              <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--foreground-muted))]" />
+                  <p className="text-sm text-[hsl(var(--foreground-muted))]">
+                    Loading images...
+                  </p>
+                </div>
+              </div>
+            ) : filteredImages.length > 0 ? (
               <>
                 <div
                   className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm transition-shadow hover:shadow-md"
                   onTouchStart={handleTouchStart}
                   onTouchEnd={handleTouchEnd}
                 >
+                  {!mainImageLoaded && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[hsl(var(--background-primary))]">
+                      <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--foreground-muted))]" />
+                    </div>
+                  )}
                   <Image
                     src={filteredImages[mainIndex]?.url}
                     alt={`Vehicle view ${mainIndex + 1} of ${
                       filteredImages.length
                     }`}
-                    className="object-cover"
+                    className={`object-cover transition-opacity duration-300 ${
+                      mainImageLoaded ? "opacity-100" : "opacity-0"
+                    }`}
                     fill
                     sizes="100vw"
                     priority
+                    onLoad={() => setMainImageLoaded(true)}
                   />
                   <button
                     onClick={() => {
@@ -413,14 +489,26 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
 
         <div className="w-1/3">
           <div className="flex flex-col h-[calc(100vh-24rem)]">
-            {filteredImages.length > 0 ? (
+            {isLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-[hsl(var(--foreground-muted))]" />
+                  <p className="text-sm text-[hsl(var(--foreground-muted))]">
+                    Loading thumbnails...
+                  </p>
+                </div>
+              </div>
+            ) : filteredImages.length > 0 ? (
               <div className="grid grid-cols-3 gap-x-1 gap-y-1 auto-rows-max overflow-y-auto">
                 {paginatedImages.map((image, index) => {
                   const actualIndex = (currentPage - 1) * itemsPerPage + index;
                   return (
                     <button
                       key={actualIndex}
-                      onClick={() => setMainIndex(actualIndex)}
+                      onClick={() => {
+                        setMainIndex(actualIndex);
+                        setMainImageLoaded(false);
+                      }}
                       className={`aspect-square relative transition-all duration-150 ease-in-out ${
                         actualIndex === mainIndex
                           ? "ring-2 ring-[hsl(var(--border-muted))]"
@@ -431,12 +519,24 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                         actualIndex === mainIndex ? "true" : "false"
                       }
                     >
+                      <div className="absolute inset-0 flex items-center justify-center bg-[hsl(var(--background-primary))]">
+                        <Loader2 className="w-4 h-4 animate-spin text-[hsl(var(--foreground-muted))]" />
+                      </div>
                       <Image
                         src={image.url.replace("/public", "/width=200")}
                         alt={`Thumbnail ${actualIndex + 1}`}
                         className="object-cover rounded-md"
                         fill
                         sizes="(max-width: 640px) 25vw, (max-width: 768px) 16.67vw, 12.5vw"
+                        onLoad={(e) => {
+                          // Hide the loader when image loads
+                          const target = e.target as HTMLImageElement;
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const loader = parent.querySelector("div");
+                            if (loader) loader.style.display = "none";
+                          }
+                        }}
                       />
                     </button>
                   );

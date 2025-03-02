@@ -2,29 +2,67 @@
 description: Rules for Node.js configuration and build processes
 globs: **/*.ts, **/*.tsx, package.json, next.config.js
 ---
-When working with Node.js in this project:
+# Node.js and npm Configuration Rules
 
-1. Always use Node 20 from Homebrew on macOS with the correct PATH:
+## Homebrew npm Usage
 
-   ```bash
-   export PATH="/opt/homebrew/opt/node@20/bin:$PATH"
-   ```
+When running npm commands, always use the Homebrew-installed version. The npm binary is located at:
 
-2. For development:
+```
+/opt/homebrew/bin/npm
+```
 
-   ```bash
-   npm run dev
-   ```
+### Important Guidelines:
 
-3. For production builds:
+1. Always use the full path to npm when running commands:
 
    ```bash
-   npm run build
+   /opt/homebrew/bin/npm install
+   /opt/homebrew/bin/npm run dev
    ```
 
-4. Always run a build before deploying to git
+2. Environment Setup:
 
-5. Ensure Homebrew is properly configured:
+   - PATH should include: `/opt/homebrew/bin`
+   - When running terminal commands, ensure the PATH is properly set:
+
    ```bash
    export PATH="/opt/homebrew/bin:$PATH"
    ```
+
+3. Troubleshooting:
+
+   - If npm is not found, first verify Homebrew installation:
+     ```bash
+     /opt/homebrew/bin/brew doctor
+     ```
+   - Check npm installation:
+     ```bash
+     /opt/homebrew/bin/brew list npm
+     ```
+
+4. Version Management:
+   - Use Homebrew to update npm:
+     ```bash
+     /opt/homebrew/bin/brew upgrade npm
+     ```
+   - Check current version:
+     ```bash
+     /opt/homebrew/bin/npm --version
+     ```
+
+## Project-specific npm Configuration
+
+- Node version: Use the version specified in `.nvmrc` or `package.json`
+- Always use `--save-exact` when adding new dependencies
+- Use `npm ci` for clean installs in CI/CD environments
+
+## Script Execution
+
+When running npm scripts, always use the full path:
+
+```bash
+/opt/homebrew/bin/npm run [script-name]
+```
+
+This ensures consistency and avoids any PATH-related issues.

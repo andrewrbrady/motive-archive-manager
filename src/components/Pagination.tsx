@@ -30,7 +30,21 @@ const Pagination = ({
       const params = new URLSearchParams(searchParams);
       params.set("page", page.toString());
       params.set("pageSize", pageSize.toString());
-      router.push(`${pathname}?${params.toString()}`);
+
+      // Determine the correct path to use
+      let targetPath = pathname;
+
+      // If we're on the market page with a tab, ensure we preserve the tab parameter
+      if (pathname.includes("/market") && params.has("tab")) {
+        // Tab parameter is already in the params, so we keep it
+      } else if (pathname === "/inventory" || pathname === "/auctions") {
+        // We're on a direct page, so we keep the current path
+      } else if (pathname === "/market") {
+        // We're on the market page without a tab, default to inventory
+        params.set("tab", "inventory");
+      }
+
+      router.push(`${targetPath}?${params.toString()}`);
     }
   };
 

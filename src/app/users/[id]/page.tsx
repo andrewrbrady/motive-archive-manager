@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import UserDeliverables from "@/components/users/UserDeliverables";
 import UserEvents from "@/components/users/UserEvents";
 
@@ -192,20 +193,23 @@ export default function UserDashboard() {
           </Card>
 
           {/* Tabs for Deliverables and Events */}
-          <Tabs defaultValue="deliverables" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
-              <TabsTrigger value="events">Events</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="deliverables">
-              <UserDeliverables userName={user.name} />
-            </TabsContent>
-
-            <TabsContent value="events">
-              <UserEvents userName={user.name} />
-            </TabsContent>
-          </Tabs>
+          <CustomTabs
+            items={[
+              {
+                value: "deliverables",
+                label: "Deliverables",
+                content: <UserDeliverables userName={user.name} />,
+              },
+              {
+                value: "events",
+                label: "Events",
+                content: <UserEvents userName={user.name} />,
+              },
+            ]}
+            defaultValue="deliverables"
+            basePath={`/users/${id}`}
+            className="space-y-4"
+          />
         </div>
       </div>
     </div>

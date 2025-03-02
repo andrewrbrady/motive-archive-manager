@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import UserManagement from "@/components/users/UserManagement";
 import LocationsClient from "../locations/LocationsClient";
 import ClientsContent from "@/app/admin/ClientsContent";
@@ -68,35 +69,36 @@ export default function AdminTabs() {
 
   return (
     <div>
-      <Tabs
-        defaultValue="users"
+      <CustomTabs
+        items={[
+          {
+            value: "users",
+            label: "Users",
+            content: renderTabContent("users", <UserManagement />),
+          },
+          {
+            value: "clients",
+            label: "Clients",
+            content: renderTabContent("clients", <ClientsContent />),
+          },
+          {
+            value: "locations",
+            label: "Locations",
+            content: renderTabContent(
+              "locations",
+              <LocationsClient hideNavbar={true} />
+            ),
+          },
+          {
+            value: "makes",
+            label: "Makes",
+            content: renderTabContent("makes", <MakesContent />),
+          },
+        ]}
+        defaultValue={activeTab}
+        basePath="/admin"
         className="w-full"
-        value={activeTab}
-        onValueChange={handleTabChange}
-      >
-        <TabsList className="mb-4 w-full bg-background-secondary/50 dark:bg-background-secondary/25 p-1 gap-1">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="clients">Clients</TabsTrigger>
-          <TabsTrigger value="locations">Locations</TabsTrigger>
-          <TabsTrigger value="makes">Makes</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users" className="space-y-4">
-          {renderTabContent("users", <UserManagement />)}
-        </TabsContent>
-
-        <TabsContent value="clients" className="space-y-4">
-          {renderTabContent("clients", <ClientsContent />)}
-        </TabsContent>
-
-        <TabsContent value="locations" className="space-y-4">
-          {renderTabContent("locations", <LocationsClient hideNavbar={true} />)}
-        </TabsContent>
-
-        <TabsContent value="makes" className="space-y-4">
-          {renderTabContent("makes", <MakesContent />)}
-        </TabsContent>
-      </Tabs>
+      />
     </div>
   );
 }

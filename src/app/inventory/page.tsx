@@ -16,9 +16,16 @@ import FiltersSection from "@/components/inventory/FiltersSection";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 
+// Update the InventoryPageProps interface to include tab
+interface ExtendedInventoryPageProps extends InventoryPageProps {
+  searchParams: InventoryPageProps["searchParams"] & {
+    tab?: string;
+  };
+}
+
 export default async function InventoryPage({
   searchParams,
-}: InventoryPageProps) {
+}: ExtendedInventoryPageProps) {
   const page = Number(searchParams.page) || 1;
   const view = (searchParams.view || "grid") as "grid" | "list";
   const filters = {
@@ -51,11 +58,16 @@ export default async function InventoryPage({
     transformInventoryItem(item)
   );
 
+  // Check if we're on the market page or inventory page
+  const isMarketPage = searchParams.tab !== undefined;
+
   return (
     <div className="flex flex-col space-y-6">
-      <PageTitle title="Vehicle Inventory" count={total}>
-        <ViewModeSelector currentView={view} />
-      </PageTitle>
+      {!isMarketPage && (
+        <PageTitle title="Vehicle Inventory" count={total}>
+          <ViewModeSelector currentView={view} />
+        </PageTitle>
+      )}
 
       <FiltersSection
         currentFilters={{

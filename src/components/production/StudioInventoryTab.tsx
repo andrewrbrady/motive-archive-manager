@@ -34,6 +34,7 @@ import BulkEditModal from "./BulkEditModal";
 import BulkCheckoutModal from "./BulkCheckoutModal";
 import ImportInventoryModal from "./ImportInventoryModal";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 
 export default function StudioInventoryTab() {
   const { toast } = useToast();
@@ -1081,36 +1082,42 @@ export default function StudioInventoryTab() {
         </div>
       )}
 
-      <Tabs
+      <CustomTabs
+        items={[
+          {
+            value: "items",
+            label: "Individual Items",
+            content: (
+              <StudioInventoryList
+                items={filteredItems}
+                onItemUpdate={handleItemUpdate}
+                onItemDelete={handleItemDelete}
+                selectedItems={selectedItems}
+                onSelectedItemsChange={setSelectedItems}
+                isSelectionMode={isSelectionMode}
+              />
+            ),
+          },
+          {
+            value: "kits",
+            label: "Kits",
+            content: (
+              <KitsList
+                kits={filteredKits}
+                onEdit={handleEditKit}
+                onDelete={handleDeleteKitConfirm}
+                onView={handleViewKit}
+                onCheckout={handleKitCheckout}
+                onCheckin={handleKitCheckin}
+                selectionMode={false}
+              />
+            ),
+          },
+        ]}
         defaultValue="items"
-        onValueChange={(value) => setSelectedView(value as "items" | "kits")}
-      >
-        <TabsList className="mb-4">
-          <TabsTrigger value="items">Individual Items</TabsTrigger>
-          <TabsTrigger value="kits">Kits</TabsTrigger>
-        </TabsList>
-        <TabsContent value="items">
-          <StudioInventoryList
-            items={filteredItems}
-            onItemUpdate={handleItemUpdate}
-            onItemDelete={handleItemDelete}
-            selectedItems={selectedItems}
-            onSelectedItemsChange={setSelectedItems}
-            isSelectionMode={isSelectionMode}
-          />
-        </TabsContent>
-        <TabsContent value="kits">
-          <KitsList
-            kits={filteredKits}
-            onEdit={handleEditKit}
-            onDelete={handleDeleteKitConfirm}
-            onView={handleViewKit}
-            onCheckout={handleKitCheckout}
-            onCheckin={handleKitCheckin}
-            selectionMode={false}
-          />
-        </TabsContent>
-      </Tabs>
+        basePath="/production"
+        paramName="view"
+      />
 
       <AddInventoryItemModal
         isOpen={isAddItemModalOpen}

@@ -34,19 +34,15 @@ export async function GET() {
             make: 1,
             model: 1,
             year: 1,
+            description: 1,
+            status: 1,
             images: {
               $map: {
                 input: "$images",
                 as: "img",
                 in: {
                   _id: { $toString: "$$img._id" },
-                  url: {
-                    $cond: {
-                      if: { $endsWith: ["$$img.url", "/public"] },
-                      then: "$$img.url",
-                      else: { $concat: ["$$img.url", "/public"] },
-                    },
-                  },
+                  url: "$$img.url",
                   filename: "$$img.filename",
                   metadata: "$$img.metadata",
                 },
