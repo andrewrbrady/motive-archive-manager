@@ -1,5 +1,6 @@
 import InventoryPage from "../inventory/page";
 import AuctionsPage from "../auctions/page";
+import YoutubePage from "../youtube/page";
 
 export default function MarketPage(props: any) {
   // Get the tab from search params
@@ -8,6 +9,10 @@ export default function MarketPage(props: any) {
   // Render the appropriate page based on the tab
   if (tab === "auctions") {
     return <AuctionsPage {...props} />;
+  }
+
+  if (tab === "youtube") {
+    return <YoutubePage {...props} />;
   }
 
   // Default to inventory

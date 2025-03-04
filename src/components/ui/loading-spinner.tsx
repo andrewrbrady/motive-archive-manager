@@ -1,63 +1,30 @@
-import React from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface LoadingSpinnerProps {
-  /**
-   * Size of the spinner in pixels. Default is 24px.
-   */
-  size?: number;
-
-  /**
-   * Custom CSS classes to apply to the spinner.
-   */
+interface LoadingSpinnerProps {
+  size?: "sm" | "md" | "lg";
   className?: string;
-
-  /**
-   * Text to display next to the spinner. If not provided, only the spinner will be shown.
-   */
-  text?: string;
-
-  /**
-   * Position of the text relative to the spinner. Default is "right".
-   */
-  textPosition?: "left" | "right" | "top" | "bottom";
-
-  /**
-   * Gap between spinner and text (if text is provided). Default is 2.
-   */
-  gap?: number;
 }
 
 export function LoadingSpinner({
-  size = 24,
+  size = "md",
   className,
-  text,
-  textPosition = "right",
-  gap = 2,
 }: LoadingSpinnerProps) {
-  const wrapperClassName = cn(
-    "flex items-center justify-center",
-    {
-      "flex-row": textPosition === "right",
-      "flex-row-reverse": textPosition === "left",
-      "flex-col": textPosition === "bottom",
-      "flex-col-reverse": textPosition === "top",
-    },
-    className
-  );
-
-  const gapClassName = cn({
-    [`gap-${gap}`]: gap > 0,
-  });
+  const sizeClasses = {
+    sm: "h-4 w-4",
+    md: "h-8 w-8",
+    lg: "h-12 w-12",
+  };
 
   return (
-    <div className={cn(wrapperClassName, gapClassName)}>
+    <div className="flex justify-center items-center w-full py-8">
       <Loader2
-        className="animate-spin"
-        style={{ width: `${size}px`, height: `${size}px` }}
+        className={cn(
+          "animate-spin text-muted-foreground",
+          sizeClasses[size],
+          className
+        )}
       />
-      {text && <span className="text-muted-foreground">{text}</span>}
     </div>
   );
 }

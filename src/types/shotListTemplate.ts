@@ -4,6 +4,7 @@ export interface Shot {
   angle?: string;
   lighting?: string;
   notes?: string;
+  thumbnail?: string;
 }
 
 export interface ShotListTemplate {
@@ -11,6 +12,7 @@ export interface ShotListTemplate {
   name: string;
   description: string;
   shots: Shot[];
+  thumbnail?: string;
   createdAt?: string;
   updatedAt?: string;
 }

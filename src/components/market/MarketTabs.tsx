@@ -18,6 +18,8 @@ export default function MarketTabs() {
     ? "inventory"
     : pathname.includes("/auctions")
     ? "auctions"
+    : pathname.includes("/youtube")
+    ? "youtube"
     : "inventory";
 
   return (
@@ -34,6 +36,11 @@ export default function MarketTabs() {
           {
             value: "auctions",
             label: "Auctions",
+            content: null, // Content is rendered by the page, not by the tabs
+          },
+          {
+            value: "youtube",
+            label: "YouTube",
             content: null, // Content is rendered by the page, not by the tabs
           },
         ]}

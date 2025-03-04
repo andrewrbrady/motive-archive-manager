@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       name: data.name,
       description: data.description,
       shots: data.shots || [],
+      thumbnail: data.thumbnail || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

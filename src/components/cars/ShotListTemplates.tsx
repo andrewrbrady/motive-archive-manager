@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, createRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,10 +16,18 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Edit, Trash2, Save, Copy } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  Copy,
+  Image as ImageIcon,
+  Loader2,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { LoadingSpinner } from "@/components/ui/loading";
+import Image from "next/image";
 
 export interface ShotTemplate {
   title: string;
@@ -27,6 +35,7 @@ export interface ShotTemplate {
   angle?: string;
   lighting?: string;
   notes?: string;
+  thumbnail?: string;
 }
 
 interface Template {
@@ -34,6 +43,7 @@ interface Template {
   name: string;
   description: string;
   shots: ShotTemplate[];
+  thumbnail?: string;
 }
 
 interface ShotListTemplatesProps {
@@ -49,12 +59,20 @@ export default function ShotListTemplates({
   const [isCreating, setIsCreating] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState<{
+    [key: string]: boolean;
+  }>({});
+  const templateThumbnailRef = useRef<HTMLInputElement>(null);
+  const shotThumbnailRefs = useRef<{
+    [key: number]: React.RefObject<HTMLInputElement>;
+  }>({});
 
   const form = useForm<Template>({
     defaultValues: {
       name: "",
       description: "",
       shots: [],
+      thumbnail: "",
     },
   });
 
@@ -152,6 +170,7 @@ export default function ShotListTemplates({
         angle: "",
         lighting: "",
         notes: "",
+        thumbnail: "",
       },
     ]);
   };
@@ -163,6 +182,61 @@ export default function ShotListTemplates({
       currentShots.filter((_, i) => i !== index)
     );
   };
+
+  const handleThumbnailUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldPath: string
+  ) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    setUploadingThumbnail((prev) => ({ ...prev, [fieldPath]: true }));
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/cloudflare/images", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload thumbnail");
+      }
+
+      const data = await response.json();
+      const imageUrl = data.imageUrl;
+
+      // Update the form with the new thumbnail URL
+      if (fieldPath === "thumbnail") {
+        form.setValue("thumbnail", imageUrl);
+      } else if (fieldPath.startsWith("shots.")) {
+        // Handle nested fields for shots
+        form.setValue(fieldPath as any, imageUrl);
+      }
+
+      toast.success("Thumbnail uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading thumbnail:", error);
+      toast.error("Failed to upload thumbnail");
+    } finally {
+      setUploadingThumbnail((prev) => ({ ...prev, [fieldPath]: false }));
+      // Reset the file input
+      e.target.value = "";
+    }
+  };
+
+  // Initialize refs for existing shots when editing a template
+  useEffect(() => {
+    if (editingTemplate) {
+      editingTemplate.shots.forEach((_, index) => {
+        if (!shotThumbnailRefs.current[index]) {
+          shotThumbnailRefs.current[index] = createRef<HTMLInputElement>();
+        }
+      });
+    }
+  }, [editingTemplate]);
 
   return (
     <div>
@@ -215,6 +289,70 @@ export default function ShotListTemplates({
                             {...field}
                           />
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="thumbnail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Thumbnail</FormLabel>
+                        <div className="space-y-2">
+                          {field.value && (
+                            <div className="relative w-40 h-40 rounded-md overflow-hidden border border-[hsl(var(--border))]">
+                              <Image
+                                src={
+                                  field.value.endsWith("/public")
+                                    ? field.value
+                                    : `${field.value}/public`
+                                }
+                                alt="Template thumbnail"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                templateThumbnailRef.current?.click()
+                              }
+                              disabled={uploadingThumbnail["thumbnail"]}
+                            >
+                              {uploadingThumbnail["thumbnail"] ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <ImageIcon className="w-4 h-4 mr-2" />
+                              )}
+                              {field.value
+                                ? "Change Thumbnail"
+                                : "Upload Thumbnail"}
+                            </Button>
+                            {field.value && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => form.setValue("thumbnail", "")}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove
+                              </Button>
+                            )}
+                            <input
+                              ref={templateThumbnailRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) =>
+                                handleThumbnailUpload(e, "thumbnail")
+                              }
+                            />
+                          </div>
+                        </div>
                       </FormItem>
                     )}
                   />
@@ -317,10 +455,95 @@ export default function ShotListTemplates({
                               <FormLabel>Notes</FormLabel>
                               <FormControl>
                                 <Textarea
-                                  placeholder="Any additional notes..."
+                                  placeholder="Additional notes for the photographer..."
                                   {...field}
                                 />
                               </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`shots.${index}.thumbnail`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Thumbnail</FormLabel>
+                              <div className="space-y-2">
+                                {field.value && (
+                                  <div className="relative w-40 h-40 rounded-md overflow-hidden border border-[hsl(var(--border))]">
+                                    <Image
+                                      src={
+                                        field.value.endsWith("/public")
+                                          ? field.value
+                                          : `${field.value}/public`
+                                      }
+                                      alt="Shot thumbnail"
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      // Create a file input dynamically
+                                      const input =
+                                        document.createElement("input");
+                                      input.type = "file";
+                                      input.accept = "image/*";
+                                      input.onchange = (event) => {
+                                        const target =
+                                          event.target as HTMLInputElement;
+                                        if (
+                                          target.files &&
+                                          target.files.length > 0
+                                        ) {
+                                          handleThumbnailUpload(
+                                            { target } as any,
+                                            `shots.${index}.thumbnail`
+                                          );
+                                        }
+                                      };
+                                      input.click();
+                                    }}
+                                    disabled={
+                                      uploadingThumbnail[
+                                        `shots.${index}.thumbnail`
+                                      ]
+                                    }
+                                  >
+                                    {uploadingThumbnail[
+                                      `shots.${index}.thumbnail`
+                                    ] ? (
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                      <ImageIcon className="w-4 h-4 mr-2" />
+                                    )}
+                                    {field.value
+                                      ? "Change Thumbnail"
+                                      : "Upload Thumbnail"}
+                                  </Button>
+                                  {field.value && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        form.setValue(
+                                          `shots.${index}.thumbnail` as any,
+                                          ""
+                                        )
+                                      }
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Remove
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
                             </FormItem>
                           )}
                         />
@@ -344,64 +567,87 @@ export default function ShotListTemplates({
           {!isEmbedded && (
             <h3 className="text-lg font-semibold">Available Templates</h3>
           )}
-          {isLoading ? (
-            <div className="text-center py-4">
-              <LoadingSpinner text="Loading templates..." />
-            </div>
-          ) : templates.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              No templates available.{" "}
-              {!isEmbedded && "Create your first template to get started."}
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-medium">{template.name}</h4>
-                      <p className="text-sm text-[hsl(var(--foreground-muted))]">
-                        {template.description}
-                      </p>
-                      <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
-                        {template.shots.length} shots
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {!isEmbedded && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(template)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(template.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </>
+          <div className="mt-4">
+            {isLoading ? (
+              <div className="text-center py-4">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Loading templates...
+                </p>
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No templates available.{" "}
+                {!isEmbedded && "Create your first template to get started."}
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4"
+                  >
+                    <div className="flex items-start gap-4">
+                      {template.thumbnail && (
+                        <div className="relative w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
+                          <Image
+                            src={
+                              template.thumbnail.endsWith("/public")
+                                ? template.thumbnail
+                                : `${template.thumbnail}/public`
+                            }
+                            alt={template.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleApplyTemplate(template)}
-                      >
-                        {isEmbedded ? "Use Template" : "Apply Template"}
-                      </Button>
+                      <div className="flex-grow">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-medium">{template.name}</h4>
+                            <p className="text-sm text-[hsl(var(--foreground-muted))]">
+                              {template.description}
+                            </p>
+                            <p className="text-sm text-[hsl(var(--foreground-muted))] mt-1">
+                              {template.shots.length} shots
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            {!isEmbedded && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit(template)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(template.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleApplyTemplate(template)}
+                            >
+                              {isEmbedded ? "Use Template" : "Apply Template"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
