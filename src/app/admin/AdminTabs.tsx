@@ -56,13 +56,7 @@ export default function AdminTabs() {
   // Render loading state or actual content based on isLoading state
   const renderTabContent = (tabValue: string, component: React.ReactNode) => {
     if (activeTab === tabValue && isLoading) {
-      return (
-        <LoadingContainer
-          text={`Loading ${tabValue}...`}
-          size={24}
-          fullHeight
-        />
-      );
+      return <LoadingContainer fullHeight />;
     }
     return component;
   };

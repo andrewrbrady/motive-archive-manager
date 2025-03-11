@@ -174,7 +174,7 @@ export default function UserManagement() {
             {isLoading ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-4">
-                  <LoadingSpinner text="Loading users..." size={20} />
+                  <LoadingSpinner size="sm" />
                 </TableCell>
               </TableRow>
             ) : filteredUsers.length === 0 ? (

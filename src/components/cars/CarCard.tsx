@@ -167,12 +167,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       <div className="relative aspect-[16/9]">
         {loading ? (
           <div className="w-full h-full bg-background-primary/50 flex flex-col items-center justify-center gap-4">
-            <LoadingSpinner
-              size={32}
-              text="Loading..."
-              textPosition="bottom"
-              gap={4}
-            />
+            <LoadingSpinner size="lg" />
           </div>
         ) : primaryImage ? (
           <Image

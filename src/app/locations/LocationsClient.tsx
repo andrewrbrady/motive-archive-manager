@@ -179,7 +179,7 @@ export default function LocationsClient({
 
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
-          <LoadingSpinner text="Loading locations..." size={24} />
+          <LoadingSpinner size="md" />
         </div>
       ) : (
         <ListContainer>

@@ -1112,7 +1112,7 @@ ${template.rows
                     className="h-6 px-2"
                   >
                     {uploading ? (
-                      <LoadingSpinner size={12} />
+                      <LoadingSpinner size="sm" />
                     ) : (
                       <Upload className="h-3 w-3 mr-1" />
                     )}
@@ -1140,7 +1140,7 @@ ${template.rows
 
             {isLoadingFiles ? (
               <div className="p-2">
-                <LoadingContainer text="Loading files..." size={20} />
+                <LoadingContainer />
               </div>
             ) : (
               <>
@@ -1225,7 +1225,7 @@ ${template.rows
           {selectedFile ? (
             isLoadingContent ? (
               <div className="flex items-center justify-center h-full">
-                <LoadingSpinner size={24} text="Loading content..." />
+                <LoadingSpinner size="md" />
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">

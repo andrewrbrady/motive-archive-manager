@@ -1,6 +1,12 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { LoadingSpinner, LoadingSpinnerProps } from "./loading-spinner";
+import { LoadingSpinner } from "./loading-spinner";
+
+// Define the LoadingSpinnerProps interface here since it's not exported from loading-spinner
+interface LoadingSpinnerProps {
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
 
 export interface LoadingContainerProps extends LoadingSpinnerProps {
   /**

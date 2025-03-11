@@ -82,7 +82,7 @@ export default function ResearchChat({ carId }: ResearchChatProps) {
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-lg p-3">
-                  <LoadingSpinner size={20} />
+                  <LoadingSpinner size="md" />
                 </div>
               </div>
             )}
@@ -99,7 +99,7 @@ export default function ResearchChat({ carId }: ResearchChatProps) {
           className="flex-1"
         />
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? <LoadingSpinner size={16} /> : "Send"}
+          {isLoading ? <LoadingSpinner size="sm" /> : "Send"}
         </Button>
       </form>
     </div>

@@ -874,7 +874,7 @@ export default function StudioInventoryTab() {
   };
 
   if (isLoading) {
-    return <LoadingContainer text="Loading inventory..." />;
+    return <LoadingContainer />;
   }
 
   return (

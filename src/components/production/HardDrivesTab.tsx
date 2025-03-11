@@ -544,7 +544,7 @@ export default function HardDrivesTab() {
       </div>
 
       {loading ? (
-        <LoadingContainer text="Loading drives..." />
+        <LoadingContainer />
       ) : error ? (
         <div className="text-center py-4 text-destructive">{error}</div>
       ) : drives.length === 0 ? (

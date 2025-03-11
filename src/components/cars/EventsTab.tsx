@@ -92,7 +92,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
   };
 
   if (isLoading) {
-    return <LoadingContainer text="Loading events..." />;
+    return <LoadingContainer />;
   }
 
   return (

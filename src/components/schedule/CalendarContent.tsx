@@ -68,7 +68,7 @@ export default function CalendarContent() {
   return (
     <div className="flex h-full w-full flex-col">
       {isLoading ? (
-        <LoadingContainer fullHeight size={32} text="Loading calendar..." />
+        <LoadingContainer fullHeight />
       ) : (
         <div className="flex h-full w-full flex-1 flex-col">
           <MotiveCalendar

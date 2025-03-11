@@ -177,7 +177,7 @@ export default function MakesContent() {
             {isLoading ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-4">
-                  <LoadingSpinner text="Loading makes..." size={20} />
+                  <LoadingSpinner size="md" />
                 </TableCell>
               </TableRow>
             ) : filteredMakes.length === 0 ? (

@@ -244,17 +244,17 @@ export default function RawAssetDetailsModal({
               Associated Cars
             </h3>
             <div className="space-y-2">
-              {asset.cars && asset.cars.length > 0 ? (
-                asset.cars.map((car) => (
+              {asset.carIds && asset.carIds.length > 0 ? (
+                asset.carIds.map((carId) => (
                   <div
-                    key={car._id.toString()}
+                    key={carId.toString()}
                     className="flex items-center justify-between p-3 bg-[hsl(var(--background-secondary))] rounded-md hover:bg-[hsl(var(--background-secondary))]/80 cursor-pointer transition-colors"
-                    onClick={(e) => handleCarClick(car._id, e)}
+                    onClick={(e) => handleCarClick(carId, e)}
                   >
                     <div className="flex items-center">
                       <CarIcon className="w-4 h-4 mr-2 text-[hsl(var(--muted-foreground))]" />
                       <span>
-                        {car.year} {car.make} {car.model}
+                        Car ID: {carId.toString().substring(0, 10)}...
                       </span>
                     </div>
                     <ExternalLinkIcon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />

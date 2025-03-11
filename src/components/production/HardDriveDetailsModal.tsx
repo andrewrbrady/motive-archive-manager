@@ -489,7 +489,7 @@ export default function HardDriveDetailsModal({
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <LoadingSpinner size={32} text="Loading hard drive details..." />
+            <LoadingSpinner size="lg" />
           </div>
         ) : error ? (
           <div className="text-red-500 p-4 text-center">{error}</div>

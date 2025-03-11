@@ -149,7 +149,7 @@ export default function UserEvents({ userName }: UserEventsProps) {
     return (
       <Card>
         <CardContent className="flex items-center gap-2">
-          <LoadingSpinner size={14} />
+          <LoadingSpinner size="sm" />
           <span>Loading events...</span>
         </CardContent>
       </Card>

@@ -16,6 +16,7 @@ import CaptionGenerator from "@/components/CaptionGenerator";
 import BaTListingGenerator from "@/components/BaTListingGenerator";
 import { toast } from "react-hot-toast";
 import ResearchFiles from "@/components/ResearchFiles";
+import DocumentationFiles from "@/components/DocumentationFiles";
 import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -1453,6 +1454,11 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 value: "research",
                 label: "Research",
                 content: <ResearchFiles carId={id} />,
+              },
+              {
+                value: "documentation",
+                label: "Documentation",
+                content: <DocumentationFiles carId={id} />,
               },
               {
                 value: "article",

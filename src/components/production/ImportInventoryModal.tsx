@@ -274,7 +274,7 @@ export default function ImportInventoryModal({
             <Button type="submit" disabled={!file || loading}>
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <LoadingSpinner size={14} />
+                  <LoadingSpinner size="sm" />
                   <span>Importing...</span>
                 </div>
               ) : (

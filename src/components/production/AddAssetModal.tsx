@@ -185,7 +185,8 @@ export default function AddAssetModal({
               <div className="border border-[hsl(var(--border))] rounded-lg max-h-48 overflow-y-auto">
                 {isLoadingDrives ? (
                   <div className="p-2 text-[hsl(var(--muted-foreground))] flex items-center justify-center">
-                    <LoadingSpinner size={16} text="Loading..." />
+                    <LoadingSpinner size="sm" />
+                    <span className="ml-2">Loading...</span>
                   </div>
                 ) : availableDrives.length > 0 ? (
                   availableDrives.map((drive) => (

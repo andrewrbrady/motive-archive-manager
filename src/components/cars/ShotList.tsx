@@ -473,7 +473,7 @@ export default function ShotList({ carId }: ShotListProps) {
 
       {isLoading ? (
         <div className="text-center py-4">
-          <LoadingSpinner text="Loading shot lists..." />
+          <LoadingSpinner size="md" />
         </div>
       ) : shotLists.length === 0 ? (
         <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">

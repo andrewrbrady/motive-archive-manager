@@ -30,13 +30,7 @@ interface RawAsset {
   date: string;
   description: string;
   hardDriveIds: string[];
-  carIds?: string[];
-  cars?: Array<{
-    _id: string;
-    make: string;
-    model: string;
-    year: number;
-  }>;
+  carIds: string[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -125,7 +119,6 @@ export default function RawAssetsTab() {
                   (id) => id as unknown as ObjectId
                 ),
                 carIds: asset.carIds,
-                cars: asset.cars || [],
               };
               setSelectedAssetForDetails(rawAssetData);
               setIsEditModalOpen(true);
@@ -141,7 +134,6 @@ export default function RawAssetsTab() {
                   (id) => id as unknown as ObjectId
                 ),
                 carIds: asset.carIds,
-                cars: asset.cars || [],
                 createdAt: asset.createdAt,
                 updatedAt: asset.updatedAt,
               });
@@ -284,7 +276,6 @@ export default function RawAssetsTab() {
       description: asset.description,
       hardDriveIds: asset.hardDriveIds.map((id) => id as unknown as ObjectId),
       carIds: asset.carIds,
-      cars: asset.cars || [],
       createdAt: asset.createdAt,
       updatedAt: asset.updatedAt,
     });
@@ -325,7 +316,6 @@ export default function RawAssetsTab() {
         description: asset.description,
         hardDriveIds: asset.hardDriveIds.map((id) => id as unknown as ObjectId),
         carIds: asset.carIds,
-        cars: asset.cars || [],
       };
       setSelectedAssetId(asset._id);
       setSelectedAssetForDetails(rawAssetData);
@@ -346,17 +336,18 @@ export default function RawAssetsTab() {
       const method = selectedAssetId ? "PUT" : "POST";
       const url = selectedAssetId ? `/api/raw/${selectedAssetId}` : "/api/raw";
 
-      // Ensure we're sending both carIds and cars arrays
+      // Create a clean data object without any extra fields
+      const cleanData = {
+        ...assetData,
+        carIds: assetData.carIds || [],
+      };
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...assetData,
-          carIds: assetData.carIds || [],
-          cars: assetData.cars || [],
-        }),
+        body: JSON.stringify(cleanData),
       });
 
       if (!response.ok) throw new Error("Failed to save asset");
@@ -472,7 +463,6 @@ export default function RawAssetsTab() {
           (id: string) => id as unknown as ObjectId
         ),
         carIds: asset.carIds,
-        cars: asset.cars || [],
         createdAt: asset.createdAt,
         updatedAt: asset.updatedAt,
       };
@@ -586,7 +576,7 @@ export default function RawAssetsTab() {
             {loading ? (
               <tr>
                 <td colSpan={5} className="py-8">
-                  <LoadingContainer text="Loading assets..." />
+                  <LoadingContainer />
                 </td>
               </tr>
             ) : error ? (
@@ -619,16 +609,17 @@ export default function RawAssetsTab() {
                   <td className="py-3 px-2 text-sm">{asset.description}</td>
                   <td className="py-3 px-2">
                     <div className="flex flex-wrap gap-2">
-                      {asset.cars &&
-                        asset.cars.map((car) => (
+                      {asset.carIds.map((carId, index) => {
+                        return (
                           <span
-                            key={car._id}
+                            key={index}
                             className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
                           >
                             <CarIcon className="w-3 h-3" />
-                            {car.year} {car.make} {car.model}
+                            {carId}
                           </span>
-                        ))}
+                        );
+                      })}
                     </div>
                   </td>
                   <td className="py-3 px-2">

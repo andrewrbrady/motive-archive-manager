@@ -478,12 +478,7 @@ export function ImageGallery({
             >
               {uploading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <LoadingSpinner
-                    size={32}
-                    text="Uploading Images..."
-                    textPosition="bottom"
-                    gap={4}
-                  />
+                  <LoadingSpinner size="sm" />
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
@@ -517,7 +512,7 @@ export function ImageGallery({
                   >
                     {uploading ? (
                       <>
-                        <LoadingSpinner size={14} text="Uploading..." />
+                        <LoadingSpinner size="sm" />
                       </>
                     ) : (
                       <>
@@ -545,7 +540,7 @@ export function ImageGallery({
                     >
                       {uploading ? (
                         <>
-                          <LoadingSpinner size={14} text="Uploading..." />
+                          <LoadingSpinner size="sm" />
                         </>
                       ) : (
                         <>
@@ -792,7 +787,7 @@ export function ImageGallery({
                 >
                   {uploading ? (
                     <>
-                      <LoadingSpinner size={14} text="Uploading..." />
+                      <LoadingSpinner size="sm" />
                     </>
                   ) : (
                     <>

@@ -780,7 +780,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
               {isLoadingFiles ? (
                 <div className="p-2 flex justify-center">
-                  <LoadingSpinner size={24} text="Loading files..." />
+                  <LoadingSpinner size="md" />
                 </div>
               ) : (
                 <>
@@ -854,7 +854,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
           {selectedFile ? (
             isLoadingContent ? (
               <div className="flex items-center justify-center h-full">
-                <LoadingSpinner size={24} text="Loading content..." />
+                <LoadingSpinner size="md" />
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">

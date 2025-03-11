@@ -145,7 +145,8 @@ export default function BulkCheckoutModal({
                       {isLoadingUsers ? (
                         <SelectItem value="loading" disabled>
                           <div className="flex items-center">
-                            <LoadingSpinner size={14} text="Loading users..." />
+                            <LoadingSpinner size="sm" />
+                            <span className="ml-2">Loading users...</span>
                           </div>
                         </SelectItem>
                       ) : users.length > 0 ? (

@@ -36,7 +36,7 @@ export interface S3UploadResult {
 export async function uploadFile(
   file: File,
   carId: string,
-  type: "research" | "script_files"
+  type: "research" | "script_files" | "documentation"
 ): Promise<S3UploadResult> {
   const timestamp = Date.now();
   const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, "-");
@@ -93,6 +93,31 @@ export async function deleteResearchFile(key: string): Promise<void> {
 }
 
 export async function getResearchFileUrl(key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+
+  return getSignedUrl(s3Client, command, { expiresIn: 3600 }); // URL expires in 1 hour
+}
+
+export async function uploadDocumentationFile(
+  file: File,
+  carId: string
+): Promise<S3UploadResult> {
+  return uploadFile(file, carId, "documentation");
+}
+
+export async function deleteDocumentationFile(key: string): Promise<void> {
+  const command = new DeleteObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+
+  await s3Client.send(command);
+}
+
+export async function getDocumentationFileUrl(key: string): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,

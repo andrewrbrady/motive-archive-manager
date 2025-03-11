@@ -29,7 +29,7 @@ export default function EditRawAssetModal({
     date: "",
     description: "",
     hardDriveIds: [],
-    cars: [],
+    carIds: [],
   });
   const [selectedCars, setSelectedCars] = useState<any[]>([]);
   const [selectedDrives, setSelectedDrives] = useState<HardDriveWithId[]>([]);
@@ -46,7 +46,7 @@ export default function EditRawAssetModal({
         date: "",
         description: "",
         hardDriveIds: [],
-        cars: [],
+        carIds: [],
       });
       setSelectedCars([]);
       setSelectedDrives([]);
@@ -85,10 +85,14 @@ export default function EditRawAssetModal({
   useEffect(() => {
     if (asset) {
       setFormData({
-        ...asset,
-        _id: undefined,
+        date: asset.date || "",
+        description: asset.description || "",
+        hardDriveIds: asset.hardDriveIds || [],
+        carIds: asset.carIds || [],
       });
-      setSelectedCars(asset.cars || []);
+      setSelectedCars(
+        asset.carIds ? asset.carIds.map((id) => ({ _id: id })) : []
+      );
 
       // Fetch selected drives
       const fetchSelectedDrives = async () => {
@@ -129,7 +133,7 @@ export default function EditRawAssetModal({
         date: "",
         description: "",
         hardDriveIds: [],
-        cars: [],
+        carIds: [],
       });
       setSelectedCars([]);
       setSelectedDrives([]);
@@ -144,9 +148,8 @@ export default function EditRawAssetModal({
     try {
       await onSave({
         ...formData,
-        carIds: selectedCars.map((car) => car._id),
-        cars: selectedCars,
         hardDriveIds: selectedDrives.map((drive) => drive._id),
+        carIds: selectedCars.map((car) => car._id),
       });
       onClose();
     } catch (error) {

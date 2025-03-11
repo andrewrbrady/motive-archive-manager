@@ -125,7 +125,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
   };
 
   if (loading) {
-    return <LoadingContainer text="Loading clients..." size={24} />;
+    return <LoadingContainer />;
   }
 
   if (clients.length === 0) {

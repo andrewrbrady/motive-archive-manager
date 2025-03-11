@@ -100,7 +100,8 @@ export default function CarSelector({
           <div className="absolute z-10 w-full mt-1 bg-[hsl(var(--background))] rounded-lg shadow-lg border border-[hsl(var(--border))] max-h-60 overflow-auto">
             {loading ? (
               <div className="px-4 py-2 flex justify-center">
-                <LoadingSpinner size={16} text="Loading..." />
+                <LoadingSpinner size="sm" />
+                <span className="ml-2">Loading...</span>
               </div>
             ) : suggestions.length > 0 ? (
               suggestions.map((car) => (

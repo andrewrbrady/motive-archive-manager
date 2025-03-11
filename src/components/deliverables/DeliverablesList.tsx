@@ -396,7 +396,7 @@ export default function DeliverablesList() {
                   colSpan={isBatchEditing ? 12 : 11}
                   className="text-center py-8"
                 >
-                  <LoadingSpinner text="Loading deliverables..." />
+                  <LoadingSpinner size="md" />
                 </TableCell>
               </TableRow>
             ) : deliverables.length === 0 ? (

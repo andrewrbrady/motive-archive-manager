@@ -481,7 +481,7 @@ export default function ScriptTemplatesTab() {
       </div>
 
       {isLoading ? (
-        <LoadingContainer text="Loading templates..." />
+        <LoadingContainer />
       ) : templates.length === 0 ? (
         <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">
           No templates yet. Create a new template to get started.

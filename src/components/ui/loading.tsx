@@ -1,5 +1,5 @@
 export { LoadingSpinner } from "./loading-spinner";
-export type { LoadingSpinnerProps } from "./loading-spinner";
+// LoadingSpinnerProps is not exported from loading-spinner.tsx
 
 export { LoadingContainer } from "./loading-container";
 export type { LoadingContainerProps } from "./loading-container";

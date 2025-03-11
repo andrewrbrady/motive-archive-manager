@@ -445,7 +445,7 @@ export default function ScriptTemplates({
           <div className="grid gap-4">
             {isLoading ? (
               <div className="text-center py-4">
-                <LoadingSpinner text="Loading templates..." />
+                <LoadingSpinner size="md" />
               </div>
             ) : templates.length === 0 ? (
               <div className="text-center py-4 text-[hsl(var(--foreground-muted))]">

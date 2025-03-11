@@ -158,7 +158,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
     return (
       <Card>
         <CardContent className="flex items-center gap-2">
-          <LoadingSpinner size={14} />
+          <LoadingSpinner size="sm" />
           <span>Loading deliverables...</span>
         </CardContent>
       </Card>

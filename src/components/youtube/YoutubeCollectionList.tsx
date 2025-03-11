@@ -73,8 +73,8 @@ export default function YoutubeCollectionList() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {collections.map((collection) => (
-        <Card key={collection._id?.toString()} className="overflow-hidden">
+      {collections.map((collection, index) => (
+        <Card key={index} className="overflow-hidden">
           <div className="relative aspect-video w-full bg-muted flex items-center justify-center">
             {collection.thumbnail_url ? (
               <Image

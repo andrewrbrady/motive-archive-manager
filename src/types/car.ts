@@ -208,6 +208,7 @@ export interface Car {
   captionIds?: string[];
   eventIds?: string[];
   deliverableIds?: string[];
+  documentationIds?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

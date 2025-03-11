@@ -184,7 +184,6 @@ export async function POST(request: Request) {
       description,
       hardDriveIds,
       carIds = [],
-      cars = [],
     } = await request.json();
 
     // Validate required fields
@@ -204,7 +203,6 @@ export async function POST(request: Request) {
       description,
       hardDriveIds,
       carIds,
-      cars,
     });
 
     return new Response(JSON.stringify(newAsset), { status: 201 });
