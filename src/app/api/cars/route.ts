@@ -6,6 +6,26 @@ import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { Car as InventoryCar } from "@/types/inventory";
 
+// Add error handling utility
+function errorHandler(error: unknown, message: string): NextResponse {
+  console.error(`${message}:`, error);
+
+  // Determine if this is a connection error
+  const errorStr = String(error);
+  if (
+    errorStr.includes("connection") ||
+    errorStr.includes("timeout") ||
+    errorStr.includes("network")
+  ) {
+    return NextResponse.json(
+      { error: "Database connection error. Please try again." },
+      { status: 503 }
+    );
+  }
+
+  return NextResponse.json({ error: message }, { status: 500 });
+}
+
 interface StandardizedCar {
   _id: string;
   price: {
@@ -81,11 +101,7 @@ export async function POST(request: NextRequest) {
     console.log("Created car:", JSON.stringify(car, null, 2));
     return NextResponse.json(car, { status: 201 });
   } catch (error) {
-    console.error("Error creating car:", error);
-    return NextResponse.json(
-      { error: "Failed to create car" },
-      { status: 500 }
-    );
+    return errorHandler(error, "Failed to create car");
   }
 }
 
@@ -131,7 +147,23 @@ export async function GET(request: Request) {
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
 
-    const client = await clientPromise;
+    let client;
+    try {
+      client = await clientPromise;
+    } catch (connectionError) {
+      console.error("MongoDB connection error:", connectionError);
+      return NextResponse.json(
+        {
+          error: "Database connection error",
+          cars: [],
+          totalPages: 0,
+          currentPage: page,
+          totalCount: 0,
+        },
+        { status: 503 }
+      );
+    }
+
     const db = client.db();
     const carsCollection = db.collection("cars");
 
@@ -278,34 +310,104 @@ export async function GET(request: Request) {
       query,
     });
 
-    // Get total count for pagination
-    const totalCount = await carsCollection.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / pageSize);
+    try {
+      // Get total count for pagination
+      const totalCount = await carsCollection.countDocuments(query);
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const skip = (page - 1) * pageSize;
 
-    // Execute query with pagination and sorting
-    const cars = await carsCollection
-      .find(query)
-      .sort(sortOptions)
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .toArray();
+      // Determine sort field and direction
+      const [sortField, sortDir] = sort.split("_");
+      const sortSpec: Record<string, 1 | -1> = {};
+      sortSpec[sortField || "createdAt"] = sortDir === "asc" ? 1 : -1;
 
-    console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
-    console.log("Found", cars.length, "cars matching the query");
-    console.log("Total cars in database matching query:", totalCount);
-    console.log("Total pages:", totalPages, "Page size:", pageSize);
+      // Add secondary sort for consistency
+      if (sortField !== "createdAt") {
+        sortSpec["createdAt"] = -1;
+      }
 
-    return NextResponse.json({
-      cars,
-      totalPages,
-      currentPage: page,
-      totalCount,
-    });
+      // Execute the query with pagination and sorting
+      const cars = await carsCollection
+        .aggregate([
+          { $match: query },
+          {
+            $lookup: {
+              from: "clients",
+              localField: "client",
+              foreignField: "_id",
+              as: "clientInfo",
+            },
+          },
+          {
+            $addFields: {
+              clientInfo: { $arrayElemAt: ["$clientInfo", 0] },
+              imageIds: {
+                $map: {
+                  input: { $ifNull: ["$imageIds", []] },
+                  as: "id",
+                  in: { $toString: "$$id" },
+                },
+              },
+            },
+          },
+          { $sort: sortSpec },
+          { $skip: skip },
+          { $limit: pageSize },
+          {
+            $project: {
+              _id: { $toString: "$_id" },
+              year: 1,
+              make: 1,
+              model: 1,
+              vin: 1,
+              price: 1,
+              status: 1,
+              mileage: 1,
+              color: 1,
+              description: 1,
+              imageIds: 1,
+              clientInfo: {
+                $cond: {
+                  if: { $eq: ["$clientInfo", null] },
+                  then: null,
+                  else: {
+                    _id: { $toString: "$clientInfo._id" },
+                    name: "$clientInfo.name",
+                    email: "$clientInfo.email",
+                    phone: "$clientInfo.phone",
+                    businessType: "$clientInfo.businessType",
+                  },
+                },
+              },
+              client: { $toString: "$client" },
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ])
+        .toArray();
+
+      // Return the cars with pagination info
+      return NextResponse.json({
+        cars,
+        totalPages,
+        currentPage: page,
+        totalCount,
+      });
+    } catch (queryError) {
+      console.error("Error executing cars query:", queryError);
+      return NextResponse.json(
+        {
+          error: "Error querying cars",
+          cars: [],
+          totalPages: 0,
+          currentPage: page,
+          totalCount: 0,
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error("Error fetching cars:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch cars" },
-      { status: 500 }
-    );
+    return errorHandler(error, "Failed to fetch cars");
   }
 }
