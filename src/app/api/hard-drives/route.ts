@@ -4,6 +4,8 @@ import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { toObjectId } from "@/lib/mongodb-types";
 
+export const dynamic = "force-dynamic";
+
 type PipelineStage = {
   $match?: any;
   $sort?: { updatedAt: number };

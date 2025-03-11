@@ -3,6 +3,8 @@ import clientPromise from "@/lib/mongodb";
 import { RawAsset, RawAssetData } from "../../../models/raw_assets";
 import { ObjectId } from "mongodb";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
