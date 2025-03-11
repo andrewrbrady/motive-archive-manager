@@ -27,9 +27,28 @@ interface FilterParams {
   sort?: string;
 }
 
+// Enhanced server-side logging
+function serverLog(
+  message: string,
+  data: any = {},
+  level: "info" | "warn" | "error" = "info"
+) {
+  const prefix = `[Server] 🚗 Cars Page: ${message}`;
+
+  if (level === "error") {
+    console.error(prefix, data);
+  } else if (level === "warn") {
+    console.warn(prefix, data);
+  } else {
+    console.log(prefix, data);
+  }
+}
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
+  serverLog("getCars called with params", { page, pageSize, filters });
+
   try {
     // Add artificial delay
     await delay(500);
@@ -50,6 +69,7 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
 
     // Simplify approach - just use a relative URL with Next.js fetch
     const url = `/api/cars?${queryParams.toString()}`;
+    serverLog("Fetching cars from URL", { url });
 
     // Fetch from the API route with safety timeouts and cache settings
     const response = await fetch(url, {
@@ -57,9 +77,17 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       next: { revalidate: 0 },
     });
 
+    serverLog("API response status", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries([...response.headers.entries()]),
+    });
+
     if (!response.ok) {
-      console.error(
-        `Failed to fetch cars: ${response.status} ${response.statusText}`
+      serverLog(
+        `Failed to fetch cars: ${response.status} ${response.statusText}`,
+        {},
+        "error"
       );
       // Return empty data rather than throwing
       return {
@@ -70,15 +98,58 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       };
     }
 
-    const data = await response.json();
-    return {
+    // Try to get the raw response body for debugging
+    const responseBody = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(responseBody);
+      serverLog("Successfully parsed JSON response", {
+        carsCount: data.cars?.length || 0,
+        totalPages: data.totalPages,
+        totalCount: data.totalCount,
+      });
+    } catch (parseError) {
+      serverLog(
+        "Failed to parse JSON response",
+        {
+          responseBody:
+            responseBody.substring(0, 500) +
+            (responseBody.length > 500 ? "..." : ""),
+          parseError,
+        },
+        "error"
+      );
+
+      // Return empty data for parse failure
+      return {
+        cars: [],
+        totalPages: 0,
+        currentPage: page,
+        totalCount: 0,
+      };
+    }
+
+    const result = {
       cars: (data.cars as Car[]) || [],
       totalPages: data.totalPages || 0,
       currentPage: page,
       totalCount: data.totalCount || 0,
     };
+
+    serverLog("getCars returning data", {
+      carsCount: result.cars.length,
+      totalPages: result.totalPages,
+      totalCount: result.totalCount,
+      firstCar:
+        result.cars.length > 0
+          ? JSON.stringify(result.cars[0]).substring(0, 200) + "..."
+          : "none",
+    });
+
+    return result;
   } catch (error) {
-    console.error("Error fetching cars:", error);
+    serverLog("Error fetching cars", { error }, "error");
     // Return empty data rather than throwing
     return {
       cars: [],
@@ -94,8 +165,11 @@ export default async function CarsPage({
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
+  serverLog("CarsPage rendering with searchParams", { searchParams });
+
   try {
     const resolvedParams = await Promise.resolve(searchParams);
+    serverLog("Resolved search params", { resolvedParams });
 
     const page = Number(resolvedParams.page) || 1;
     const pageSize = Number(resolvedParams.pageSize) || 48;
@@ -119,6 +193,14 @@ export default async function CarsPage({
       }
     });
 
+    serverLog("Processed filters", {
+      filters,
+      page,
+      pageSize,
+      view,
+      isEditMode,
+    });
+
     // Default values
     let cars: Car[] = [];
     let totalPages = 0;
@@ -129,21 +211,32 @@ export default async function CarsPage({
 
     try {
       // Separate operations to handle individual failures
+      serverLog("Fetching cars data");
       const carsData = await getCars(page, pageSize, filters);
       cars = carsData.cars;
       totalPages = carsData.totalPages;
       currentPage = carsData.currentPage;
       totalCount = carsData.totalCount;
 
+      serverLog("Cars data fetched", {
+        carsCount: cars.length,
+        totalPages,
+        totalCount,
+      });
+
       try {
+        serverLog("Fetching makes");
         makes = await fetchMakes();
+        serverLog("Makes fetched", { makesCount: makes.length });
       } catch (makeError) {
-        console.error("Failed to fetch makes:", makeError);
+        serverLog("Failed to fetch makes", { makeError }, "error");
         makes = [];
       }
 
       try {
+        serverLog("Fetching clients");
         const rawClients = await fetchClients();
+        serverLog("Clients fetched", { clientsCount: rawClients.length });
 
         // Transform to expected Client type
         clients = rawClients.map((client) => {
@@ -169,13 +262,32 @@ export default async function CarsPage({
             updatedAt: new Date(),
           } as Client;
         });
+        serverLog("Clients transformed", { transformedCount: clients.length });
       } catch (clientError) {
-        console.error("Failed to fetch clients:", clientError);
+        serverLog("Failed to fetch clients", { clientError }, "error");
       }
     } catch (err) {
-      console.error("Error fetching initial data:", err);
+      serverLog("Error fetching initial data", { err }, "error");
       // Continue with empty data
     }
+
+    // Debug log before rendering client component
+    serverLog("Rendering client component with data", {
+      carsCount: cars.length,
+      makesCount: makes.length,
+      clientsCount: clients.length,
+      carsSample:
+        cars.length > 0
+          ? JSON.stringify(
+              cars.slice(0, 1).map((car) => ({
+                _id: car._id,
+                make: car.make,
+                model: car.model,
+                year: car.year,
+              }))
+            )
+          : "No cars",
+    });
 
     return (
       <CarsPageClient
@@ -192,7 +304,7 @@ export default async function CarsPage({
       />
     );
   } catch (error) {
-    console.error("Critical error in CarsPage:", error);
+    serverLog("Critical error in CarsPage", { error }, "error");
     // Don't throw, provide a minimal fallback UI
     return (
       <div className="flex flex-col min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
@@ -201,6 +313,16 @@ export default async function CarsPage({
           <p className="text-red-500">
             Unable to load cars at this time. Please try again later.
           </p>
+          <div className="mt-4 p-4 bg-gray-100 rounded">
+            <p className="text-sm text-gray-700">
+              Error details (for debugging):
+            </p>
+            <pre className="mt-2 p-2 text-xs bg-gray-200 rounded overflow-auto max-h-40">
+              {error instanceof Error
+                ? error.stack || error.message
+                : String(error)}
+            </pre>
+          </div>
         </div>
       </div>
     );
