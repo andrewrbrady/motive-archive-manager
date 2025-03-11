@@ -49,11 +49,12 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
 
     // Get host from headers
     const headersList = headers();
-    const host = headersList.get("host");
+    const host = headersList.get("host") || "";
     const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
 
-    // Construct absolute URL
-    const url = `${protocol}://${host}/api/cars?${queryParams.toString()}`;
+    // Use relative URL instead of constructing absolute URL
+    // This avoids host/protocol issues between environments
+    const url = `/api/cars?${queryParams.toString()}`;
 
     // Fetch from the API route
     const response = await fetch(url, {
