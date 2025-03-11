@@ -1,0 +1,13 @@
+{
+  "name": "motive-archive-scripts",
+  "version": "1.0.0",
+  "description": "Scripts for Motive Archive Manager",
+  "type": "module",
+  "scripts": {
+    "standardize": "node run-standardize.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "mongodb": "^6.3.0"
+  }
+}
