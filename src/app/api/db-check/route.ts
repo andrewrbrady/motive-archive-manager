@@ -32,8 +32,12 @@ export async function GET() {
       // Continue execution, might not have admin permissions
     }
 
+    // Get current database name from environment or use default
+    const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+    console.log("Using database from environment or default:", DB_NAME);
+
     // Get current database
-    const db = client.db();
+    const db = client.db(DB_NAME);
     const dbName = db.databaseName;
 
     // List all collections

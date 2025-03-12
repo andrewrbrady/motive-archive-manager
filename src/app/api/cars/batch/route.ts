@@ -25,7 +25,8 @@ export async function GET(request: Request) {
     }
 
     const client = await clientPromise;
-    const db = client.db();
+    const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+    const db = client.db(DB_NAME);
     const carsCollection = db.collection("cars");
 
     const cars = await carsCollection

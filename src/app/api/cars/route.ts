@@ -144,8 +144,12 @@ export async function GET(request: Request) {
         dbInfo.databases.map((db) => db.name)
       );
 
-      // Get current database name
-      const db = client.db();
+      // Get current database name from environment or use default
+      const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+      console.log("Using database from environment or default:", DB_NAME);
+
+      // Get connected to the correct database, not the default "test" database
+      const db = client.db(DB_NAME);
       console.log("Currently connected to database:", db.databaseName);
 
       // List all collections
