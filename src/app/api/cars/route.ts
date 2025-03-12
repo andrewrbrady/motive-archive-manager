@@ -137,8 +137,8 @@ export async function GET(request: Request) {
 
     // Build query
     const query: any = {
-      // Ensure createdAt exists for all documents in the query
-      createdAt: { $exists: true },
+      // Remove the createdAt exists filter since documents don't have this field
+      // We'll use an empty query object initially, then add filters as needed
     };
 
     console.log("Received filter parameters:", {
@@ -268,7 +268,25 @@ export async function GET(request: Request) {
 
     // Get the actual database field name
     const dbSortField = sortFieldMap[sortField] || "createdAt";
-    sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
+
+    // If sorting by createdAt but it doesn't exist on documents, use _id as a fallback
+    // since MongoDB ObjectIDs have creation time embedded in them
+    if (dbSortField === "createdAt") {
+      // Check if any car has createdAt field
+      const hasCreatedAt = await carsCollection.countDocuments({
+        createdAt: { $exists: true },
+      });
+      if (hasCreatedAt === 0) {
+        console.log(
+          "No cars have createdAt field, using _id for sorting instead"
+        );
+        sortOptions["_id"] = sortDirection === "desc" ? -1 : 1;
+      } else {
+        sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
+      }
+    } else {
+      sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
+    }
 
     console.log("Using sort options:", {
       requestedSort: sort,
@@ -294,6 +312,23 @@ export async function GET(request: Request) {
     console.log("Found", cars.length, "cars matching the query");
     console.log("Total cars in database matching query:", totalCount);
     console.log("Total pages:", totalPages, "Page size:", pageSize);
+
+    // Check if there are ANY cars in the collection at all, without filters
+    const totalCarsInCollection = await carsCollection.countDocuments({});
+    console.log(
+      "Total cars in collection (without filters):",
+      totalCarsInCollection
+    );
+
+    // If there are cars but our query found none, examine the first car to debug
+    if (totalCarsInCollection > 0 && cars.length === 0) {
+      const sampleCar = await carsCollection.findOne({});
+      console.log("Sample car fields:", Object.keys(sampleCar || {}));
+      console.log(
+        "Sample car (first 500 chars):",
+        JSON.stringify(sampleCar).substring(0, 500)
+      );
+    }
 
     return NextResponse.json({
       cars,
