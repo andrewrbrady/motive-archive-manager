@@ -47,13 +47,8 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       }
     });
 
-    // Get host from headers
-    const headersList = headers();
-    const host = headersList.get("host");
-    const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
-
-    // Construct absolute URL
-    const url = `${protocol}://${host}/api/cars?${queryParams.toString()}`;
+    // Use relative URL instead of absolute URL to avoid issues with protocol/host in serverless environments
+    const url = `/api/cars?${queryParams.toString()}`;
 
     // Fetch from the API route
     const response = await fetch(url, {
@@ -61,7 +56,9 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch cars");
+      throw new Error(
+        `Failed to fetch cars: ${response.status} ${response.statusText}`
+      );
     }
 
     const data = await response.json();

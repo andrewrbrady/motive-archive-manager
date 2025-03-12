@@ -4,6 +4,8 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
+export const dynamic = "force-dynamic";
+
 async function getDriveInfo(path: string) {
   try {
     // Special handling for root directory and system paths
