@@ -131,211 +131,278 @@ export async function GET(request: Request) {
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
 
-    const client = await clientPromise;
-    const db = client.db();
-    const carsCollection = db.collection("cars");
+    // DATABASE CONNECTION DEBUGGING
+    console.log("=== DATABASE CONNECTION DEBUGGING ===");
+    try {
+      const client = await clientPromise;
 
-    // Build query
-    const query: any = {
-      // Remove the createdAt exists filter since documents don't have this field
-      // We'll use an empty query object initially, then add filters as needed
-    };
+      // List all databases
+      const adminDb = client.db().admin();
+      const dbInfo = await adminDb.listDatabases();
+      console.log(
+        "Available databases:",
+        dbInfo.databases.map((db) => db.name)
+      );
 
-    console.log("Received filter parameters:", {
-      make,
-      minYear,
-      maxYear,
-      clientId,
-      minPrice,
-      maxPrice,
-      search,
-      sort,
-    });
+      // Get current database name
+      const db = client.db();
+      console.log("Currently connected to database:", db.databaseName);
 
-    // Add search condition if search term exists
-    if (search) {
-      const searchTerms = search.split(/\s+/).filter((term) => term);
+      // List all collections
+      const collections = await db.listCollections().toArray();
+      console.log(
+        "Available collections:",
+        collections.map((c) => c.name)
+      );
 
-      // Look for year patterns (4 digits)
-      const yearTerms = searchTerms
-        .filter((term) => /^\d{4}$/.test(term))
-        .map((term) => parseInt(term));
-
-      // Create regex for non-year terms
-      const textTerms = searchTerms
-        .filter((term) => !/^\d{4}$/.test(term))
-        .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-
-      const searchConditions = [];
-
-      // Add text-based searches
-      if (textTerms.length > 0) {
-        const textRegex = { $regex: textTerms.join("|"), $options: "i" };
-        searchConditions.push(
-          { make: textRegex },
-          { model: textRegex },
-          { vin: textRegex },
-          { color: textRegex },
-          { "manufacturing.series": textRegex },
-          { "manufacturing.trim": textRegex }
-        );
+      // Check for various collection name possibilities
+      const possibleCollectionNames = [
+        "cars",
+        "Cars",
+        "car",
+        "Car",
+        "vehicles",
+        "Vehicles",
+      ];
+      for (const collName of possibleCollectionNames) {
+        if (!collections.find((c) => c.name === collName)) continue;
+        const count = await db.collection(collName).countDocuments({});
+        console.log(`Collection "${collName}" has ${count} documents`);
       }
 
-      // Add year-based searches
-      if (yearTerms.length > 0) {
-        searchConditions.push(
-          ...yearTerms.map((year) => ({
-            $or: [{ year: year }, { year: year.toString() }],
-          }))
-        );
+      const carsCollection = db.collection("cars");
+
+      // Log the connection string (partially redacted)
+      const connStr = process.env.MONGODB_URI || "";
+      const redactedConnStr = connStr.replace(/:([^@/]+)@/, ":****@");
+      console.log("MongoDB connection string (redacted):", redactedConnStr);
+
+      // Try a direct query with no limits to see if anything returns
+      const firstFiveCars = await carsCollection.find({}).limit(5).toArray();
+      console.log(
+        "First 5 cars query returned:",
+        firstFiveCars.length,
+        "documents"
+      );
+      if (firstFiveCars.length > 0) {
+        console.log("Sample car document keys:", Object.keys(firstFiveCars[0]));
       }
 
-      if (searchConditions.length > 0) {
-        query.$or = searchConditions;
-      }
-    }
+      // Build query
+      const query: any = {};
 
-    // Add make filter
-    if (make) {
-      query.make = make;
-    }
-
-    // Add year range filter
-    if (minYear || maxYear) {
-      query.year = {};
-      if (minYear) {
-        const minYearNum = parseInt(minYear);
-        if (!isNaN(minYearNum)) {
-          query.year.$gte = minYearNum;
-        }
-      }
-      if (maxYear) {
-        const maxYearNum = parseInt(maxYear);
-        if (!isNaN(maxYearNum)) {
-          query.year.$lte = maxYearNum;
-        }
-      }
-      // If no valid year filters were added, remove the empty year query
-      if (Object.keys(query.year).length === 0) {
-        delete query.year;
-      }
-    }
-
-    // Add client filter
-    if (clientId) {
-      try {
-        query.client = new ObjectId(clientId);
-      } catch (error) {
-        console.error("Invalid client ID format:", error);
-        // If the ID is invalid, return no results
-        query.client = null;
-      }
-    }
-
-    // Add price range filter
-    if (minPrice || maxPrice) {
-      query["price.listPrice"] = {};
-      if (minPrice) {
-        const minPriceNum = parseInt(minPrice);
-        if (!isNaN(minPriceNum)) {
-          query["price.listPrice"].$gte = minPriceNum;
-        }
-      }
-      if (maxPrice) {
-        const maxPriceNum = parseInt(maxPrice);
-        if (!isNaN(maxPriceNum)) {
-          query["price.listPrice"].$lte = maxPriceNum;
-        }
-      }
-      // If no valid price filters were added, remove the empty price query
-      if (Object.keys(query["price.listPrice"]).length === 0) {
-        delete query["price.listPrice"];
-      }
-    }
-
-    // Determine sort order
-    const [sortField, sortDirection] = sort.split("_");
-    const sortOptions: any = {};
-
-    // Map sort fields to their database counterparts
-    const sortFieldMap: { [key: string]: string } = {
-      price: "price.listPrice",
-      createdAt: "createdAt",
-      year: "year",
-      make: "make",
-      model: "model",
-    };
-
-    // Get the actual database field name
-    const dbSortField = sortFieldMap[sortField] || "createdAt";
-
-    // If sorting by createdAt but it doesn't exist on documents, use _id as a fallback
-    // since MongoDB ObjectIDs have creation time embedded in them
-    if (dbSortField === "createdAt") {
-      // Check if any car has createdAt field
-      const hasCreatedAt = await carsCollection.countDocuments({
-        createdAt: { $exists: true },
+      console.log("Received filter parameters:", {
+        make,
+        minYear,
+        maxYear,
+        clientId,
+        minPrice,
+        maxPrice,
+        search,
+        sort,
       });
-      if (hasCreatedAt === 0) {
-        console.log(
-          "No cars have createdAt field, using _id for sorting instead"
-        );
-        sortOptions["_id"] = sortDirection === "desc" ? -1 : 1;
+
+      // Add search condition if search term exists
+      if (search) {
+        const searchTerms = search.split(/\s+/).filter((term) => term);
+
+        // Look for year patterns (4 digits)
+        const yearTerms = searchTerms
+          .filter((term) => /^\d{4}$/.test(term))
+          .map((term) => parseInt(term));
+
+        // Create regex for non-year terms
+        const textTerms = searchTerms
+          .filter((term) => !/^\d{4}$/.test(term))
+          .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
+        const searchConditions = [];
+
+        // Add text-based searches
+        if (textTerms.length > 0) {
+          const textRegex = { $regex: textTerms.join("|"), $options: "i" };
+          searchConditions.push(
+            { make: textRegex },
+            { model: textRegex },
+            { vin: textRegex },
+            { color: textRegex },
+            { "manufacturing.series": textRegex },
+            { "manufacturing.trim": textRegex }
+          );
+        }
+
+        // Add year-based searches
+        if (yearTerms.length > 0) {
+          searchConditions.push(
+            ...yearTerms.map((year) => ({
+              $or: [{ year: year }, { year: year.toString() }],
+            }))
+          );
+        }
+
+        if (searchConditions.length > 0) {
+          query.$or = searchConditions;
+        }
+      }
+
+      // Add make filter
+      if (make) {
+        query.make = make;
+      }
+
+      // Add year range filter
+      if (minYear || maxYear) {
+        query.year = {};
+        if (minYear) {
+          const minYearNum = parseInt(minYear);
+          if (!isNaN(minYearNum)) {
+            query.year.$gte = minYearNum;
+          }
+        }
+        if (maxYear) {
+          const maxYearNum = parseInt(maxYear);
+          if (!isNaN(maxYearNum)) {
+            query.year.$lte = maxYearNum;
+          }
+        }
+        // If no valid year filters were added, remove the empty year query
+        if (Object.keys(query.year).length === 0) {
+          delete query.year;
+        }
+      }
+
+      // Add client filter
+      if (clientId) {
+        try {
+          query.client = new ObjectId(clientId);
+        } catch (error) {
+          console.error("Invalid client ID format:", error);
+          // If the ID is invalid, return no results
+          query.client = null;
+        }
+      }
+
+      // Add price range filter
+      if (minPrice || maxPrice) {
+        query["price.listPrice"] = {};
+        if (minPrice) {
+          const minPriceNum = parseInt(minPrice);
+          if (!isNaN(minPriceNum)) {
+            query["price.listPrice"].$gte = minPriceNum;
+          }
+        }
+        if (maxPrice) {
+          const maxPriceNum = parseInt(maxPrice);
+          if (!isNaN(maxPriceNum)) {
+            query["price.listPrice"].$lte = maxPriceNum;
+          }
+        }
+        // If no valid price filters were added, remove the empty price query
+        if (Object.keys(query["price.listPrice"]).length === 0) {
+          delete query["price.listPrice"];
+        }
+      }
+
+      // Determine sort order
+      const [sortField, sortDirection] = sort.split("_");
+      const sortOptions: any = {};
+
+      // Map sort fields to their database counterparts
+      const sortFieldMap: { [key: string]: string } = {
+        price: "price.listPrice",
+        createdAt: "createdAt",
+        year: "year",
+        make: "make",
+        model: "model",
+      };
+
+      // Get the actual database field name
+      const dbSortField = sortFieldMap[sortField] || "createdAt";
+
+      // If sorting by createdAt but it doesn't exist on documents, use _id as a fallback
+      if (dbSortField === "createdAt") {
+        // Check if any car has createdAt field
+        const hasCreatedAt = await carsCollection.countDocuments({
+          createdAt: { $exists: true },
+        });
+        if (hasCreatedAt === 0) {
+          console.log(
+            "No cars have createdAt field, using _id for sorting instead"
+          );
+          sortOptions["_id"] = sortDirection === "desc" ? -1 : 1;
+        } else {
+          sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
+        }
       } else {
         sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
       }
-    } else {
-      sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
-    }
 
-    console.log("Using sort options:", {
-      requestedSort: sort,
-      dbField: dbSortField,
-      direction: sortDirection,
-      finalSortOptions: sortOptions,
-      query,
-    });
+      console.log("Using sort options:", {
+        requestedSort: sort,
+        dbField: dbSortField,
+        direction: sortDirection,
+        finalSortOptions: sortOptions,
+        query,
+      });
 
-    // Get total count for pagination
-    const totalCount = await carsCollection.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / pageSize);
+      // Get total count for pagination
+      const totalCount = await carsCollection.countDocuments(query);
+      const totalPages = Math.ceil(totalCount / pageSize);
 
-    // Execute query with pagination and sorting
-    const cars = await carsCollection
-      .find(query)
-      .sort(sortOptions)
-      .skip((page - 1) * pageSize)
-      .limit(pageSize)
-      .toArray();
+      // Execute query with pagination and sorting
+      const cars = await carsCollection
+        .find(query)
+        .sort(sortOptions)
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray();
 
-    console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
-    console.log("Found", cars.length, "cars matching the query");
-    console.log("Total cars in database matching query:", totalCount);
-    console.log("Total pages:", totalPages, "Page size:", pageSize);
+      console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
+      console.log("Found", cars.length, "cars matching the query");
+      console.log("Total cars in database matching query:", totalCount);
+      console.log("Total pages:", totalPages, "Page size:", pageSize);
 
-    // Check if there are ANY cars in the collection at all, without filters
-    const totalCarsInCollection = await carsCollection.countDocuments({});
-    console.log(
-      "Total cars in collection (without filters):",
-      totalCarsInCollection
-    );
-
-    // If there are cars but our query found none, examine the first car to debug
-    if (totalCarsInCollection > 0 && cars.length === 0) {
-      const sampleCar = await carsCollection.findOne({});
-      console.log("Sample car fields:", Object.keys(sampleCar || {}));
+      // Check if there are ANY cars in the collection at all, without filters
+      const totalCarsInCollection = await carsCollection.countDocuments({});
       console.log(
-        "Sample car (first 500 chars):",
-        JSON.stringify(sampleCar).substring(0, 500)
+        "Total cars in collection (without filters):",
+        totalCarsInCollection
+      );
+
+      // If there are cars but our query found none, examine the first car to debug
+      if (totalCarsInCollection > 0 && cars.length === 0) {
+        const sampleCar = await carsCollection.findOne({});
+        console.log("Sample car fields:", Object.keys(sampleCar || {}));
+        console.log(
+          "Sample car (first 500 chars):",
+          JSON.stringify(sampleCar).substring(0, 500)
+        );
+      }
+
+      return NextResponse.json({
+        cars,
+        totalPages,
+        currentPage: page,
+        totalCount,
+        debug: {
+          databaseName: db.databaseName,
+          collectionsAvailable: collections.map((c) => c.name),
+          totalCarsInCollection,
+          environment: process.env.NODE_ENV,
+          vercelUrl: process.env.VERCEL_URL || "not set",
+        },
+      });
+    } catch (dbError) {
+      console.error("DATABASE ERROR:", dbError);
+      return NextResponse.json(
+        {
+          error: "Database error",
+          details: dbError instanceof Error ? dbError.message : String(dbError),
+          stack: dbError instanceof Error ? dbError.stack : undefined,
+        },
+        { status: 500 }
       );
     }
-
-    return NextResponse.json({
-      cars,
-      totalPages,
-      currentPage: page,
-      totalCount,
-    });
   } catch (error) {
     console.error("Error fetching cars:", error);
     return NextResponse.json(
