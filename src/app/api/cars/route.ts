@@ -197,6 +197,33 @@ export async function GET(request: Request) {
     const carsCollection = db.collection("cars");
     apiLog("Retrieved cars collection reference");
 
+    // ADDED: Check if the collection exists and has documents
+    try {
+      // Use db.command instead of stats() which doesn't exist on Collection type
+      const collectionStats = await db.command({ collStats: "cars" });
+      apiLog("Collection stats", {
+        count: collectionStats.count,
+        size: collectionStats.size,
+        avgObjSize: collectionStats.avgObjSize,
+        storageSize: collectionStats.storageSize,
+      });
+
+      // If zero documents, do a quick sample to check schema
+      if (collectionStats.count === 0) {
+        apiLog("Empty collection detected - check database setup", {}, "warn");
+      } else {
+        // Sample a document to check schema
+        const sampleDoc = await carsCollection.findOne({});
+        apiLog("Sample document from collection", {
+          sampleId: sampleDoc?._id ? sampleDoc._id.toString() : "none",
+          hasCreatedAt: !!sampleDoc?.createdAt,
+          fieldCount: sampleDoc ? Object.keys(sampleDoc).length : 0,
+        });
+      }
+    } catch (statsError) {
+      apiLog("Error checking collection stats", { error: statsError }, "error");
+    }
+
     // Build query
     const query: any = {
       // Ensure createdAt exists for all documents in the query
@@ -353,6 +380,17 @@ export async function GET(request: Request) {
 
       apiLog("Count results", { totalCount, totalPages, skip });
 
+      // Exit early if no documents match
+      if (totalCount === 0) {
+        apiLog("No matching documents found", { query }, "warn");
+        return NextResponse.json({
+          cars: [],
+          totalPages: 0,
+          currentPage: page,
+          totalCount: 0,
+        });
+      }
+
       // Determine sort field and direction
       const [sortField, sortDir] = sort.split("_");
       const sortSpec: Record<string, 1 | -1> = {};
@@ -444,19 +482,31 @@ export async function GET(request: Request) {
             : "No cars found",
       });
 
+      // NEW: Added safeguards for response data
+      let validCars = cars;
+      if (!validCars || !Array.isArray(validCars)) {
+        apiLog(
+          "Cars result is not an array",
+          { carsType: typeof cars },
+          "error"
+        );
+        validCars = [];
+      }
+
       // Return the cars with pagination info
       const response = {
-        cars,
+        cars: validCars,
         totalPages,
         currentPage: page,
         totalCount,
       };
 
       apiLog("Sending response", {
-        totalCars: cars.length,
+        totalCars: validCars.length,
         totalPages,
         totalCount,
         status: 200,
+        responseKeys: Object.keys(response),
       });
 
       return NextResponse.json(response);

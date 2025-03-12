@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 import { Make } from "@/lib/fetchMakes";
 import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
+import clientPromise from "@/lib/mongodb"; // Import MongoDB client
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -168,6 +169,46 @@ export default async function CarsPage({
   serverLog("CarsPage rendering with searchParams", { searchParams });
 
   try {
+    // Check MongoDB connection directly
+    try {
+      serverLog("Testing direct MongoDB connection");
+      const client = await clientPromise;
+      const db = client.db();
+
+      // Check if cars collection exists
+      const collections = await db.listCollections().toArray();
+      const hasCarCollection = collections.some((c) => c.name === "cars");
+
+      serverLog("MongoDB connection test results", {
+        connected: !!client,
+        collections: collections.map((c) => c.name),
+        hasCarCollection,
+      });
+
+      if (hasCarCollection) {
+        // Check if there are any cars in the collection
+        const carCount = await db.collection("cars").countDocuments();
+        serverLog("Cars collection count", { carCount });
+
+        if (carCount === 0) {
+          serverLog("Cars collection is empty", {}, "warn");
+        } else {
+          // Sample a car to check schema
+          const sampleCar = await db.collection("cars").findOne({});
+          serverLog("Sample car from MongoDB", {
+            id: sampleCar?._id?.toString(),
+            hasFields: sampleCar ? Object.keys(sampleCar).join(", ") : "none",
+          });
+        }
+      }
+    } catch (dbError) {
+      serverLog(
+        "Error directly testing MongoDB connection",
+        { error: dbError },
+        "error"
+      );
+    }
+
     const resolvedParams = await Promise.resolve(searchParams);
     serverLog("Resolved search params", { resolvedParams });
 
