@@ -57,6 +57,11 @@ export async function DELETE(
       }`
     );
 
+    if (!carCheck) {
+      console.log(`Error: Car with ID ${id} not found`);
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
     // Get the car with its images
     const car = (await carsCollection
       .aggregate([
@@ -73,7 +78,7 @@ export async function DELETE(
       .next()) as CarDocument;
 
     if (!car) {
-      console.log(`Error: Car with ID ${id} not found`);
+      console.log(`Error: Car with ID ${id} not found after aggregation`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
@@ -167,9 +172,7 @@ export async function DELETE(
       validIndices
     );
 
-    const imagesToDelete = validIndices.map((index) => car.images![index]);
-
-    if (imagesToDelete.length === 0) {
+    if (validIndices.length === 0) {
       console.log("Error: No valid images to delete after filtering indices");
       return NextResponse.json(
         { error: "No valid images to delete" },
@@ -177,58 +180,141 @@ export async function DELETE(
       );
     }
 
+    const imagesToDelete = validIndices.map((index) => car.images![index]);
+
     console.log(
       `Found ${imagesToDelete.length} images to delete:`,
       imagesToDelete.map((img) => ({
         id: img._id.toString(),
-        url: img.url,
+        url: img.url.substring(0, 30) + "...", // truncate for readability
         cloudflareId: img.cloudflareId,
       }))
     );
 
+    // Track successful deletions
+    const deletedImages = [];
+    const failedImages = [];
+
     // Delete each image
     for (const image of imagesToDelete) {
-      console.log(`Deleting image: ${image._id.toString()}, url: ${image.url}`);
+      try {
+        console.log(
+          `Deleting image: ${image._id.toString()}, url: ${image.url}`
+        );
 
-      // Remove image ID from car
-      await carsCollection.updateOne(
-        { _id: new ObjectId(id) },
-        {
-          $pull: { imageIds: image._id.toString() },
-          $set: { updatedAt: new Date().toISOString() },
-        }
-      );
+        // Convert image._id to string if it's an ObjectId
+        const imageIdString =
+          typeof image._id === "object" && image._id !== null
+            ? image._id.toString()
+            : image._id;
 
-      // Delete image document
-      await imagesCollection.deleteOne({ _id: image._id });
+        // Remove image ID from car
+        const updateResult = await carsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $pull: { imageIds: imageIdString },
+            $set: { updatedAt: new Date().toISOString() },
+          }
+        );
 
-      // Delete from Cloudflare if requested
-      if (deleteFromStorage && image.cloudflareId) {
-        try {
-          console.log(`Deleting from Cloudflare: ${image.cloudflareId}`);
-          await fetch(
-            `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
-              },
+        console.log(`Update result: ${JSON.stringify(updateResult)}`);
+
+        // Delete image document
+        const deleteResult = await imagesCollection.deleteOne({
+          _id: image._id,
+        });
+        console.log(`Delete result: ${JSON.stringify(deleteResult)}`);
+
+        // Delete from Cloudflare if requested
+        if (deleteFromStorage && image.cloudflareId) {
+          try {
+            console.log(`Deleting from Cloudflare: ${image.cloudflareId}`);
+            const cloudflareResponse = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`,
+              {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+                },
+              }
+            );
+
+            const cloudflareResult = await cloudflareResponse.json();
+            console.log(
+              `Cloudflare delete result: ${JSON.stringify(cloudflareResult)}`
+            );
+
+            if (!cloudflareResponse.ok) {
+              console.error(
+                `Error deleting from Cloudflare: ${
+                  cloudflareResult.errors?.[0]?.message || "Unknown error"
+                }`
+              );
             }
-          );
-        } catch (cloudflareError) {
-          console.error("Error deleting from Cloudflare:", cloudflareError);
-          // Continue with other deletions
+          } catch (cloudflareError) {
+            console.error("Error deleting from Cloudflare:", cloudflareError);
+            // Continue with other deletions
+          }
         }
+
+        deletedImages.push({
+          id: image._id.toString(),
+          url: image.url,
+        });
+      } catch (error) {
+        console.error(`Error deleting image ${image._id.toString()}:`, error);
+        failedImages.push({
+          id: image._id.toString(),
+          url: image.url,
+          error: String(error),
+        });
       }
+    }
+
+    // After all deletions, refresh the car document to ensure it's up to date
+    // Use a more aggressive approach to ensure the car document is updated
+    try {
+      // First, get the current car document to see what imageIds are left
+      const currentCar = await carsCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      console.log(`Current car imageIds: ${currentCar?.imageIds?.length || 0}`);
+
+      // If we deleted all images, explicitly set imageIds to an empty array
+      if (
+        deletedImages.length === imagesToDelete.length &&
+        imagesToDelete.length > 0
+      ) {
+        console.log(`All images deleted, setting imageIds to empty array`);
+        await carsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              imageIds: [],
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        );
+      } else {
+        // Otherwise, just update the timestamp
+        await carsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { updatedAt: new Date().toISOString() } }
+        );
+      }
+    } catch (refreshError) {
+      console.error(`Error refreshing car document: ${refreshError}`);
     }
 
     return NextResponse.json({
       success: true,
-      message: `Deleted ${imagesToDelete.length} images`,
-      deletedImages: imagesToDelete.map((img) => ({
-        id: img._id.toString(),
-        url: img.url,
-      })),
+      message: `Deleted ${deletedImages.length} images${
+        failedImages.length > 0
+          ? `, failed to delete ${failedImages.length} images`
+          : ""
+      }`,
+      deletedImages,
+      failedImages: failedImages.length > 0 ? failedImages : undefined,
     });
   } catch (error) {
     console.error("Error in batch delete:", error);

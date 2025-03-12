@@ -328,29 +328,6 @@ export function ImageGallery({
         carId,
       });
 
-      // Try test endpoint first as a diagnostic
-      try {
-        const testResponse = await fetch(`/api/test-images`, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            testData: "Testing DELETE endpoint from handleDeleteAll",
-            indices,
-            deleteFromStorage: true,
-          }),
-        });
-
-        const testResult = await testResponse.json();
-        console.log("[DEBUG ImageGallery] Test API response:", testResult);
-      } catch (testError) {
-        console.error(
-          "[DEBUG ImageGallery] Error calling test API:",
-          testError
-        );
-      }
-
       // Now try the actual operation - explicitly set deleteFromStorage to true
       if (!onRemoveImage) {
         throw new Error("onRemoveImage function is not available");
@@ -372,6 +349,12 @@ export function ImageGallery({
       });
 
       console.log("[DEBUG ImageGallery] Batch deletion completed successfully");
+
+      // Force a page reload after a short delay to ensure everything is reset
+      setTimeout(() => {
+        console.log("[DEBUG ImageGallery] Reloading page after delete all");
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error("[DEBUG ImageGallery] Error in handleDeleteAll:", error);
       onImageProgress?.({

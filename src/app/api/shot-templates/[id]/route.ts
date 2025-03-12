@@ -117,11 +117,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
     }
 
-    const result = await db
+    // First check if the template exists
+    const template = await db
       .collection("shotTemplates")
-      .deleteOne({ _id: objectId });
-
-    if (result.deletedCount === 0) {
+      .findOne({ _id: objectId });
+    if (!template) {
       console.log("Template not found for deletion:", params.id);
       return NextResponse.json(
         { error: "Template not found" },
@@ -129,8 +129,21 @@ export async function DELETE(
       );
     }
 
+    // Delete the template
+    const result = await db
+      .collection("shotTemplates")
+      .deleteOne({ _id: objectId });
+
+    if (result.deletedCount === 0) {
+      console.log("Template not deleted:", params.id);
+      return NextResponse.json(
+        { error: "Failed to delete template" },
+        { status: 500 }
+      );
+    }
+
     console.log("Template deleted successfully:", params.id);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, id: params.id });
   } catch (error) {
     console.error("Error deleting shot template:", error);
     return NextResponse.json(

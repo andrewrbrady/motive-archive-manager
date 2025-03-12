@@ -878,7 +878,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
       // Initialize progress tracking immediately
       const fileArray = Array.from(files);
       setUploadProgress(
-        fileArray.map((file) => ({
+        fileArray.map((file, i) => ({
           fileName: file.name,
           progress: 0,
           status: "pending" as const,
@@ -1337,9 +1337,19 @@ export default function CarPage({ params }: { params: { id: string } }) {
         );
       });
 
-      const imagesToDelete = indices
-        .filter((index) => car.images && index < car.images.length)
-        .map((index) => car.images![index]);
+      // Filter out invalid indices
+      const validIndices = indices.filter(
+        (index) => index >= 0 && car.images && index < car.images.length
+      );
+
+      console.log("[DEBUG] Valid indices after filtering:", validIndices);
+
+      if (validIndices.length === 0) {
+        console.error("[DEBUG] No valid indices to delete");
+        return;
+      }
+
+      const imagesToDelete = validIndices.map((index) => car.images![index]);
 
       console.log(
         "[DEBUG] Images to delete:",
@@ -1354,39 +1364,14 @@ export default function CarPage({ params }: { params: { id: string } }) {
       setCar((prev) => (prev ? { ...prev, images: remainingImages } : null));
 
       if (deleteFromStorage) {
-        // Test with our simple API first to check if routing is working
-        try {
-          console.log("[DEBUG] Calling test API...");
-          const testResponse = await fetch(`/api/test-images`, {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              testData: "Testing DELETE endpoint",
-              indices,
-              deleteFromStorage: true,
-            }),
-          });
-
-          const testResult = await testResponse.json();
-          console.log("[DEBUG] Test API response:", testResult);
-
-          if (!testResponse.ok) {
-            console.error("[DEBUG] Test API failed:", testResult);
-          }
-        } catch (testError) {
-          console.error("[DEBUG] Error calling test API:", testError);
-        }
-
         console.log("[DEBUG] Processing deletion request");
 
         try {
+          // Always use the batch endpoint for multiple images
+          // Use the main endpoint for single image
+          const isBatchDeletion = validIndices.length > 1;
           let apiUrl = `/api/cars/${car._id}/images`;
-          const isBatchDeletion =
-            indices.length > 1 && imagesToDelete.length > 1;
 
-          // Use the batch endpoint for multiple images
           if (isBatchDeletion) {
             apiUrl += `/batch`;
             console.log(`[DEBUG] Using batch endpoint: ${apiUrl}`);
@@ -1399,7 +1384,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
           const payload = isBatchDeletion
             ? {
                 // Batch deletion
-                indices,
+                indices: validIndices,
                 deleteFromStorage,
               }
             : {
@@ -1409,11 +1394,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
               };
 
           console.log("[DEBUG] Request payload:", JSON.stringify(payload));
-
-          // Check that we have valid indices
-          if (isBatchDeletion && (!indices.length || !imagesToDelete.length)) {
-            throw new Error("No valid images to delete");
-          }
 
           const response = await fetch(apiUrl, {
             method: "DELETE",
@@ -1434,31 +1414,95 @@ export default function CarPage({ params }: { params: { id: string } }) {
             );
           }
 
-          // If the API call was successful, let's refresh the data
-          try {
-            console.log(
-              "[DEBUG] Refreshing car data after successful deletion"
-            );
-            const carResponse = await fetch(`/api/cars/${car._id}`);
-            if (carResponse.ok) {
-              const updatedCarData = await carResponse.json();
-              setCar(updatedCarData);
-              console.log("[DEBUG] Car data refreshed successfully");
-            }
-          } catch (refreshError) {
-            console.error("[DEBUG] Error refreshing car data:", refreshError);
-          }
+          // Always force a complete refresh of the car data after deletion
+          await refreshCarData();
 
-          console.log("[DEBUG] Deletion successful");
-        } catch (apiError) {
-          console.error("[DEBUG] Error with API request:", apiError);
-          throw apiError;
+          // If this is a "delete all" operation, also refresh the page to ensure everything is reset
+          if (validIndices.length === car.images.length) {
+            console.log(
+              "[DEBUG] This was a delete all operation, refreshing page"
+            );
+            window.location.reload();
+          }
+        } catch (error) {
+          console.error("[DEBUG] Error deleting images:", error);
+          // Always refresh car data even on error to ensure UI is in sync
+          await refreshCarData();
+          throw error;
         }
+      } else {
+        // If not deleting from storage, just update the UI
+        console.log("[DEBUG] Not deleting from storage, UI already updated");
       }
     } catch (error) {
-      console.error("[DEBUG] Error removing images:", error);
-      // Revert the optimistic update on error
-      setCar((prev) => (prev ? { ...prev, images: car.images } : null));
+      console.error("[DEBUG] Error in handleRemoveImage:", error);
+      // Revert the optimistic update
+      await refreshCarData();
+      throw error;
+    }
+  };
+
+  // Function to refresh car data
+  const refreshCarData = async () => {
+    try {
+      console.log("[DEBUG] Refreshing car data");
+
+      // Add a small delay to ensure database operations have completed
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const response = await fetch(`/api/cars/${params.id}`, {
+        // Add cache-busting query parameter
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+        // Add timestamp to prevent caching
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data._id) {
+          console.log("[DEBUG] Car data refreshed successfully:", data._id);
+          setCar(data);
+        } else {
+          console.error("[DEBUG] Received invalid car data:", data);
+          // If we got an invalid response, try one more time after a delay
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const retryResponse = await fetch(
+            `/api/cars/${params.id}?retry=true`,
+            {
+              headers: {
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+              },
+              cache: "no-store",
+            }
+          );
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            if (retryData && retryData._id) {
+              console.log(
+                "[DEBUG] Car data refreshed successfully on retry:",
+                retryData._id
+              );
+              setCar(retryData);
+            } else {
+              console.error(
+                "[DEBUG] Failed to get valid car data even on retry"
+              );
+            }
+          }
+        }
+      } else {
+        console.error(
+          "[DEBUG] Failed to refresh car data:",
+          response.status,
+          response.statusText
+        );
+      }
+    } catch (error) {
+      console.error("[DEBUG] Error refreshing car data:", error);
     }
   };
 

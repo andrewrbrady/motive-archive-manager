@@ -33,6 +33,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
+import ResponsiveImage from "@/components/ui/ResponsiveImage";
 
 export interface ShotTemplate {
   title: string;
@@ -59,9 +60,6 @@ const getThumbnailUrl = (thumbnail: string | undefined): string => {
   // Always ensure the URL ends with /public for Cloudflare Images
   return thumbnail.endsWith("/public") ? thumbnail : `${thumbnail}/public`;
 };
-
-// Helper function to create a 4:3 aspect ratio container
-const aspectRatio4x3 = "pb-[75%]"; // 3/4 = 0.75 = 75%
 
 // Image Browser Component
 interface ImageBrowserProps {
@@ -127,16 +125,11 @@ function ImageBrowser({ onSelectImage }: ImageBrowserProps) {
           className="relative w-full rounded-md overflow-hidden border border-[hsl(var(--border))] cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => onSelectImage(imageUrl)}
         >
-          <div
-            className={`relative w-full ${aspectRatio4x3} bg-muted rounded-md overflow-hidden`}
-          >
-            <Image
-              src={getThumbnailUrl(imageUrl)}
-              alt={`Image ${index + 1}`}
-              fill
-              className="object-cover"
-            />
-          </div>
+          <ResponsiveImage
+            src={getThumbnailUrl(imageUrl)}
+            alt={`Image ${index + 1}`}
+            className="bg-muted rounded-md overflow-hidden"
+          />
         </div>
       ))}
     </div>
@@ -161,10 +154,73 @@ export default function ShotListTemplatesTab() {
   const [selectedShotIndex, setSelectedShotIndex] = useState<number | null>(
     null
   );
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const shotFileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const viewModeShotFileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [isViewModeSelection, setIsViewModeSelection] = useState(false);
+  const multipleFilesInputRef = useRef<HTMLInputElement>(null);
+
+  // Add global styles for portrait/landscape orientation
+  useEffect(() => {
+    // Add a style tag to the document head
+    const styleTag = document.createElement("style");
+    styleTag.innerHTML = `
+      .shot-item {
+        display: flex;
+        flex-direction: column;
+      }
+      .shot-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .shot-item-content {
+        display: flex;
+        flex-direction: row;
+        gap: 1.5rem;
+        align-items: flex-start;
+      }
+      .shot-item-left {
+        width: 200px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .shot-item-right {
+        flex-grow: 1;
+      }
+      .thumbnail-container {
+        width: 100%;
+        margin-bottom: 0.5rem;
+      }
+      .button-container {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+      }
+      .button-container button {
+        width: 100%;
+      }
+      @media (max-width: 768px) {
+        .shot-item-content {
+          flex-direction: column;
+        }
+        .shot-item-left {
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+      }
+    `;
+    document.head.appendChild(styleTag);
+
+    // Clean up the style tag when the component unmounts
+    return () => {
+      document.head.removeChild(styleTag);
+    };
+  }, []);
 
   const form = useForm<Template>({
     defaultValues: {
@@ -296,20 +352,41 @@ export default function ShotListTemplatesTab() {
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
+      console.log("Deleting template with ID:", templateId);
       const response = await fetch(`/api/shot-templates/${templateId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
-      if (!response.ok) throw new Error("Failed to delete template");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error response:", errorData);
+        throw new Error(
+          `Failed to delete template: ${errorData.error || response.statusText}`
+        );
+      }
 
       // Update the templates state directly
       setTemplates((prevTemplates) =>
         prevTemplates.filter((t) => t.id !== templateId)
       );
 
-      // If this was the selected template, clear the selection
+      // If this was the selected template, clear the selection and update the URL
       if (selectedTemplate && selectedTemplate.id === templateId) {
         setSelectedTemplate(null);
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("template");
+        router.push(`?${params.toString()}`);
+      }
+
+      // Select another template if available
+      if (templates.length > 1) {
+        const remainingTemplates = templates.filter((t) => t.id !== templateId);
+        if (remainingTemplates.length > 0) {
+          handleTemplateSelect(remainingTemplates[0]);
+        }
       }
 
       toast.success("Template deleted successfully");
@@ -696,10 +773,378 @@ export default function ShotListTemplatesTab() {
     }
   };
 
+  const handleMultipleFilesDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFiles(true);
+  };
+
+  const handleMultipleFilesDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFiles(false);
+  };
+
+  const handleMultipleFilesDrop = async (
+    e: React.DragEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFiles(false);
+
+    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    if (imageFiles.length === 0) {
+      toast.error("Please upload image files");
+      return;
+    }
+
+    // Show loading toast for multiple files
+    toast.loading(`Uploading ${imageFiles.length} images...`);
+
+    try {
+      // Process each file and create a new shot for each
+      const uploadPromises = imageFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/cloudflare/thumbnails", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload image: ${file.name}`);
+        }
+
+        const data = await response.json();
+        return data.imageUrl;
+      });
+
+      // Wait for all uploads to complete
+      const imageUrls = await Promise.all(uploadPromises);
+
+      // Get current shots
+      const currentShots = form.getValues("shots") || [];
+
+      // Create new shots with the uploaded images
+      const newShots = imageUrls.map((imageUrl) => ({
+        title: "",
+        description: "",
+        angle: "",
+        lighting: "",
+        notes: "",
+        thumbnail: imageUrl,
+      }));
+
+      // Update the form with the new shots
+      form.setValue("shots", [...currentShots, ...newShots]);
+
+      // Ensure we have refs for the new shots
+      shotFileInputRefs.current = [
+        ...shotFileInputRefs.current,
+        ...Array(newShots.length).fill(null),
+      ];
+
+      toast.dismiss();
+      toast.success(`Added ${imageUrls.length} new shots`);
+    } catch (error) {
+      console.error("Error uploading multiple images:", error);
+      toast.dismiss();
+      toast.error("Failed to upload some images");
+    }
+  };
+
+  const handleMultipleFilesSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const files = Array.from(e.target.files);
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    if (imageFiles.length === 0) {
+      toast.error("Please select image files");
+      return;
+    }
+
+    // Show loading toast for multiple files
+    toast.loading(`Uploading ${imageFiles.length} images...`);
+
+    try {
+      // Process each file and create a new shot for each
+      const uploadPromises = imageFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/cloudflare/thumbnails", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload image: ${file.name}`);
+        }
+
+        const data = await response.json();
+        return data.imageUrl;
+      });
+
+      // Wait for all uploads to complete
+      const imageUrls = await Promise.all(uploadPromises);
+
+      // Get current shots
+      const currentShots = form.getValues("shots") || [];
+
+      // Create new shots with the uploaded images
+      const newShots = imageUrls.map((imageUrl) => ({
+        title: "",
+        description: "",
+        angle: "",
+        lighting: "",
+        notes: "",
+        thumbnail: imageUrl,
+      }));
+
+      // Update the form with the new shots
+      form.setValue("shots", [...currentShots, ...newShots]);
+
+      // Ensure we have refs for the new shots
+      shotFileInputRefs.current = [
+        ...shotFileInputRefs.current,
+        ...Array(newShots.length).fill(null),
+      ];
+
+      toast.dismiss();
+      toast.success(`Added ${imageUrls.length} new shots`);
+    } catch (error) {
+      console.error("Error uploading multiple images:", error);
+      toast.dismiss();
+      toast.error("Failed to upload some images");
+    } finally {
+      // Reset the file input
+      if (multipleFilesInputRef.current) {
+        multipleFilesInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleViewModeMultipleFilesDrop = async (
+    e: React.DragEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFiles(false);
+
+    if (
+      !e.dataTransfer.files ||
+      e.dataTransfer.files.length === 0 ||
+      !selectedTemplate
+    )
+      return;
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    if (imageFiles.length === 0) {
+      toast.error("Please upload image files");
+      return;
+    }
+
+    // Show loading toast for multiple files
+    toast.loading(`Uploading ${imageFiles.length} images...`);
+
+    try {
+      // Process each file and create a new shot for each
+      const uploadPromises = imageFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/cloudflare/thumbnails", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload image: ${file.name}`);
+        }
+
+        const data = await response.json();
+        return data.imageUrl;
+      });
+
+      // Wait for all uploads to complete
+      const imageUrls = await Promise.all(uploadPromises);
+
+      // Create new shots with the uploaded images
+      const newShots = imageUrls.map((imageUrl) => ({
+        title: "",
+        description: "",
+        angle: "",
+        lighting: "",
+        notes: "",
+        thumbnail: imageUrl,
+      }));
+
+      // Create a copy of the template with the new shots
+      const updatedTemplate = { ...selectedTemplate };
+      updatedTemplate.shots = [...selectedTemplate.shots, ...newShots];
+
+      // Update the template on the server
+      const endpoint = `/api/shot-templates/${selectedTemplate.id}`;
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: updatedTemplate.name,
+          description: updatedTemplate.description,
+          shots: updatedTemplate.shots,
+          thumbnail: updatedTemplate.thumbnail,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update template");
+      }
+
+      // Update the selected template in state
+      setSelectedTemplate(updatedTemplate);
+
+      // Also update the template in the templates array
+      setTemplates((prevTemplates) =>
+        prevTemplates.map((t) =>
+          t.id === selectedTemplate.id ? updatedTemplate : t
+        )
+      );
+
+      toast.dismiss();
+      toast.success(`Added ${imageUrls.length} new shots`);
+    } catch (error) {
+      console.error("Error uploading multiple images:", error);
+      toast.dismiss();
+      toast.error("Failed to upload some images");
+    }
+  };
+
+  const handleViewModeMultipleFilesSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!e.target.files || e.target.files.length === 0 || !selectedTemplate)
+      return;
+
+    const files = Array.from(e.target.files);
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+
+    if (imageFiles.length === 0) {
+      toast.error("Please select image files");
+      return;
+    }
+
+    // Show loading toast for multiple files
+    toast.loading(`Uploading ${imageFiles.length} images...`);
+
+    try {
+      // Process each file and create a new shot for each
+      const uploadPromises = imageFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/cloudflare/thumbnails", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload image: ${file.name}`);
+        }
+
+        const data = await response.json();
+        return data.imageUrl;
+      });
+
+      // Wait for all uploads to complete
+      const imageUrls = await Promise.all(uploadPromises);
+
+      // Create new shots with the uploaded images
+      const newShots = imageUrls.map((imageUrl) => ({
+        title: "",
+        description: "",
+        angle: "",
+        lighting: "",
+        notes: "",
+        thumbnail: imageUrl,
+      }));
+
+      // Create a copy of the template with the new shots
+      const updatedTemplate = { ...selectedTemplate };
+      updatedTemplate.shots = [...selectedTemplate.shots, ...newShots];
+
+      // Update the template on the server
+      const endpoint = `/api/shot-templates/${selectedTemplate.id}`;
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: updatedTemplate.name,
+          description: updatedTemplate.description,
+          shots: updatedTemplate.shots,
+          thumbnail: updatedTemplate.thumbnail,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update template");
+      }
+
+      // Update the selected template in state
+      setSelectedTemplate(updatedTemplate);
+
+      // Also update the template in the templates array
+      setTemplates((prevTemplates) =>
+        prevTemplates.map((t) =>
+          t.id === selectedTemplate.id ? updatedTemplate : t
+        )
+      );
+
+      toast.dismiss();
+      toast.success(`Added ${imageUrls.length} new shots`);
+    } catch (error) {
+      console.error("Error uploading multiple images:", error);
+      toast.dismiss();
+      toast.error("Failed to upload some images");
+    } finally {
+      // Reset the file input
+      if (e.target) {
+        e.target.value = "";
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <Dialog open={isCreating} onOpenChange={setIsCreating}>
+        <Dialog
+          open={isCreating}
+          onOpenChange={(open) => {
+            setIsCreating(open);
+            if (open && !editingTemplate) {
+              // Reset the form when opening the dialog for a new template
+              form.reset({
+                name: "",
+                description: "",
+                shots: [],
+                thumbnail: "",
+              });
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
@@ -792,7 +1237,7 @@ export default function ShotListTemplatesTab() {
                             }
                             alt={template.name}
                             fill
-                            className="object-cover"
+                            className="object-contain"
                           />
                         </div>
                       ) : (
@@ -865,20 +1310,14 @@ export default function ShotListTemplatesTab() {
                                 <div className="space-y-2">
                                   {field.value ? (
                                     <div className="relative w-48 rounded-md overflow-hidden border border-[hsl(var(--border))]">
-                                      <div
-                                        className={aspectRatio4x3 + " relative"}
-                                      >
-                                        <Image
-                                          src={
-                                            field.value.endsWith("/public")
-                                              ? field.value
-                                              : `${field.value}/public`
-                                          }
-                                          alt="Template thumbnail"
-                                          fill
-                                          className="object-cover"
-                                        />
-                                      </div>
+                                      <ResponsiveImage
+                                        src={
+                                          field.value.endsWith("/public")
+                                            ? field.value
+                                            : `${field.value}/public`
+                                        }
+                                        alt="Template thumbnail"
+                                      />
                                     </div>
                                   ) : (
                                     <div
@@ -889,12 +1328,7 @@ export default function ShotListTemplatesTab() {
                                         fileInputRef.current?.click()
                                       }
                                     >
-                                      <div
-                                        className={
-                                          aspectRatio4x3 +
-                                          " relative w-full flex items-center justify-center"
-                                        }
-                                      >
+                                      <div className="relative w-full h-36 flex items-center justify-center">
                                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                                           {uploadingThumbnail ? (
                                             <>
@@ -989,23 +1423,68 @@ export default function ShotListTemplatesTab() {
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <h4 className="font-medium">Shots</h4>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleAddShot}
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Shot
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                multipleFilesInputRef.current?.click()
+                              }
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload Multiple
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleAddShot}
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Shot
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Multiple files input */}
+                        <input
+                          ref={multipleFilesInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleMultipleFilesSelect}
+                        />
+
+                        {/* Drag and drop area for multiple files */}
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-6 mb-4 transition-colors ${
+                            isDraggingFiles
+                              ? "border-primary bg-primary/5"
+                              : "border-[hsl(var(--border))]"
+                          }`}
+                          onDragOver={handleMultipleFilesDragOver}
+                          onDragLeave={handleMultipleFilesDragLeave}
+                          onDrop={handleMultipleFilesDrop}
+                          onClick={() => multipleFilesInputRef.current?.click()}
+                        >
+                          <div className="flex flex-col items-center justify-center text-center">
+                            <Upload className="w-10 h-10 mb-2 text-[hsl(var(--foreground-muted))]" />
+                            <p className="text-sm font-medium mb-1">
+                              Drag & drop multiple images here
+                            </p>
+                            <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                              Each image will be added as a new shot
+                            </p>
+                          </div>
                         </div>
 
                         {form.watch("shots")?.map((shot, index) => (
                           <div
                             key={index}
                             id={`shot-${index}`}
-                            className="space-y-4 p-4 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg"
+                            className="space-y-4 p-4 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg shot-item"
                           >
-                            <div className="flex justify-between items-center">
+                            <div className="shot-item-header">
                               <h5 className="font-medium">Shot {index + 1}</h5>
                               <Button
                                 type="button"
@@ -1017,73 +1496,40 @@ export default function ShotListTemplatesTab() {
                               </Button>
                             </div>
 
-                            <div className="flex flex-row gap-6">
-                              {/* Left side - Thumbnail */}
-                              <div className="flex-shrink-0 mr-4">
-                                <div className="relative w-48">
-                                  <div
-                                    className={`relative w-full ${aspectRatio4x3} bg-muted rounded-md overflow-hidden`}
-                                  >
-                                    {shot.thumbnail ? (
-                                      <Image
-                                        src={getThumbnailUrl(shot.thumbnail)}
-                                        alt={shot.title || "Shot thumbnail"}
-                                        fill
-                                        className="object-cover"
-                                      />
-                                    ) : (
-                                      <div
-                                        className={`absolute inset-0 flex flex-col items-center justify-center p-2 text-center ${
-                                          uploadingShotThumbnail === index
-                                            ? ""
-                                            : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
-                                        } transition-colors`}
-                                        onClick={(e) => {
-                                          if (uploadingShotThumbnail === index)
-                                            return;
-                                          e.preventDefault();
-                                          console.log(
-                                            "Upload button clicked for index:",
+                            <div className="shot-item-content">
+                              <div className="shot-item-left">
+                                {/* Thumbnail */}
+                                <div className="thumbnail-container">
+                                  {shot.thumbnail ? (
+                                    <ResponsiveImage
+                                      src={getThumbnailUrl(shot.thumbnail)}
+                                      alt={shot.title || "Shot thumbnail"}
+                                      className="bg-muted rounded-md overflow-hidden"
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`relative rounded-md border border-dashed border-[hsl(var(--border))] ${
+                                        uploadingShotThumbnail === index
+                                          ? ""
+                                          : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
+                                      } transition-colors`}
+                                      style={{ aspectRatio: "4/3" }}
+                                      onClick={(e) => {
+                                        if (uploadingShotThumbnail === index)
+                                          return;
+                                        e.preventDefault();
+                                        if (
+                                          viewModeShotFileInputRefs.current[
                                             index
-                                          );
-                                          console.log(
-                                            "viewModeShotFileInputRefs.current:",
-                                            viewModeShotFileInputRefs.current
-                                          );
-                                          console.log(
-                                            "viewModeShotFileInputRefs.current[index]:",
-                                            viewModeShotFileInputRefs.current[
-                                              index
-                                            ]
-                                          );
-
-                                          // Try to find the input element by its data attribute
-                                          const buttonInputElement =
-                                            document.querySelector(
-                                              `input[type="file"][data-shot-index="${index}"]`
-                                            ) as HTMLInputElement;
-                                          if (buttonInputElement) {
-                                            console.log(
-                                              "Found input element by data attribute:",
-                                              buttonInputElement
-                                            );
-                                            buttonInputElement.click();
-                                          } else if (
-                                            viewModeShotFileInputRefs.current[
-                                              index
-                                            ]
-                                          ) {
-                                            viewModeShotFileInputRefs.current[
-                                              index
-                                            ]?.click();
-                                          } else {
-                                            console.error(
-                                              "No file input ref found for index:",
-                                              index
-                                            );
-                                          }
-                                        }}
-                                      >
+                                          ]
+                                        ) {
+                                          viewModeShotFileInputRefs.current[
+                                            index
+                                          ]?.click();
+                                        }
+                                      }}
+                                    >
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center">
                                         {uploadingShotThumbnail === index ? (
                                           <>
                                             <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
@@ -1102,88 +1548,56 @@ export default function ShotListTemplatesTab() {
                                           </>
                                         )}
                                       </div>
-                                    )}
-                                  </div>
-                                  <div className="flex mt-2 space-x-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="flex-1"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        if (
-                                          viewModeShotFileInputRefs.current[
-                                            index
-                                          ]
-                                        ) {
-                                          viewModeShotFileInputRefs.current[
-                                            index
-                                          ]?.click();
-                                        }
-                                      }}
-                                    >
-                                      <Upload className="w-4 h-4 mr-2" />
-                                      {shot.thumbnail ? "Change" : "Upload"}
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        openImageBrowser(index, true);
-                                      }}
-                                    >
-                                      <Search className="w-4 h-4 mr-2" />
-                                      Browse
-                                    </Button>
-                                  </div>
-                                  <input
-                                    type="file"
-                                    data-shot-index={index}
-                                    ref={(el) => {
-                                      // Ensure the array is initialized
-                                      if (!viewModeShotFileInputRefs.current) {
-                                        viewModeShotFileInputRefs.current = [];
-                                      }
+                                    </div>
+                                  )}
+                                </div>
 
-                                      // Ensure the array is large enough
+                                {/* Buttons */}
+                                <div className="button-container">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={(e) => {
+                                      e.preventDefault();
                                       if (
-                                        viewModeShotFileInputRefs.current
-                                          .length <= index
+                                        viewModeShotFileInputRefs.current[index]
                                       ) {
-                                        const newArray = [
-                                          ...viewModeShotFileInputRefs.current,
-                                        ];
-                                        while (newArray.length <= index) {
-                                          newArray.push(null);
-                                        }
-                                        viewModeShotFileInputRefs.current =
-                                          newArray;
+                                        viewModeShotFileInputRefs.current[
+                                          index
+                                        ]?.click();
                                       }
-
-                                      // Set the ref
-                                      viewModeShotFileInputRefs.current[index] =
-                                        el;
-                                      console.log(
-                                        `Ref set for index ${index}:`,
-                                        el
-                                      );
                                     }}
-                                    className="hidden"
+                                  >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {shot.thumbnail ? "Change" : "Upload"}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                      openImageBrowser(index);
+                                    }}
+                                  >
+                                    <Search className="w-4 h-4 mr-2" />
+                                    Browse
+                                  </Button>
+                                  <input
+                                    ref={(el) => {
+                                      shotFileInputRefs.current[index] = el;
+                                    }}
+                                    type="file"
                                     accept="image/*"
+                                    className="hidden"
+                                    data-shot-index={index}
                                     onChange={(e) =>
-                                      handleViewModeShotThumbnailUpload(
-                                        e,
-                                        index
-                                      )
+                                      handleShotThumbnailUpload(e, index)
                                     }
                                   />
                                 </div>
                               </div>
 
-                              {/* Right side - Form fields */}
-                              <div className="flex-grow space-y-4">
+                              {/* Form fields */}
+                              <div className="shot-item-right space-y-4">
                                 <FormField
                                   control={form.control}
                                   name={`shots.${index}.title`}
@@ -1286,19 +1700,15 @@ export default function ShotListTemplatesTab() {
                                 Thumbnail
                               </p>
                               <div className="relative w-48 rounded-md overflow-hidden border border-[hsl(var(--border))]">
-                                <div className={aspectRatio4x3 + " relative"}>
-                                  <Image
-                                    src={getThumbnailUrl(
-                                      selectedTemplate.thumbnail
-                                    )}
-                                    alt={
-                                      selectedTemplate.name ||
-                                      "Template thumbnail"
-                                    }
-                                    fill
-                                    className="object-cover"
-                                  />
-                                </div>
+                                <ResponsiveImage
+                                  src={getThumbnailUrl(
+                                    selectedTemplate.thumbnail
+                                  )}
+                                  alt={
+                                    selectedTemplate.name ||
+                                    "Template thumbnail"
+                                  }
+                                />
                               </div>
                             </div>
                           )}
@@ -1341,80 +1751,107 @@ export default function ShotListTemplatesTab() {
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="text-lg font-medium">Shots</h3>
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-medium">Shots</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            document
+                              .getElementById("viewModeMultipleFilesInput")
+                              ?.click()
+                          }
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Add Multiple Shots
+                        </Button>
+                      </div>
+
+                      {/* Multiple files input for view mode */}
+                      <input
+                        id="viewModeMultipleFilesInput"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleViewModeMultipleFilesSelect}
+                      />
+
+                      {/* Drag and drop area for multiple files in view mode */}
+                      <div
+                        className={`border-2 border-dashed rounded-lg p-6 mb-4 transition-colors ${
+                          isDraggingFiles
+                            ? "border-primary bg-primary/5"
+                            : "border-[hsl(var(--border))]"
+                        }`}
+                        onDragOver={handleMultipleFilesDragOver}
+                        onDragLeave={handleMultipleFilesDragLeave}
+                        onDrop={handleViewModeMultipleFilesDrop}
+                        onClick={() =>
+                          document
+                            .getElementById("viewModeMultipleFilesInput")
+                            ?.click()
+                        }
+                      >
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <Upload className="w-10 h-10 mb-2 text-[hsl(var(--foreground-muted))]" />
+                          <p className="text-sm font-medium mb-1">
+                            Drag & drop multiple images here
+                          </p>
+                          <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                            Each image will be added as a new shot
+                          </p>
+                        </div>
+                      </div>
+
                       <div className="grid gap-4">
                         {selectedTemplate?.shots.map((shot, index) => (
                           <div
                             key={index}
-                            className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4"
+                            className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4 shot-item"
                           >
-                            <div className="flex flex-row gap-4">
-                              {/* Left side - Thumbnail */}
-                              <div className="flex-shrink-0 mr-4">
-                                <div className="relative w-48">
-                                  <div
-                                    className={`relative w-full ${aspectRatio4x3} bg-muted rounded-md overflow-hidden`}
-                                  >
-                                    {shot.thumbnail ? (
-                                      <Image
-                                        src={getThumbnailUrl(shot.thumbnail)}
-                                        alt={shot.title || "Shot thumbnail"}
-                                        fill
-                                        className="object-cover"
-                                      />
-                                    ) : (
-                                      <div
-                                        className={`absolute inset-0 flex flex-col items-center justify-center p-2 text-center ${
-                                          uploadingShotThumbnail === index
-                                            ? ""
-                                            : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
-                                        } transition-colors`}
-                                        onClick={(e) => {
-                                          if (uploadingShotThumbnail === index)
-                                            return;
-                                          e.preventDefault();
-                                          console.log(
-                                            "Upload button clicked for index:",
-                                            index
-                                          );
-                                          console.log(
-                                            "viewModeShotFileInputRefs.current:",
-                                            viewModeShotFileInputRefs.current
-                                          );
-                                          console.log(
-                                            "viewModeShotFileInputRefs.current[index]:",
-                                            viewModeShotFileInputRefs.current[
-                                              index
-                                            ]
-                                          );
+                            <div className="shot-item-header">
+                              <h5 className="font-medium">Shot {index + 1}</h5>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveShot(index)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
 
-                                          // Try to find the input element by its data attribute
-                                          const buttonInputElement =
-                                            document.querySelector(
-                                              `input[type="file"][data-shot-index="${index}"]`
-                                            ) as HTMLInputElement;
-                                          if (buttonInputElement) {
-                                            console.log(
-                                              "Found input element by data attribute:",
-                                              buttonInputElement
-                                            );
-                                            buttonInputElement.click();
-                                          } else if (
-                                            viewModeShotFileInputRefs.current[
-                                              index
-                                            ]
-                                          ) {
-                                            viewModeShotFileInputRefs.current[
-                                              index
-                                            ]?.click();
-                                          } else {
-                                            console.error(
-                                              "No file input ref found for index:",
-                                              index
-                                            );
-                                          }
-                                        }}
-                                      >
+                            <div className="shot-item-content">
+                              <div className="shot-item-left">
+                                {/* Thumbnail */}
+                                <div className="thumbnail-container">
+                                  {shot.thumbnail ? (
+                                    <ResponsiveImage
+                                      src={getThumbnailUrl(shot.thumbnail)}
+                                      alt={shot.title || "Shot thumbnail"}
+                                      className="bg-muted rounded-md overflow-hidden"
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`relative rounded-md border border-dashed border-[hsl(var(--border))] ${
+                                        uploadingShotThumbnail === index
+                                          ? ""
+                                          : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
+                                      } transition-colors`}
+                                      style={{ aspectRatio: "4/3" }}
+                                      onClick={(e) => {
+                                        if (uploadingShotThumbnail === index)
+                                          return;
+                                        e.preventDefault();
+                                        if (shotFileInputRefs.current[index]) {
+                                          shotFileInputRefs.current[
+                                            index
+                                          ]?.click();
+                                        }
+                                      }}
+                                    >
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center">
                                         {uploadingShotThumbnail === index ? (
                                           <>
                                             <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
@@ -1433,76 +1870,46 @@ export default function ShotListTemplatesTab() {
                                           </>
                                         )}
                                       </div>
-                                    )}
-                                  </div>
-                                  <div className="flex mt-2 space-x-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="flex-1"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        if (
-                                          viewModeShotFileInputRefs.current[
-                                            index
-                                          ]
-                                        ) {
-                                          viewModeShotFileInputRefs.current[
-                                            index
-                                          ]?.click();
-                                        }
-                                      }}
-                                    >
-                                      <Upload className="w-4 h-4 mr-2" />
-                                      {shot.thumbnail ? "Change" : "Upload"}
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        openImageBrowser(index, true);
-                                      }}
-                                    >
-                                      <Search className="w-4 h-4 mr-2" />
-                                      Browse
-                                    </Button>
-                                  </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Buttons */}
+                                <div className="button-container">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (shotFileInputRefs.current[index]) {
+                                        shotFileInputRefs.current[
+                                          index
+                                        ]?.click();
+                                      }
+                                    }}
+                                  >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {shot.thumbnail ? "Change" : "Upload"}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                      openImageBrowser(index, true);
+                                    }}
+                                  >
+                                    <Search className="w-4 h-4 mr-2" />
+                                    Browse
+                                  </Button>
                                   <input
-                                    type="file"
-                                    data-shot-index={index}
                                     ref={(el) => {
-                                      // Ensure the array is initialized
-                                      if (!viewModeShotFileInputRefs.current) {
-                                        viewModeShotFileInputRefs.current = [];
-                                      }
-
-                                      // Ensure the array is large enough
-                                      if (
-                                        viewModeShotFileInputRefs.current
-                                          .length <= index
-                                      ) {
-                                        const newArray = [
-                                          ...viewModeShotFileInputRefs.current,
-                                        ];
-                                        while (newArray.length <= index) {
-                                          newArray.push(null);
-                                        }
-                                        viewModeShotFileInputRefs.current =
-                                          newArray;
-                                      }
-
-                                      // Set the ref
                                       viewModeShotFileInputRefs.current[index] =
                                         el;
-                                      console.log(
-                                        `Ref set for index ${index}:`,
-                                        el
-                                      );
                                     }}
-                                    className="hidden"
+                                    type="file"
                                     accept="image/*"
+                                    className="hidden"
+                                    data-shot-index={index}
                                     onChange={(e) =>
                                       handleViewModeShotThumbnailUpload(
                                         e,
@@ -1513,12 +1920,16 @@ export default function ShotListTemplatesTab() {
                                 </div>
                               </div>
 
-                              {/* Right side - Shot details */}
-                              <div className="flex-grow space-y-2">
-                                <h4 className="font-medium">{shot.title}</h4>
-                                <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                                  {shot.description}
-                                </p>
+                              {/* Shot details */}
+                              <div className="shot-item-right">
+                                {shot.title && (
+                                  <h4 className="font-medium">{shot.title}</h4>
+                                )}
+                                {shot.description && (
+                                  <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+                                    {shot.description}
+                                  </p>
+                                )}
 
                                 {(shot.angle ||
                                   shot.lighting ||
