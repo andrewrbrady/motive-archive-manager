@@ -204,6 +204,7 @@ export interface Car {
   documents?: string[];
   research_entries?: any[];
   imageIds: string[];
+  primaryImageId?: string;
   images?: CarImage[];
   captionIds?: string[];
   eventIds?: string[];

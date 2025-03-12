@@ -49,6 +49,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     model: car.model,
     imageIds: car.imageIds,
     images: car.images,
+    primaryImageId: car.primaryImageId,
     hasImageIds: Boolean(car.imageIds?.length),
     hasImages: Boolean(car.images?.length),
   });
@@ -69,7 +70,26 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
 
       try {
         // First check if we have direct images array with the new structure
-        if (car.images?.[0]?.url) {
+        if (car.images?.length) {
+          // If there's a primaryImageId, use that image
+          if (car.primaryImageId) {
+            const primaryImg = car.images.find(
+              (img) => img._id === car.primaryImageId
+            );
+            if (primaryImg) {
+              console.log("CarCard: Using primary image from primaryImageId");
+              setPrimaryImage({
+                id: primaryImg._id,
+                url: primaryImg.url.endsWith("/public")
+                  ? primaryImg.url
+                  : `${primaryImg.url}/public`,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+
+          // If no primaryImageId or it wasn't found, fall back to first image
           console.log("CarCard: Using direct image URL from new structure");
           setPrimaryImage({
             id: car.images[0]._id,
@@ -82,35 +102,38 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
         }
 
         // Fall back to imageIds if no direct images
-        if (!car.imageIds?.[0]) {
-          console.log("CarCard: No image IDs available");
-          setLoading(false);
-          return;
-        }
+        if (car.imageIds?.length) {
+          // If there's a primaryImageId, use that image
+          const idToFetch =
+            car.primaryImageId && car.imageIds.includes(car.primaryImageId)
+              ? car.primaryImageId
+              : car.imageIds[0];
 
-        const response = await fetch(
-          `/api/images/metadata?ids=${car.imageIds[0]}`
-        );
-        console.log("CarCard: Response received:", {
-          status: response.status,
-          ok: response.ok,
-          statusText: response.statusText,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch image metadata");
-        }
-
-        const data = await response.json();
-        console.log("CarCard: Image metadata received:", data);
-
-        if (data && data[0]) {
-          setPrimaryImage({
-            id: data[0].imageId,
-            url: `${data[0].url}/public`,
+          console.log("CarCard: Fetching image with ID:", idToFetch);
+          const response = await fetch(`/api/images/metadata?ids=${idToFetch}`);
+          console.log("CarCard: Response received:", {
+            status: response.status,
+            ok: response.ok,
+            statusText: response.statusText,
           });
+
+          if (!response.ok) {
+            throw new Error("Failed to fetch image metadata");
+          }
+
+          const data = await response.json();
+          console.log("CarCard: Image metadata received:", data);
+
+          if (data && data[0]) {
+            setPrimaryImage({
+              id: data[0].imageId,
+              url: `${data[0].url}/public`,
+            });
+          } else {
+            console.error("CarCard: No image data in response");
+          }
         } else {
-          console.error("CarCard: No image data in response");
+          console.log("CarCard: No image IDs available");
         }
       } catch (error) {
         console.error("CarCard: Error fetching image:", error);
@@ -120,7 +143,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     };
 
     fetchPrimaryImage();
-  }, [car._id, car.imageIds, car.images]);
+  }, [car._id, car.imageIds, car.images, car.primaryImageId]);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation

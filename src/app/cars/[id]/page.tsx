@@ -1633,6 +1633,20 @@ export default function CarPage({ params }: { params: { id: string } }) {
                           })) || []
                         }
                         isLoading={imagesLoading}
+                        carId={id}
+                        primaryImageId={car.primaryImageId}
+                        onPrimaryImageChange={(imageId: string) => {
+                          // Update the local state to reflect the change
+                          setCar((prevCar) => {
+                            if (!prevCar) return prevCar;
+                            return {
+                              ...prevCar,
+                              primaryImageId: imageId,
+                            };
+                          });
+                          // Show a success message
+                          toast.success("Thumbnail updated successfully");
+                        }}
                       />
                     )}
                   </div>

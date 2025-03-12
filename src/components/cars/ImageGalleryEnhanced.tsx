@@ -1,9 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, X, ZoomIn, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ZoomIn,
+  Loader2,
+  Image as ImageIcon,
+} from "lucide-react";
 import { transformImageUrl, imagePresets } from "@/lib/imageTransform";
 import Image from "next/image";
+import { toast } from "react-hot-toast";
 
 interface ImageGalleryProps {
   images: {
@@ -24,11 +32,17 @@ interface ImageGalleryProps {
     updatedAt: string;
   }[];
   isLoading?: boolean;
+  carId?: string;
+  primaryImageId?: string;
+  onPrimaryImageChange?: (imageId: string) => void;
 }
 
 export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   images,
   isLoading = false,
+  carId,
+  primaryImageId,
+  onPrimaryImageChange,
 }) => {
   // Sort images by filename
   const sortedImages = [...images].sort((a, b) =>
@@ -49,9 +63,24 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     movement?: string;
     tod?: string;
   }>({});
+  const [updatingThumbnail, setUpdatingThumbnail] = useState<string | null>(
+    null
+  );
   const mainImageRef = useRef<HTMLDivElement>(null);
   const imagesPerRow = 3;
   const rowsPerPage = 5;
+
+  // Find the index of the primary image
+  useEffect(() => {
+    if (primaryImageId) {
+      const primaryIndex = sortedImages.findIndex(
+        (img) => img.id === primaryImageId
+      );
+      if (primaryIndex !== -1) {
+        setMainIndex(primaryIndex);
+      }
+    }
+  }, [primaryImageId, sortedImages]);
 
   // Reset image loaded state when images change
   useEffect(() => {
@@ -282,6 +311,69 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  const handleSetAsThumbnail = async (imageId: string) => {
+    if (!carId) {
+      toast.error("Cannot set thumbnail: Car ID is not available");
+      return;
+    }
+
+    setUpdatingThumbnail(imageId);
+
+    try {
+      const response = await fetch(`/api/cars/${carId}/thumbnail`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ primaryImageId: imageId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update thumbnail");
+      }
+
+      toast.success("Thumbnail updated successfully");
+
+      // Call the callback if provided
+      if (onPrimaryImageChange) {
+        onPrimaryImageChange(imageId);
+      }
+    } catch (error) {
+      console.error("Error updating thumbnail:", error);
+      toast.error("Failed to update thumbnail");
+    } finally {
+      setUpdatingThumbnail(null);
+    }
+  };
+
+  // Add this to the JSX where you render each thumbnail
+  const renderThumbnailButton = (imageId: string, index: number) => {
+    // Only show for visible thumbnails that match the filter criteria
+    const isVisible = true; // You can add logic here based on your filters if needed
+
+    if (!isVisible) return null;
+
+    return (
+      <button
+        className={`absolute bottom-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-black/90 transition-colors ${
+          primaryImageId === imageId ? "ring-2 ring-yellow-500" : ""
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleSetAsThumbnail(imageId);
+        }}
+        disabled={updatingThumbnail === imageId}
+        title="Set as thumbnail"
+      >
+        {updatingThumbnail === imageId ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <ImageIcon className="h-4 w-4" />
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -538,6 +630,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                           }
                         }}
                       />
+                      {renderThumbnailButton(image.id, index)}
                     </button>
                   );
                 })}
