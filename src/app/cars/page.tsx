@@ -71,7 +71,6 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     console.log("Fetching cars from:", url);
     const response = await fetch(url, {
       cache: "no-store",
-      next: { revalidate: 0 },
     });
 
     if (!response.ok) {
