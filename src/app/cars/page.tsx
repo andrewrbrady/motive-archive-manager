@@ -47,8 +47,15 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       }
     });
 
-    // Use relative URL instead of absolute URL to avoid issues with protocol/host in serverless environments
-    const url = `/api/cars?${queryParams.toString()}`;
+    // Use a properly formed URL that works in both development and production
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : "";
+
+    const url = `${baseUrl}/api/cars?${queryParams.toString()}`;
+    console.log("Fetching cars from:", url);
 
     // Fetch from the API route
     const response = await fetch(url, {

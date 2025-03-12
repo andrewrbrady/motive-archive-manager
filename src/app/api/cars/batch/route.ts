@@ -7,8 +7,18 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const ids = searchParams.get("ids")?.split(",") || [];
+    let ids: string[] = [];
+
+    try {
+      const { searchParams } = new URL(request.url);
+      ids = searchParams.get("ids")?.split(",") || [];
+    } catch (urlError) {
+      console.error("Error parsing URL:", urlError, request.url);
+      return NextResponse.json(
+        { error: "Invalid URL format" },
+        { status: 400 }
+      );
+    }
 
     if (ids.length === 0) {
       return NextResponse.json({ cars: [] });

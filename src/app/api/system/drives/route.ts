@@ -267,8 +267,18 @@ async function getBasicDriveInfo(
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const path = searchParams.get("path");
+    let path: string | null = null;
+
+    try {
+      const { searchParams } = new URL(request.url);
+      path = searchParams.get("path");
+    } catch (urlError) {
+      console.error("Error parsing URL:", urlError, request.url);
+      return NextResponse.json(
+        { error: "Invalid URL format" },
+        { status: 400 }
+      );
+    }
 
     if (!path) {
       return NextResponse.json(
