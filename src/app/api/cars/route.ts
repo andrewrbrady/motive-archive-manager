@@ -368,11 +368,15 @@ export async function GET(request: Request) {
       // Add client filter
       if (clientId) {
         try {
-          query.client = new ObjectId(clientId);
+          // Use $or to match both ObjectId and string client IDs
+          query.$or = [
+            { client: new ObjectId(clientId) },
+            { client: clientId },
+          ];
         } catch (error) {
           console.error("Invalid client ID format:", error);
-          // If the ID is invalid, return no results
-          query.client = null;
+          // If the ID is invalid, just use the string version
+          query.client = clientId;
         }
       }
 
