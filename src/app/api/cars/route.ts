@@ -6,33 +6,14 @@ import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { Car as InventoryCar } from "@/types/inventory";
 
-// Enhanced API logging utility
-function apiLog(
-  message: string,
-  data: any = {},
-  level: "info" | "warn" | "error" = "info"
-) {
-  const prefix = `[API] 🚙 Cars API: ${message}`;
-
-  if (level === "error") {
-    console.error(prefix, JSON.stringify(data, null, 2));
-  } else if (level === "warn") {
-    console.warn(prefix, JSON.stringify(data, null, 2));
-  } else {
-    console.log(prefix, JSON.stringify(data, null, 2));
-  }
+// Basic logging function
+function log(message: string, data?: any) {
+  console.log(`[Cars API] ${message}`, data);
 }
 
 // Add error handling utility
 function errorHandler(error: unknown, message: string): NextResponse {
-  apiLog(
-    message,
-    {
-      error: String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    },
-    "error"
-  );
+  console.error(`${message}:`, error);
 
   // Determine if this is a connection error
   const errorStr = String(error);
@@ -130,8 +111,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: Request) {
-  apiLog("Received GET request", { url: request.url });
-
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -142,7 +121,7 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") || "";
     const sort = searchParams.get("sort") || "createdAt_desc";
 
-    apiLog("Request parameters", {
+    log("Request parameters", {
       page,
       pageSize,
       search,
@@ -159,7 +138,6 @@ export async function GET(request: Request) {
 
     // Validate page number
     if (page < 1) {
-      apiLog("Invalid page number", { page }, "warn");
       return NextResponse.json(
         { error: "Invalid page number" },
         { status: 400 }
@@ -176,11 +154,9 @@ export async function GET(request: Request) {
 
     let client;
     try {
-      apiLog("Attempting to connect to MongoDB");
       client = await clientPromise;
-      apiLog("MongoDB connection successful");
     } catch (connectionError) {
-      apiLog("MongoDB connection error", { error: connectionError }, "error");
+      console.error("MongoDB connection error:", connectionError);
       return NextResponse.json(
         {
           error: "Database connection error",
@@ -195,51 +171,12 @@ export async function GET(request: Request) {
 
     const db = client.db();
     const carsCollection = db.collection("cars");
-    apiLog("Retrieved cars collection reference");
-
-    // ADDED: Check if the collection exists and has documents
-    try {
-      // Use db.command instead of stats() which doesn't exist on Collection type
-      const collectionStats = await db.command({ collStats: "cars" });
-      apiLog("Collection stats", {
-        count: collectionStats.count,
-        size: collectionStats.size,
-        avgObjSize: collectionStats.avgObjSize,
-        storageSize: collectionStats.storageSize,
-      });
-
-      // If zero documents, do a quick sample to check schema
-      if (collectionStats.count === 0) {
-        apiLog("Empty collection detected - check database setup", {}, "warn");
-      } else {
-        // Sample a document to check schema
-        const sampleDoc = await carsCollection.findOne({});
-        apiLog("Sample document from collection", {
-          sampleId: sampleDoc?._id ? sampleDoc._id.toString() : "none",
-          hasCreatedAt: !!sampleDoc?.createdAt,
-          fieldCount: sampleDoc ? Object.keys(sampleDoc).length : 0,
-        });
-      }
-    } catch (statsError) {
-      apiLog("Error checking collection stats", { error: statsError }, "error");
-    }
 
     // Build query
     const query: any = {
       // Ensure createdAt exists for all documents in the query
       createdAt: { $exists: true },
     };
-
-    apiLog("Building query with filter parameters", {
-      make,
-      minYear,
-      maxYear,
-      clientId,
-      minPrice,
-      maxPrice,
-      search,
-      sort,
-    });
 
     // Add search condition if search term exists
     if (search) {
@@ -314,12 +251,8 @@ export async function GET(request: Request) {
     if (clientId) {
       try {
         query.client = new ObjectId(clientId);
-        apiLog("Added client filter", {
-          clientId,
-          objectId: query.client.toString(),
-        });
       } catch (error) {
-        apiLog("Invalid client ID format", { clientId, error }, "error");
+        console.error("Invalid client ID format:", error);
         // If the ID is invalid, return no results
         query.client = null;
       }
@@ -363,7 +296,7 @@ export async function GET(request: Request) {
     const dbSortField = sortFieldMap[sortField] || "createdAt";
     sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
 
-    apiLog("Final query parameters", {
+    log("Using sort options", {
       requestedSort: sort,
       dbField: dbSortField,
       direction: sortDirection,
@@ -373,23 +306,9 @@ export async function GET(request: Request) {
 
     try {
       // Get total count for pagination
-      apiLog("Counting documents matching query");
       const totalCount = await carsCollection.countDocuments(query);
       const totalPages = Math.ceil(totalCount / pageSize);
       const skip = (page - 1) * pageSize;
-
-      apiLog("Count results", { totalCount, totalPages, skip });
-
-      // Exit early if no documents match
-      if (totalCount === 0) {
-        apiLog("No matching documents found", { query }, "warn");
-        return NextResponse.json({
-          cars: [],
-          totalPages: 0,
-          currentPage: page,
-          totalCount: 0,
-        });
-      }
 
       // Determine sort field and direction
       const [sortField, sortDir] = sort.split("_");
@@ -400,13 +319,6 @@ export async function GET(request: Request) {
       if (sortField !== "createdAt") {
         sortSpec["createdAt"] = -1;
       }
-
-      apiLog("Executing aggregate query", {
-        matchStage: query,
-        sortSpec,
-        skip,
-        limit: pageSize,
-      });
 
       // Execute the query with pagination and sorting
       const cars = await carsCollection
@@ -469,49 +381,21 @@ export async function GET(request: Request) {
         ])
         .toArray();
 
-      apiLog("Query results", {
-        carsCount: cars.length,
-        firstCarSample:
-          cars.length > 0
-            ? {
-                _id: cars[0]._id,
-                make: cars[0].make,
-                model: cars[0].model,
-                year: cars[0].year,
-              }
-            : "No cars found",
+      log("Query results", {
+        totalCount,
+        totalPages,
+        carsFound: cars.length,
       });
 
-      // NEW: Added safeguards for response data
-      let validCars = cars;
-      if (!validCars || !Array.isArray(validCars)) {
-        apiLog(
-          "Cars result is not an array",
-          { carsType: typeof cars },
-          "error"
-        );
-        validCars = [];
-      }
-
       // Return the cars with pagination info
-      const response = {
-        cars: validCars,
+      return NextResponse.json({
+        cars,
         totalPages,
         currentPage: page,
         totalCount,
-      };
-
-      apiLog("Sending response", {
-        totalCars: validCars.length,
-        totalPages,
-        totalCount,
-        status: 200,
-        responseKeys: Object.keys(response),
       });
-
-      return NextResponse.json(response);
     } catch (queryError) {
-      apiLog("Error executing cars query", { error: queryError }, "error");
+      console.error("Error executing cars query:", queryError);
       return NextResponse.json(
         {
           error: "Error querying cars",
