@@ -47,28 +47,57 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       }
     });
 
-    // Use a properly formed URL that works in both development and production
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NODE_ENV === "development"
-      ? "http://localhost:3000"
-      : "";
+    // Create the URL differently based on environment
+    // This avoids URL parsing issues in server components
+    let url: string;
 
-    const url = `${baseUrl}/api/cars?${queryParams.toString()}`;
+    if (typeof window === "undefined") {
+      // Server-side: Use new URL() with a base URL from env or defaults
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.NODE_ENV === "development"
+        ? "http://localhost:3000"
+        : "";
+
+      url = new URL(`/api/cars?${queryParams.toString()}`, baseUrl).toString();
+      console.log("Server-side cars URL:", url);
+    } else {
+      // Client-side: Use relative URL (will be automatically resolved)
+      url = `/api/cars?${queryParams.toString()}`;
+      console.log("Client-side cars URL:", url);
+    }
+
+    // Fetch with better error handling
     console.log("Fetching cars from:", url);
-
-    // Fetch from the API route
     const response = await fetch(url, {
       cache: "no-store",
+      next: { revalidate: 0 },
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch cars: ${response.status} ${response.statusText}`
-      );
+      // Try to get more error details
+      try {
+        const errorData = await response.json();
+        throw new Error(
+          `Failed to fetch cars: ${response.status} ${response.statusText}. ${
+            errorData.error || ""
+          }`
+        );
+      } catch (jsonError) {
+        throw new Error(
+          `Failed to fetch cars: ${response.status} ${response.statusText}`
+        );
+      }
     }
 
     const data = await response.json();
+
+    // Validate response data
+    if (!data || !Array.isArray(data.cars)) {
+      console.error("Invalid response data:", data);
+      throw new Error("Invalid response data from cars API");
+    }
+
     return {
       cars: data.cars as Car[],
       totalPages: data.totalPages,
