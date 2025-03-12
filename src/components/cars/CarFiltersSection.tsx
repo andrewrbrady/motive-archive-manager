@@ -11,6 +11,7 @@ import {
   FilterSelect,
   FilterInput,
 } from "@/components/ui/FilterSection";
+import { Search } from "lucide-react";
 
 interface CarFiltersSectionProps {
   currentFilters: {
@@ -20,6 +21,7 @@ interface CarFiltersSectionProps {
     clientId: string;
     minPrice: string;
     maxPrice: string;
+    search?: string;
   };
   makes: string[];
   clients: Client[];
@@ -87,6 +89,7 @@ export default function CarFiltersSection({
       minPrice: "",
       maxPrice: "",
       clientId: "",
+      search: "",
     };
     setFilters(emptyFilters);
 
@@ -107,78 +110,94 @@ export default function CarFiltersSection({
       hasActiveFilters={hasActiveFilters}
       onClearFilters={clearFilters}
     >
-      <div className="flex flex-row gap-6 items-end">
-        <FilterItem className="w-72">
-          <FilterLabel>Client</FilterLabel>
-          <FilterSelect
-            name="clientId"
-            value={filters.clientId}
-            onChange={(e) => handleFilterChange("clientId", e.target.value)}
-          >
-            <option value="">Any Client</option>
-            {clients.map((client) => (
-              <option key={client._id} value={client._id}>
-                {client.name}
-              </option>
-            ))}
-          </FilterSelect>
+      <div className="flex flex-col gap-6">
+        <FilterItem className="w-full">
+          <FilterLabel>
+            <Search className="h-4 w-4 inline mr-1" />
+            Search
+          </FilterLabel>
+          <FilterInput
+            type="text"
+            name="search"
+            placeholder="Search by make, model, year, VIN, color, etc."
+            value={filters.search || ""}
+            onChange={(e) => handleFilterChange("search", e.target.value)}
+          />
         </FilterItem>
 
-        <FilterItem className="w-56">
-          <FilterLabel>Make</FilterLabel>
-          <FilterSelect
-            name="make"
-            value={filters.make}
-            onChange={(e) => handleFilterChange("make", e.target.value)}
-          >
-            <option value="">Any Make</option>
-            {makes.map((make) => (
-              <option key={make} value={make}>
-                {make}
-              </option>
-            ))}
-          </FilterSelect>
-        </FilterItem>
+        <div className="flex flex-row gap-6 items-end">
+          <FilterItem className="w-72">
+            <FilterLabel>Client</FilterLabel>
+            <FilterSelect
+              name="clientId"
+              value={filters.clientId}
+              onChange={(e) => handleFilterChange("clientId", e.target.value)}
+            >
+              <option value="">Any Client</option>
+              {clients.map((client) => (
+                <option key={client._id} value={client._id}>
+                  {client.name}
+                </option>
+              ))}
+            </FilterSelect>
+          </FilterItem>
 
-        <FilterItem className="w-80">
-          <FilterLabel>Year Range</FilterLabel>
-          <div className="grid grid-cols-2 gap-4">
-            <FilterInput
-              type="number"
-              name="minYear"
-              placeholder="Min"
-              value={filters.minYear}
-              onChange={(e) => handleFilterChange("minYear", e.target.value)}
-            />
-            <FilterInput
-              type="number"
-              name="maxYear"
-              placeholder="Max"
-              value={filters.maxYear}
-              onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-            />
-          </div>
-        </FilterItem>
+          <FilterItem className="w-56">
+            <FilterLabel>Make</FilterLabel>
+            <FilterSelect
+              name="make"
+              value={filters.make}
+              onChange={(e) => handleFilterChange("make", e.target.value)}
+            >
+              <option value="">Any Make</option>
+              {makes.map((make) => (
+                <option key={make} value={make}>
+                  {make}
+                </option>
+              ))}
+            </FilterSelect>
+          </FilterItem>
 
-        <FilterItem className="w-80">
-          <FilterLabel>Price Range</FilterLabel>
-          <div className="grid grid-cols-2 gap-4">
-            <FilterInput
-              type="number"
-              name="minPrice"
-              placeholder="Min"
-              value={filters.minPrice}
-              onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-            />
-            <FilterInput
-              type="number"
-              name="maxPrice"
-              placeholder="Max"
-              value={filters.maxPrice}
-              onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
-            />
-          </div>
-        </FilterItem>
+          <FilterItem className="w-80">
+            <FilterLabel>Year Range</FilterLabel>
+            <div className="grid grid-cols-2 gap-4">
+              <FilterInput
+                type="number"
+                name="minYear"
+                placeholder="Min"
+                value={filters.minYear}
+                onChange={(e) => handleFilterChange("minYear", e.target.value)}
+              />
+              <FilterInput
+                type="number"
+                name="maxYear"
+                placeholder="Max"
+                value={filters.maxYear}
+                onChange={(e) => handleFilterChange("maxYear", e.target.value)}
+              />
+            </div>
+          </FilterItem>
+
+          <FilterItem className="w-80">
+            <FilterLabel>Price Range</FilterLabel>
+            <div className="grid grid-cols-2 gap-4">
+              <FilterInput
+                type="number"
+                name="minPrice"
+                placeholder="Min"
+                value={filters.minPrice}
+                onChange={(e) => handleFilterChange("minPrice", e.target.value)}
+              />
+              <FilterInput
+                type="number"
+                name="maxPrice"
+                placeholder="Max"
+                value={filters.maxPrice}
+                onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
+              />
+            </div>
+          </FilterItem>
+        </div>
       </div>
     </FilterSection>
   );

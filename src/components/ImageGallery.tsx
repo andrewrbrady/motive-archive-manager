@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
-import { UploadProgressDialog } from "./UploadProgressDialog";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import Image from "next/image";
 import ImageManager from "./ImageManager";
@@ -138,15 +137,15 @@ export function ImageGallery({
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>(
     {}
   );
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
 
   useEffect(() => {
-    if (uploadProgress.length > 0) {
-      setIsUploadDialogOpen(true);
-    } else {
-      setIsUploadDialogOpen(false);
+    if (uploading && uploadProgress.length > 0) {
+      // We no longer need to set dialog open state since StatusNotification
+      // is automatically shown by the parent component
+      // setIsUploadDialogOpen(true);
     }
-  }, [uploadProgress]);
+  }, [uploading, uploadProgress]);
 
   // Update effect to handle transition from no images to having images
   useEffect(() => {
@@ -319,11 +318,49 @@ export function ImageGallery({
       fileName: "all-images",
       progress: 0,
       status: "uploading",
-      currentStep: `Deleting all images`,
+      currentStep: `Starting batch deletion of ${indices.length} images`,
     });
 
     try {
-      // Delete all images at once
+      console.log("[DEBUG ImageGallery] Attempting to delete all images", {
+        indices,
+        totalImages: images.length,
+        carId,
+      });
+
+      // Try test endpoint first as a diagnostic
+      try {
+        const testResponse = await fetch(`/api/test-images`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            testData: "Testing DELETE endpoint from handleDeleteAll",
+            indices,
+            deleteFromStorage: true,
+          }),
+        });
+
+        const testResult = await testResponse.json();
+        console.log("[DEBUG ImageGallery] Test API response:", testResult);
+      } catch (testError) {
+        console.error(
+          "[DEBUG ImageGallery] Error calling test API:",
+          testError
+        );
+      }
+
+      // Now try the actual operation - explicitly set deleteFromStorage to true
+      if (!onRemoveImage) {
+        throw new Error("onRemoveImage function is not available");
+      }
+
+      console.log(
+        "[DEBUG ImageGallery] Calling onRemoveImage with deleteFromStorage=true"
+      );
+
+      // Call the onRemoveImage with explicit deleteFromStorage=true
       await onRemoveImage(indices, true);
 
       // Update progress after successful deletion
@@ -331,15 +368,17 @@ export function ImageGallery({
         fileName: "all-images",
         progress: 100,
         status: "complete",
-        currentStep: "All images deleted successfully",
+        currentStep: `Successfully deleted ${indices.length} images`,
       });
+
+      console.log("[DEBUG ImageGallery] Batch deletion completed successfully");
     } catch (error) {
-      console.error("Error deleting images:", error);
+      console.error("[DEBUG ImageGallery] Error in handleDeleteAll:", error);
       onImageProgress?.({
         fileName: "all-images",
         progress: 0,
         status: "error",
-        error: "Failed to delete images",
+        error: `Failed to delete images: ${error}`,
         currentStep: "Deletion failed",
       });
     }
@@ -572,19 +611,12 @@ export function ImageGallery({
             </div>
           </div>
         </div>
-
-        {/* Always show upload progress dialog */}
-        <UploadProgressDialog
-          uploadProgress={uploadProgress}
-          isOpen={isUploadDialogOpen}
-          onClose={() => setIsUploadDialogOpen(false)}
-        />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
       {showFilters && (
         <ImageFilterControls
           filters={filters}
@@ -948,13 +980,6 @@ export function ImageGallery({
           </div>
         </div>
       )}
-
-      {/* Upload Progress */}
-      <UploadProgressDialog
-        uploadProgress={uploadProgress}
-        isOpen={isUploadDialogOpen}
-        onClose={() => setIsUploadDialogOpen(false)}
-      />
 
       <ImageManager
         selectedImages={selectedImages.map((index) => images[index].url)}

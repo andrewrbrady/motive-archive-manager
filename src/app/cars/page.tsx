@@ -24,6 +24,7 @@ interface FilterParams {
   minPrice?: string;
   maxPrice?: string;
   sort?: string;
+  search?: string;
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -130,6 +131,7 @@ export default async function CarsPage({
       minPrice: resolvedParams.minPrice?.toString(),
       maxPrice: resolvedParams.maxPrice?.toString(),
       sort: resolvedParams.sort?.toString(),
+      search: resolvedParams.search?.toString(),
     };
 
     // Clean up undefined values

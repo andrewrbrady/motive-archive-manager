@@ -32,6 +32,7 @@ interface CarsPageClientProps {
     minPrice?: string;
     maxPrice?: string;
     sort?: string;
+    search?: string;
   };
   makes: Make[];
   clients: Client[];
@@ -97,6 +98,7 @@ export default function CarsPageClient({
               clientId: filters.clientId || "",
               minPrice: filters.minPrice || "",
               maxPrice: filters.maxPrice || "",
+              search: filters.search || "",
             }}
             makes={makes.map((make) => make.name)}
             clients={clients}

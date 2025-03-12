@@ -542,6 +542,66 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const [additionalContext, setAdditionalContext] = useState("");
   const [imagesLoading, setImagesLoading] = useState(true);
 
+  // Create a CarsClientContext object for the ImageUploadWithContext component
+  const carsClientContext = {
+    uploadImages: async (
+      carId: string,
+      files: File[],
+      setProgress: (progress: UploadProgress[]) => void
+    ) => {
+      try {
+        // Initialize progress tracking
+        const initialProgress = files.map((file) => ({
+          fileName: file.name,
+          progress: 0,
+          status: "pending" as const,
+          currentStep: "Starting upload...",
+        }));
+        setProgress(initialProgress);
+
+        // Convert File[] to FileList-like object for handleImageUpload
+        const fileListLike = {
+          length: files.length,
+          item: (index: number) => files[index],
+          [Symbol.iterator]: function* () {
+            for (let i = 0; i < files.length; i++) {
+              yield files[i];
+            }
+          },
+        } as unknown as FileList;
+
+        // Use the existing handleImageUpload function
+        await handleImageUpload(fileListLike);
+      } catch (error) {
+        console.error("Error in uploadImages:", error);
+      }
+    },
+    deleteImage: async (
+      carId: string,
+      imageId: string,
+      setStatus: (status: any) => void
+    ) => {
+      try {
+        setStatus({ status: "deleting" });
+
+        // Find the image index
+        const imageIndex =
+          car?.images?.findIndex((img) => img._id === imageId) ?? -1;
+        if (imageIndex === -1) {
+          throw new Error("Image not found");
+        }
+
+        // Use the existing handleRemoveImage function
+        await handleRemoveImage([imageIndex], true);
+
+        setStatus({ status: "complete" });
+      } catch (error) {
+        console.error("Error in deleteImage:", error);
+        setStatus({ status: "error", error: "Failed to delete image" });
+      }
+    },
+  };
+
   type NestedFields =
     | "engine"
     | "dimensions"
@@ -822,7 +882,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
           fileName: file.name,
           progress: 0,
           status: "pending" as const,
-          currentStep: "Preparing upload...",
+          currentStep: "Starting upload...",
         }))
       );
       setUploadingImages(true);
@@ -855,7 +915,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
               ? {
                   ...p,
                   status: "uploading",
-                  currentStep: "Starting upload...",
+                  progress: 0,
+                  currentStep: "Uploading...",
                 }
               : p
           )
@@ -875,7 +936,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
                     ? {
                         ...p,
                         progress,
-                        currentStep: `Uploading: ${progress}%`,
+                        currentStep:
+                          progress === 100 ? "Processing..." : "Uploading...",
                       }
                     : p
                 )
@@ -894,7 +956,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
                           ...p,
                           progress: 100,
                           status: "analyzing",
-                          currentStep: "Analyzing image with AI...",
+                          currentStep: "Analyzing image...",
                         }
                       : p
                   )
@@ -928,7 +990,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
                       ? {
                           ...p,
                           status: "complete",
-                          currentStep: "Upload complete!",
+                          currentStep: "Upload complete",
                         }
                       : p
                   )
@@ -1250,10 +1312,40 @@ export default function CarPage({ params }: { params: { id: string } }) {
     indices: number[],
     deleteFromStorage = false
   ) => {
-    if (!car?.images?.length) return;
+    console.log(
+      `[DEBUG] Starting handleRemoveImage with indices:`,
+      indices,
+      `deleteFromStorage:`,
+      deleteFromStorage
+    );
+
+    if (!car?.images?.length) {
+      console.log("[DEBUG] No images to delete - car has no images");
+      return;
+    }
 
     try {
+      console.log("[DEBUG] Deleting images with indices:", indices);
       const indicesToRemove = new Set(indices);
+
+      // Debug each index to ensure it's valid
+      indices.forEach((index) => {
+        console.log(
+          `[DEBUG] Checking index ${index}: valid=${
+            index >= 0 && car.images && index < car.images.length
+          }`
+        );
+      });
+
+      const imagesToDelete = indices
+        .filter((index) => car.images && index < car.images.length)
+        .map((index) => car.images![index]);
+
+      console.log(
+        "[DEBUG] Images to delete:",
+        imagesToDelete.map((img) => img.url)
+      );
+
       const remainingImages = car.images.filter(
         (_, i) => !indicesToRemove.has(i)
       );
@@ -1262,20 +1354,109 @@ export default function CarPage({ params }: { params: { id: string } }) {
       setCar((prev) => (prev ? { ...prev, images: remainingImages } : null));
 
       if (deleteFromStorage) {
-        const response = await fetch(`/api/cars/${car._id}/images`, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ indices }),
-        });
+        // Test with our simple API first to check if routing is working
+        try {
+          console.log("[DEBUG] Calling test API...");
+          const testResponse = await fetch(`/api/test-images`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              testData: "Testing DELETE endpoint",
+              indices,
+              deleteFromStorage: true,
+            }),
+          });
 
-        if (!response.ok) {
-          throw new Error("Failed to delete images");
+          const testResult = await testResponse.json();
+          console.log("[DEBUG] Test API response:", testResult);
+
+          if (!testResponse.ok) {
+            console.error("[DEBUG] Test API failed:", testResult);
+          }
+        } catch (testError) {
+          console.error("[DEBUG] Error calling test API:", testError);
+        }
+
+        console.log("[DEBUG] Processing deletion request");
+
+        try {
+          let apiUrl = `/api/cars/${car._id}/images`;
+          const isBatchDeletion =
+            indices.length > 1 && imagesToDelete.length > 1;
+
+          // Use the batch endpoint for multiple images
+          if (isBatchDeletion) {
+            apiUrl += `/batch`;
+            console.log(`[DEBUG] Using batch endpoint: ${apiUrl}`);
+          } else {
+            console.log(`[DEBUG] Using main endpoint: ${apiUrl}`);
+          }
+
+          console.log("[DEBUG] Sending delete request to API:", apiUrl);
+
+          const payload = isBatchDeletion
+            ? {
+                // Batch deletion
+                indices,
+                deleteFromStorage,
+              }
+            : {
+                // Single image deletion
+                imageUrl: imagesToDelete[0].url,
+                deleteFromStorage,
+              };
+
+          console.log("[DEBUG] Request payload:", JSON.stringify(payload));
+
+          // Check that we have valid indices
+          if (isBatchDeletion && (!indices.length || !imagesToDelete.length)) {
+            throw new Error("No valid images to delete");
+          }
+
+          const response = await fetch(apiUrl, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+          console.log("[DEBUG] API response:", result);
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to delete images: ${response.status} ${
+                response.statusText
+              } - ${JSON.stringify(result)}`
+            );
+          }
+
+          // If the API call was successful, let's refresh the data
+          try {
+            console.log(
+              "[DEBUG] Refreshing car data after successful deletion"
+            );
+            const carResponse = await fetch(`/api/cars/${car._id}`);
+            if (carResponse.ok) {
+              const updatedCarData = await carResponse.json();
+              setCar(updatedCarData);
+              console.log("[DEBUG] Car data refreshed successfully");
+            }
+          } catch (refreshError) {
+            console.error("[DEBUG] Error refreshing car data:", refreshError);
+          }
+
+          console.log("[DEBUG] Deletion successful");
+        } catch (apiError) {
+          console.error("[DEBUG] Error with API request:", apiError);
+          throw apiError;
         }
       }
     } catch (error) {
-      console.error("Error removing images:", error);
+      console.error("[DEBUG] Error removing images:", error);
       // Revert the optimistic update on error
       setCar((prev) => (prev ? { ...prev, images: car.images } : null));
     }
@@ -1353,7 +1534,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
                         )}
                       </button>
                     </div>
-                    {isEditMode && (
+                    {isEditMode ? (
                       <ImageUploadWithContext
                         images={
                           car.images?.map((img) => ({
@@ -1380,24 +1561,36 @@ export default function CarPage({ params }: { params: { id: string } }) {
                         title={`${car.year} ${car.make} ${car.model}`}
                         onContextChange={setAdditionalContext}
                         carId={id}
+                        refreshImages={() => {
+                          fetch(`/api/cars/${id}`)
+                            .then((res) => res.json())
+                            .then((data) => setCar(data))
+                            .catch((error) =>
+                              console.error("Error refreshing images:", error)
+                            );
+                        }}
+                        context={carsClientContext}
+                      />
+                    ) : (
+                      <ImageGalleryEnhanced
+                        images={
+                          car.images?.map((img) => ({
+                            id: img._id,
+                            url: img.url.endsWith("/public")
+                              ? img.url
+                              : `${img.url}/public`,
+                            filename: img.filename,
+                            metadata: img.metadata || {},
+                            variants: {},
+                            createdAt:
+                              img.createdAt || new Date().toISOString(),
+                            updatedAt:
+                              img.updatedAt || new Date().toISOString(),
+                          })) || []
+                        }
+                        isLoading={imagesLoading}
                       />
                     )}
-                    <ImageGalleryEnhanced
-                      images={
-                        car.images?.map((img) => ({
-                          id: img._id,
-                          url: img.url.endsWith("/public")
-                            ? img.url
-                            : `${img.url}/public`,
-                          filename: img.filename,
-                          metadata: img.metadata || {},
-                          variants: {},
-                          createdAt: img.createdAt || new Date().toISOString(),
-                          updatedAt: img.updatedAt || new Date().toISOString(),
-                        })) || []
-                      }
-                      isLoading={imagesLoading}
-                    />
                   </div>
                 ),
               },

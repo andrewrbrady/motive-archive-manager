@@ -206,44 +206,134 @@ export async function GET(request: Request) {
         sort,
       });
 
-      // Add search condition if search term exists
-      if (search) {
-        const searchTerms = search.split(/\s+/).filter((term) => term);
+      // Enhanced fuzzy search implementation
+      if (search && search.trim() !== "") {
+        const searchTerm = search.trim();
 
-        // Look for year patterns (4 digits)
-        const yearTerms = searchTerms
-          .filter((term) => /^\d{4}$/.test(term))
-          .map((term) => parseInt(term));
-
-        // Create regex for non-year terms
-        const textTerms = searchTerms
-          .filter((term) => !/^\d{4}$/.test(term))
-          .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+        // Split search terms for multi-term searching
+        const searchTerms = searchTerm
+          .split(/\s+/)
+          .filter((term) => term && term.length > 1);
 
         const searchConditions = [];
 
-        // Add text-based searches
-        if (textTerms.length > 0) {
-          const textRegex = { $regex: textTerms.join("|"), $options: "i" };
-          searchConditions.push(
-            { make: textRegex },
-            { model: textRegex },
-            { vin: textRegex },
-            { color: textRegex },
-            { "manufacturing.series": textRegex },
-            { "manufacturing.trim": textRegex }
+        // If we have multiple terms, we'll handle them specially
+        if (searchTerms.length > 0) {
+          // Process potential year patterns (4 digits)
+          const yearTerms = searchTerms
+            .filter((term) => /^\d{4}$/.test(term))
+            .map((term) => parseInt(term));
+
+          // Process VIN patterns (alphanumeric patterns that might be VINs)
+          const vinTerms = searchTerms.filter((term) =>
+            /^[A-Za-z0-9]{5,17}$/.test(term)
           );
+
+          // Process remaining text terms
+          const textTerms = searchTerms.filter(
+            (term) => !/^\d{4}$/.test(term) && !/^[A-Za-z0-9]{5,17}$/.test(term)
+          );
+
+          // Build text search conditions
+          if (textTerms.length > 0) {
+            // Create regex for each term - case insensitive
+            const regexTerms = textTerms.map(
+              (term) =>
+                new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
+            );
+
+            // For each regex term, search across all text fields
+            for (const regexTerm of regexTerms) {
+              searchConditions.push(
+                { make: { $regex: regexTerm } },
+                { model: { $regex: regexTerm } },
+                { color: { $regex: regexTerm } },
+                { interior_color: { $regex: regexTerm } },
+                { condition: { $regex: regexTerm } },
+                { location: { $regex: regexTerm } },
+                { type: { $regex: regexTerm } },
+                { description: { $regex: regexTerm } },
+                { "engine.type": { $regex: regexTerm } },
+                { "clientInfo.name": { $regex: regexTerm } },
+                { "clientInfo.contact": { $regex: regexTerm } },
+                { "clientInfo.notes": { $regex: regexTerm } },
+                { "engine.features": { $regex: regexTerm } }
+              );
+            }
+          }
+
+          // Add year-specific search
+          if (yearTerms.length > 0) {
+            searchConditions.push(...yearTerms.map((year) => ({ year })));
+          }
+
+          // Add VIN-specific search
+          if (vinTerms.length > 0) {
+            for (const vinTerm of vinTerms) {
+              searchConditions.push({
+                vin: { $regex: new RegExp(vinTerm, "i") },
+              });
+            }
+          }
+
+          // Add raw search term as a fallback for partial matches
+          if (searchTerm.length > 2) {
+            const rawRegex = new RegExp(
+              searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "i"
+            );
+            searchConditions.push(
+              { make: { $regex: rawRegex } },
+              { model: { $regex: rawRegex } },
+              { vin: { $regex: rawRegex } },
+              { color: { $regex: rawRegex } },
+              { interior_color: { $regex: rawRegex } },
+              { location: { $regex: rawRegex } },
+              { description: { $regex: rawRegex } },
+              { "clientInfo.name": { $regex: rawRegex } }
+            );
+          }
+        } else {
+          // For a single search term we can be more efficient
+          const singleTermRegex = new RegExp(
+            searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            "i"
+          );
+
+          // Check if it's a year
+          if (/^\d{4}$/.test(searchTerm)) {
+            searchConditions.push({ year: parseInt(searchTerm) });
+          }
+
+          // Add text searches for all key fields
+          searchConditions.push(
+            { make: { $regex: singleTermRegex } },
+            { model: { $regex: singleTermRegex } },
+            { vin: { $regex: singleTermRegex } },
+            { color: { $regex: singleTermRegex } },
+            { interior_color: { $regex: singleTermRegex } },
+            { location: { $regex: singleTermRegex } },
+            { type: { $regex: singleTermRegex } },
+            { description: { $regex: singleTermRegex } },
+            { "engine.type": { $regex: singleTermRegex } },
+            { "clientInfo.name": { $regex: singleTermRegex } },
+            { "clientInfo.contact": { $regex: singleTermRegex } }
+          );
+
+          // Try to parse as numbers for numerical fields
+          const numericValue = parseFloat(searchTerm);
+          if (!isNaN(numericValue)) {
+            searchConditions.push(
+              { year: numericValue },
+              { "price.listPrice": numericValue },
+              { "price.soldPrice": numericValue },
+              { "mileage.value": numericValue },
+              { horsepower: numericValue }
+            );
+          }
         }
 
-        // Add year-based searches
-        if (yearTerms.length > 0) {
-          searchConditions.push(
-            ...yearTerms.map((year) => ({
-              $or: [{ year: year }, { year: year.toString() }],
-            }))
-          );
-        }
-
+        // Apply the search conditions with $or operator
         if (searchConditions.length > 0) {
           query.$or = searchConditions;
         }
