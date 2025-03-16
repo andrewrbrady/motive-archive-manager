@@ -228,56 +228,130 @@ export default function HardDrivesTab() {
       const timeout = 20000 + fetchAttempts * 10000; // 20s, 30s, 40s...
       console.log(`Using timeout of ${timeout}ms for hard drives request`);
 
-      const response = await fetchWithTimeout(url, {}, timeout);
+      // Add explicit retry mechanism
+      const maxRetries = 3;
+      let currentAttempt = 0;
+      let lastError = null;
 
-      if (!response.ok) {
-        throw new Error(
-          `Server responded with ${response.status}: ${response.statusText}`
-        );
+      while (currentAttempt < maxRetries) {
+        try {
+          // Use standard fetch with timeout handled separately
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+          const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(
+              `Server responded with ${response.status}: ${response.statusText}`
+            );
+          }
+
+          const data = await response.json();
+
+          // Debug info to console
+          console.log("API Response data structure:", Object.keys(data));
+
+          // Log debug information if available
+          if (data.debug) {
+            console.log("Hard drives API debug info:", data.debug);
+          }
+
+          // Try different possible response formats
+          // First check standard format (data.data)
+          let drivesList = [];
+
+          if (data.data && Array.isArray(data.data)) {
+            console.log(`Using data.data array with ${data.data.length} items`);
+            drivesList = data.data;
+          } else if (data.drives && Array.isArray(data.drives)) {
+            console.log(
+              `Using data.drives array with ${data.drives.length} items`
+            );
+            drivesList = data.drives;
+          } else if (Array.isArray(data)) {
+            console.log(
+              `Using direct array response with ${data.length} items`
+            );
+            drivesList = data;
+          } else {
+            console.warn("Unexpected API response format:", data);
+            drivesList = []; // Default to empty array
+          }
+
+          // Double-check that drivesList is actually an array
+          if (!Array.isArray(drivesList)) {
+            console.error(
+              "drivesList is not an array after processing:",
+              drivesList
+            );
+            drivesList = [];
+          }
+
+          console.log(
+            `Received ${drivesList.length} hard drives out of ${
+              data.meta?.total || 0
+            } total`
+          );
+
+          // Add defensive check to ensure each drive has required properties
+          const sanitizedDrives = drivesList.map((drive: any) => ({
+            ...drive,
+            _id: drive?._id?.toString() || Math.random().toString(), // Ensure we always have an ID
+            label: drive?.label || drive?.name || "Unnamed Drive",
+            type: drive?.type || "Unknown",
+            interface: drive?.interface || "Unknown",
+            capacity: drive?.capacity || { total: 0, used: 0 },
+            status: drive?.status || "Unknown",
+            locationDetails: drive?.locationDetails || null,
+            rawAssetDetails: Array.isArray(drive?.rawAssetDetails)
+              ? drive.rawAssetDetails
+              : [],
+          }));
+
+          setDrives(sanitizedDrives);
+          setTotalPages(data.meta?.totalPages || 1);
+          setFetchAttempts(0); // Reset attempts on success
+          setTimeoutOccurred(false);
+          setLoading(false);
+
+          // Successfully got data, break out of retry loop
+          break;
+        } catch (err) {
+          currentAttempt++;
+          lastError = err;
+          console.warn(`Attempt ${currentAttempt}/${maxRetries} failed:`, err);
+
+          if (currentAttempt < maxRetries) {
+            // Wait before retrying (exponential backoff)
+            const retryDelay = 1000 * Math.pow(2, currentAttempt);
+            console.log(`Retrying in ${retryDelay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          }
+        }
       }
 
-      const data = await response.json();
-
-      // Log debug information if available
-      if (data.debug) {
-        console.log("Hard drives API debug info:", data.debug);
+      // If we exhausted all retries and still have an error, throw it
+      if (currentAttempt === maxRetries && lastError) {
+        throw lastError;
       }
-
-      // Update to use data.data instead of data.drives to match the new API response format
-      const drivesList = data.data || [];
-      console.log(
-        `Received ${drivesList.length} hard drives out of ${
-          data.meta?.total || 0
-        } total`
-      );
-
-      // Add defensive check to ensure each drive has required properties
-      const sanitizedDrives = drivesList.map((drive: any) => ({
-        ...drive,
-        _id: drive._id || "",
-        label: drive.label || "Unnamed Drive",
-        type: drive.type || "Unknown",
-        interface: drive.interface || "Unknown",
-        capacity: drive.capacity || { total: 0, used: 0 },
-        status: drive.status || "Unknown",
-        locationDetails: drive.locationDetails || null,
-        rawAssetDetails: Array.isArray(drive.rawAssetDetails)
-          ? drive.rawAssetDetails
-          : [],
-      }));
-
-      setDrives(sanitizedDrives);
-      setTotalPages(data.meta?.totalPages || 1);
-      setFetchAttempts(0); // Reset attempts on success
-      setTimeoutOccurred(false);
-      setLoading(false);
     } catch (err) {
       console.error("Error fetching hard drives:", err);
 
       // Check if this was a timeout
       const isTimeout =
         err instanceof Error &&
-        (err.name === "AbortError" || err.message.includes("timed out"));
+        (err.name === "AbortError" ||
+          err.message.includes("timed out") ||
+          err.message.includes("abort"));
 
       // Check if the error is a connection issue
       const isConnectionError =
@@ -294,6 +368,11 @@ export default function HardDrivesTab() {
         console.warn("Database connection error detected:", err.message);
       }
 
+      // Provide a fallback empty array for drives to prevent mapping errors
+      setDrives([]);
+      setLoading(false);
+      setError("Failed to load hard drives. Please try again.");
+
       // Try to extract any debug info from the response
       let debugInfo = {};
       try {
@@ -306,66 +385,6 @@ export default function HardDrivesTab() {
         }
       } catch (e) {
         console.log("Could not extract debug info from error");
-      }
-
-      // If we haven't exceeded max retries, try again
-      if (fetchAttempts < maxRetries) {
-        const nextAttempt = fetchAttempts + 1;
-        console.log(
-          `Retrying hard drives fetch (attempt ${nextAttempt} of ${maxRetries})...`
-        );
-        setFetchAttempts(nextAttempt);
-
-        // Wait longer between retries with exponential backoff
-        const delay = Math.min(1000 * Math.pow(2, fetchAttempts), 10000);
-        console.log(`Waiting ${delay}ms before retry...`);
-
-        setTimeout(() => {
-          fetchDrives(true); // Pass true to indicate this is a retry
-        }, delay);
-
-        // Update error message to be more user-friendly
-        if (fetchAttempts === 0) {
-          setError(
-            isTimeout
-              ? "Loading is taking longer than expected. Retrying..."
-              : isConnectionError
-              ? `Database connection issue. Retrying... (${
-                  err instanceof Error ? err.message : "Unknown error"
-                })`
-              : `Loading error: ${
-                  err instanceof Error ? err.message : "Unknown error"
-                }. Retrying...`
-          );
-        } else {
-          setError(
-            `Still trying to load (attempt ${nextAttempt} of ${maxRetries})...${
-              isTimeout
-                ? " The server is taking longer than expected to respond."
-                : isConnectionError
-                ? " Database connection issues persist."
-                : ""
-            }`
-          );
-        }
-      } else {
-        // Max retries exceeded, show final error
-        const errorMessage = isTimeout
-          ? "Request timed out. The server might be under heavy load or the database connection may be having issues."
-          : isConnectionError
-          ? `Database connection failed: ${
-              err instanceof Error ? err.message : "Unknown error"
-            }. Please check your database settings or network connection.`
-          : `Failed to load hard drives: ${
-              err instanceof Error ? err.message : "Unknown error"
-            }`;
-
-        console.error("All retries failed. Final error:", errorMessage, {
-          env: process.env.NODE_ENV,
-          isVercel: Boolean(process.env.VERCEL),
-        });
-        setError(errorMessage);
-        setLoading(false);
       }
     }
   };

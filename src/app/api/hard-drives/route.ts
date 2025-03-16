@@ -1,183 +1,194 @@
 import { NextResponse } from "next/server";
-import { HardDrive, HardDriveData } from "@/models/hard-drive";
-import clientPromise, {
-  getMongoClient,
-  validateConnection,
-  ensureCollectionExists,
-  type MongoDebugInfo,
-} from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { toObjectId } from "@/lib/mongodb-types";
-
-type PipelineStage = {
-  $match?: any;
-  $sort?: { updatedAt: number };
-  $skip?: number;
-  $limit?: number;
-  $lookup?: {
-    from: string;
-    localField: string;
-    foreignField: string;
-    as: string;
-  };
-  $addFields?: any;
-};
+import { HardDrive } from "@/models/hard-drive";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const currentPage = Number(searchParams.get("page") || "1");
-  const limit = Number(searchParams.get("limit") || "25");
-  const skip = (currentPage - 1) * limit;
-  const sort = searchParams.get("sort") || "";
-  const direction = searchParams.get("direction") === "desc" ? -1 : 1;
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "10");
+  const search = searchParams.get("search") || "";
+  const sort = searchParams.get("sort") || "name";
+  const direction = searchParams.get("direction") === "asc" ? 1 : -1;
+  const ids = searchParams.get("ids");
+  const includeAssets = searchParams.get("include_assets") === "true";
 
-  // Construct sort options
-  const sortOptions: Record<string, 1 | -1> = {};
-  if (sort) {
-    sortOptions[sort] = direction;
-  } else {
-    // Default sort by createdAt desc if no sort specified
-    sortOptions["createdAt"] = -1;
-  }
+  const skip = (page - 1) * limit;
 
-  // Create the debug info object
-  const debugInfo: MongoDebugInfo = {
+  // Debug info to help diagnose issues
+  const debugInfo = {
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development",
+    environment: process.env.NODE_ENV || "unknown",
     vercel: process.env.VERCEL === "1",
     database: process.env.MONGODB_DB || "motive_archive",
-    connectionPoolSize: 10,
-    connectionStatus: "error",
+    connectionPoolSize: 5,
+    hasCollection: false,
+    returnedCount: 0,
+    totalCount: 0,
+    retryCount: 0,
+    requestParams: {
+      page,
+      limit,
+      search: search ? true : false,
+      ids: ids ? true : false,
+      includeAssets,
+    },
+    collections: [] as string[],
   };
 
-  let client;
-  let hasCollection = false;
+  console.time("hard-drives-api-fetch");
 
   try {
-    // Validate connection first
-    const isConnected = await validateConnection();
-    if (!isConnected) {
-      return NextResponse.json(
-        {
-          error: "Failed to validate MongoDB connection",
-          data: [],
-          meta: {
-            page: currentPage,
-            limit,
-            total: 0,
-            totalPages: 0,
-          },
-          debug: {
-            ...debugInfo,
-            connectionStatus: "error",
-            connectionError: "Connection validation failed",
-          },
+    const db = await getDatabase();
+
+    // Check if collection exists to provide better error messages
+    const collections = await db.collections();
+    const collectionNames = collections.map((c) => c.collectionName);
+    debugInfo.hasCollection = collectionNames.includes("hard_drives");
+
+    if (!debugInfo.hasCollection) {
+      console.warn("Collection 'hard_drives' not found in database");
+      debugInfo.collections = collectionNames;
+
+      // Return empty array with metadata to avoid frontend errors
+      return NextResponse.json({
+        data: [],
+        meta: {
+          currentPage: page,
+          totalPages: 0,
+          totalCount: 0,
+          limit,
         },
-        { status: 500 }
-      );
+        debug: { ...debugInfo, error: "Collection not found" },
+      });
     }
 
-    // Attempt to get the MongoDB client with more aggressive retry
-    client = await getMongoClient(3, 500);
+    const hardDrivesCollection = db.collection("hard_drives");
 
-    // Use our more robust collection check
-    const { exists, client: collectionClient } = await ensureCollectionExists(
-      "hard_drives",
-      client
-    );
-    client = collectionClient; // Use the client returned from ensureCollectionExists
-    hasCollection = exists;
+    // Build query
+    let query: any = {};
 
-    debugInfo.hasCollection = hasCollection;
-    debugInfo.connectionStatus = "success";
+    // If IDs are provided, filter by those specific IDs
+    if (ids) {
+      try {
+        const idArray = ids
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean);
+        if (idArray.length > 0) {
+          // Convert string IDs to ObjectId if valid, otherwise keep as string for backup search
+          const objectIdArray = idArray.map((id) => {
+            try {
+              return new ObjectId(id);
+            } catch (e) {
+              console.warn(`Invalid ObjectId format for ID: ${id}`);
+              return id; // Keep the original string as fallback
+            }
+          });
 
-    // If collection does not exist, return empty result
-    if (!hasCollection) {
-      return NextResponse.json(
-        {
-          data: [],
-          meta: {
-            page: currentPage,
-            limit,
-            total: 0,
-            totalPages: 0,
-          },
-          debug: {
-            ...debugInfo,
-            returnedCount: 0,
-            totalCount: 0,
-          },
-        },
-        { status: 200 }
-      );
+          // Create a query that can handle both ObjectId and string _id values
+          query = {
+            $or: [
+              {
+                _id: {
+                  $in: objectIdArray.filter((id) => id instanceof ObjectId),
+                },
+              },
+              // Also try matching against string IDs in case they're stored as strings
+              { _id: { $in: idArray.filter((id) => typeof id === "string") } },
+            ],
+          };
+        }
+      } catch (error) {
+        console.error("Error parsing IDs parameter:", error);
+        // If ID parsing fails, continue with empty query to avoid complete failure
+        query = {};
+      }
+    } else if (search) {
+      // Text search if no specific IDs
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { label: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
     }
 
-    // Make sure client is defined before using it
-    if (!client) {
-      throw new Error("MongoDB client is undefined after collection check");
-    }
+    console.log("Executing query:", JSON.stringify(query, null, 2));
 
-    // Get the collection
-    const db = client.db();
-    const collection = db.collection("hard_drives");
+    // Get count for pagination
+    const totalCount = await hardDrivesCollection.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limit);
 
-    // Count total documents for pagination
-    const totalDocumentsPromise = collection.countDocuments();
+    // Get sorted and paginated results
+    const sortOptions: Record<string, 1 | -1> = {};
+    sortOptions[sort] = direction;
 
-    // Get the drives with pagination and sorting
-    const drivesPromise = collection
-      .find({})
+    // Execute the query
+    const hardDrives = await hardDrivesCollection
+      .find(query)
       .sort(sortOptions)
       .skip(skip)
       .limit(limit)
       .toArray();
 
-    // Wait for both promises to resolve
-    const [totalDocuments, drives] = await Promise.all([
-      totalDocumentsPromise,
-      drivesPromise,
-    ]);
+    // Update debug info
+    debugInfo.returnedCount = hardDrives?.length || 0;
+    debugInfo.totalCount = totalCount;
 
-    const totalPages = Math.ceil(totalDocuments / limit);
+    // Double-check we have an array (defense against possible null from MongoDB)
+    const safelyTypedDrives = Array.isArray(hardDrives) ? hardDrives : [];
 
-    // Update debug info with counts
-    debugInfo.returnedCount = drives.length;
-    debugInfo.totalCount = totalDocuments;
+    // Make sure to convert ObjectId values to strings and set default values
+    const formattedDrives = safelyTypedDrives.map((drive) => ({
+      ...drive,
+      _id: drive._id ? drive._id.toString() : Math.random().toString(),
+      // Add required fields with defaults to ensure consistent response
+      name: drive.name || "Unnamed Drive",
+      label: drive.label || drive.name || "Unnamed Drive",
+      description: drive.description || "",
+      capacity: drive.capacity || { total: 0, used: 0 },
+      type: drive.type || "Unknown",
+      interface: drive.interface || "Unknown",
+      status: drive.status || "Unknown",
+      // Convert any ObjectId arrays to string arrays
+      rawAssetIds: Array.isArray(drive.rawAssetIds)
+        ? drive.rawAssetIds.map((id) => id?.toString() || "")
+        : [],
+      // Add empty arrays for related data if not present
+      rawAssetDetails: Array.isArray(drive.rawAssetDetails)
+        ? drive.rawAssetDetails
+        : [],
+      locationDetails: drive.locationDetails || null,
+    }));
 
-    return NextResponse.json(
-      {
-        data: drives,
-        meta: {
-          page: currentPage,
-          limit,
-          total: totalDocuments,
-          totalPages,
-        },
-        debug: debugInfo,
+    console.timeEnd("hard-drives-api-fetch");
+    console.log(`Returned ${formattedDrives.length} hard drives`);
+
+    return NextResponse.json({
+      data: formattedDrives,
+      meta: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        limit,
       },
-      { status: 200 }
-    );
+      debug: debugInfo,
+    });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error(`Error fetching hard drives: ${errorMessage}`);
+    console.error("Failed to fetch hard drives:", error);
+    // Return empty data with error to avoid frontend errors
     return NextResponse.json(
       {
-        error: "Failed to fetch hard drives",
-        message: errorMessage,
-        data: [],
+        data: [], // Always include an empty array rather than null/undefined
         meta: {
-          page: currentPage,
-          limit,
-          total: 0,
+          currentPage: page,
           totalPages: 0,
+          totalCount: 0,
+          limit,
         },
-        debug: {
-          ...debugInfo,
-          connectionStatus: "error",
-          connectionError: errorMessage,
-          hasCollection,
-        },
+        error: "Failed to fetch hard drives",
+        details: error instanceof Error ? error.message : String(error),
+        debug: debugInfo,
       },
       { status: 500 }
     );
@@ -186,76 +197,44 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    console.log("Received data:", JSON.stringify(data, null, 2));
+    const {
+      name,
+      description,
+      capacity,
+      rawAssetIds = [],
+    } = await request.json();
 
     // Validate required fields
-    if (!data.label || !data.capacity?.total || !data.type || !data.interface) {
-      console.log("Missing required fields:", {
-        label: !!data.label,
-        "capacity.total": !!data.capacity?.total,
-        type: !!data.type,
-        interface: !!data.interface,
-      });
+    if (!name || !description || !capacity) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // Check for duplicate label
-    const existingDrive = await HardDrive.findByLabel(data.label);
-    if (existingDrive) {
-      console.log(`A hard drive with label "${data.label}" already exists`);
-      return NextResponse.json(
-        { error: `A hard drive with label "${data.label}" already exists` },
-        { status: 400 }
-      );
-    }
-
-    // Check for duplicate system name if provided
-    if (data.systemName) {
-      const existingBySystemName = await HardDrive.findBySystemName(
-        data.systemName
-      );
-      if (existingBySystemName) {
-        console.log(
-          `A hard drive with system name "${data.systemName}" already exists`
-        );
-        return NextResponse.json(
-          {
-            error: `A hard drive with system name "${data.systemName}" already exists`,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Convert locationId to ObjectId if provided
-    if (data.locationId) {
-      try {
-        data.locationId = data.locationId.toString();
-      } catch (error) {
-        return NextResponse.json(
-          { error: "Invalid location ID" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Convert raw asset IDs to ObjectIds if provided
-    if (data.rawAssets) {
-      data.rawAssets = data.rawAssets.map((id: string) => new ObjectId(id));
-    }
+    const db = await getDatabase();
+    const hardDrivesCollection = db.collection("hard_drives");
 
     // Create new hard drive
-    const newDrive = await HardDrive.create({
-      ...data,
-      status: data.status || "Available",
-      rawAssets: data.rawAssets || [],
-    });
+    const newDrive = {
+      name,
+      description,
+      capacity,
+      rawAssetIds: rawAssetIds.map((id: string) => new ObjectId(id)),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    return NextResponse.json(newDrive, { status: 201 });
+    const result = await hardDrivesCollection.insertOne(newDrive);
+
+    return NextResponse.json(
+      {
+        ...newDrive,
+        _id: result.insertedId.toString(),
+        rawAssetIds: rawAssetIds,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error creating hard drive:", error);
     return NextResponse.json(
@@ -267,35 +246,17 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
+    const db = await getDatabase();
+    const hardDrivesCollection = db.collection("hard_drives");
 
-    if (!id) {
-      return NextResponse.json(
-        { error: "Hard drive ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const client = await getMongoClient(3, 500);
-    const db = client.db();
-
-    const result = await db
-      .collection("hard_drives")
-      .deleteOne({ _id: new ObjectId(id) });
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json(
-        { error: "Hard drive not found" },
-        { status: 404 }
-      );
-    }
+    // Delete all hard drives
+    await hardDrivesCollection.deleteMany({});
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting hard drive:", error);
+    console.error("Error deleting hard drives:", error);
     return NextResponse.json(
-      { error: "Failed to delete hard drive" },
+      { error: "Failed to delete hard drives" },
       { status: 500 }
     );
   }

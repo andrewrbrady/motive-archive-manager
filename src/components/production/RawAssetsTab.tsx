@@ -761,7 +761,7 @@ export default function RawAssetsTab() {
 
       // If we had to fetch a single asset, also fetch drive labels for it
       if (asset.hardDriveIds && asset.hardDriveIds.length > 0) {
-        fetchDriveLabelsForAsset(asset.hardDriveIds);
+        fetchDriveLabelsForAsset(asset);
       }
 
       // Also fetch car labels for this asset
@@ -774,162 +774,6 @@ export default function RawAssetsTab() {
       setError(err instanceof Error ? err.message : "Failed to fetch asset");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Function to fetch drive labels for a specific asset
-  const fetchDriveLabelsForAsset = async (hardDriveIds: string[]) => {
-    if (!hardDriveIds.length) return;
-
-    try {
-      // Ensure we have proper string IDs by removing any empty values
-      const validIds = hardDriveIds.filter(
-        (id) => id && id.toString().length > 0
-      );
-
-      if (validIds.length === 0) {
-        console.log("No valid drive IDs to fetch");
-        return;
-      }
-
-      console.log("Fetching drive labels for IDs:", validIds);
-      const response = await fetch(
-        `/api/hard-drives?ids=${validIds.join(",")}`
-      );
-
-      if (!response.ok) {
-        console.warn(`Failed to fetch drive labels: ${response.statusText}`);
-        return;
-      }
-
-      const data = await response.json();
-      console.log("Received drive data structure:", Object.keys(data));
-
-      const labels: Record<string, string> = {};
-
-      // The API response format should be consistent with what the HardDrivesTab uses
-      // First check for data.data format (which is what HardDrivesTab uses)
-      if (Array.isArray(data.data) && data.data.length > 0) {
-        console.log(
-          `Processing ${data.data.length} drives from data.data array`
-        );
-
-        // Log the first item to help with debugging
-        if (data.data[0]) {
-          console.log(
-            "Sample drive from data.data:",
-            JSON.stringify(data.data[0])
-          );
-        }
-
-        data.data.forEach((drive: any) => {
-          if (drive && drive._id) {
-            const driveIdStr = drive._id.toString();
-
-            // Set label with more robust fallbacks
-            const driveLabel =
-              drive.label ||
-              drive.name ||
-              (drive.systemName ? drive.systemName : null);
-
-            if (driveLabel) {
-              labels[driveIdStr] = driveLabel;
-              console.log(
-                `Set label for drive ${driveIdStr}: ${labels[driveIdStr]}`
-              );
-            }
-          }
-        });
-      }
-      // For backward compatibility, also handle data.drives format
-      else if (Array.isArray(data.drives) && data.drives.length > 0) {
-        console.log(`Processing ${data.drives.length} drives from data.drives`);
-
-        // Log the first item to help with debugging
-        if (data.drives[0]) {
-          console.log(
-            "Sample drive from data.drives:",
-            JSON.stringify(data.drives[0])
-          );
-        }
-
-        data.drives.forEach((drive: any) => {
-          if (drive && drive._id) {
-            const driveIdStr = drive._id.toString();
-
-            // Set label with more robust fallbacks
-            const driveLabel =
-              drive.label ||
-              drive.name ||
-              (drive.systemName ? drive.systemName : null);
-
-            if (driveLabel) {
-              labels[driveIdStr] = driveLabel;
-              console.log(
-                `Set label for drive ${driveIdStr}: ${labels[driveIdStr]}`
-              );
-            }
-          }
-        });
-      }
-      // Check for direct array format as last resort
-      else if (Array.isArray(data) && data.length > 0) {
-        console.log(
-          `Processing ${data.length} drives from direct array format`
-        );
-
-        // Log the first item to help with debugging
-        if (data[0]) {
-          console.log(
-            "Sample drive from direct array:",
-            JSON.stringify(data[0])
-          );
-        }
-
-        data.forEach((drive: any) => {
-          if (drive && drive._id) {
-            const driveIdStr = drive._id.toString();
-
-            // Set label with more robust fallbacks
-            const driveLabel =
-              drive.label ||
-              drive.name ||
-              (drive.systemName ? drive.systemName : null);
-
-            if (driveLabel) {
-              labels[driveIdStr] = driveLabel;
-              console.log(
-                `Set label for drive ${driveIdStr}: ${labels[driveIdStr]}`
-              );
-            }
-          }
-        });
-      } else {
-        console.warn(
-          "Unexpected or empty data format from /api/hard-drives:",
-          data
-        );
-      }
-
-      // Only update state if we found any labels
-      if (Object.keys(labels).length > 0) {
-        console.log(
-          `Successfully found labels for ${Object.keys(labels).length} drives`
-        );
-        setDriveLabels((prevLabels) => ({ ...prevLabels, ...labels }));
-      } else {
-        console.warn("No valid drive labels found in API response");
-
-        // If we didn't find any labels but we have valid IDs, try fetching individually
-        if (validIds.length > 0 && validIds.length <= 5) {
-          console.log("Falling back to individual fetch for each drive");
-          validIds.forEach((id) => {
-            fetchIndividualDrive(id);
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching drive labels:", error);
     }
   };
 
@@ -985,42 +829,105 @@ export default function RawAssetsTab() {
     }
   }, []);
 
-  // Add to the useEffect for missing drive labels
-  useEffect(() => {
-    // Check if we have any assets but missing drive labels
-    if (assets.length > 0) {
-      // Find all unique drive IDs
-      const allDriveIds = new Set<string>();
-      assets.forEach((asset) => {
-        if (asset.hardDriveIds && asset.hardDriveIds.length) {
-          asset.hardDriveIds.forEach((id) => allDriveIds.add(id.toString()));
-        }
-      });
+  // Utility function to get drive label, with fallback
+  const getDriveLabel = useCallback(
+    (driveId: string): string => {
+      if (!driveId) return "Unknown Drive";
 
-      // Find drive IDs that don't have labels
-      const missingDriveIds = Array.from(allDriveIds).filter(
-        (id) => !driveLabels[id] && id !== ""
-      );
+      const label = driveLabels[driveId];
+      if (label) return label;
 
-      // If there are missing drive labels, fetch them individually
-      if (missingDriveIds.length > 0) {
-        console.log(
-          `Found ${missingDriveIds.length} drives without labels, fetching data...`
+      // If we don't have a label yet, trigger individual fetch and return fallback
+      fetchIndividualDrive(driveId).catch(console.error);
+      return `Drive ${driveId.substring(0, 8)}...`;
+    },
+    [driveLabels, fetchIndividualDrive]
+  );
+
+  // Function to fetch drive labels for a specific asset
+  const fetchDriveLabelsForAsset = useCallback(
+    async (asset: any) => {
+      if (!asset) return;
+
+      const driveIds = asset.hardDriveIds || [];
+      if (!Array.isArray(driveIds) || driveIds.length === 0) {
+        console.log("Asset has no drive IDs", asset);
+        return;
+      }
+
+      console.log(`Fetching labels for ${driveIds.length} drives`);
+
+      // Format IDs to strings
+      const formattedDriveIds = driveIds
+        .map((id) => (typeof id === "string" ? id : id?.toString()))
+        .filter(Boolean); // Remove any null/undefined values
+
+      try {
+        // First check if we already have the labels
+        const missingLabels = formattedDriveIds.filter(
+          (id) => !driveLabels[id]
         );
 
-        // Try fetch as a batch first
-        fetchDriveLabelsForAsset(missingDriveIds);
-
-        // If we have specific drives that we repeatedly fail to fetch in batch,
-        // try fetching them individually (limit to 5 to avoid excessive requests)
-        if (missingDriveIds.length < 5) {
-          missingDriveIds.forEach((id) => {
-            fetchIndividualDrive(id);
-          });
+        if (missingLabels.length === 0) {
+          console.log("All drive labels already cached");
+          return;
         }
+
+        console.log(`Fetching ${missingLabels.length} missing drive labels`);
+
+        // Try batch fetch first
+        const response = await fetch(
+          `/api/hard-drives?ids=${missingLabels.join(",")}`
+        );
+
+        if (!response.ok) {
+          console.warn(
+            "Batch fetch failed, falling back to individual fetches"
+          );
+          // Fall back to individual fetches
+          await Promise.all(missingLabels.map(fetchIndividualDrive));
+          return;
+        }
+
+        const data = await response.json();
+
+        // Process different response formats
+        let drivesList = [];
+        if (data.data && Array.isArray(data.data)) {
+          drivesList = data.data;
+        } else if (data.drives && Array.isArray(data.drives)) {
+          drivesList = data.drives;
+        } else if (Array.isArray(data)) {
+          drivesList = data;
+        }
+
+        if (!Array.isArray(drivesList) || drivesList.length === 0) {
+          console.warn("No drives found in response");
+          return;
+        }
+
+        // Update labels
+        const newLabels = { ...driveLabels };
+        drivesList.forEach((drive) => {
+          if (drive && drive._id) {
+            const driveIdStr =
+              typeof drive._id === "string" ? drive._id : drive._id.toString();
+            const label =
+              drive.label ||
+              drive.name ||
+              drive.systemName ||
+              `Drive ${driveIdStr.substring(0, 8)}`;
+            newLabels[driveIdStr] = label;
+          }
+        });
+
+        setDriveLabels(newLabels);
+      } catch (error) {
+        console.error("Error fetching drive labels:", error);
       }
-    }
-  }, [assets, driveLabels, fetchIndividualDrive]);
+    },
+    [driveLabels, fetchIndividualDrive]
+  );
 
   // Add effect to prefetch all drive labels when component mounts
   useEffect(() => {
@@ -1040,64 +947,61 @@ export default function RawAssetsTab() {
 
         // Find the drives data in the response
         let drivesList = [];
-        if (Array.isArray(data.data)) {
+        if (data.data && Array.isArray(data.data)) {
           console.log(`Found ${data.data.length} drives in data.data`);
           drivesList = data.data;
-        } else if (Array.isArray(data.drives)) {
+        } else if (data.drives && Array.isArray(data.drives)) {
           console.log(`Found ${data.drives.length} drives in data.drives`);
           drivesList = data.drives;
         } else if (Array.isArray(data)) {
           console.log(`Found ${data.length} drives in direct array`);
           drivesList = data;
-        }
-
-        if (drivesList.length > 0) {
-          console.log(`Prefetched ${drivesList.length} drive labels`);
-
-          // Log some sample drives to debug
-          if (drivesList.length > 0) {
-            console.log("Sample drive data:", JSON.stringify(drivesList[0]));
-          }
-
-          // Create a labels object with careful processing
-          const labels: Record<string, string> = {};
-          drivesList.forEach((drive: any) => {
-            if (drive && drive._id) {
-              const driveIdStr = drive._id.toString();
-
-              // Try to get a meaningful label
-              const driveLabel =
-                drive.label ||
-                drive.name ||
-                (drive.systemName ? `${drive.systemName}` : null);
-
-              if (driveLabel) {
-                labels[driveIdStr] = driveLabel;
-                console.log(
-                  `Mapped drive ${driveIdStr} to label: ${driveLabel}`
-                );
-              }
-            }
-          });
-
-          // Log the full mapping for debugging
-          console.log(
-            `Created ${Object.keys(labels).length} drive label mappings`
-          );
-
-          // Only update if we found labels
-          if (Object.keys(labels).length > 0) {
-            setDriveLabels(labels);
-          }
         } else {
-          console.warn("No drives found in prefetch response");
+          console.warn(
+            "Unexpected API response format, no drives found:",
+            data
+          );
+          return;
         }
+
+        // Safely transform the drivesList
+        const labels: Record<string, string> = {};
+
+        if (!Array.isArray(drivesList)) {
+          console.warn("drivesList is not an array:", drivesList);
+          setDriveLabels({});
+          return;
+        }
+
+        drivesList.forEach((drive) => {
+          if (drive && drive._id) {
+            const driveIdStr =
+              typeof drive._id === "string" ? drive._id : drive._id.toString();
+
+            // Try multiple possible label fields
+            const driveLabel =
+              drive.label ||
+              drive.name ||
+              drive.systemName ||
+              `Drive ${driveIdStr.substring(0, 8)}`;
+
+            if (driveLabel) {
+              labels[driveIdStr] = driveLabel;
+              console.log(
+                `Set label for drive ${driveIdStr}: ${labels[driveIdStr]}`
+              );
+            }
+          }
+        });
+
+        console.log(`Prefetched ${Object.keys(labels).length} drive labels`);
+        setDriveLabels(labels);
       } catch (error) {
         console.error("Error prefetching drive labels:", error);
+        // Don't set an empty object here, keep any previous labels we might have
       }
     };
 
-    // Call the prefetch function
     prefetchAllDrives();
   }, []);
 
@@ -1322,7 +1226,7 @@ export default function RawAssetsTab() {
                             : "";
 
                           // Get the actual drive label from our state
-                          let driveLabel = driveLabels[hardDriveIdStr];
+                          let driveLabel = getDriveLabel(hardDriveIdStr);
 
                           // Special handling for ARB_SHARED drives
                           if (!driveLabel && hardDriveIdStr.includes("ARB")) {
