@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { HardDrive, HardDriveData } from "@/models/hard-drive";
-import clientPromise from "@/lib/mongodb";
+import clientPromise, { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { toObjectId } from "@/lib/mongodb-types";
 
@@ -35,7 +35,8 @@ export async function GET(request: Request) {
       `Fetching hard drives: page=${page}, limit=${limit}, search=${search}, location=${location}, includeAssets=${includeAssets}`
     );
 
-    const client = await clientPromise;
+    // Use the enhanced getMongoClient with retry logic
+    const client = await getMongoClient(5, 1000); // 5 retries with 1s initial delay
     const db = client.db();
     const collection = db.collection("hard_drives");
 
@@ -63,6 +64,46 @@ export async function GET(request: Request) {
     if (location) {
       match.locationId = location;
     }
+
+    // First do a quick check if any documents exist in this collection
+    console.time("hard-drives-collection-check");
+    const collectionCheck = await collection.findOne(
+      {},
+      { projection: { _id: 1 } }
+    );
+    console.timeEnd("hard-drives-collection-check");
+
+    if (!collectionCheck) {
+      console.warn("No hard drives found in collection - it may be empty");
+    } else {
+      console.log("Hard drives collection exists and contains data");
+    }
+
+    // Get total count for pagination with timeout handling
+    console.time("hard-drives-count");
+    const countPromise = new Promise<number>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        console.warn("Count query timed out, using default count of 0");
+        resolve(0);
+      }, 5000);
+
+      collection
+        .countDocuments(match)
+        .then((count) => {
+          clearTimeout(timeoutId);
+          resolve(count);
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          console.error("Error in count query:", err);
+          resolve(0);
+        });
+    });
+
+    const totalCount = await countPromise;
+    const totalPages = Math.ceil(totalCount / limit);
+    console.timeEnd("hard-drives-count");
+    console.log(`Found ${totalCount} hard drives matching criteria`);
 
     // Create aggregation pipeline
     const pipeline: PipelineStage[] = [
@@ -110,14 +151,31 @@ export async function GET(request: Request) {
       });
     }
 
-    // Get total count for pagination
-    const totalCount = await collection.countDocuments(match);
-    const totalPages = Math.ceil(totalCount / limit);
-
-    // Execute aggregation
+    // Execute aggregation with timeout handling
     console.time("hard-drives-aggregation");
-    const hardDrives = await collection.aggregate(pipeline).toArray();
+    const aggregationPromise = new Promise<any[]>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        console.warn("Aggregation query timed out after 10 seconds");
+        resolve([]);
+      }, 10000);
+
+      collection
+        .aggregate(pipeline)
+        .toArray()
+        .then((results) => {
+          clearTimeout(timeoutId);
+          resolve(results);
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          console.error("Error in aggregation query:", err);
+          resolve([]);
+        });
+    });
+
+    const hardDrives = await aggregationPromise;
     console.timeEnd("hard-drives-aggregation");
+    console.log(`Aggregation returned ${hardDrives.length} hard drives`);
 
     // Format the results
     const formattedDrives = hardDrives.map((drive) => {
@@ -158,6 +216,11 @@ export async function GET(request: Request) {
       total: totalCount,
       currentPage: page,
       totalPages,
+      debug: {
+        environment: process.env.NODE_ENV,
+        vercel: process.env.VERCEL === "1" ? true : false,
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error("Error fetching hard drives:", error);
@@ -271,7 +334,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient(3, 500);
     const db = client.db();
 
     const result = await db

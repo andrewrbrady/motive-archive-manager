@@ -1,4 +1,4 @@
-// MongoDB configuration v1.0.6
+// MongoDB configuration v1.1.0 - Enhanced for serverless environment
 import mongoose from "mongoose";
 import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
@@ -8,14 +8,29 @@ if (!process.env.MONGODB_URI) {
 
 const uri = process.env.MONGODB_URI;
 const options: MongoClientOptions = {
-  maxPoolSize: 150, // Increase from default (100)
-  minPoolSize: 5, // Keep some connections ready
-  maxIdleTimeMS: 60000, // Close idle connections after 60 seconds (up from 30000)
+  maxPoolSize: 10, // Lower pool size for serverless
+  minPoolSize: 1, // Minimal connections for serverless
+  maxIdleTimeMS: 45000, // Close idle connections after 45 seconds (balanced for serverless)
   connectTimeoutMS: 30000, // Connection timeout increased to 30 seconds (up from 10000)
   socketTimeoutMS: 60000, // Socket timeout increased to 60 seconds (up from 45000)
   serverSelectionTimeoutMS: 30000, // Server selection timeout added (30 seconds)
   waitQueueTimeoutMS: 10000, // Wait queue timeout added
+  retryWrites: true, // Enable retry for write operations
+  retryReads: true, // Enable retry for read operations
 };
+
+// Detect if running on Vercel
+const isVercel = process.env.VERCEL === "1";
+
+// Adjust options for Vercel environment
+if (isVercel) {
+  // Optimize for serverless - reduce pool size further
+  options.maxPoolSize = 5;
+  options.minPoolSize = 0; // No persistent connections
+  console.log(
+    "Detected Vercel environment, optimizing MongoDB connection settings"
+  );
+}
 
 // Log MongoDB configuration (omit URI for security)
 console.log("MongoDB Configuration:", {
@@ -26,6 +41,9 @@ console.log("MongoDB Configuration:", {
   socketTimeoutMS: options.socketTimeoutMS,
   serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
   waitQueueTimeoutMS: options.waitQueueTimeoutMS,
+  retryWrites: options.retryWrites,
+  retryReads: options.retryReads,
+  isVercel,
 });
 
 // Get database name from environment or use default
@@ -42,6 +60,10 @@ declare global {
   // We need to use var here because let/const are not allowed in global scope
   // eslint-disable-next-line no-var
   var mongoose: MongooseCache | undefined;
+  // eslint-disable-next-line no-var
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
+  // eslint-disable-next-line no-var
+  var _lastConnectionTime: number | undefined;
 }
 
 // Global is used here to maintain a cached connection across hot reloads
@@ -50,20 +72,45 @@ declare global {
 const cached: MongooseCache = global.mongoose || { conn: null, promise: null };
 global.mongoose = cached;
 
+// Add a timestamp for the last successful connection
+if (!global._lastConnectionTime) {
+  global._lastConnectionTime = 0;
+}
+
+// Helper function to check if we should force a new connection
+// This helps when a serverless function has been idle for a while
+function shouldForceNewConnection(): boolean {
+  const now = Date.now();
+  const timeSinceLastConnection = now - (global._lastConnectionTime || 0);
+  const CONNECTION_TTL = 60 * 1000; // 1 minute
+
+  // If more than CONNECTION_TTL has passed since our last connection,
+  // we should force a new one to avoid using a stale connection
+  if (isVercel && timeSinceLastConnection > CONNECTION_TTL) {
+    console.log(
+      `Last connection was ${timeSinceLastConnection}ms ago. Forcing new connection.`
+    );
+    return true;
+  }
+  return false;
+}
+
 // For Mongoose ORM connection (used by models)
 export async function dbConnect() {
-  if (cached.conn) {
+  if (cached.conn && !shouldForceNewConnection()) {
     console.log("Using cached Mongoose connection");
     return cached.conn;
   }
 
-  if (!cached.promise) {
+  if (!cached.promise || shouldForceNewConnection()) {
     const opts = {
       ...options,
       bufferCommands: false,
     };
 
+    console.log("Creating new Mongoose connection");
     cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
+      global._lastConnectionTime = Date.now();
       console.log(
         "New Mongoose connection established with pool size:",
         options.maxPoolSize
@@ -87,58 +134,92 @@ export async function dbConnect() {
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
+// Robust connection creation function with retry logic
+function createMongoClient(): Promise<MongoClient> {
+  console.log("Creating new MongoDB client connection");
+  client = new MongoClient(uri, options);
+
+  // Create new connection promise
+  return client
+    .connect()
+    .then((client) => {
+      global._lastConnectionTime = Date.now();
+      console.log("MongoDB client connected successfully");
+      return client;
+    })
+    .catch((err) => {
+      console.error("MongoDB client connection error:", err);
+      throw err;
+    });
+}
+
 // Create a cached MongoDB connection
 if (process.env.NODE_ENV === "development") {
   // In development mode, use a global variable so that the value
   // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  const globalWithMongo = global as typeof globalThis & {
-    _mongoClientPromise?: Promise<MongoClient>;
-  };
-
-  if (!globalWithMongo._mongoClientPromise) {
-    client = new MongoClient(uri, options);
-    globalWithMongo._mongoClientPromise = client.connect().catch((err) => {
-      console.error("MongoDB client connection error:", err);
-      throw err;
-    });
+  if (!global._mongoClientPromise || shouldForceNewConnection()) {
+    global._mongoClientPromise = createMongoClient();
   }
-  clientPromise = globalWithMongo._mongoClientPromise;
+  clientPromise = global._mongoClientPromise;
 } else {
   // In production mode, it's best to not use a global variable.
-  client = new MongoClient(uri, options);
-  clientPromise = client.connect().catch((err) => {
-    console.error("MongoDB client connection error:", err);
-    throw err;
-  });
+  // However, for serverless functions we still need to be careful
+  // about creating too many connections
+  if (!global._mongoClientPromise || shouldForceNewConnection()) {
+    global._mongoClientPromise = createMongoClient();
+  }
+  clientPromise = global._mongoClientPromise;
 }
 
-// Add retry mechanism for serverless environments
+// Add exponential backoff retry mechanism for serverless environments
 export async function getMongoClient(
   retries = 3,
   delay = 500
 ): Promise<MongoClient> {
   try {
+    // If we should force a new connection, clear the cached promise
+    if (shouldForceNewConnection()) {
+      global._mongoClientPromise = createMongoClient();
+      clientPromise = global._mongoClientPromise;
+    }
+
     return await clientPromise;
   } catch (err) {
-    if (retries <= 0) throw err;
+    if (retries <= 0) {
+      console.error("All MongoDB connection retries failed");
+      throw err;
+    }
+
+    const retryDelay = delay * Math.pow(2, 3 - retries); // Exponential backoff
     console.log(
-      `MongoDB connection failed, retrying... (${retries} attempts left)`
+      `MongoDB connection failed, retrying in ${retryDelay}ms... (${retries} attempts left)`
     );
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    return getMongoClient(retries - 1, delay * 2);
+
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
+    return getMongoClient(retries - 1, delay);
   }
 }
 
+// Connection with diagnostics for debugging connection issues
 export async function connectToDatabase() {
   try {
+    console.time("mongodb-connect");
     const client = await getMongoClient();
     const db = client.db(DB_NAME);
+
+    // Log connection success with timing
+    console.timeEnd("mongodb-connect");
     console.log(
       "Connected to database:",
       db.databaseName,
       "with pool size:",
       options.maxPoolSize
     );
+
+    // Run a simple ping to verify connection is responsive
+    await db.command({ ping: 1 });
+    console.log("Database ping successful");
+
     return { client, db };
   } catch (err) {
     console.error("Failed to connect to database:", err);

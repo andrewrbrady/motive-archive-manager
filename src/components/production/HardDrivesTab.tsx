@@ -102,6 +102,42 @@ export default function HardDrivesTab() {
 
   const router = useRouter();
 
+  // First add fetchWithTimeout function at the top of the component but inside it
+  const fetchWithTimeout = async (
+    url: string,
+    options = {},
+    timeout = 30000
+  ) => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
+    const timeoutId = setTimeout(() => {
+      console.warn(`Request to ${url} timed out after ${timeout}ms`);
+      controller.abort();
+    }, timeout);
+
+    try {
+      const response = await fetch(url, { ...options, signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === "AbortError") {
+        console.error(`Fetch aborted due to timeout: ${url}`);
+        throw new Error(
+          `Request timed out after ${timeout}ms. The server might be under heavy load.`
+        );
+      }
+      throw error;
+    }
+  };
+
+  // Add retry state variables
+  const [fetchAttempts, setFetchAttempts] = useState(0);
+  const maxRetries = 3;
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
+
   // Handle Escape key press
   useEffect(() => {
     const handleEscapeKey = (event: KeyboardEvent) => {
@@ -144,9 +180,17 @@ export default function HardDrivesTab() {
     }
   };
 
-  const fetchDrives = async () => {
-    setLoading(true);
+  // Modify the fetchDrives function to handle retries and timeouts
+  const fetchDrives = async (isRetry = false) => {
+    if (!isRetry) {
+      setLoading(true);
+      setError(null);
+      setTimeoutOccurred(false);
+    }
+
     try {
+      console.log(`Fetching hard drives (attempt ${fetchAttempts + 1})...`);
+
       let url = `/api/hard-drives?page=${currentPage}&search=${encodeURIComponent(
         searchTerm
       )}&limit=${itemsPerPage}&include_assets=true`;
@@ -155,16 +199,92 @@ export default function HardDrivesTab() {
         url += `&location=${selectedLocation}`;
       }
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch hard drives");
+      // Increase timeout for subsequent retries
+      const timeout = 20000 + fetchAttempts * 10000; // 20s, 30s, 40s...
+      console.log(`Using timeout of ${timeout}ms for hard drives request`);
+
+      const response = await fetchWithTimeout(url, {}, timeout);
+
+      if (!response.ok) {
+        throw new Error(
+          `Server responded with ${response.status}: ${response.statusText}`
+        );
+      }
+
       const data = await response.json();
+
+      // Log debug information if available
+      if (data.debug) {
+        console.log("Hard drives API debug info:", data.debug);
+      }
+
+      console.log(
+        `Received ${data.drives.length} hard drives out of ${data.total} total`
+      );
+
       setDrives(data.drives);
       setTotalPages(data.totalPages);
+      setFetchAttempts(0); // Reset attempts on success
+      setTimeoutOccurred(false);
+      setLoading(false);
     } catch (err) {
       console.error("Error fetching hard drives:", err);
-      setError("Failed to fetch hard drives");
-    } finally {
-      setLoading(false);
+
+      // Check if this was a timeout
+      const isTimeout =
+        err instanceof Error &&
+        (err.name === "AbortError" || err.message.includes("timed out"));
+
+      if (isTimeout) {
+        setTimeoutOccurred(true);
+        console.warn("Request timed out while fetching hard drives");
+      }
+
+      // If we haven't exceeded max retries, try again
+      if (fetchAttempts < maxRetries) {
+        const nextAttempt = fetchAttempts + 1;
+        console.log(
+          `Retrying hard drives fetch (attempt ${nextAttempt} of ${maxRetries})...`
+        );
+        setFetchAttempts(nextAttempt);
+
+        // Wait longer between retries with exponential backoff
+        const delay = Math.min(1000 * Math.pow(2, fetchAttempts), 10000);
+        console.log(`Waiting ${delay}ms before retry...`);
+
+        setTimeout(() => {
+          fetchDrives(true); // Pass true to indicate this is a retry
+        }, delay);
+
+        // Update error message to be more user-friendly
+        if (fetchAttempts === 0) {
+          setError(
+            isTimeout
+              ? "Loading is taking longer than expected. Retrying..."
+              : `Loading error: ${
+                  err instanceof Error ? err.message : "Unknown error"
+                }. Retrying...`
+          );
+        } else {
+          setError(
+            `Still trying to load (attempt ${nextAttempt} of ${maxRetries})...${
+              isTimeout
+                ? " The server is taking longer than expected to respond."
+                : ""
+            }`
+          );
+        }
+      } else {
+        // Max retries exceeded, show final error
+        const errorMessage = isTimeout
+          ? "Request timed out. The server might be under heavy load or the database connection may be having issues."
+          : `Failed to load hard drives: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`;
+
+        setError(errorMessage);
+        setLoading(false);
+      }
     }
   };
 
@@ -539,9 +659,47 @@ export default function HardDrivesTab() {
       </div>
 
       {loading ? (
-        <LoadingContainer />
+        <div>
+          {fetchAttempts > 0 && (
+            <div className="text-center mb-4 text-muted-foreground">
+              Loading... (attempt {fetchAttempts} of {maxRetries})
+            </div>
+          )}
+          <LoadingContainer fullHeight />
+        </div>
       ) : error ? (
-        <div className="text-center py-4 text-destructive">{error}</div>
+        <div className="p-6 mt-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <h3 className="text-lg font-semibold text-destructive mb-2">
+            Error Loading Hard Drives
+          </h3>
+          <p className="text-destructive/80 mb-4">{error}</p>
+          {fetchAttempts >= maxRetries && (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                This could be due to connection issues with the database or high
+                server load. You can try the following:
+              </p>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground mb-4">
+                <li>Try refreshing the page</li>
+                <li>Check your network connection</li>
+                <li>Try again in a few minutes</li>
+                {timeoutOccurred && (
+                  <li>Check if the database connection needs attention</li>
+                )}
+              </ul>
+            </>
+          )}
+          <Button
+            variant="outline"
+            className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={() => {
+              setFetchAttempts(0);
+              fetchDrives();
+            }}
+          >
+            Try Again
+          </Button>
+        </div>
       ) : drives.length === 0 ? (
         <div className="text-center py-4">No hard drives found</div>
       ) : currentView === "grid" ? (
