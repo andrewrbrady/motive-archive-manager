@@ -180,6 +180,31 @@ export default function HardDrivesTab() {
     }
   };
 
+  const fetchDriveDetailsById = async (driveId: string) => {
+    try {
+      setLoading(true);
+      console.log(`Fetching details for drive ID: ${driveId}`);
+      const response = await fetch(`/api/hard-drives/${driveId}`);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch drive details (status ${response.status})`
+        );
+      }
+      const driveData = await response.json();
+      setSelectedDriveForDetails(driveData);
+      console.log("Drive details loaded:", driveData);
+    } catch (error) {
+      console.error("Error fetching drive details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load drive details. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Modify the fetchDrives function to handle retries and timeouts
   const fetchDrives = async (isRetry = false) => {
     if (!isRetry) {
@@ -226,7 +251,22 @@ export default function HardDrivesTab() {
         } total`
       );
 
-      setDrives(drivesList);
+      // Add defensive check to ensure each drive has required properties
+      const sanitizedDrives = drivesList.map((drive: any) => ({
+        ...drive,
+        _id: drive._id || "",
+        label: drive.label || "Unnamed Drive",
+        type: drive.type || "Unknown",
+        interface: drive.interface || "Unknown",
+        capacity: drive.capacity || { total: 0, used: 0 },
+        status: drive.status || "Unknown",
+        locationDetails: drive.locationDetails || null,
+        rawAssetDetails: Array.isArray(drive.rawAssetDetails)
+          ? drive.rawAssetDetails
+          : [],
+      }));
+
+      setDrives(sanitizedDrives);
       setTotalPages(data.meta?.totalPages || 1);
       setFetchAttempts(0); // Reset attempts on success
       setTimeoutOccurred(false);
@@ -334,33 +374,63 @@ export default function HardDrivesTab() {
     fetchDrives();
   }, [currentPage, itemsPerPage, searchTerm, selectedLocation]);
 
-  // Handle selected drive from URL
+  // Synchronize component state with URL parameters
   useEffect(() => {
-    const selectedDriveId = getParam("drive");
-    const template = getParam("template");
+    const driveParam = getParam("drive");
+    const templateParam = getParam("template");
+    console.log("URL drive parameter changed:", driveParam);
 
-    if (selectedDriveId && drives.length > 0) {
-      const drive = drives.find((d) => d._id?.toString() === selectedDriveId);
-
-      if (drive) {
-        // Only set the details if the details modal is not already open
-        if (!isDetailsModalOpen) {
-          setSelectedDriveForDetails(drive);
-          setIsDetailsModalOpen(true);
+    // If template parameter exists, remove it immediately as it shouldn't be in this tab
+    if (templateParam) {
+      console.log("HardDrivesTab: Removing unexpected template parameter");
+      // Create an updates object that preserves all necessary parameters except template
+      updateParams(
+        { template: null },
+        {
+          preserveParams: [
+            "tab",
+            "drive",
+            "page",
+            "limit",
+            "search",
+            "location",
+            "view",
+          ],
+          clearOthers: false,
         }
-      }
+      );
     }
-  }, [drives, getParam, isDetailsModalOpen]);
 
-  useEffect(() => {
-    const driveId = getParam("drive");
-    if (driveId) {
-      setSelectedDriveId(driveId);
-    } else {
-      setSelectedDriveId(null);
-      handleCloseDetails();
+    if (driveParam) {
+      console.log("Setting selectedDriveId from URL parameter:", driveParam);
+
+      // Always update the selectedDriveId when the URL parameter changes
+      setSelectedDriveId(driveParam);
+      setIsDetailsModalOpen(true);
+
+      // Always fetch drive details when navigating to this tab with a drive parameter
+      console.log("Fetching drive details for:", driveParam);
+      fetchDriveDetailsById(driveParam);
+    } else if (!driveParam && selectedDriveId) {
+      // Only clear the state if this wasn't triggered by our own handleViewDetails function
+      // This prevents the immediate closing of the modal after setting the URL parameter
+      console.log("Checking if we should clear selectedDriveId");
+
+      // Add a small delay to avoid race conditions with URL updates
+      const timeoutId = setTimeout(() => {
+        // Check again if the parameter is still not present
+        const currentDriveParam = getParam("drive");
+        if (!currentDriveParam) {
+          console.log("Clearing selectedDriveId as URL parameter is empty");
+          setSelectedDriveId(null);
+          setIsDetailsModalOpen(false);
+          setSelectedDriveForDetails(undefined);
+        }
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [getParam]);
+  }, [searchParams, selectedDriveId, getParam, fetchDriveDetailsById]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -406,31 +476,6 @@ export default function HardDrivesTab() {
   const handleViewDetails = (drive: HardDriveWithDetails) => {
     // Instead of showing a modal, navigate to the hard drive details page
     router.push(`/hard-drives/${drive._id?.toString()}`);
-  };
-
-  // Function to fetch drive details by ID
-  const fetchDriveDetailsById = async (driveId: string) => {
-    try {
-      console.log("Fetching drive details for ID:", driveId);
-      setLoading(true);
-      const response = await fetch(`/api/hard-drives/${driveId}`);
-      if (!response.ok) {
-        throw new Error(`Error fetching drive details: ${response.statusText}`);
-      }
-      const data = await response.json();
-      console.log("Fetched drive details:", data);
-      setSelectedDriveForDetails(data);
-      setIsDetailsModalOpen(true);
-    } catch (error) {
-      console.error("Error fetching drive details:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch drive details",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleCloseDetails = () => {
@@ -577,16 +622,53 @@ export default function HardDrivesTab() {
     }
   }, [getParam, isModalOpen]);
 
-  // Ensure tab parameter is set when component mounts
+  // Ensure tab parameter is set when component mounts and no template param exists
   useEffect(() => {
+    // Check for and immediately remove any template parameter as soon as component mounts
+    const templateParam = getParam("template");
+    const tabParam = getParam("tab");
+
+    if (templateParam) {
+      console.log(
+        "HardDrivesTab: Initial mount - removing template parameter immediately"
+      );
+      // Force cleanup through the URL utility
+      const params = new URLSearchParams(window.location.search);
+      params.delete("template");
+
+      updateParams(
+        { template: null },
+        {
+          preserveParams: [
+            "tab",
+            "drive",
+            "page",
+            "limit",
+            "search",
+            "location",
+            "view",
+          ],
+          context: "tab:hard-drives",
+          clearOthers: false,
+        }
+      );
+    }
+
     // Make sure the tab parameter is set to hard-drives
-    const tab = getParam("tab");
-    if (tab !== "hard-drives") {
+    if (tabParam !== "hard-drives") {
       updateParams(
         { tab: "hard-drives" },
         {
-          preserveParams: ["page", "limit", "search", "location", "view"],
+          preserveParams: [
+            "page",
+            "limit",
+            "search",
+            "location",
+            "view",
+            "drive",
+          ],
           clearOthers: false,
+          context: "tab:hard-drives",
         }
       );
     }
@@ -605,41 +687,30 @@ export default function HardDrivesTab() {
     );
   }, [selectedDriveId]);
 
-  // Synchronize component state with URL parameters
+  // Add this line anywhere before the function is used in the useEffect
+  // This ensures we check for template parameters in each render
   useEffect(() => {
-    const driveParam = getParam("drive");
-    console.log("URL drive parameter changed:", driveParam);
-
-    if (driveParam) {
-      console.log("Setting selectedDriveId from URL parameter:", driveParam);
-
-      // Always update the selectedDriveId when the URL parameter changes
-      setSelectedDriveId(driveParam);
-      setIsDetailsModalOpen(true);
-
-      // Always fetch drive details when navigating to this tab with a drive parameter
-      console.log("Fetching drive details for:", driveParam);
-      fetchDriveDetailsById(driveParam);
-    } else if (!driveParam && selectedDriveId) {
-      // Only clear the state if this wasn't triggered by our own handleViewDetails function
-      // This prevents the immediate closing of the modal after setting the URL parameter
-      console.log("Checking if we should clear selectedDriveId");
-
-      // Add a small delay to avoid race conditions with URL updates
-      const timeoutId = setTimeout(() => {
-        // Check again if the parameter is still not present
-        const currentDriveParam = getParam("drive");
-        if (!currentDriveParam) {
-          console.log("Clearing selectedDriveId as URL parameter is empty");
-          setSelectedDriveId(null);
-          setIsDetailsModalOpen(false);
-          setSelectedDriveForDetails(undefined);
+    // Check for and remove any template parameter on the hard-drives tab
+    const templateParam = getParam("template");
+    if (templateParam) {
+      console.log("HardDrivesTab: Initial check removing template parameter");
+      updateParams(
+        { template: null },
+        {
+          preserveParams: [
+            "tab",
+            "drive",
+            "page",
+            "limit",
+            "search",
+            "location",
+            "view",
+          ],
+          clearOthers: false,
         }
-      }, 100);
-
-      return () => clearTimeout(timeoutId);
+      );
     }
-  }, [searchParams, selectedDriveId, getParam, fetchDriveDetailsById]);
+  }, [getParam, updateParams]);
 
   return (
     <div className="space-y-6">
@@ -748,7 +819,7 @@ export default function HardDrivesTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {drives.map((drive) => (
             <div
-              key={drive._id?.toString()}
+              key={drive._id?.toString() || Math.random().toString()}
               className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 cursor-pointer hover:bg-[hsl(var(--accent))/10] shadow-sm transition-colors"
               onClick={(e) => {
                 console.log("Grid item clicked for drive:", drive);
@@ -833,7 +904,7 @@ export default function HardDrivesTab() {
                         : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
                     }`}
                   >
-                    {drive.status}
+                    {drive.status || "Unknown"}
                   </span>
                 </div>
                 {drive.locationDetails && (
@@ -872,7 +943,7 @@ export default function HardDrivesTab() {
             <tbody className="text-[hsl(var(--foreground))]">
               {drives.map((drive) => (
                 <tr
-                  key={drive._id?.toString()}
+                  key={drive._id?.toString() || Math.random().toString()}
                   className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
                   onClick={(e) => {
                     console.log("Table row clicked for drive:", drive);
@@ -936,7 +1007,7 @@ export default function HardDrivesTab() {
                           : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
                       )}
                     >
-                      {drive.status}
+                      {drive.status || "Unknown"}
                     </span>
                   </td>
                   <td className="py-3 px-2 text-sm">
@@ -953,7 +1024,10 @@ export default function HardDrivesTab() {
                   </td>
                   <td className="py-3 px-2">
                     <span className="inline-flex items-center px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs">
-                      {drive.rawAssetDetails?.length || 0} assets
+                      {Array.isArray(drive.rawAssetDetails)
+                        ? drive.rawAssetDetails.length
+                        : 0}{" "}
+                      assets
                     </span>
                   </td>
                   <td className="py-3 px-2 text-right">

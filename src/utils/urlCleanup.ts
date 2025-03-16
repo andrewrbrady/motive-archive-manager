@@ -15,7 +15,21 @@ export function cleanupUrlParameters(
   currentParams: URLSearchParams,
   context: string
 ): URLSearchParams {
+  // Create a new URLSearchParams object to avoid mutating the input
   const params = new URLSearchParams(currentParams.toString());
+  console.log("Cleaning up URL parameters for context:", context);
+  console.log("Before cleanup:", params.toString());
+
+  // AGGRESSIVE CLEANUP: Special case for template parameter
+  // If we're not in a template context, ALWAYS remove the template parameter immediately
+  if (context !== "tab:shot-lists" && context !== "tab:scripts") {
+    if (params.has("template")) {
+      console.log(
+        "AGGRESSIVE CLEANUP: Removing template parameter immediately for non-template tab"
+      );
+      params.delete("template");
+    }
+  }
 
   // Define parameter contexts - which parameters are valid in each context
   const contextMap: Record<string, string[]> = {
@@ -50,7 +64,7 @@ export function cleanupUrlParameters(
       "location",
       "view",
       "createDrive",
-      "template",
+      // "template" is explicitly NOT included here
     ],
     "tab:kits": ["tab", "page", "limit", "search", "status", "kit", "mode"],
 
@@ -71,13 +85,33 @@ export function cleanupUrlParameters(
   // Get allowed parameters for the current context
   const allowedParams = contextMap[context] || contextMap["default"];
 
+  // Special case for the hard-drives tab which seems problematic
+  if (context === "tab:hard-drives" && params.has("template")) {
+    console.log(
+      "SPECIAL CASE: Forcibly removing template parameter from hard-drives tab"
+    );
+    params.delete("template");
+  }
+
   // Remove parameters that aren't allowed in this context
   Array.from(params.keys()).forEach((key) => {
     if (!allowedParams.includes(key)) {
+      console.log(`Removing parameter ${key} from context ${context}`);
       params.delete(key);
     }
   });
 
+  // One final check to ensure template is gone in non-template contexts
+  if (
+    context !== "tab:shot-lists" &&
+    context !== "tab:scripts" &&
+    params.has("template")
+  ) {
+    console.log("FINAL CHECK: Removing persistent template parameter");
+    params.delete("template");
+  }
+
+  console.log("After cleanup:", params.toString());
   return params;
 }
 

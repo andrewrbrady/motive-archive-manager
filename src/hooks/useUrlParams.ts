@@ -1,4 +1,5 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { cleanupUrlParameters } from "@/utils/urlCleanup";
 
 /**
  * Custom hook for managing URL parameters with context awareness
@@ -33,6 +34,20 @@ export function useUrlParams() {
   ) => {
     const params = new URLSearchParams(searchParams?.toString() || "");
 
+    // Log the initial state
+    console.log("useUrlParams: Initial URL parameters:", params.toString());
+    console.log("useUrlParams: Updates to apply:", JSON.stringify(updates));
+
+    // Handle explicit parameter removal with extra care for 'template'
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null) {
+        console.log(`useUrlParams: Explicitly removing parameter: ${key}`);
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+
     // Clear unrelated parameters if requested
     if (options.clearOthers) {
       // Keep only the specified parameters to preserve
@@ -41,29 +56,49 @@ export function useUrlParams() {
 
       currentKeys.forEach((key) => {
         if (!keysToKeep.includes(key) && !Object.keys(updates).includes(key)) {
+          console.log(
+            `useUrlParams: Removing parameter due to clearOthers: ${key}`
+          );
           params.delete(key);
         }
       });
     }
 
-    // Apply updates
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null) {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
+    // Special case for template parameter in non-template contexts
+    if (
+      options.context &&
+      options.context !== "tab:shot-lists" &&
+      options.context !== "tab:scripts" &&
+      params.has("template")
+    ) {
+      console.log(
+        `useUrlParams: Enforcing removal of template parameter in non-template context: ${options.context}`
+      );
+      params.delete("template");
+    }
 
-    // Use the correct App Router navigation method
-    const url = `${pathname}?${params.toString()}`;
+    // Apply context-based cleanup if specified
+    if (options.context) {
+      const cleanedParams = cleanupUrlParameters(params, options.context);
+      console.log(
+        "useUrlParams: After context cleanup:",
+        cleanedParams.toString()
+      );
 
-    // Log the URL update for debugging
-    console.log("useUrlParams: Updating URL to", url);
+      // Use the cleaned parameters
+      const url = `${pathname}?${cleanedParams.toString()}`;
+      console.log("useUrlParams: Final URL:", url);
 
-    // Use replace instead of push to avoid adding to browser history
-    // This helps prevent navigation issues
-    router.replace(url);
+      // Use replace instead of push to avoid adding to browser history
+      router.replace(url);
+    } else {
+      // Use the cleaned parameters
+      const url = `${pathname}?${params.toString()}`;
+      console.log("useUrlParams: Final URL (no context):", url);
+
+      // Use replace instead of push to avoid adding to browser history
+      router.replace(url);
+    }
   };
 
   return { getParam, updateParams };

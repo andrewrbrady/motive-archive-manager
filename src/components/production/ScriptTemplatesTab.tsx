@@ -69,7 +69,13 @@ interface Template {
   updatedAt: string;
 }
 
-export default function ScriptTemplatesTab() {
+interface ScriptTemplatesTabProps {
+  shouldCreateTemplate?: boolean;
+}
+
+export default function ScriptTemplatesTab({
+  shouldCreateTemplate = false,
+}: ScriptTemplatesTabProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -107,6 +113,12 @@ export default function ScriptTemplatesTab() {
     }
   }, [searchParams, templates]);
 
+  useEffect(() => {
+    if (shouldCreateTemplate && !isCreating) {
+      setIsCreating(true);
+    }
+  }, [shouldCreateTemplate]);
+
   const fetchTemplates = async () => {
     try {
       setIsLoading(true);
@@ -115,9 +127,15 @@ export default function ScriptTemplatesTab() {
       const data = await response.json();
       setTemplates(data);
 
-      // Select first template if none selected
-      if (data.length > 0 && !searchParams?.get("template")) {
-        handleTemplateSelect(data[0]);
+      // REMOVING THIS: Don't automatically select first template
+      // Only select from URL parameter if it exists
+      if (data.length > 0 && searchParams?.get("template")) {
+        const templateFromUrl = data.find(
+          (t: Template) => t.id === searchParams.get("template")
+        );
+        if (templateFromUrl) {
+          setSelectedTemplate(templateFromUrl);
+        }
       }
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -275,12 +293,14 @@ export default function ScriptTemplatesTab() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <Dialog open={isCreating} onOpenChange={setIsCreating}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Template
-            </Button>
-          </DialogTrigger>
+          <div className="hidden">
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                New Template
+              </Button>
+            </DialogTrigger>
+          </div>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Template</DialogTitle>
@@ -1017,7 +1037,7 @@ export default function ScriptTemplatesTab() {
               </div>
             ) : (
               <div className="text-center text-[hsl(var(--foreground-muted))]">
-                Select a template to view its details
+                Select a template from the list to view its details
               </div>
             )}
           </div>

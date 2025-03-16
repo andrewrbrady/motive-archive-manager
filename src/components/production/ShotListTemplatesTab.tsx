@@ -54,6 +54,10 @@ interface Template {
   updatedAt: string;
 }
 
+interface ShotListTemplatesTabProps {
+  shouldCreateTemplate?: boolean;
+}
+
 // Helper function to safely get thumbnail URL
 const getThumbnailUrl = (thumbnail: string | undefined): string => {
   if (!thumbnail) return "";
@@ -136,7 +140,9 @@ function ImageBrowser({ onSelectImage }: ImageBrowserProps) {
   );
 }
 
-export default function ShotListTemplatesTab() {
+export default function ShotListTemplatesTab({
+  shouldCreateTemplate = false,
+}: ShotListTemplatesTabProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -271,6 +277,13 @@ export default function ShotListTemplatesTab() {
     }
   }, [selectedTemplate, form]);
 
+  // Effect to automatically open creation dialog when shouldCreateTemplate is true
+  useEffect(() => {
+    if (shouldCreateTemplate && !isCreating) {
+      setIsCreating(true);
+    }
+  }, [shouldCreateTemplate]);
+
   const fetchTemplates = async () => {
     try {
       setIsLoading(true);
@@ -279,9 +292,15 @@ export default function ShotListTemplatesTab() {
       const data = await response.json();
       setTemplates(data);
 
-      // Select first template if none selected
-      if (data.length > 0 && !searchParams?.get("template")) {
-        handleTemplateSelect(data[0]);
+      // REMOVING THIS: Don't automatically select first template
+      // Only select from URL parameter if it exists
+      if (data.length > 0 && searchParams?.get("template")) {
+        const templateFromUrl = data.find(
+          (t: Template) => t.id === searchParams.get("template")
+        );
+        if (templateFromUrl) {
+          setSelectedTemplate(templateFromUrl);
+        }
       }
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -1145,12 +1164,15 @@ export default function ShotListTemplatesTab() {
             }
           }}
         >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Template
-            </Button>
-          </DialogTrigger>
+          {/* New Template button hidden - used only programmatically */}
+          <div className="hidden">
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                New Template
+              </Button>
+            </DialogTrigger>
+          </div>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Template</DialogTitle>
@@ -1222,29 +1244,11 @@ export default function ShotListTemplatesTab() {
                     onClick={() => handleTemplateSelect(template)}
                     className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
                       selectedTemplate?.id === template.id
-                        ? "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
-                        : "hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
+                        ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+                        : "hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))]"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      {template.thumbnail ? (
-                        <div className="relative w-10 h-10 rounded-md overflow-hidden flex-shrink-0">
-                          <Image
-                            src={
-                              template.thumbnail.endsWith("/public")
-                                ? template.thumbnail
-                                : `${template.thumbnail}/public`
-                            }
-                            alt={template.name}
-                            fill
-                            className="object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-md bg-[hsl(var(--background-subtle))] flex items-center justify-center flex-shrink-0">
-                          <ImageIcon className="w-5 h-5 text-[hsl(var(--foreground-muted))]" />
-                        </div>
-                      )}
+                    <div className="flex items-center justify-between">
                       <div>
                         <div className="font-medium">{template.name}</div>
                         <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
@@ -1953,7 +1957,7 @@ export default function ShotListTemplatesTab() {
               </div>
             ) : (
               <div className="text-center text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                Select a template to view its details
+                Select a template from the list to view its details
               </div>
             )}
           </div>

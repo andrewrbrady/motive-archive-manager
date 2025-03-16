@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cleanupUrlParameters } from "@/utils/urlCleanup";
 
 export interface TabItem {
   value: string;
@@ -35,16 +36,39 @@ export function CustomTabs({
 
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
+    // Immediately update component state
     setActiveTab(value);
 
     // Create a new URLSearchParams object from the current search params
     const params = new URLSearchParams(searchParams?.toString() || "");
 
+    // Check for template parameter when switching to non-template tabs
+    const hasTemplateParam = params.has("template");
+    const isTemplateTab = value === "shot-lists" || value === "scripts";
+
     // Update the tab parameter
     params.set(paramName, value);
 
-    // Preserve all other parameters
-    router.push(`${basePath}?${params.toString()}`, { scroll: false });
+    // When switching to a non-template tab, explicitly remove template parameter
+    if (hasTemplateParam && !isTemplateTab) {
+      console.log(
+        "CustomTabs: Removing template parameter when switching to non-template tab:",
+        value
+      );
+      params.delete("template");
+    }
+
+    // Apply context-based cleanup to the parameters
+    const context = `tab:${value}`;
+    const cleanedParams = cleanupUrlParameters(params, context);
+
+    console.log(
+      "CustomTabs: Navigating to tab with params:",
+      cleanedParams.toString()
+    );
+
+    // Use the cleaned parameters and force a navigation
+    router.push(`${basePath}?${cleanedParams.toString()}`, { scroll: false });
   };
 
   // Sync with URL parameters on initial load and when URL changes
