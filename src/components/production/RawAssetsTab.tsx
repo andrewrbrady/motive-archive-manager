@@ -879,7 +879,7 @@ export default function RawAssetsTab() {
       try {
         // First check if we already have the labels for all drives
         const missingLabels = formattedDriveIds.filter(
-          (id) => !driveLabels[id]
+          (id: string) => !driveLabels[id]
         );
 
         if (missingLabels.length === 0) {
@@ -938,7 +938,7 @@ export default function RawAssetsTab() {
 
         // Update labels with better safety checks
         const newLabels = { ...driveLabels };
-        drivesList.forEach((drive) => {
+        drivesList.forEach((drive: any) => {
           if (drive && drive._id) {
             const driveIdStr =
               typeof drive._id === "string"
