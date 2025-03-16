@@ -218,12 +218,16 @@ export default function HardDrivesTab() {
         console.log("Hard drives API debug info:", data.debug);
       }
 
+      // Update to use data.data instead of data.drives to match the new API response format
+      const drivesList = data.data || [];
       console.log(
-        `Received ${data.drives.length} hard drives out of ${data.total} total`
+        `Received ${drivesList.length} hard drives out of ${
+          data.meta?.total || 0
+        } total`
       );
 
-      setDrives(data.drives);
-      setTotalPages(data.totalPages);
+      setDrives(drivesList);
+      setTotalPages(data.meta?.totalPages || 1);
       setFetchAttempts(0); // Reset attempts on success
       setTimeoutOccurred(false);
       setLoading(false);

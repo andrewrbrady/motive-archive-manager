@@ -307,19 +307,32 @@ export default function RawAssetsTab() {
         const data = await response.json();
 
         console.timeEnd("fetch-raw-assets");
-        console.log(`Received ${data.assets.length} raw assets`);
+
+        // Update to use data.data instead of data.assets to match the new API response format
+        const assetsList = data.data || [];
+        console.log(`Received ${assetsList.length} raw assets`);
 
         // Check if we got debug information
         if (data.debug) {
           console.log("API debug info:", data.debug);
         }
 
-        setAssets(data.assets);
-        setTotalPages(data.totalPages);
+        // Use data.data instead of data.assets
+        setAssets(assetsList);
+
+        // Use data.meta for pagination info
+        setTotalPages(data.meta?.totalPages || 1);
         setFetchAttempts(0); // Reset attempts on success
         setTimeoutOccurred(false);
         setLoading(false);
       } catch (error) {
+        // Make sure we end the timer even if there's an error
+        try {
+          console.timeEnd("fetch-raw-assets");
+        } catch (timerError) {
+          // Timer might not exist if this is a retry attempt, ignore the error
+        }
+
         console.error("Error fetching raw assets:", error);
 
         // Check if this was an abort error (timeout)

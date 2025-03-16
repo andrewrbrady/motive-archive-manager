@@ -64,7 +64,7 @@ export default function AddAssetModal({
         const data = await response.json();
         // Ensure _id is string
         setAvailableDrives(
-          data.drives.map((drive: HardDriveData & { _id: ObjectId }) => ({
+          (data.data || []).map((drive: HardDriveData & { _id: ObjectId }) => ({
             ...drive,
             _id: drive._id.toString(),
           }))

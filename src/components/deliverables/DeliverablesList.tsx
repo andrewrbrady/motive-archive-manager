@@ -167,8 +167,8 @@ export default function DeliverablesList() {
       const response = await fetch(`/api/deliverables?${params}`);
       if (!response.ok) throw new Error("Failed to fetch deliverables");
       const data = await response.json();
-      setDeliverables(data.deliverables);
-      setTotalPages(data.pagination.totalPages);
+      setDeliverables(data.data || []);
+      setTotalPages(data.meta?.totalPages || 1);
     } catch (error) {
       console.error("Error fetching deliverables:", error);
       toast.error("Failed to fetch deliverables");

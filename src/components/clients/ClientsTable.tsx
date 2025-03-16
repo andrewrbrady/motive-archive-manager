@@ -82,8 +82,8 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
       const data = await response.json();
       console.log("Received clients data:", data);
 
-      setClients(data.clients || []);
-      setTotalPages(data.totalPages || 1);
+      setClients(data.data || []);
+      setTotalPages(data.meta?.totalPages || 1);
     } catch (error) {
       console.error("Error fetching clients:", error);
       toast({
