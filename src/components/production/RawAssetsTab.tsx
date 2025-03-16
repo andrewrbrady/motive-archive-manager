@@ -777,7 +777,7 @@ export default function RawAssetsTab() {
     }
   };
 
-  // Add individual drive fetching as a last resort
+  // Add individual drive fetching as a last resort - MOVED UP before it's used elsewhere
   const fetchIndividualDrive = useCallback(async (driveId: string) => {
     try {
       console.log(`Fetching individual drive: ${driveId}`);
@@ -844,26 +844,40 @@ export default function RawAssetsTab() {
     [driveLabels, fetchIndividualDrive]
   );
 
-  // Function to fetch drive labels for a specific asset
+  // Function to fetch drive labels for a specific asset - IMPROVED ERROR HANDLING
   const fetchDriveLabelsForAsset = useCallback(
     async (asset: any) => {
       if (!asset) return;
 
-      const driveIds = asset.hardDriveIds || [];
-      if (!Array.isArray(driveIds) || driveIds.length === 0) {
-        console.log("Asset has no drive IDs", asset);
+      // Ensure hardDriveIds is an array, even if it's undefined or null
+      const driveIds = Array.isArray(asset.hardDriveIds)
+        ? asset.hardDriveIds
+        : [];
+
+      if (driveIds.length === 0) {
+        console.log("Asset has no drive IDs or invalid driveIds format", asset);
         return;
       }
 
       console.log(`Fetching labels for ${driveIds.length} drives`);
 
-      // Format IDs to strings
+      // Format IDs to strings with safety checks
       const formattedDriveIds = driveIds
-        .map((id) => (typeof id === "string" ? id : id?.toString()))
-        .filter(Boolean); // Remove any null/undefined values
+        .filter(
+          (id: string | null | undefined) => id !== null && id !== undefined
+        ) // Remove null/undefined entries
+        .map((id: string | { toString?: () => string }) =>
+          typeof id === "string" ? id : id?.toString ? id.toString() : ""
+        )
+        .filter((id: string) => id); // Remove empty strings
+
+      if (formattedDriveIds.length === 0) {
+        console.log("No valid drive IDs to fetch");
+        return;
+      }
 
       try {
-        // First check if we already have the labels
+        // First check if we already have the labels for all drives
         const missingLabels = formattedDriveIds.filter(
           (id) => !driveLabels[id]
         );
@@ -882,48 +896,86 @@ export default function RawAssetsTab() {
 
         if (!response.ok) {
           console.warn(
-            "Batch fetch failed, falling back to individual fetches"
+            `Batch fetch failed (${response.status}), falling back to individual fetches`
           );
           // Fall back to individual fetches
-          await Promise.all(missingLabels.map(fetchIndividualDrive));
+          for (const driveId of missingLabels) {
+            await fetchIndividualDrive(driveId);
+          }
           return;
         }
 
         const data = await response.json();
+        console.log("Drive labels API response:", Object.keys(data));
 
-        // Process different response formats
+        // Process different response formats with better safety checks
         let drivesList = [];
-        if (data.data && Array.isArray(data.data)) {
+
+        if (data?.data && Array.isArray(data.data)) {
+          console.log(`Using data.data array with ${data.data.length} items`);
           drivesList = data.data;
-        } else if (data.drives && Array.isArray(data.drives)) {
+        } else if (data?.drives && Array.isArray(data.drives)) {
+          console.log(
+            `Using data.drives array with ${data.drives.length} items`
+          );
           drivesList = data.drives;
         } else if (Array.isArray(data)) {
+          console.log(`Using direct array response with ${data.length} items`);
           drivesList = data;
+        } else {
+          console.warn("Unexpected API response format:", data);
+          // Fall back to individual fetches if the response format is unexpected
+          for (const driveId of missingLabels) {
+            await fetchIndividualDrive(driveId);
+          }
+          return;
         }
 
-        if (!Array.isArray(drivesList) || drivesList.length === 0) {
+        if (drivesList.length === 0) {
           console.warn("No drives found in response");
           return;
         }
 
-        // Update labels
+        // Update labels with better safety checks
         const newLabels = { ...driveLabels };
         drivesList.forEach((drive) => {
           if (drive && drive._id) {
             const driveIdStr =
-              typeof drive._id === "string" ? drive._id : drive._id.toString();
+              typeof drive._id === "string"
+                ? drive._id
+                : drive._id.toString
+                ? drive._id.toString()
+                : "";
+
+            if (!driveIdStr) {
+              console.warn("Invalid drive ID format", drive);
+              return;
+            }
+
             const label =
               drive.label ||
               drive.name ||
               drive.systemName ||
               `Drive ${driveIdStr.substring(0, 8)}`;
+
             newLabels[driveIdStr] = label;
+            console.log(`Set label for drive ${driveIdStr}: ${label}`);
           }
         });
 
         setDriveLabels(newLabels);
       } catch (error) {
         console.error("Error fetching drive labels:", error);
+        // For any error, still attempt individual fetches as a fallback
+        for (const driveId of formattedDriveIds) {
+          if (!driveLabels[driveId]) {
+            try {
+              await fetchIndividualDrive(driveId);
+            } catch (e) {
+              console.error(`Failed individual fetch for ${driveId}:`, e);
+            }
+          }
+        }
       }
     },
     [driveLabels, fetchIndividualDrive]
@@ -1220,41 +1272,49 @@ export default function RawAssetsTab() {
                   <td className="py-3 px-2">
                     <div className="flex flex-wrap gap-2">
                       {Array.isArray(asset.hardDriveIds) &&
-                        asset.hardDriveIds.map((hardDriveId, index) => {
-                          const hardDriveIdStr = hardDriveId
-                            ? hardDriveId.toString()
-                            : "";
+                        asset.hardDriveIds
+                          .filter((id: any) => id) // Filter out null/undefined/empty IDs
+                          .map((hardDriveId: any, index) => {
+                            const hardDriveIdStr = hardDriveId
+                              ? typeof hardDriveId === "string"
+                                ? hardDriveId
+                                : hardDriveId.toString
+                                ? hardDriveId.toString()
+                                : ""
+                              : "";
 
-                          // Get the actual drive label from our state
-                          let driveLabel = getDriveLabel(hardDriveIdStr);
+                            // Get the actual drive label from our state
+                            let driveLabel = getDriveLabel(hardDriveIdStr);
 
-                          // Special handling for ARB_SHARED drives
-                          if (!driveLabel && hardDriveIdStr.includes("ARB")) {
-                            driveLabel = "ARB_SHARED";
-                          }
+                            // Special handling for ARB_SHARED drives
+                            if (!driveLabel && hardDriveIdStr.includes("ARB")) {
+                              driveLabel = "ARB_SHARED";
+                            }
 
-                          // Format the full drive ID for display if needed
-                          let formattedId = "";
-                          if (hardDriveIdStr && hardDriveIdStr.length > 6) {
-                            formattedId =
-                              hardDriveIdStr.substring(0, 8) + "...";
-                          }
+                            // Format the full drive ID for display if needed
+                            let formattedId = "";
+                            if (hardDriveIdStr && hardDriveIdStr.length > 6) {
+                              formattedId =
+                                hardDriveIdStr.substring(0, 8) + "...";
+                            }
 
-                          // Show a descriptive label instead of just the ID
-                          const displayLabel =
-                            driveLabel ||
-                            (formattedId ? `${formattedId}` : "Unknown Drive");
+                            // Show a descriptive label instead of just the ID
+                            const displayLabel =
+                              driveLabel ||
+                              (formattedId
+                                ? `${formattedId}`
+                                : "Unknown Drive");
 
-                          return (
-                            <span
-                              key={index}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
-                            >
-                              <HardDriveIcon className="w-3 h-3" />
-                              {displayLabel}
-                            </span>
-                          );
-                        })}
+                            return (
+                              <span
+                                key={index}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
+                              >
+                                <HardDriveIcon className="w-3 h-3" />
+                                {displayLabel}
+                              </span>
+                            );
+                          })}
                     </div>
                   </td>
                   <td className="py-3 px-2 text-right">
