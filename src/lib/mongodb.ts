@@ -57,6 +57,12 @@ console.log("MongoDB Configuration:", {
 // Get database name from environment or use default
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
+// Helper function to get database instance with consistent database name
+export async function getDatabase(): Promise<Db> {
+  const client = await getMongoClient();
+  return client.db(DB_NAME);
+}
+
 // Define the type for cached mongoose connection
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -116,8 +122,9 @@ export async function dbConnect() {
       bufferCommands: false,
     };
 
-    console.log("Creating new Mongoose connection");
-    cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
+    const mongooseUri = `${uri}/${DB_NAME}`;
+    console.log("Creating new Mongoose connection to database:", DB_NAME);
+    cached.promise = mongoose.connect(mongooseUri, opts).then((mongoose) => {
       global._lastConnectionTime = Date.now();
       console.log(
         "New Mongoose connection established with pool size:",
@@ -144,8 +151,7 @@ let clientPromise: Promise<MongoClient>;
 
 // Robust connection creation function with retry logic
 function createMongoClient(): Promise<MongoClient> {
-  const dbName = process.env.MONGODB_DB || "motive_archive";
-  console.log("Creating new MongoDB client connection to database:", dbName);
+  console.log("Creating new MongoDB client connection to database:", DB_NAME);
   console.log("MongoDB connection options:", {
     maxPoolSize: options.maxPoolSize,
     minPoolSize: options.minPoolSize,
@@ -154,14 +160,23 @@ function createMongoClient(): Promise<MongoClient> {
     environment: process.env.NODE_ENV,
   });
 
-  client = new MongoClient(uri, options);
+  const clientOptions = {
+    ...options,
+  } as MongoClientOptions & { dbName: string };
+
+  clientOptions.dbName = DB_NAME;
+
+  client = new MongoClient(uri, clientOptions);
 
   // Create new connection promise with improved error handling
   return client
     .connect()
     .then((client) => {
       global._lastConnectionTime = Date.now();
-      console.log("MongoDB client connected successfully to database:", dbName);
+      console.log(
+        "MongoDB client connected successfully to database:",
+        DB_NAME
+      );
       return client;
     })
     .catch((err) => {
@@ -169,7 +184,7 @@ function createMongoClient(): Promise<MongoClient> {
       // Add more detailed error information
       console.error("Connection details (sanitized):", {
         uriPrefix: uri.substring(0, 20) + "...",
-        dbName,
+        dbName: DB_NAME,
         environment: process.env.NODE_ENV,
         vercel: process.env.VERCEL === "1",
       });
@@ -279,7 +294,7 @@ export async function connectToDatabase() {
   try {
     console.time("mongodb-connect");
     const client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    const db = client.db(DB_NAME); // Always use DB_NAME
 
     // Log connection success with timing
     console.timeEnd("mongodb-connect");
@@ -299,12 +314,6 @@ export async function connectToDatabase() {
     console.error("Failed to connect to database:", err);
     throw err;
   }
-}
-
-// Helper function to get a typed database instance
-export async function getDatabase(): Promise<Db> {
-  const client = await getMongoClient();
-  return client.db(DB_NAME);
 }
 
 // Initialize Mongoose connection

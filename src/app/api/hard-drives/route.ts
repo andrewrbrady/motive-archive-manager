@@ -12,10 +12,11 @@ export async function GET(request: Request) {
   const direction = searchParams.get("direction") === "asc" ? 1 : -1;
   const ids = searchParams.get("ids");
   const includeAssets = searchParams.get("include_assets") === "true";
+  const id = searchParams.get("id"); // Support for single ID fetch
 
   const skip = (page - 1) * limit;
 
-  // Debug info to help diagnose issues
+  // Enhanced debug info to help diagnose issues
   const debugInfo = {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "unknown",
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
       limit,
       search: search ? true : false,
       ids: ids ? true : false,
+      id: id ? true : false,
       includeAssets,
     },
     collections: [] as string[],
@@ -44,15 +46,16 @@ export async function GET(request: Request) {
     // Check if collection exists to provide better error messages
     const collections = await db.collections();
     const collectionNames = collections.map((c) => c.collectionName);
+    debugInfo.collections = collectionNames;
     debugInfo.hasCollection = collectionNames.includes("hard_drives");
 
     if (!debugInfo.hasCollection) {
       console.warn("Collection 'hard_drives' not found in database");
-      debugInfo.collections = collectionNames;
 
       // Return empty array with metadata to avoid frontend errors
       return NextResponse.json({
-        data: [],
+        data: [], // Always return an array
+        drives: [], // Alternative format for older code
         meta: {
           currentPage: page,
           totalPages: 0,
@@ -68,8 +71,24 @@ export async function GET(request: Request) {
     // Build query
     let query: any = {};
 
+    // Support for single ID fetch
+    if (id) {
+      try {
+        query = { _id: new ObjectId(id) };
+      } catch (e) {
+        console.warn(`Invalid ObjectId format for ID: ${id}`);
+        // Use a more flexible query to match by ID in different formats
+        query = {
+          $or: [
+            { _id: id }, // Try string match
+            { label: id }, // Try matching by label
+            { name: id }, // Try matching by name
+          ],
+        };
+      }
+    }
     // If IDs are provided, filter by those specific IDs
-    if (ids) {
+    else if (ids) {
       try {
         const idArray = ids
           .split(",")
@@ -87,17 +106,28 @@ export async function GET(request: Request) {
           });
 
           // Create a query that can handle both ObjectId and string _id values
-          query = {
-            $or: [
-              {
-                _id: {
-                  $in: objectIdArray.filter((id) => id instanceof ObjectId),
-                },
-              },
-              // Also try matching against string IDs in case they're stored as strings
-              { _id: { $in: idArray.filter((id) => typeof id === "string") } },
-            ],
-          };
+          const validObjectIds = objectIdArray.filter(
+            (id) => id instanceof ObjectId
+          );
+          const stringIds = idArray.filter((id) => typeof id === "string");
+
+          // Build a more comprehensive query
+          const queryConditions = [];
+
+          if (validObjectIds.length > 0) {
+            queryConditions.push({ _id: { $in: validObjectIds } });
+          }
+
+          if (stringIds.length > 0) {
+            queryConditions.push({ _id: { $in: stringIds } });
+            // Also try matching by label or name (might help in some cases)
+            queryConditions.push({ label: { $in: stringIds } });
+            queryConditions.push({ name: { $in: stringIds } });
+          }
+
+          query = queryConditions.length > 0 ? { $or: queryConditions } : {};
+
+          console.log("Hard drives query:", JSON.stringify(query, null, 2));
         }
       } catch (error) {
         console.error("Error parsing IDs parameter:", error);
@@ -164,8 +194,10 @@ export async function GET(request: Request) {
     console.timeEnd("hard-drives-api-fetch");
     console.log(`Returned ${formattedDrives.length} hard drives`);
 
+    // Return in both formats to support different client needs
     return NextResponse.json({
       data: formattedDrives,
+      drives: formattedDrives, // Alternative format for older code
       meta: {
         currentPage: page,
         totalPages,
@@ -180,6 +212,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         data: [], // Always include an empty array rather than null/undefined
+        drives: [], // Alternative format for older code
         meta: {
           currentPage: page,
           totalPages: 0,

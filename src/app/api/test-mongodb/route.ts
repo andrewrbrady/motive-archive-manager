@@ -9,7 +9,7 @@ export async function GET() {
 
     // Test connection
     const client = await clientPromise;
-    const db = client.db();
+    const db = client.db(process.env.MONGODB_DB || "motive_archive");
 
     // Get basic stats
     const stats = await db.stats();
@@ -34,6 +34,7 @@ export async function GET() {
       mongoUriStart: process.env.MONGODB_URI
         ? `${process.env.MONGODB_URI.substring(0, 15)}...`
         : null,
+      mongoDbName: process.env.MONGODB_DB || "motive_archive",
     };
 
     return NextResponse.json({

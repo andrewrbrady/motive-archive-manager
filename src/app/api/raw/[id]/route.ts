@@ -1,32 +1,28 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { RawAsset } from "@/types/inventory";
+import { RawAsset } from "@/models/raw_assets";
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
+    const db = await getDatabase();
     const rawCollection = db.collection("raw_assets");
 
-    const asset = await rawCollection.findOne({
+    const rawAsset = await rawCollection.findOne({
       _id: new ObjectId(params.id),
     });
 
-    if (!asset) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    if (!rawAsset) {
+      return NextResponse.json(
+        { error: "Raw asset not found" },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({
-      ...asset,
-      _id: asset._id.toString(),
-    });
+    return NextResponse.json(rawAsset);
   } catch (error) {
     console.error("Error fetching raw asset:", error);
     return NextResponse.json(
@@ -36,118 +32,61 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
+    const updates = await request.json();
+    const db = await getDatabase();
     const rawCollection = db.collection("raw_assets");
-    const hardDrivesCollection = db.collection("hard_drives");
 
-    const data = await request.json();
-    const assetId = params.id;
-
-    // Get the current asset to compare locations
-    const currentAsset = await rawCollection.findOne({
-      _id: new ObjectId(assetId),
-    });
-
-    if (!currentAsset) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    // Validate required fields
+    if (!updates.date || !updates.description) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
-    // Convert current and new locations to strings for comparison
-    const currentHardDriveIds = (currentAsset.hardDriveIds || []).map(
-      (loc: ObjectId | string) =>
-        loc instanceof ObjectId ? loc.toString() : loc
+    // Convert hardDriveIds to ObjectIds if present
+    if (updates.hardDriveIds) {
+      updates.hardDriveIds = updates.hardDriveIds.map(
+        (id: string) => new ObjectId(id)
+      );
+    }
+
+    // Convert carIds to ObjectIds if present
+    if (updates.carIds) {
+      updates.carIds = updates.carIds.map((id: string) => new ObjectId(id));
+    }
+
+    // Add updatedAt timestamp
+    updates.updatedAt = new Date();
+
+    const result = await rawCollection.findOneAndUpdate(
+      { _id: new ObjectId(params.id) },
+      { $set: updates },
+      { returnDocument: "after" }
     );
 
-    // Ensure new locations are valid and convert to ObjectId
-    const newHardDriveIds = (data.hardDriveIds || [])
-      .map((loc: string) => {
-        try {
-          return new ObjectId(loc);
-        } catch (error) {
-          console.error(`Invalid ObjectId: ${loc}`);
-          return null;
-        }
-      })
-      .filter(Boolean);
+    if (!result) {
+      return NextResponse.json(
+        { error: "Raw asset not found" },
+        { status: 404 }
+      );
+    }
 
-    // Convert new locations to strings for comparison
-    const newHardDriveIdStrings = newHardDriveIds.map((loc: ObjectId) =>
-      loc.toString()
-    );
-
-    // Find locations to add and remove
-    const hardDriveIdsToAdd = newHardDriveIdStrings.filter(
-      (loc: string) => !currentHardDriveIds.includes(loc)
-    );
-
-    const hardDriveIdsToRemove = currentHardDriveIds.filter(
-      (loc: string) => !newHardDriveIdStrings.includes(loc)
-    );
-
-    console.log(`Updating asset ${assetId}:`);
-    console.log(`- Current hard drive IDs: ${currentHardDriveIds.join(", ")}`);
-    console.log(`- New hard drive IDs: ${newHardDriveIdStrings.join(", ")}`);
-    console.log(`- Adding hard drive IDs: ${hardDriveIdsToAdd.join(", ")}`);
-    console.log(
-      `- Removing hard drive IDs: ${hardDriveIdsToRemove.join(", ")}`
-    );
-
-    // Prepare update data
-    const updateData = {
-      ...data,
-      updatedAt: new Date(),
-      carIds: data.carIds?.map((id: string) => new ObjectId(id)),
-      hardDriveIds: newHardDriveIds,
+    // Convert ObjectIds back to strings for response
+    const formattedResult = {
+      ...result,
+      _id: result._id.toString(),
+      hardDriveIds:
+        result.hardDriveIds?.map((id: ObjectId) => id.toString()) || [],
+      carIds: result.carIds?.map((id: ObjectId) => id.toString()) || [],
     };
-    delete updateData._id;
 
-    // Update the raw asset
-    await rawCollection.updateOne(
-      { _id: new ObjectId(assetId) },
-      { $set: updateData }
-    );
-
-    // Update hard drives - add asset to new locations
-    if (hardDriveIdsToAdd.length > 0) {
-      const addPromises = hardDriveIdsToAdd.map((hardDriveId: string) =>
-        hardDrivesCollection.updateOne(
-          { _id: new ObjectId(hardDriveId) },
-          {
-            $addToSet: { rawAssets: new ObjectId(assetId) },
-            $set: { updatedAt: new Date() },
-          }
-        )
-      );
-      await Promise.all(addPromises);
-      console.log(`Added asset to ${hardDriveIdsToAdd.length} hard drives`);
-    }
-
-    // Update hard drives - remove asset from old locations
-    if (hardDriveIdsToRemove.length > 0) {
-      const removePromises = hardDriveIdsToRemove.map((hardDriveId: string) =>
-        hardDrivesCollection.updateOne(
-          { _id: new ObjectId(hardDriveId) },
-          {
-            $pull: { rawAssets: new ObjectId(assetId) } as any,
-            $set: { updatedAt: new Date() },
-          }
-        )
-      );
-      await Promise.all(removePromises);
-      console.log(
-        `Removed asset from ${hardDriveIdsToRemove.length} hard drives`
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Asset updated successfully",
-      hardDrivesAdded: hardDriveIdsToAdd.length,
-      hardDrivesRemoved: hardDriveIdsToRemove.length,
-    });
+    return NextResponse.json(formattedResult);
   } catch (error) {
     console.error("Error updating raw asset:", error);
     return NextResponse.json(
@@ -157,46 +96,26 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
+    const db = await getDatabase();
     const rawCollection = db.collection("raw_assets");
-    const hardDrivesCollection = db.collection("hard_drives");
-    const assetId = params.id;
 
-    // Get the asset to find its hard drive IDs
-    const asset = await rawCollection.findOne({
-      _id: new ObjectId(assetId),
+    const result = await rawCollection.deleteOne({
+      _id: new ObjectId(params.id),
     });
 
-    if (!asset) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-    }
-
-    // Delete the asset
-    await rawCollection.deleteOne({
-      _id: new ObjectId(assetId),
-    });
-
-    // Remove the asset from all hard drives it was associated with
-    if (asset.hardDriveIds && asset.hardDriveIds.length > 0) {
-      await hardDrivesCollection.updateMany(
-        { _id: { $in: asset.hardDriveIds } },
-        {
-          $pull: { rawAssets: new ObjectId(assetId) } as any,
-          $set: { updatedAt: new Date() },
-        }
-      );
-      console.log(
-        `Removed asset from ${asset.hardDriveIds.length} hard drives`
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "Raw asset not found" },
+        { status: 404 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Asset deleted successfully",
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting raw asset:", error);
     return NextResponse.json(

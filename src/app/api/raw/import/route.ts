@@ -1,149 +1,63 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { RawAsset } from "@/types/inventory";
-import { HardDrive } from "@/models/hard-drive";
-import { Document, ObjectId } from "mongodb";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
+
+interface RawAsset {
+  _id: ObjectId;
+  date: string;
+  description: string;
+  hardDriveIds: ObjectId[];
+  carIds: ObjectId[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export async function POST(request: Request) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const rawCollection = db.collection("raw_assets");
-    const hardDrivesCollection = db.collection("hard_drives");
+    const { assets } = await request.json();
 
-    const data = await request.json();
-    console.log("Received CSV data:", data);
-
-    const assets: (Partial<RawAsset> & { hardDriveIds: ObjectId[] })[] = [];
-    const now = new Date().toISOString();
-
-    // Process each row and handle hard drives
-    for (const row of data) {
-      // Filter out empty hardDriveIds and clean up the values
-      const locationLabels = [
-        row["location 1"],
-        row["location 2"],
-        row["location 3"],
-        row["location 4"],
-      ]
-        .filter(Boolean)
-        .map((location) => location.trim());
-
-      console.log("Processing row with hard drive labels:", locationLabels);
-
-      // Array to store the hard drive ObjectIds
-      const hardDriveIds: ObjectId[] = [];
-
-      // For each location, check if we need to create a hard drive
-      for (const label of locationLabels) {
-        // Skip if location is empty
-        if (!label) continue;
-
-        console.log("Checking for hard drive with label:", label);
-
-        // Try to find existing hard drive
-        const existingDrive = await hardDrivesCollection.findOne({
-          label: { $regex: new RegExp(`^${label}$`, "i") }, // Case-insensitive exact match
-        });
-
-        let driveId;
-        if (!existingDrive) {
-          console.log(
-            "No existing drive found, creating new drive with label:",
-            label
-          );
-
-          // Create new hard drive if it doesn't exist
-          const newDrive = {
-            label: label,
-            capacity: {
-              total: 0, // Default capacity, can be updated later
-            },
-            type: "HDD", // Default type
-            interface: "USB", // Default interface
-            status: "In Use",
-            location: "Studio", // Default location
-            notes: "Created from raw asset location migration",
-            rawAssets: [], // Will be updated after raw asset is created
-            createdAt: now,
-            updatedAt: now,
-          };
-
-          const result = await hardDrivesCollection.insertOne(newDrive);
-          driveId = result.insertedId;
-          console.log("Created new drive:", driveId.toString());
-        } else {
-          driveId = existingDrive._id;
-          console.log("Found existing drive:", driveId.toString());
-        }
-
-        hardDriveIds.push(driveId);
-      }
-
-      // Create the raw asset with ObjectIds instead of labels
-      const asset: Partial<RawAsset> & { hardDriveIds: ObjectId[] } = {
-        date: row.date,
-        client: row.client || undefined,
-        description: row.description,
-        hardDriveIds: hardDriveIds, // Store the ObjectIds instead of labels
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      assets.push(asset);
-    }
-
-    console.log("Inserting assets:", assets);
-
-    // Insert all processed assets
-    const result = await rawCollection.insertMany(
-      assets as unknown as Document[]
-    );
-    console.log("Inserted assets result:", result);
-
-    // Now update the hard drives with the new raw asset IDs
-    for (const [index, assetId] of Object.entries(result.insertedIds)) {
-      const assetData = assets[parseInt(index)];
-      console.log(
-        "Updating hard drives for asset:",
-        assetId.toString(),
-        "with hard drive IDs:",
-        assetData.hardDriveIds
+    if (!Array.isArray(assets) || assets.length === 0) {
+      return NextResponse.json(
+        { error: "No assets provided" },
+        { status: 400 }
       );
-
-      // Update each hard drive that corresponds to this asset's hard drive IDs
-      for (const driveId of assetData.hardDriveIds) {
-        console.log(
-          "Updating drive:",
-          driveId.toString(),
-          "with asset:",
-          assetId.toString()
-        );
-        await hardDrivesCollection.updateOne(
-          { _id: driveId },
-          {
-            $addToSet: { rawAssets: assetId },
-            $set: { updatedAt: now },
-          }
-        );
-      }
     }
+
+    const db = await getDatabase();
+    const rawCollection = db.collection<RawAsset>("raw_assets");
+
+    // Validate and prepare assets
+    const preparedAssets = assets.map((asset) => ({
+      ...asset,
+      hardDriveIds:
+        asset.hardDriveIds?.map((id: string) => new ObjectId(id)) || [],
+      carIds: asset.carIds?.map((id: string) => new ObjectId(id)) || [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+
+    // Insert all assets
+    const result = await rawCollection.insertMany(preparedAssets);
+
+    // Format response
+    const insertedAssets = preparedAssets.map((asset, index) => ({
+      ...asset,
+      _id: result.insertedIds[index].toString(),
+      hardDriveIds: asset.hardDriveIds.map((id: ObjectId) => id.toString()),
+      carIds: asset.carIds.map((id: ObjectId) => id.toString()),
+    }));
 
     return NextResponse.json({
       success: true,
       insertedCount: result.insertedCount,
-      message: "Successfully imported assets and updated hard drives",
+      insertedAssets,
     });
   } catch (error) {
     console.error("Error importing raw assets:", error);
     return NextResponse.json(
       {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to import raw assets",
-        details: error instanceof Error ? error.stack : undefined,
+        error: "Failed to import assets",
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

@@ -286,17 +286,27 @@ export default function RawAssetsTab() {
         );
 
         // Use an increasing timeout based on retry attempts
-        const timeout = 20000 + fetchAttempts * 10000; // 20s, 30s, 40s...
+        const timeout = 30000 + fetchAttempts * 15000; // Increased timeouts: 30s, 45s, 60s
         console.log(`Using timeout of ${timeout}ms for this request`);
 
+        // Get the current URL search parameters
+        const hardDriveId = getParam("hardDriveId") || "";
+
+        // Build the query URL with proper encoding
+        let queryUrl = `/api/raw?page=${currentPage}&limit=${itemsPerPage}`;
+
+        if (searchTerm) {
+          queryUrl += `&search=${encodeURIComponent(searchTerm)}`;
+        }
+
+        if (hardDriveId) {
+          queryUrl += `&hardDriveId=${encodeURIComponent(hardDriveId)}`;
+        }
+
+        console.log("Fetching from URL:", queryUrl);
+
         // Use the fetchWithTimeout function
-        const response = await fetchWithTimeout(
-          `/api/raw?page=${currentPage}&limit=${itemsPerPage}${
-            searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""
-          }`,
-          {},
-          timeout
-        );
+        const response = await fetchWithTimeout(queryUrl, {}, timeout);
 
         if (!response.ok) {
           throw new Error(
@@ -309,6 +319,7 @@ export default function RawAssetsTab() {
 
         // Log the API response structure to help debug
         console.log("Raw Assets API Response structure:", Object.keys(data));
+        console.log("Raw Assets meta:", data.meta);
 
         // Log debug info if available
         if (data.debug) {

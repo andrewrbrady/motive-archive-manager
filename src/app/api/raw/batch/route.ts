@@ -1,52 +1,64 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function PUT(request: Request) {
+interface RawAsset {
+  _id: ObjectId;
+  date: string;
+  description: string;
+  hardDriveIds: ObjectId[];
+  carIds: ObjectId[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export async function POST(request: Request) {
   try {
-    const client = await clientPromise;
-    const db = client.db();
-    const rawCollection = db.collection("raw_assets");
+    const { assets } = await request.json();
 
-    const { ids, carIds } = await request.json();
-
-    if (!Array.isArray(ids) || ids.length === 0) {
+    if (!Array.isArray(assets) || assets.length === 0) {
       return NextResponse.json(
-        { error: "No assets selected" },
+        { error: "No assets provided" },
         { status: 400 }
       );
     }
 
-    // Convert string IDs to ObjectIds
-    const objectIds = ids.map((id) => new ObjectId(id));
-    const carObjectIds = carIds.map((id: string) => new ObjectId(id));
+    const db = await getDatabase();
+    const rawCollection = db.collection<RawAsset>("raw_assets");
 
-    // Update all selected assets
-    const result = await rawCollection.updateMany(
-      { _id: { $in: objectIds } },
-      {
-        $set: {
-          carIds: carObjectIds,
-          updatedAt: new Date(),
-        },
-      }
-    );
+    // Validate and prepare assets
+    const preparedAssets = assets.map((asset) => ({
+      ...asset,
+      hardDriveIds:
+        asset.hardDriveIds?.map((id: string) => new ObjectId(id)) || [],
+      carIds: asset.carIds?.map((id: string) => new ObjectId(id)) || [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json(
-        { error: "No matching assets found" },
-        { status: 404 }
-      );
-    }
+    // Insert all assets
+    const result = await rawCollection.insertMany(preparedAssets);
+
+    // Format response
+    const insertedAssets = preparedAssets.map((asset, index) => ({
+      ...asset,
+      _id: result.insertedIds[index].toString(),
+      hardDriveIds: asset.hardDriveIds.map((id: ObjectId) => id.toString()),
+      carIds: asset.carIds.map((id: ObjectId) => id.toString()),
+    }));
 
     return NextResponse.json({
       success: true,
-      modifiedCount: result.modifiedCount,
+      insertedCount: result.insertedCount,
+      insertedAssets,
     });
   } catch (error) {
-    console.error("Error updating raw assets:", error);
+    console.error("Error in batch insert:", error);
     return NextResponse.json(
-      { error: "Failed to update raw assets" },
+      {
+        error: "Failed to insert assets",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

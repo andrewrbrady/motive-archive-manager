@@ -1,11 +1,16 @@
 ---
 description: Rules for Node.js configuration and build processes
 globs: **/*.ts, **/*.tsx, package.json, next.config.js
-alwaysApply: undefined
+alwaysApply: false
 ---
 # Node.js and npm Configuration Rules
 
 ## Homebrew npm Usage
+
+- DO NOT run `npm run dev` as the user already has it running in a separate terminal
+- IMPORTANT: AI assistants should NEVER attempt to start the development server
+- The user will provide feedback from the running development server when needed
+- For testing changes, rely on the user's existing development server instance
 
 When running npm commands, always use the Homebrew-installed version. The npm binary is located at:
 
