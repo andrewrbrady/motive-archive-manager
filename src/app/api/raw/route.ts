@@ -219,6 +219,11 @@ export async function GET(request: Request) {
           vercel: process.env.VERCEL === "1",
           timestamp: new Date().toISOString(),
           retryCount,
+          database: process.env.MONGODB_DB || "motive_archive",
+          connectionPoolSize: client.options?.maxPoolSize,
+          hasCollection: Boolean(collectionExists),
+          returnedCount: formattedAssets.length,
+          totalCount,
         },
       });
     } catch (error) {
@@ -247,6 +252,14 @@ export async function GET(request: Request) {
           error: "Failed to fetch raw assets",
           message: error instanceof Error ? error.message : String(error),
           details: errorDetail,
+          debug: {
+            environment: process.env.NODE_ENV,
+            vercel: process.env.VERCEL === "1",
+            timestamp: new Date().toISOString(),
+            retryCount,
+            database: process.env.MONGODB_DB || "motive_archive",
+            errorName: error instanceof Error ? error.name : "Unknown",
+          },
           stack:
             process.env.NODE_ENV === "development"
               ? error instanceof Error

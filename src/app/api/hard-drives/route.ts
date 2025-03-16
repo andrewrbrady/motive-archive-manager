@@ -220,6 +220,11 @@ export async function GET(request: Request) {
         environment: process.env.NODE_ENV,
         vercel: process.env.VERCEL === "1" ? true : false,
         timestamp: new Date().toISOString(),
+        database: process.env.MONGODB_DB || "motive_archive",
+        connectionPoolSize: client.options?.maxPoolSize,
+        hasCollection: Boolean(collectionCheck),
+        returnedCount: formattedDrives.length,
+        totalCount,
       },
     });
   } catch (error) {
@@ -229,6 +234,13 @@ export async function GET(request: Request) {
       {
         error: "Failed to fetch hard drives",
         message: error instanceof Error ? error.message : String(error),
+        debug: {
+          environment: process.env.NODE_ENV,
+          vercel: process.env.VERCEL === "1" ? true : false,
+          timestamp: new Date().toISOString(),
+          database: process.env.MONGODB_DB || "motive_archive",
+          errorName: error instanceof Error ? error.name : "Unknown",
+        },
         stack:
           process.env.NODE_ENV === "development"
             ? error instanceof Error

@@ -327,9 +327,36 @@ export default function RawAssetsTab() {
           error instanceof Error &&
           (error.name === "AbortError" || error.message.includes("timed out"));
 
+        // Check if the error is a connection issue
+        const isConnectionError =
+          error instanceof Error &&
+          (error.message.includes("connection") ||
+            error.message.includes("ECONNREFUSED") ||
+            error.message.includes("network") ||
+            error.message.includes("MongoDB"));
+
         if (isTimeout) {
           setTimeoutOccurred(true);
           console.warn("Request timed out while fetching raw assets");
+        } else if (isConnectionError) {
+          console.warn("Database connection error detected");
+        }
+
+        // Try to extract any debug info from the response
+        let debugInfo = {};
+        try {
+          if (error instanceof Error && "response" in error) {
+            const responseData = await (error as any).response?.json();
+            if (responseData?.debug) {
+              debugInfo = responseData.debug;
+              console.log(
+                "Extracted debug info from error response:",
+                debugInfo
+              );
+            }
+          }
+        } catch (e) {
+          console.log("Could not extract debug info from error");
         }
 
         // If we haven't exceeded max retries, try again
@@ -353,6 +380,10 @@ export default function RawAssetsTab() {
             setError(
               isTimeout
                 ? "Loading is taking longer than expected. Retrying..."
+                : isConnectionError
+                ? `Database connection issue. Retrying... (${
+                    error instanceof Error ? error.message : "Unknown error"
+                  })`
                 : `Loading error: ${
                     error instanceof Error ? error.message : "Unknown error"
                   }. Retrying...`
@@ -362,6 +393,8 @@ export default function RawAssetsTab() {
               `Still trying to load (attempt ${nextAttempt} of ${maxRetries})...${
                 isTimeout
                   ? " The server is taking longer than expected to respond."
+                  : isConnectionError
+                  ? " Database connection issues persist."
                   : ""
               }`
             );
@@ -370,10 +403,15 @@ export default function RawAssetsTab() {
           // Max retries exceeded, show final error
           const errorMessage = isTimeout
             ? "Request timed out. The server might be under heavy load or the database connection may be having issues."
+            : isConnectionError
+            ? `Database connection failed: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }. Please check your database settings or network connection.`
             : `Failed to load raw assets: ${
                 error instanceof Error ? error.message : "Unknown error"
               }`;
 
+          console.error("All retries failed. Final error:", errorMessage);
           setError(errorMessage);
           setLoading(false);
         }

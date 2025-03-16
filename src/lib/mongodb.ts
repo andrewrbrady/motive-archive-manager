@@ -136,7 +136,16 @@ let clientPromise: Promise<MongoClient>;
 
 // Robust connection creation function with retry logic
 function createMongoClient(): Promise<MongoClient> {
-  console.log("Creating new MongoDB client connection");
+  const dbName = process.env.MONGODB_DB || "motive_archive";
+  console.log("Creating new MongoDB client connection to database:", dbName);
+  console.log("MongoDB connection options:", {
+    maxPoolSize: options.maxPoolSize,
+    minPoolSize: options.minPoolSize,
+    maxIdleTimeMS: options.maxIdleTimeMS,
+    isVercel: process.env.VERCEL === "1",
+    environment: process.env.NODE_ENV,
+  });
+
   client = new MongoClient(uri, options);
 
   // Create new connection promise
@@ -144,11 +153,18 @@ function createMongoClient(): Promise<MongoClient> {
     .connect()
     .then((client) => {
       global._lastConnectionTime = Date.now();
-      console.log("MongoDB client connected successfully");
+      console.log("MongoDB client connected successfully to database:", dbName);
       return client;
     })
     .catch((err) => {
       console.error("MongoDB client connection error:", err);
+      // Add more detailed error information
+      console.error("Connection details (sanitized):", {
+        uriPrefix: uri.substring(0, 20) + "...",
+        dbName,
+        environment: process.env.NODE_ENV,
+        vercel: process.env.VERCEL === "1",
+      });
       throw err;
     });
 }

@@ -235,9 +235,33 @@ export default function HardDrivesTab() {
         err instanceof Error &&
         (err.name === "AbortError" || err.message.includes("timed out"));
 
+      // Check if the error is a connection issue
+      const isConnectionError =
+        err instanceof Error &&
+        (err.message.includes("connection") ||
+          err.message.includes("ECONNREFUSED") ||
+          err.message.includes("network") ||
+          err.message.includes("MongoDB"));
+
       if (isTimeout) {
         setTimeoutOccurred(true);
         console.warn("Request timed out while fetching hard drives");
+      } else if (isConnectionError) {
+        console.warn("Database connection error detected:", err.message);
+      }
+
+      // Try to extract any debug info from the response
+      let debugInfo = {};
+      try {
+        if (err instanceof Error && "response" in err) {
+          const responseData = await (err as any).response?.json();
+          if (responseData?.debug) {
+            debugInfo = responseData.debug;
+            console.log("Extracted debug info from error response:", debugInfo);
+          }
+        }
+      } catch (e) {
+        console.log("Could not extract debug info from error");
       }
 
       // If we haven't exceeded max retries, try again
@@ -261,6 +285,10 @@ export default function HardDrivesTab() {
           setError(
             isTimeout
               ? "Loading is taking longer than expected. Retrying..."
+              : isConnectionError
+              ? `Database connection issue. Retrying... (${
+                  err instanceof Error ? err.message : "Unknown error"
+                })`
               : `Loading error: ${
                   err instanceof Error ? err.message : "Unknown error"
                 }. Retrying...`
@@ -270,6 +298,8 @@ export default function HardDrivesTab() {
             `Still trying to load (attempt ${nextAttempt} of ${maxRetries})...${
               isTimeout
                 ? " The server is taking longer than expected to respond."
+                : isConnectionError
+                ? " Database connection issues persist."
                 : ""
             }`
           );
@@ -278,10 +308,18 @@ export default function HardDrivesTab() {
         // Max retries exceeded, show final error
         const errorMessage = isTimeout
           ? "Request timed out. The server might be under heavy load or the database connection may be having issues."
+          : isConnectionError
+          ? `Database connection failed: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }. Please check your database settings or network connection.`
           : `Failed to load hard drives: ${
               err instanceof Error ? err.message : "Unknown error"
             }`;
 
+        console.error("All retries failed. Final error:", errorMessage, {
+          env: process.env.NODE_ENV,
+          isVercel: Boolean(process.env.VERCEL),
+        });
         setError(errorMessage);
         setLoading(false);
       }
