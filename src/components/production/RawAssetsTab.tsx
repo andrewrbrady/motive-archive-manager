@@ -35,6 +35,22 @@ interface RawAsset {
   updatedAt?: Date;
 }
 
+const fetchWithTimeout = async (url: string, options = {}, timeout = 15000) => {
+  const controller = new AbortController();
+  const { signal } = controller;
+
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, { ...options, signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
 export default function RawAssetsTab() {
   const pathname = usePathname();
   const router = useRouter();
@@ -69,6 +85,13 @@ export default function RawAssetsTab() {
   >();
   const [isAddingAsset, setIsAddingAsset] = useState(false);
   const [isEditingAsset, setIsEditingAsset] = useState(false);
+
+  // Add a state for tracking retry attempts
+  const [fetchAttempts, setFetchAttempts] = useState(0);
+  const maxRetries = 3;
+
+  // Add a state for tracking if a timeout occurred
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
 
   // Handle Escape key press for both modals
   useEffect(() => {
@@ -235,55 +258,96 @@ export default function RawAssetsTab() {
     }
   }, []);
 
-  const fetchAssets = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/raw?page=${currentPage}&search=${encodeURIComponent(
-          searchTerm
-        )}&limit=${itemsPerPage}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch assets");
-      const data = await response.json();
-      setAssets(data.assets);
-      setTotalPages(data.totalPages);
-
-      // Fetch drive labels for all hardDriveIds
-      const allHardDriveIds = data.assets.flatMap((asset: RawAsset) =>
-        asset.hardDriveIds.map((loc: string) => loc)
-      );
-      const labels = await Promise.all(allHardDriveIds.map(fetchDriveLabels));
-      const driveLabels = labels.reduce((acc, label, index) => {
-        acc[allHardDriveIds[index]] = label;
-        return acc;
-      }, {} as Record<string, string>);
-      setDriveLabels(driveLabels);
-
-      // Fetch car labels for all carIds
-      const allCarIds = data.assets.flatMap(
-        (asset: RawAsset) => asset.carIds || []
-      );
-
-      // Ensure all car IDs are strings
-      const uniqueCarIds = [...new Set(allCarIds)]
-        .filter(Boolean)
-        .map((id) => (typeof id === "string" ? id : String(id)));
-
-      console.log("Unique car IDs for fetching labels:", uniqueCarIds);
-
-      if (uniqueCarIds.length > 0) {
-        const carLabelsResult = await fetchCarLabels(uniqueCarIds);
-        setCarLabels(carLabelsResult);
+  // Modified fetch assets function with better error handling and retries
+  const fetchAssets = useCallback(
+    async (isRetry = false) => {
+      if (!isRetry) {
+        setLoading(true);
+        setError(null);
       }
-    } catch (err) {
-      console.error("Error fetching assets:", err);
-      setError("Failed to fetch assets");
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, itemsPerPage, searchTerm, fetchDriveLabels, fetchCarLabels]);
 
+      try {
+        console.time("fetch-raw-assets");
+        console.log(
+          `Fetching raw assets (attempt ${
+            fetchAttempts + 1
+          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchTerm}`
+        );
+
+        // Use the fetchWithTimeout function with a 20-second timeout
+        const response = await fetchWithTimeout(
+          `/api/raw?page=${currentPage}&limit=${itemsPerPage}${
+            searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""
+          }`,
+          {},
+          20000
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Server responded with ${response.status}: ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+
+        console.timeEnd("fetch-raw-assets");
+        console.log(`Received ${data.assets.length} raw assets`);
+
+        setAssets(data.assets);
+        setTotalPages(data.totalPages);
+        setFetchAttempts(0); // Reset attempts on success
+        setTimeoutOccurred(false);
+      } catch (error) {
+        console.error("Error fetching raw assets:", error);
+
+        // Check if this was an abort error (timeout)
+        const isTimeout = error instanceof Error && error.name === "AbortError";
+        if (isTimeout) {
+          setTimeoutOccurred(true);
+          console.warn("Request timed out while fetching raw assets");
+        }
+
+        // If we haven't exceeded max retries, try again
+        if (fetchAttempts < maxRetries) {
+          console.log(
+            `Retrying fetch (attempt ${fetchAttempts + 1} of ${maxRetries})...`
+          );
+          setFetchAttempts((prev) => prev + 1);
+
+          // Wait longer between retries
+          const delay = 1000 * (fetchAttempts + 1);
+          setTimeout(() => {
+            fetchAssets(true); // Pass true to indicate this is a retry
+          }, delay);
+
+          // If this is the first retry, show a more user-friendly message
+          if (fetchAttempts === 0) {
+            setError("Loading is taking longer than expected. Retrying...");
+          }
+        } else {
+          // Max retries exceeded, show error
+          setError(
+            isTimeout
+              ? "Request timed out. The server might be under heavy load, please try again later."
+              : `Failed to load raw assets: ${
+                  error instanceof Error ? error.message : "Unknown error"
+                }`
+          );
+          setLoading(false);
+        }
+      } finally {
+        if (fetchAttempts >= maxRetries || !isRetry) {
+          setLoading(false);
+        }
+      }
+    },
+    [currentPage, itemsPerPage, searchTerm, fetchAttempts]
+  );
+
+  // Replace the existing useEffect for fetching assets with this improved version
   useEffect(() => {
+    setFetchAttempts(0); // Reset attempts when parameters change
     fetchAssets();
   }, [fetchAssets]);
 
@@ -604,6 +668,91 @@ export default function RawAssetsTab() {
       console.error("Error fetching drive labels:", error);
     }
   };
+
+  // Modify the render function to handle the timeout state
+  // Add this JSX before the main content rendering (after the loading check)
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="text-3xl font-bold tracking-tight">Raw Assets</h2>
+          <div className="space-x-2">
+            <Button
+              variant="outline"
+              onClick={handleAddAssetClick}
+              className="space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Asset</span>
+            </Button>
+            <Button
+              onClick={() => setIsImportModalOpen(true)}
+              className="space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Import Assets</span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-8">
+          {fetchAttempts > 0 && (
+            <p className="text-center mb-4 text-gray-500 dark:text-gray-400">
+              Loading... (attempt {fetchAttempts} of {maxRetries})
+            </p>
+          )}
+          <LoadingContainer fullHeight />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="text-3xl font-bold tracking-tight">Raw Assets</h2>
+          <div className="space-x-2">
+            <Button
+              variant="outline"
+              onClick={handleAddAssetClick}
+              className="space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Asset</span>
+            </Button>
+            <Button
+              onClick={() => setIsImportModalOpen(true)}
+              className="space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Import Assets</span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6 mt-4 bg-destructive-50 dark:bg-destructive-900/20 border border-destructive-200 dark:border-destructive-800 rounded-lg">
+          <h3 className="text-lg font-semibold text-destructive-700 dark:text-destructive-300 mb-2">
+            Error Loading Assets
+          </h3>
+          <p className="text-destructive-600 dark:text-destructive-400">
+            {error}
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4 border-destructive-300 dark:border-destructive-700 text-destructive-700 dark:text-destructive-300 hover:bg-destructive-100"
+            onClick={() => {
+              setFetchAttempts(0);
+              fetchAssets();
+            }}
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,4 @@
-// MongoDB configuration v1.0.5
+// MongoDB configuration v1.0.6
 import mongoose from "mongoose";
 import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
@@ -10,10 +10,23 @@ const uri = process.env.MONGODB_URI;
 const options: MongoClientOptions = {
   maxPoolSize: 150, // Increase from default (100)
   minPoolSize: 5, // Keep some connections ready
-  maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
-  connectTimeoutMS: 10000, // Connection timeout
-  socketTimeoutMS: 45000, // Socket timeout for operations
+  maxIdleTimeMS: 60000, // Close idle connections after 60 seconds (up from 30000)
+  connectTimeoutMS: 30000, // Connection timeout increased to 30 seconds (up from 10000)
+  socketTimeoutMS: 60000, // Socket timeout increased to 60 seconds (up from 45000)
+  serverSelectionTimeoutMS: 30000, // Server selection timeout added (30 seconds)
+  waitQueueTimeoutMS: 10000, // Wait queue timeout added
 };
+
+// Log MongoDB configuration (omit URI for security)
+console.log("MongoDB Configuration:", {
+  maxPoolSize: options.maxPoolSize,
+  minPoolSize: options.minPoolSize,
+  maxIdleTimeMS: options.maxIdleTimeMS,
+  connectTimeoutMS: options.connectTimeoutMS,
+  socketTimeoutMS: options.socketTimeoutMS,
+  serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
+  waitQueueTimeoutMS: options.waitQueueTimeoutMS,
+});
 
 // Get database name from environment or use default
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -63,6 +76,7 @@ export async function dbConnect() {
     cached.conn = await cached.promise;
   } catch (e) {
     cached.promise = null;
+    console.error("MongoDB connection error:", e);
     throw e;
   }
 
@@ -73,6 +87,7 @@ export async function dbConnect() {
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
+// Create a cached MongoDB connection
 if (process.env.NODE_ENV === "development") {
   // In development mode, use a global variable so that the value
   // is preserved across module reloads caused by HMR (Hot Module Replacement).
@@ -82,30 +97,58 @@ if (process.env.NODE_ENV === "development") {
 
   if (!globalWithMongo._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    globalWithMongo._mongoClientPromise = client.connect();
+    globalWithMongo._mongoClientPromise = client.connect().catch((err) => {
+      console.error("MongoDB client connection error:", err);
+      throw err;
+    });
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
   // In production mode, it's best to not use a global variable.
   client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+  clientPromise = client.connect().catch((err) => {
+    console.error("MongoDB client connection error:", err);
+    throw err;
+  });
+}
+
+// Add retry mechanism for serverless environments
+export async function getMongoClient(
+  retries = 3,
+  delay = 500
+): Promise<MongoClient> {
+  try {
+    return await clientPromise;
+  } catch (err) {
+    if (retries <= 0) throw err;
+    console.log(
+      `MongoDB connection failed, retrying... (${retries} attempts left)`
+    );
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return getMongoClient(retries - 1, delay * 2);
+  }
 }
 
 export async function connectToDatabase() {
-  const client = await clientPromise;
-  const db = client.db(DB_NAME);
-  console.log(
-    "Connected to database:",
-    db.databaseName,
-    "with pool size:",
-    options.maxPoolSize
-  );
-  return { client, db };
+  try {
+    const client = await getMongoClient();
+    const db = client.db(DB_NAME);
+    console.log(
+      "Connected to database:",
+      db.databaseName,
+      "with pool size:",
+      options.maxPoolSize
+    );
+    return { client, db };
+  } catch (err) {
+    console.error("Failed to connect to database:", err);
+    throw err;
+  }
 }
 
 // Helper function to get a typed database instance
 export async function getDatabase(): Promise<Db> {
-  const client = await clientPromise;
+  const client = await getMongoClient();
   return client.db(DB_NAME);
 }
 

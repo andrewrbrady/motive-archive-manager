@@ -272,8 +272,11 @@ export default function HardDrivesTab() {
   };
 
   const handleCloseDetails = () => {
-    // Get the current template parameter
-    const template = getParam("template");
+    // Don't do anything if the modal is already closed
+    if (!isDetailsModalOpen && !selectedDriveForDetails) {
+      console.log("handleCloseDetails: Modal already closed, skipping");
+      return;
+    }
 
     console.log("handleCloseDetails called");
 
@@ -284,38 +287,30 @@ export default function HardDrivesTab() {
 
     console.log("Component state updated: selectedDriveId set to null");
 
-    // Then update the URL directly for immediate effect
-    const url = new URL(window.location.href);
-    url.searchParams.delete("drive");
-    console.log("Removed drive parameter from URL");
+    // Get the current template parameter and other preserved parameters
+    const template = getParam("template");
+    const tab = getParam("tab");
+    const page = getParam("page");
+    const limit = getParam("limit");
+    const search = getParam("search");
+    const location = getParam("location");
+    const view = getParam("view");
 
-    if (template) {
-      url.searchParams.set("template", template);
-    }
+    // Use only the router-based update for consistency
+    console.log("Updating URL to remove drive parameter");
 
-    // Preserve other parameters
-    ["tab", "page", "limit", "search", "location", "view"].forEach((param) => {
-      const value = getParam(param);
-      if (value && param !== "drive") {
-        url.searchParams.set(param, value);
-      }
+    // Create an updates object with parameters to preserve
+    const updates: Record<string, string | null> = {
+      drive: null,
+    };
+
+    // Only include parameters that exist
+    if (template) updates.template = template;
+
+    updateParams(updates, {
+      preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+      context: "tab:hard-drives",
     });
-
-    console.log("Setting URL directly to:", url.toString());
-    window.history.pushState({}, "", url.toString());
-
-    // Also update the Next.js router state to keep it in sync
-    console.log("Updating Next.js router to remove drive parameter");
-    updateParams(
-      {
-        drive: null,
-        template: template || null,
-      },
-      {
-        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
-        context: "tab:hard-drives",
-      }
-    );
 
     console.log("handleCloseDetails completed");
   };

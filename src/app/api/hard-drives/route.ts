@@ -20,6 +20,7 @@ type PipelineStage = {
 
 export async function GET(request: Request) {
   try {
+    console.time("hard-drives-api");
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
@@ -30,120 +31,127 @@ export async function GET(request: Request) {
     const includeAssets = searchParams.get("include_assets") === "true";
     const skip = (page - 1) * limit;
 
+    console.log(
+      `Fetching hard drives: page=${page}, limit=${limit}, search=${search}, location=${location}, includeAssets=${includeAssets}`
+    );
+
     const client = await clientPromise;
     const db = client.db();
     const collection = db.collection("hard_drives");
 
-    // Build query
-    const query: any = {};
+    // Build match query
+    const match: any = {};
     if (search) {
       const searchRegex = { $regex: search, $options: "i" };
-      query.$or = [
+      match.$or = [
         { label: searchRegex },
         { systemName: searchRegex },
         { notes: searchRegex },
       ];
     }
     if (status) {
-      query.status = status;
+      match.status = status;
     }
     if (id) {
       try {
-        query._id = new ObjectId(id);
+        match._id = new ObjectId(id);
       } catch {
         // If id is not a valid ObjectId, try searching by label
-        query.label = id;
+        match.label = id;
       }
     }
     if (location) {
-      query.locationId = location;
+      match.locationId = location;
+    }
+
+    // Create aggregation pipeline
+    const pipeline: PipelineStage[] = [
+      { $match: match },
+      { $sort: { updatedAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ];
+
+    // Add location details lookup if requested
+    if (includeAssets) {
+      // Add location lookup
+      pipeline.push({
+        $lookup: {
+          from: "locations",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "locationDetails",
+        },
+      });
+
+      // Limit returned location data to the first match
+      pipeline.push({
+        $addFields: {
+          locationDetails: { $arrayElemAt: ["$locationDetails", 0] },
+        },
+      });
+
+      // Add raw assets lookup (only if the drive has rawAssets)
+      pipeline.push({
+        $lookup: {
+          from: "raw_assets",
+          localField: "rawAssets",
+          foreignField: "_id",
+          as: "rawAssetDetails",
+        },
+      });
+
+      // Add a field to limit number of raw assets details returned
+      // This prevents returning too much data
+      pipeline.push({
+        $addFields: {
+          rawAssetDetails: { $slice: ["$rawAssetDetails", 0, 20] },
+        },
+      });
     }
 
     // Get total count for pagination
-    const totalCount = await collection.countDocuments(query);
+    const totalCount = await collection.countDocuments(match);
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Fetch hard drives directly
-    const hardDrives = await collection
-      .find(query)
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+    // Execute aggregation
+    console.time("hard-drives-aggregation");
+    const hardDrives = await collection.aggregate(pipeline).toArray();
+    console.timeEnd("hard-drives-aggregation");
 
-    // Format basic drive data
+    // Format the results
     const formattedDrives = hardDrives.map((drive) => {
       const formattedDrive: any = {
         ...drive,
         _id: drive._id.toString(),
         rawAssets: drive.rawAssets?.map((id: ObjectId) => id.toString()) || [],
-        locationDetails: null,
-        rawAssetDetails: [],
       };
+
+      // Format locationDetails if exists
+      if (formattedDrive.locationDetails) {
+        formattedDrive.locationDetails = {
+          ...formattedDrive.locationDetails,
+          _id: formattedDrive.locationDetails._id.toString(),
+        };
+      }
+
+      // Format rawAssetDetails if exists
+      if (formattedDrive.rawAssetDetails) {
+        formattedDrive.rawAssetDetails = formattedDrive.rawAssetDetails.map(
+          (asset: any) => ({
+            ...asset,
+            _id: asset._id.toString(),
+          })
+        );
+      }
+
       return formattedDrive;
     });
 
-    // If we need to include assets or location details
-    if (includeAssets) {
-      // Process each drive
-      for (const drive of formattedDrives) {
-        // Add location details if locationId exists and is not empty
-        if (drive.locationId && drive.locationId !== "") {
-          try {
-            const locationDetails = await db.collection("locations").findOne({
-              _id: new ObjectId(drive.locationId),
-            });
-
-            if (locationDetails) {
-              drive.locationDetails = {
-                ...locationDetails,
-                _id: locationDetails._id.toString(),
-              };
-            }
-          } catch (error) {
-            console.error(
-              `Error fetching location details for drive ${drive._id}:`,
-              error
-            );
-          }
-        }
-
-        // Add raw asset details if requested and rawAssets exist
-        if (drive.rawAssets && drive.rawAssets.length > 0) {
-          try {
-            const rawAssetIds = drive.rawAssets
-              .map((id: string) => {
-                try {
-                  return new ObjectId(id);
-                } catch (error) {
-                  console.error(`Invalid ObjectId: ${id}`);
-                  return null;
-                }
-              })
-              .filter(Boolean);
-
-            if (rawAssetIds.length > 0) {
-              const rawAssetDetails = await db
-                .collection("raw_assets")
-                .find({
-                  _id: { $in: rawAssetIds },
-                })
-                .toArray();
-
-              drive.rawAssetDetails = rawAssetDetails.map((asset: any) => ({
-                ...asset,
-                _id: asset._id.toString(),
-              }));
-            }
-          } catch (error) {
-            console.error(
-              `Error fetching raw asset details for drive ${drive._id}:`,
-              error
-            );
-          }
-        }
-      }
-    }
+    console.timeEnd("hard-drives-api");
+    console.log(
+      `Returning ${formattedDrives.length} hard drives out of ${totalCount} total`
+    );
 
     return NextResponse.json({
       drives: formattedDrives,
@@ -153,8 +161,18 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Error fetching hard drives:", error);
+    // Provide more details in the error response
     return NextResponse.json(
-      { error: "Failed to fetch hard drives" },
+      {
+        error: "Failed to fetch hard drives",
+        message: error instanceof Error ? error.message : String(error),
+        stack:
+          process.env.NODE_ENV === "development"
+            ? error instanceof Error
+              ? error.stack
+              : undefined
+            : undefined,
+      },
       { status: 500 }
     );
   }

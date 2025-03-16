@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { RawAsset, RawAssetData } from "../../../models/raw_assets";
 import { ObjectId } from "mongodb";
 
 export async function GET(request: Request) {
+  console.time("raw-assets-api");
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -11,13 +12,19 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") || "";
     const skip = (page - 1) * limit;
 
-    const client = await clientPromise;
+    console.log(
+      `Fetching raw assets: page=${page}, limit=${limit}, search=${search}`
+    );
+
+    const client = await getMongoClient(3, 1000); // Use retry mechanism with 3 retries
     const db = client.db();
     const rawCollection = db.collection("raw_assets");
 
     // Build query
     const query: any = {};
+
     if (search) {
+      console.time("search-processing");
       // Split search terms and escape special regex characters
       const searchTerms = search
         .split(/\s+/)
@@ -40,126 +47,136 @@ export async function GET(request: Request) {
         .filter((term) => /^\d{4}$/.test(term))
         .map((term) => parseInt(term));
 
-      // Get matching car IDs first - separate queries for text and year matches
-      const [textMatchingCarIds, yearMatchingCarIds, matchingDriveIds] =
-        await Promise.all([
-          // Text-based matches (make, model, color)
-          db
-            .collection("cars")
-            .find({
-              $or: [
-                { make: searchRegex },
-                { model: searchRegex },
-                { color: searchRegex },
-              ],
-            })
-            .project({ _id: 1 })
-            .map((car) => car._id)
-            .toArray(),
-
-          // Year-based matches - handle both string and number types
-          yearTerms.length > 0
-            ? db
-                .collection("cars")
-                .find({
-                  $or: yearTerms.map((year) => ({
-                    $or: [
-                      { year: year }, // Match number
-                      { year: year.toString() }, // Match string
-                    ],
-                  })),
-                })
-                .project({ _id: 1 })
-                .map((car) => car._id)
-                .toArray()
-            : Promise.resolve([]),
-
-          // Search for matching hard drive labels
-          db
-            .collection("hard_drives")
-            .find({ label: searchRegex })
-            .project({ _id: 1 })
-            .map((drive) => drive._id)
-            .toArray(),
-        ]);
-
-      // Combine all matching car IDs
-      const matchingCarIds = [
-        ...new Set([...textMatchingCarIds, ...yearMatchingCarIds]),
-      ];
-
-      console.log("Search terms:", searchTerms);
-      console.log("Year terms:", yearTerms);
-      console.log("Text matching car IDs:", textMatchingCarIds.length);
-      console.log("Year matching car IDs:", yearMatchingCarIds.length);
-      console.log("Matching drive IDs:", matchingDriveIds.length);
-      console.log("Total matching car IDs:", matchingCarIds.length);
-
+      // Search directly without preprocessing car and drive relationships for better performance
       query.$or = [{ date: searchRegex }, { description: searchRegex }];
 
-      // Only add car ID search if we found matching cars
-      if (matchingCarIds.length > 0) {
-        query.$or.push({ carIds: { $in: matchingCarIds } });
+      // If there are specific year terms, add direct search on those years
+      if (yearTerms.length > 0) {
+        query.$or.push({
+          date: {
+            $in: yearTerms.map((year) => new RegExp(`${year}`, "i")),
+          },
+        });
       }
-
-      // Add storage location search if we found matching drives
-      if (matchingDriveIds.length > 0) {
-        query.$or.push({ hardDriveIds: { $in: matchingDriveIds } });
-      }
+      console.timeEnd("search-processing");
     }
 
-    // Get total count for pagination
-    const totalCount = await rawCollection.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / limit);
+    console.time("count-query");
+    // Get total count for pagination (with timeout)
+    const countPromise = new Promise<number>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        resolve(100); // Default to a reasonable number if timeout
+        console.warn("Count query timed out, using default count");
+      }, 5000);
 
-    // Fetch assets with car details
-    const assets = await rawCollection
-      .aggregate([
-        { $match: query },
-        {
-          $lookup: {
-            from: "cars",
-            localField: "carIds",
-            foreignField: "_id",
-            as: "cars",
-          },
-        },
-        {
-          $addFields: {
-            cars: {
-              $map: {
-                input: "$cars",
-                as: "car",
-                in: {
-                  $mergeObjects: [
-                    "$$car",
-                    {
-                      _id: { $toString: "$$car._id" },
-                      series: { $ifNull: ["$$car.manufacturing.series", ""] },
-                      trim: { $ifNull: ["$$car.manufacturing.trim", ""] },
-                    },
-                  ],
-                },
+      rawCollection
+        .countDocuments(query)
+        .then((count) => {
+          clearTimeout(timeoutId);
+          resolve(count);
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          console.error("Error in count query:", err);
+          resolve(100); // Use default on error
+        });
+    });
+
+    const totalCount = await countPromise;
+    const totalPages = Math.ceil(totalCount / limit);
+    console.timeEnd("count-query");
+
+    // Create pipeline for the main query
+    const pipeline = [
+      { $match: query },
+      { $sort: { date: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      // Only fetch minimal car details to reduce data transfer
+      {
+        $lookup: {
+          from: "cars",
+          localField: "carIds",
+          foreignField: "_id",
+          as: "cars",
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                make: 1,
+                model: 1,
+                year: 1,
+                color: 1,
+                "manufacturing.series": 1,
+                "manufacturing.trim": 1,
               },
             },
-          },
+          ],
         },
-        { $sort: { date: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-      ])
-      .toArray();
+      },
+      // Similarly, fetch minimal hard drive details
+      {
+        $lookup: {
+          from: "hard_drives",
+          localField: "hardDriveIds",
+          foreignField: "_id",
+          as: "hardDrives",
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                label: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    console.time("main-query");
+    // Execute the main query with timeout
+    const queryPromise = new Promise<any[]>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Raw assets query timed out after 10 seconds"));
+      }, 10000);
+
+      rawCollection
+        .aggregate(pipeline)
+        .toArray()
+        .then((results) => {
+          clearTimeout(timeoutId);
+          resolve(results);
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          reject(err);
+        });
+    });
+
+    const assets = await queryPromise;
+    console.timeEnd("main-query");
 
     // Format response
     const formattedAssets = assets.map((asset) => ({
       ...asset,
       _id: asset._id.toString(),
       carIds: asset.carIds?.map((id: ObjectId) => id.toString()),
+      hardDriveIds: asset.hardDriveIds?.map((id: ObjectId) => id.toString()),
       cars: asset.cars?.map((car: any) => ({
         ...car,
         _id: car._id.toString(),
       })),
+      hardDrives: asset.hardDrives?.map((drive: any) => ({
+        ...drive,
+        _id: drive._id.toString(),
+      })),
     }));
+
+    console.timeEnd("raw-assets-api");
+    console.log(
+      `Returning ${formattedAssets.length} raw assets out of ${totalCount} total`
+    );
 
     return NextResponse.json({
       assets: formattedAssets,
@@ -171,7 +188,16 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Error fetching raw assets:", error);
     return NextResponse.json(
-      { error: "Failed to fetch raw assets" },
+      {
+        error: "Failed to fetch raw assets",
+        message: error instanceof Error ? error.message : String(error),
+        stack:
+          process.env.NODE_ENV === "development"
+            ? error instanceof Error
+              ? error.stack
+              : undefined
+            : undefined,
+      },
       { status: 500 }
     );
   }
@@ -195,7 +221,7 @@ export async function POST(request: Request) {
     }
 
     // Create new raw asset
-    const client = await clientPromise;
+    const client = await getMongoClient(3, 1000);
     const db = client.db();
     const rawCollection = db.collection("raw_assets");
     const newAsset = await RawAsset.create({
@@ -217,7 +243,7 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   try {
-    const client = await clientPromise;
+    const client = await getMongoClient(3, 1000);
     const db = client.db();
     const rawCollection = db.collection("raw_assets");
 
