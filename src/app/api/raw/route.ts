@@ -223,12 +223,12 @@ export async function GET(request: Request) {
       });
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
       console.error(
         `Error fetching raw assets (attempt ${retryCount + 1}):`,
         error
       );
 
-      // If we still have retries left, try again with exponential backoff
       if (retryCount < maxRetries) {
         retryCount++;
         const delay = Math.pow(2, retryCount) * 500; // Exponential backoff: 1s, 2s, 4s
@@ -237,11 +237,16 @@ export async function GET(request: Request) {
         return attemptFetch();
       }
 
+      // Type assertion to ensure TypeScript knows lastError is an Error when it's not null
+      const errorDetail = lastError
+        ? (lastError as Error).message
+        : "Unknown error";
+
       return NextResponse.json(
         {
           error: "Failed to fetch raw assets",
           message: error instanceof Error ? error.message : String(error),
-          details: lastError ? lastError.message : "Unknown error",
+          details: errorDetail,
           stack:
             process.env.NODE_ENV === "development"
               ? error instanceof Error
@@ -258,11 +263,17 @@ export async function GET(request: Request) {
     return await attemptFetch();
   } catch (error) {
     console.error("All attempts to fetch raw assets failed:", error);
+
+    // Type assertion here as well
+    const errorDetail = lastError
+      ? (lastError as Error).message
+      : "Unknown error";
+
     return NextResponse.json(
       {
         error: "Failed to fetch raw assets",
         message: error instanceof Error ? error.message : String(error),
-        details: lastError ? lastError.message : "Unknown error",
+        details: errorDetail,
         stack:
           process.env.NODE_ENV === "development"
             ? error instanceof Error
