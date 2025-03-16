@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     returnedCount: 0,
     totalCount: 0,
     retryCount: 0,
-    executedQuery: null,
+    executedQuery: null as string | null,
   };
 
   console.time("raw-assets-api-fetch");
