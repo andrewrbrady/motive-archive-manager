@@ -88,7 +88,7 @@ export async function POST(request: Request) {
           {
             $set: {
               current_kit_id: result.insertedId.toString(),
-              is_available: false,
+              is_available: true,
               kit_status: "in-kit",
             },
           }

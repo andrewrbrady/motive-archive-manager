@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         name: item.name,
         category: item.category,
         sub_category: item.subCategory,
-        manufacturer: item.manufacturer,
+        manufacturer: item.manufacturer || "",
         model: item.model,
         serial_number: item.serialNumber,
 
@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
         notes: item.notes,
         location: item.location,
         is_available: item.isAvailable,
+        quantity: item.quantity || 1,
         current_kit_id: item.currentKitId,
         images: item.images || [],
         primary_image: item.primaryImage,
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
         // Financial fields
         purchase_price: item.purchasePrice,
         current_value: item.currentValue,
+        rental_price: item.rentalPrice,
         depreciation_rate: item.depreciationRate,
         insurance_value: item.insuranceValue,
 

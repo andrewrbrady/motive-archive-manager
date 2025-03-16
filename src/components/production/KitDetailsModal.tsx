@@ -6,7 +6,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDate } from "@/lib/utils";
 import { Kit } from "@/types/inventory";
 import { Package, Calendar, User, Clock } from "lucide-react";
-import { UrlModal } from "@/components/ui/url-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface KitDetailsModalProps {
   isOpen: boolean;
@@ -20,15 +26,12 @@ export default function KitDetailsModal({
   kit,
 }: KitDetailsModalProps) {
   return (
-    <UrlModal
-      paramName="kit"
-      paramValue={kit.id}
-      onClose={onClose}
-      title={kit.name}
-      preserveParams={["tab", "page", "limit", "search", "status"]}
-      className="max-w-3xl"
-    >
-      <div className="max-h-[70vh] flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{kit.name}</DialogTitle>
+        </DialogHeader>
+
         <div className="flex flex-wrap gap-2 my-2">
           {kit.status && (
             <Badge
@@ -47,9 +50,7 @@ export default function KitDetailsModal({
           <Badge variant="outline">{kit.items?.length || 0} items</Badge>
         </div>
 
-        <p className="text-[hsl(var(--muted-foreground))] mb-4">
-          {kit.description}
-        </p>
+        <p className="text-muted-foreground mb-4">{kit.description}</p>
 
         <ScrollArea className="flex-1 pr-4">
           {kit.checkedOutTo && (
@@ -180,12 +181,12 @@ export default function KitDetailsModal({
           )}
         </ScrollArea>
 
-        <div className="mt-4 pt-4 border-t flex justify-end gap-2">
+        <DialogFooter className="mt-4 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
-        </div>
-      </div>
-    </UrlModal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -43,9 +43,23 @@ export async function GET() {
 // POST a new studio inventory item
 export async function POST(request: Request) {
   try {
+    const data = await request.json();
+
+    // Validate required fields
+    if (!data.name || !data.category || !data.model) {
+      return NextResponse.json(
+        { error: "Required fields missing" },
+        { status: 400 }
+      );
+    }
+
     const client = await clientPromise;
     const db = client.db("motive_archive");
-    const data = await request.json();
+
+    // Set timestamps
+    const now = new Date();
+    data.created_at = now;
+    data.updated_at = now;
 
     // Convert dates from string to Date objects
     if (data.purchaseDate) {
@@ -96,10 +110,6 @@ export async function POST(request: Request) {
       }));
     }
 
-    // Add timestamps
-    data.created_at = new Date();
-    data.updated_at = new Date();
-
     // Convert camelCase to snake_case
     const snakeCaseData = {
       // Basic information
@@ -116,14 +126,17 @@ export async function POST(request: Request) {
       condition: data.condition,
       notes: data.notes,
       location: data.location,
+      container_id: data.containerId,
       is_available: data.isAvailable,
       current_kit_id: data.currentKitId,
-      images: data.images,
+      quantity: data.quantity || 1,
+      images: data.images || [],
       primary_image: data.primaryImage,
 
       // Financial fields
       purchase_price: data.purchasePrice,
       current_value: data.currentValue,
+      rental_price: data.rentalPrice,
       depreciation_rate: data.depreciationRate,
       insurance_value: data.insuranceValue,
 

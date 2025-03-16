@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Dialog } from "@headlessui/react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   StudioInventoryItem,
   StudioInventoryImage,
@@ -74,6 +81,7 @@ export default function EditInventoryItemModal({
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [containers, setContainers] = useState<any[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
   const [newTag, setNewTag] = useState("");
@@ -130,6 +138,7 @@ export default function EditInventoryItemModal({
   useEffect(() => {
     if (isOpen) {
       fetchLocations();
+      fetchContainers();
     }
   }, [isOpen]);
 
@@ -144,6 +153,17 @@ export default function EditInventoryItemModal({
       console.error("Error fetching locations:", error);
     } finally {
       setIsLoadingLocations(false);
+    }
+  };
+
+  const fetchContainers = async () => {
+    try {
+      const response = await fetch("/api/containers");
+      if (!response.ok) throw new Error("Failed to fetch containers");
+      const data = await response.json();
+      setContainers(data);
+    } catch (error) {
+      console.error("Error fetching containers:", error);
     }
   };
 
@@ -327,27 +347,23 @@ export default function EditInventoryItemModal({
     });
   };
 
-  return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
-        aria-hidden="true"
-      />
+  // Add a custom onOpenChange handler to ensure proper modal behavior
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
 
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-xl w-full bg-background border border-border rounded-lg shadow-lg">
-          <Dialog.Title className="text-xl font-semibold px-6 py-4 border-b border-border flex items-center justify-between">
-            Edit Inventory Item
-            <Button
-              type="button"
-              onClick={onClose}
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </Dialog.Title>
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Inventory Item</DialogTitle>
+            <DialogDescription>
+              Update the details of this inventory item
+            </DialogDescription>
+          </DialogHeader>
 
           <form onSubmit={handleSubmit} className="p-6">
             <CustomTabs
@@ -424,7 +440,7 @@ export default function EditInventoryItemModal({
 
                         <div className="space-y-2">
                           <label className="text-sm font-medium text-foreground">
-                            Manufacturer *
+                            Manufacturer
                           </label>
                           <Input
                             type="text"
@@ -435,7 +451,6 @@ export default function EditInventoryItemModal({
                                 manufacturer: e.target.value,
                               })
                             }
-                            required
                           />
                         </div>
 
@@ -469,6 +484,24 @@ export default function EditInventoryItemModal({
                                 serialNumber: e.target.value,
                               })
                             }
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            Quantity *
+                          </label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={formData.quantity?.toString() || "1"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                quantity: parseInt(e.target.value) || 1,
+                              })
+                            }
+                            required
                           />
                         </div>
 
@@ -533,24 +566,58 @@ export default function EditInventoryItemModal({
                             Location
                           </label>
                           <Select
-                            value={formData.location || ""}
-                            onValueChange={(value) =>
+                            value={formData.location || "none"}
+                            onValueChange={(value) => {
                               setFormData({
                                 ...formData,
-                                location: value,
-                              })
-                            }
+                                location: value === "none" ? undefined : value,
+                              });
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select location" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
                               {locations.map((location) => (
                                 <SelectItem
                                   key={location.id}
                                   value={location.id}
                                 >
                                   {location.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Container selection */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            Container
+                          </label>
+                          <Select
+                            value={formData.containerId || "none"}
+                            onValueChange={(value) =>
+                              setFormData({
+                                ...formData,
+                                containerId:
+                                  value === "none" ? undefined : value,
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select container" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {containers.map((container) => (
+                                <SelectItem
+                                  key={container.id}
+                                  value={container.id}
+                                >
+                                  {container.name} (#{container.containerNumber}
+                                  ) - {container.type}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -666,6 +733,27 @@ export default function EditInventoryItemModal({
                               setFormData({
                                 ...formData,
                                 currentValue: e.target.value
+                                  ? parseFloat(e.target.value)
+                                  : undefined,
+                              })
+                            }
+                            placeholder="0.00"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">
+                            Rental Price (per day)
+                          </label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.rentalPrice || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                rentalPrice: e.target.value
                                   ? parseFloat(e.target.value)
                                   : undefined,
                               })
@@ -988,25 +1076,26 @@ export default function EditInventoryItemModal({
                 },
               ]}
               defaultValue={activeTab}
-              basePath=""
+              basePath="#"
+              paramName="edit_tab"
               className="w-full"
             />
 
-            <div className="mt-8 flex justify-end gap-2">
+            <DialogFooter className="mt-8">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
               <Button type="submit">Save Changes</Button>
-            </div>
+            </DialogFooter>
           </form>
-        </Dialog.Panel>
-      </div>
+        </DialogContent>
+      </Dialog>
 
       <UploadProgressDialog
         isOpen={isUploading}
         onClose={() => setIsUploading(false)}
         uploadProgress={uploadProgress}
       />
-    </Dialog>
+    </>
   );
 }

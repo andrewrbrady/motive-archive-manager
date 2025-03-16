@@ -19,6 +19,7 @@ export default function CarSelector({
   const [suggestions, setSuggestions] = useState<Car[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const searchCars = async (query: string) => {
@@ -55,6 +56,11 @@ export default function CarSelector({
   }, [searchTerm]);
 
   useEffect(() => {
+    // Reset selected index when suggestions change
+    setSelectedIndex(-1);
+  }, [suggestions]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         searchRef.current &&
@@ -78,6 +84,28 @@ export default function CarSelector({
     onSelect(selectedCars.filter((car) => car._id !== carId));
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || loading || suggestions.length === 0) return;
+
+    // Navigate through suggestions with arrow keys
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) =>
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      );
+    } else if (e.key === "Enter" && selectedIndex >= 0) {
+      e.preventDefault();
+      handleSelect(suggestions[selectedIndex]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div ref={searchRef} className="relative">
@@ -90,6 +118,7 @@ export default function CarSelector({
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
+            onKeyDown={handleKeyDown}
             placeholder="Search cars..."
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--foreground-muted))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
           />
@@ -104,11 +133,16 @@ export default function CarSelector({
                 <span className="ml-2">Loading...</span>
               </div>
             ) : suggestions.length > 0 ? (
-              suggestions.map((car) => (
+              suggestions.map((car, index) => (
                 <div
                   key={car._id}
-                  className="px-4 py-2 cursor-pointer hover:bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]"
+                  className={`px-4 py-2 cursor-pointer ${
+                    index === selectedIndex
+                      ? "bg-[hsl(var(--accent))]"
+                      : "hover:bg-[hsl(var(--accent))]"
+                  } text-[hsl(var(--foreground))]`}
                   onClick={() => handleSelect(car)}
+                  onMouseEnter={() => setSelectedIndex(index)}
                 >
                   <div className="flex items-center justify-between">
                     <span>

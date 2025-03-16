@@ -11,29 +11,48 @@ export async function GET(
     const client = await clientPromise;
     const db = client.db("motive_archive");
 
-    const item = await db.collection("studio_inventory").findOne({
-      _id: new ObjectId(params.id),
-    });
-
-    if (!item) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    // Handle special cases
+    if (params.id === "categories") {
+      const categories = await db
+        .collection("studio_inventory")
+        .distinct("category");
+      return NextResponse.json(categories);
     }
 
-    // Ensure is_available is correctly set based on checked_out_to
-    if (item.checked_out_to) {
-      item.is_available = false;
-    }
+    // Continue with normal ID-based lookup for regular item requests
+    try {
+      const item = await db.collection("studio_inventory").findOne({
+        _id: new ObjectId(params.id),
+      });
 
-    // Ensure checkout_date and expected_return_date are properly formatted
-    if (item.checkout_date) {
-      item.checkout_date = new Date(item.checkout_date);
-    }
+      if (!item) {
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      }
 
-    if (item.expected_return_date) {
-      item.expected_return_date = new Date(item.expected_return_date);
-    }
+      // Ensure is_available is correctly set based on checked_out_to
+      if (item.checked_out_to) {
+        item.is_available = false;
+      }
 
-    return NextResponse.json(item);
+      // Ensure checkout_date and expected_return_date are properly formatted
+      if (item.checkout_date) {
+        item.checkout_date = new Date(item.checkout_date);
+      }
+
+      if (item.expected_return_date) {
+        item.expected_return_date = new Date(item.expected_return_date);
+      }
+
+      return NextResponse.json(item);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("ObjectId")) {
+        return NextResponse.json(
+          { error: "Invalid ID format" },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
   } catch (error) {
     console.error("Error fetching studio inventory item:", error);
     return NextResponse.json(
@@ -121,9 +140,10 @@ export async function PUT(
       condition: data.condition,
       notes: data.notes,
       location: data.location,
+      container_id: data.containerId,
       is_available: data.isAvailable,
       current_kit_id: data.currentKitId,
-      images: data.images,
+      images: data.images || [],
       primary_image: data.primaryImage,
 
       // Financial fields

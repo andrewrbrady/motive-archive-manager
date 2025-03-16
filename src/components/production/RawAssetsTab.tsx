@@ -61,6 +61,7 @@ export default function RawAssetsTab() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
+  const [carLabels, setCarLabels] = useState<Record<string, string>>({});
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<
@@ -98,61 +99,74 @@ export default function RawAssetsTab() {
     const selectedAssetId = getParam("asset");
     const isEdit = getParam("edit") === "true";
 
-    if (selectedAssetId) {
-      console.log("RawAssetsTab - Found asset param in URL:", selectedAssetId);
+    // Skip processing if no asset ID is specified or if we're explicitly
+    // closing the modal (when both asset and isEdit are missing/false)
+    if (!selectedAssetId) {
+      // If no asset selected in URL and modal is open, close it
+      if (isEditModalOpen && !isEdit) {
+        console.log("Closing edit modal due to URL parameter changes");
+        setIsEditModalOpen(false);
+      }
+      return;
+    }
 
-      // If we have assets loaded, find the asset and show modal
-      if (assets.length > 0) {
-        const asset = assets.find((a) => a._id === selectedAssetId);
+    console.log(
+      "RawAssetsTab - Found asset param in URL:",
+      selectedAssetId,
+      "isEdit:",
+      isEdit
+    );
 
-        if (asset) {
-          if (isEdit) {
-            setSelectedAssetId(asset._id);
-            // Only set the asset data if the edit modal is not already open
-            // This prevents overwriting the current edit with stale data
-            if (!isEditModalOpen) {
-              const rawAssetData: RawAssetData = {
-                _id: asset._id as unknown as ObjectId,
-                date: asset.date,
-                description: asset.description,
-                hardDriveIds: asset.hardDriveIds.map(
-                  (id) => id as unknown as ObjectId
-                ),
-                carIds: asset.carIds,
-              };
-              setSelectedAssetForDetails(rawAssetData);
-              setIsEditModalOpen(true);
-            }
-          } else {
-            // Only set the details if the details modal is not already open
-            if (!isDetailsModalOpen) {
-              setSelectedAssetForDetails({
-                _id: asset._id as unknown as ObjectId,
-                date: asset.date,
-                description: asset.description,
-                hardDriveIds: asset.hardDriveIds.map(
-                  (id) => id as unknown as ObjectId
-                ),
-                carIds: asset.carIds,
-                createdAt: asset.createdAt,
-                updatedAt: asset.updatedAt,
-              });
-              setIsDetailsModalOpen(true);
-              console.log("Opening details modal for asset:", asset._id);
-            }
+    // If we have assets loaded, find the asset and show modal
+    if (assets.length > 0) {
+      const asset = assets.find((a) => a._id === selectedAssetId);
+
+      if (asset) {
+        if (isEdit) {
+          setSelectedAssetId(asset._id);
+          // Only set the asset data if the edit modal is not already open
+          // This prevents overwriting the current edit with stale data
+          if (!isEditModalOpen) {
+            console.log("Opening edit modal for asset:", asset._id);
+            const rawAssetData: RawAssetData = {
+              _id: asset._id as unknown as ObjectId,
+              date: asset.date,
+              description: asset.description,
+              hardDriveIds: asset.hardDriveIds.map(
+                (id) => id as unknown as ObjectId
+              ),
+              carIds: asset.carIds,
+            };
+            setSelectedAssetForDetails(rawAssetData);
+            setIsEditModalOpen(true);
           }
-        } else {
-          console.log("Asset not found in loaded assets, fetching from API");
-          // Asset not found in currently loaded assets, fetch it directly
-          fetchAssetById(selectedAssetId);
+        } else if (!isDetailsModalOpen) {
+          // Only set the details if the details modal is not already open
+          setSelectedAssetForDetails({
+            _id: asset._id as unknown as ObjectId,
+            date: asset.date,
+            description: asset.description,
+            hardDriveIds: asset.hardDriveIds.map(
+              (id) => id as unknown as ObjectId
+            ),
+            carIds: asset.carIds,
+            createdAt: asset.createdAt,
+            updatedAt: asset.updatedAt,
+          });
+          setIsDetailsModalOpen(true);
+          console.log("Opening details modal for asset:", asset._id);
         }
       } else {
-        // If assets aren't loaded yet, fetch the specific asset
-        console.log("Assets not loaded yet, fetching specific asset");
+        console.log("Asset not found in loaded assets, fetching from API");
+        // Asset not found in currently loaded assets, fetch it directly
         fetchAssetById(selectedAssetId);
       }
+    } else {
+      // If assets aren't loaded yet, fetch the specific asset
+      console.log("Assets not loaded yet, fetching specific asset");
+      fetchAssetById(selectedAssetId);
     }
-  }, [assets, getParam]);
+  }, [assets, getParam, isEditModalOpen, isDetailsModalOpen]);
 
   // Handle addAsset parameter from URL
   useEffect(() => {
@@ -181,6 +195,46 @@ export default function RawAssetsTab() {
     }
   }, []);
 
+  const fetchCarLabels = useCallback(async (carIds: string[]) => {
+    if (!carIds.length) return {};
+
+    try {
+      console.log("Fetching car labels for IDs:", carIds);
+      const response = await fetch(`/api/cars?ids=${carIds.join(",")}`);
+      if (!response.ok) {
+        console.warn(`Failed to fetch car labels: ${response.statusText}`);
+        return {};
+      }
+      const data = await response.json();
+      console.log("Received car data:", data);
+
+      const labels: Record<string, string> = {};
+      data.cars.forEach((car: any) => {
+        // Create human-readable label from car properties
+        const year = car.year || "";
+        const make = car.make || "";
+        const model = car.model || "";
+        const color = car.exteriorColor || car.color || "";
+
+        // Format: "2020 Tesla Model 3 (Red)"
+        let label = [year, make, model].filter(Boolean).join(" ");
+        if (color) label += ` (${color})`;
+
+        // Important: Ensure the key is a string to avoid type mismatches
+        const carIdStr = car._id.toString();
+
+        // If no car details available, use ID or placeholder
+        labels[carIdStr] = label || `Car ${carIdStr}`;
+        console.log(`Set label for car ${carIdStr}: ${labels[carIdStr]}`);
+      });
+
+      return labels;
+    } catch (error) {
+      console.warn(`Error fetching car labels:`, error);
+      return {};
+    }
+  }, []);
+
   const fetchAssets = useCallback(async () => {
     setLoading(true);
     try {
@@ -204,13 +258,30 @@ export default function RawAssetsTab() {
         return acc;
       }, {} as Record<string, string>);
       setDriveLabels(driveLabels);
+
+      // Fetch car labels for all carIds
+      const allCarIds = data.assets.flatMap(
+        (asset: RawAsset) => asset.carIds || []
+      );
+
+      // Ensure all car IDs are strings
+      const uniqueCarIds = [...new Set(allCarIds)]
+        .filter(Boolean)
+        .map((id) => (typeof id === "string" ? id : String(id)));
+
+      console.log("Unique car IDs for fetching labels:", uniqueCarIds);
+
+      if (uniqueCarIds.length > 0) {
+        const carLabelsResult = await fetchCarLabels(uniqueCarIds);
+        setCarLabels(carLabelsResult);
+      }
     } catch (err) {
       console.error("Error fetching assets:", err);
       setError("Failed to fetch assets");
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, searchTerm, fetchDriveLabels]);
+  }, [currentPage, itemsPerPage, searchTerm, fetchDriveLabels, fetchCarLabels]);
 
   useEffect(() => {
     fetchAssets();
@@ -325,10 +396,25 @@ export default function RawAssetsTab() {
   };
 
   const handleCloseModal = () => {
+    console.log("Closing edit modal");
+
+    // First close the modal in the state
     setIsEditModalOpen(false);
     setSelectedAssetId(null);
     setSelectedAssetForDetails(undefined);
-    updateParams({ asset: null });
+
+    // Then clear both the asset and edit parameters from the URL
+    // This is crucial to prevent the modal from reopening due to URL parameters
+    updateParams(
+      {
+        asset: null,
+        edit: null,
+      },
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        clearOthers: false,
+      }
+    );
   };
 
   const handleSave = async (assetData: Partial<RawAssetData>) => {
@@ -485,6 +571,12 @@ export default function RawAssetsTab() {
       if (asset.hardDriveIds && asset.hardDriveIds.length > 0) {
         fetchDriveLabelsForAsset(asset.hardDriveIds);
       }
+
+      // Also fetch car labels for this asset
+      if (asset.carIds && asset.carIds.length > 0) {
+        const carLabelsResult = await fetchCarLabels(asset.carIds as string[]);
+        setCarLabels((prevLabels) => ({ ...prevLabels, ...carLabelsResult }));
+      }
     } catch (err) {
       console.error("Error fetching asset:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch asset");
@@ -609,17 +701,33 @@ export default function RawAssetsTab() {
                   <td className="py-3 px-2 text-sm">{asset.description}</td>
                   <td className="py-3 px-2">
                     <div className="flex flex-wrap gap-2">
-                      {asset.carIds.map((carId, index) => {
-                        return (
-                          <span
-                            key={index}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
-                          >
-                            <CarIcon className="w-3 h-3" />
-                            {carId}
-                          </span>
-                        );
-                      })}
+                      {asset.carIds && asset.carIds.length > 0 ? (
+                        asset.carIds.map((carId, index) => {
+                          // Ensure we have a string for comparison
+                          const carIdStr =
+                            typeof carId === "string" ? carId : String(carId);
+
+                          // Debug logging to track which car IDs don't have labels
+                          if (!carLabels[carIdStr]) {
+                            console.log(`Missing car label for ${carIdStr}`);
+                          }
+
+                          return (
+                            <span
+                              key={index}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
+                            >
+                              <CarIcon className="w-3 h-3" />
+                              {carLabels[carIdStr] ||
+                                `Car ${carIdStr.substring(0, 8)}...`}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-[hsl(var(--muted-foreground))] text-xs">
+                          No cars
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-2">

@@ -1,6 +1,7 @@
 ---
 description: Rules for Node.js configuration and build processes
 globs: **/*.ts, **/*.tsx, package.json, next.config.js
+alwaysApply: undefined
 ---
 # Node.js and npm Configuration Rules
 

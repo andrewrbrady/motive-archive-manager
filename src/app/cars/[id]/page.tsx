@@ -581,18 +581,30 @@ export default function CarPage({ params }: { params: { id: string } }) {
       imageId: string,
       setStatus: (status: any) => void
     ) => {
+      console.log(`========== CONTEXT deleteImage CALLED ==========`);
+      console.log(`Car ID: ${carId}, Image ID: ${imageId}`);
       try {
         setStatus({ status: "deleting" });
 
         // Find the image index
         const imageIndex =
           car?.images?.findIndex((img) => img._id === imageId) ?? -1;
+
+        console.log(`Found image at index: ${imageIndex}`);
         if (imageIndex === -1) {
+          console.error(`Image with ID ${imageId} not found in car images`);
           throw new Error("Image not found");
         }
 
-        // Use the existing handleRemoveImage function
-        await handleRemoveImage([imageIndex], true);
+        console.log(
+          `Calling handleRemoveImage with index [${imageIndex}] and deleteFromStorage=true`
+        );
+        // Use the existing handleRemoveImage function - FORCE deleteFromStorage to true
+        const deleteFromStorage = true; // Make it explicitly a boolean true
+        console.log(`Type of deleteFromStorage: ${typeof deleteFromStorage}`);
+
+        await handleRemoveImage([imageIndex], deleteFromStorage);
+        console.log(`handleRemoveImage completed successfully`);
 
         setStatus({ status: "complete" });
       } catch (error) {
@@ -1312,12 +1324,15 @@ export default function CarPage({ params }: { params: { id: string } }) {
     indices: number[],
     deleteFromStorage = false
   ) => {
+    console.log("=========== handleRemoveImage STARTED ===========");
     console.log(
       `[DEBUG] Starting handleRemoveImage with indices:`,
       indices,
       `deleteFromStorage:`,
       deleteFromStorage
     );
+    console.log(`deleteFromStorage type: ${typeof deleteFromStorage}`);
+    console.log(`Converting to boolean: ${Boolean(deleteFromStorage)}`);
 
     if (!car?.images?.length) {
       console.log("[DEBUG] No images to delete - car has no images");
@@ -1325,7 +1340,12 @@ export default function CarPage({ params }: { params: { id: string } }) {
     }
 
     try {
-      console.log("[DEBUG] Deleting images with indices:", indices);
+      console.log(
+        "[DEBUG] Deleting images with indices:",
+        indices,
+        "deleteFromStorage:",
+        deleteFromStorage
+      );
       const indicesToRemove = new Set(indices);
 
       // Debug each index to ensure it's valid
@@ -1353,7 +1373,13 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
       console.log(
         "[DEBUG] Images to delete:",
-        imagesToDelete.map((img) => img.url)
+        imagesToDelete.map((img) => ({
+          url: img.url.substring(0, 30) + "...",
+          _id: img._id,
+          cloudflareId: img.cloudflareId || "none",
+        })),
+        "deleteFromStorage:",
+        deleteFromStorage
       );
 
       const remainingImages = car.images.filter(
@@ -1364,7 +1390,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
       setCar((prev) => (prev ? { ...prev, images: remainingImages } : null));
 
       if (deleteFromStorage) {
-        console.log("[DEBUG] Processing deletion request");
+        console.log(
+          "[DEBUG] Processing deletion request with deleteFromStorage=true"
+        );
 
         try {
           // Always use the batch endpoint for multiple images
@@ -1391,9 +1419,26 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 // Single image deletion
                 imageUrl: imagesToDelete[0].url,
                 deleteFromStorage,
+                // Add more identification fields to help find the image
+                imageId: imagesToDelete[0]._id,
+                cloudflareId: imagesToDelete[0].cloudflareId,
+                filename: imagesToDelete[0].filename,
               };
 
-          console.log("[DEBUG] Request payload:", JSON.stringify(payload));
+          console.log(
+            "[DEBUG] Request payload:",
+            JSON.stringify(payload, null, 2)
+          );
+
+          // Ensure the deleteFromStorage flag is set correctly in the payload
+          console.log(
+            "[DEBUG] Confirming deleteFromStorage in payload:",
+            payload.deleteFromStorage
+          );
+          console.log(
+            "[DEBUG] typeof payload.deleteFromStorage:",
+            typeof payload.deleteFromStorage
+          );
 
           const response = await fetch(apiUrl, {
             method: "DELETE",
@@ -1404,7 +1449,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
           });
 
           const result = await response.json();
-          console.log("[DEBUG] API response:", result);
+          console.log("[DEBUG] API response:", JSON.stringify(result, null, 2));
 
           if (!response.ok) {
             throw new Error(
@@ -1418,11 +1463,14 @@ export default function CarPage({ params }: { params: { id: string } }) {
           await refreshCarData();
 
           // If this is a "delete all" operation, also refresh the page to ensure everything is reset
+          // Only do this after the API call has fully completed
           if (validIndices.length === car.images.length) {
             console.log(
-              "[DEBUG] This was a delete all operation, refreshing page"
+              "[DEBUG] This was a delete all operation, but NOT refreshing page immediately"
             );
-            window.location.reload();
+            console.log(
+              "[DEBUG] Letting the API call complete first - this should happen automatically"
+            );
           }
         } catch (error) {
           console.error("[DEBUG] Error deleting images:", error);
@@ -1432,7 +1480,11 @@ export default function CarPage({ params }: { params: { id: string } }) {
         }
       } else {
         // If not deleting from storage, just update the UI
-        console.log("[DEBUG] Not deleting from storage, UI already updated");
+        console.log(
+          "[DEBUG] ⚠️ NOT DELETING FROM STORAGE because deleteFromStorage =",
+          deleteFromStorage
+        );
+        console.log("[DEBUG] UI already updated");
       }
     } catch (error) {
       console.error("[DEBUG] Error in handleRemoveImage:", error);
@@ -1450,13 +1502,16 @@ export default function CarPage({ params }: { params: { id: string } }) {
       // Add a small delay to ensure database operations have completed
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const response = await fetch(`/api/cars/${params.id}`, {
-        // Add cache-busting query parameter
+      // Add a timestamp to ensure we bypass any cache
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/cars/${params.id}?t=${timestamp}`, {
+        // Add cache-busting headers
         headers: {
-          "Cache-Control": "no-cache",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
+          Expires: "0",
         },
-        // Add timestamp to prevent caching
+        // Force cache bypass
         cache: "no-store",
       });
 
@@ -1464,17 +1519,20 @@ export default function CarPage({ params }: { params: { id: string } }) {
         const data = await response.json();
         if (data && data._id) {
           console.log("[DEBUG] Car data refreshed successfully:", data._id);
+          console.log("[DEBUG] Car images count:", data.images?.length || 0);
           setCar(data);
         } else {
           console.error("[DEBUG] Received invalid car data:", data);
           // If we got an invalid response, try one more time after a delay
           await new Promise((resolve) => setTimeout(resolve, 1000));
+          const retryTimestamp = new Date().getTime();
           const retryResponse = await fetch(
-            `/api/cars/${params.id}?retry=true`,
+            `/api/cars/${params.id}?retry=true&t=${retryTimestamp}`,
             {
               headers: {
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
                 Pragma: "no-cache",
+                Expires: "0",
               },
               cache: "no-store",
             }

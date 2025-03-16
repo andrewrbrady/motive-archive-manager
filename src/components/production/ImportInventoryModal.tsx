@@ -55,6 +55,16 @@ export default function ImportInventoryModal({
     });
   };
 
+  // Helper function to clean and parse currency values
+  const parseCurrency = (value: string): number | undefined => {
+    if (!value || value.trim() === "") return undefined;
+
+    // Remove currency symbols, spaces, and commas
+    const cleanedValue = value.replace(/[$,\s]/g, "");
+    const number = parseFloat(cleanedValue);
+    return isNaN(number) ? undefined : number;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
@@ -85,68 +95,47 @@ export default function ImportInventoryModal({
 
       // Transform CSV data to match the API format
       const inventoryItems = parseResult.data.map((row: any) => {
-        // Convert "Yes"/"No" to boolean
-        const isAvailable = row["Is Available"]?.toLowerCase() === "yes";
+        // Generate a name for the item if not provided
+        const name =
+          row["Name"] ||
+          (row["Manufacturer"] && row["Model"]
+            ? `${row["Manufacturer"]} ${row["Model"]}`
+            : row["Model"] || "Unnamed Item");
 
-        // Parse dates
-        const purchaseDate = row["Purchase Date"]
-          ? new Date(row["Purchase Date"])
-          : undefined;
-        const lastMaintenanceDate = row["Last Maintenance Date"]
-          ? new Date(row["Last Maintenance Date"])
-          : undefined;
-        const warrantyExpirationDate = row["Warranty Expiration Date"]
-          ? new Date(row["Warranty Expiration Date"])
-          : undefined;
-        const checkoutDate = row["Checkout Date"]
-          ? new Date(row["Checkout Date"])
-          : undefined;
-        const expectedReturnDate = row["Expected Return Date"]
-          ? new Date(row["Expected Return Date"])
-          : undefined;
+        // Normalize categories to match InventoryCategory type
+        const category = row["Category"] || "Other";
 
-        // Parse numeric values
-        const purchasePrice = row["Purchase Price"]
-          ? parseFloat(row["Purchase Price"])
-          : undefined;
-        const currentValue = row["Current Value"]
-          ? parseFloat(row["Current Value"])
-          : undefined;
+        // Parse the rental price, handling currency symbols
+        const rentalPrice = parseCurrency(row["Rental Price"]);
 
-        // Parse tags
-        const tags = row["Tags"]
-          ? row["Tags"]
-              .split(",")
-              .map((tag: string) => tag.trim())
-              .filter(Boolean)
-          : [];
+        // Parse quantity, defaulting to 1 if not provided or invalid
+        const quantity = row["Quantity"] ? parseInt(row["Quantity"], 10) : 1;
 
+        // Get manufacturer and model
+        const manufacturer = row["Manufacturer"] || "";
+        const model = row["Model"] || "";
+
+        // Default values for required fields
         return {
-          name: row["Name"] || "",
-          category: (row["Category"] as InventoryCategory) || "other",
-          subCategory: row["Sub Category"] || undefined,
-          manufacturer: row["Manufacturer"] || "",
-          model: row["Model"] || "",
-          serialNumber: row["Serial Number"] || undefined,
-          purchaseDate,
-          lastMaintenanceDate,
+          name: name,
+          category: category as InventoryCategory,
+          manufacturer: manufacturer,
+          model: model || name, // Use name as model if not provided
           condition: row["Condition"] || "good",
+          isAvailable: true,
+          quantity: isNaN(quantity) ? 1 : quantity,
+          tags: row["Tags"]
+            ? row["Tags"]
+                .split(",")
+                .map((tag: string) => tag.trim())
+                .filter(Boolean)
+            : [],
+          rentalPrice: rentalPrice,
+          // Add other fields if present in the CSV
+          subCategory: row["Sub-Category"] || row["SubCategory"] || undefined,
+          serialNumber: row["Serial Number"] || undefined,
           notes: row["Notes"] || undefined,
           location: row["Location"] || undefined,
-          isAvailable,
-          currentKitId: row["Current Kit ID"] || undefined,
-          purchasePrice,
-          currentValue,
-          tags,
-          powerRequirements: row["Power Requirements"] || undefined,
-          dimensions: row["Dimensions"] || undefined,
-          manualUrl: row["Manual URL"] || undefined,
-          warrantyExpirationDate,
-          serviceProvider: row["Service Provider"] || undefined,
-          serviceContactInfo: row["Service Contact Info"] || undefined,
-          checkedOutTo: row["Checked Out To"] || undefined,
-          checkoutDate,
-          expectedReturnDate,
         };
       });
 
@@ -214,6 +203,22 @@ export default function ImportInventoryModal({
                   hover:file:bg-[hsl(var(--secondary))/90]"
               />
             </div>
+          </div>
+
+          <div className="bg-[hsl(var(--muted))/20] p-4 rounded-md text-sm">
+            <h3 className="font-medium mb-2">Expected CSV Format</h3>
+            <p className="mb-2">Your CSV should include these columns:</p>
+            <ul className="list-disc pl-5 mb-2 space-y-1">
+              <li>Manufacturer - The equipment manufacturer</li>
+              <li>Model - The specific model name/number</li>
+              <li>Category - Equipment category (Grip, Lighting, etc.)</li>
+              <li>Quantity - Number of items (defaults to 1)</li>
+              <li>Rental Price - Daily rental rate (can include $ symbol)</li>
+            </ul>
+            <p>
+              Additional columns like Name, Sub-Category, Serial Number, etc.
+              will also be imported if present.
+            </p>
           </div>
 
           {hasPreview && preview.length > 0 && (

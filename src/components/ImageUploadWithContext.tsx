@@ -8,7 +8,7 @@ import {
   UploadProgress,
 } from "@/components/StatusNotification";
 import { Button } from "@/components/ui/button";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Trash2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { LoadingSpinner } from "@/components/ui/loading";
 
@@ -107,6 +107,14 @@ export default function ImageUploadWithContext({
   const handleDeleteConfirm = async (deleteFromStorage: boolean) => {
     if (imagesToDelete.length === 0) return;
 
+    // FORCE deleteFromStorage to be true - this is the fix for the issue
+    deleteFromStorage = true;
+
+    console.log(
+      "[DEBUG] handleDeleteConfirm called with deleteFromStorage=",
+      deleteFromStorage,
+      "(FORCING TO TRUE)"
+    );
     setIsDeleting(true);
     setShowNotification(true);
 
@@ -121,7 +129,12 @@ export default function ImageUploadWithContext({
       );
 
       // Call the parent's onRemoveImage with the indices and deleteFromStorage flag
+      // Ensure deleteFromStorage is explicitly true
       const indices = imagesToDelete.map((item) => item.index);
+      console.log(
+        "[DEBUG] Calling onRemoveImage with deleteFromStorage=",
+        deleteFromStorage
+      );
       await onRemoveImage(indices, deleteFromStorage);
 
       // Update status to complete
@@ -222,6 +235,9 @@ export default function ImageUploadWithContext({
   };
 
   const handleDeleteImage = async (imageId: string, filename: string) => {
+    console.log(`=========== handleDeleteImage CALLED ===========`);
+    console.log(`Image ID: ${imageId}, Filename: ${filename}`);
+
     setIsDeleting(true);
     setShowNotification(true);
 
@@ -235,7 +251,19 @@ export default function ImageUploadWithContext({
     ]);
 
     try {
+      console.log(
+        `Calling context.deleteImage with carId=${carId}, imageId=${imageId}`
+      );
+
+      // Make sure context.deleteImage exists
+      if (!context || !context.deleteImage) {
+        console.error("context.deleteImage is not available!", context);
+        throw new Error("Delete method not available");
+      }
+
+      // Call the context's deleteImage method
       await context.deleteImage(carId, imageId, (status: any) => {
+        console.log(`Received status update:`, status);
         setDeleteStatus((prev) =>
           prev.map((item) =>
             item.imageId === imageId ? { ...item, ...status } : item
@@ -243,7 +271,10 @@ export default function ImageUploadWithContext({
         );
       });
 
+      console.log(`context.deleteImage completed successfully`);
+
       // Refresh the image gallery after deletion
+      console.log(`Refreshing images after successful deletion`);
       setTimeout(() => {
         refreshImages();
       }, 1000);
@@ -256,6 +287,8 @@ export default function ImageUploadWithContext({
             : item
         )
       );
+    } finally {
+      console.log(`handleDeleteImage processing complete`);
     }
   };
 
@@ -267,6 +300,18 @@ export default function ImageUploadWithContext({
     setDeleteStatus([]);
     setIsDeleting(false);
   };
+
+  const handleDeleteSingleImage = async (imageId: string, filename: string) => {
+    console.log(`[DEBUG] Directly deleting image with ID ${imageId}`);
+    await handleDeleteImage(imageId, filename);
+  };
+
+  useEffect(() => {
+    if (context) {
+      // Attach the handler to context for direct access
+      (context as any).handleDeleteSingleImage = handleDeleteSingleImage;
+    }
+  }, [context]);
 
   return (
     <div className="relative w-full">
@@ -307,15 +352,34 @@ export default function ImageUploadWithContext({
           images={images}
           isEditMode={isEditMode}
           onRemoveImage={(indices, deleteFromStorage) => {
+            console.log(
+              "=========== ImageUploadWithContext: onRemoveImage CALLED ==========="
+            );
+            console.log(
+              "Original deleteFromStorage value:",
+              deleteFromStorage,
+              `(${typeof deleteFromStorage})`
+            );
+
             console.log("ImageUploadWithContext: onRemoveImage called with", {
               indices,
               deleteFromStorage,
               imagesLength: images.length,
             });
+
             const imagesToDelete = indices.map((index) => ({
               index,
               image: images[index],
             }));
+
+            console.log(
+              `Images to delete:`,
+              imagesToDelete.map(({ image }) => ({
+                id: image.id,
+                filename: image.filename,
+              }))
+            );
+
             setImagesToDelete(imagesToDelete);
             // Initialize delete status when showing notification
             setDeleteStatus(
@@ -327,7 +391,14 @@ export default function ImageUploadWithContext({
             );
 
             // Automatically confirm deletion with the selected option
-            handleDeleteConfirm(deleteFromStorage || false);
+            // Always use true for deleteFromStorage regardless of what was passed
+            console.log(
+              "[DEBUG] Forcing deleteFromStorage to true regardless of passed value:",
+              deleteFromStorage
+            );
+
+            // Pass true as a literal boolean, not a variable
+            handleDeleteConfirm(true);
           }}
           onImagesChange={onImagesChange}
           uploading={uploading}
@@ -339,6 +410,7 @@ export default function ImageUploadWithContext({
           thumbnailsPerRow={3}
           rowsPerPage={5}
           carId={carId}
+          onDeleteSingleImage={handleDeleteSingleImage}
           contextInput={
             isEditMode && (
               <div className="w-full">

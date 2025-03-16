@@ -77,6 +77,7 @@ interface ImageGalleryProps {
   contextInput?: React.ReactNode;
   carId: string;
   onImageProgress?: (progress: UploadProgress) => void;
+  onDeleteSingleImage?: (imageId: string, filename: string) => Promise<void>;
 }
 
 interface Filters {
@@ -115,6 +116,7 @@ export function ImageGallery({
   contextInput,
   carId,
   onImageProgress,
+  onDeleteSingleImage,
 }: ImageGalleryProps) {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -303,15 +305,42 @@ export function ImageGallery({
   }, [isModalOpen, filteredImages.length]);
 
   const handleDeleteSelected = useCallback(() => {
+    console.log(
+      "[DEBUG ImageGallery] handleDeleteSelected called for",
+      selectedImages.length,
+      "images"
+    );
     if (onRemoveImage) {
-      onRemoveImage(selectedImages.map((index) => index));
+      console.log(
+        "[DEBUG ImageGallery] Calling onRemoveImage with indices:",
+        selectedImages,
+        "and deleteFromStorage=true"
+      );
+      // Explicitly set deleteFromStorage to true
+      onRemoveImage(
+        selectedImages.map((index) => index),
+        true
+      );
       setSelectedImages([]);
     }
   }, [onRemoveImage, selectedImages]);
 
   const handleDeleteAll = async () => {
+    console.log("=========== DELETE ALL BUTTON CLICKED ===========");
+    console.log("[DEBUG ImageGallery] Starting handleDeleteAll function");
     setShowDeleteAllConfirm(false);
     const indices = Array.from({ length: images.length }, (_, i) => i);
+
+    console.log(
+      `[DEBUG ImageGallery] Created ${indices.length} indices for deletion`
+    );
+    console.log(
+      `[DEBUG ImageGallery] Images to delete:`,
+      images.map((img) => ({
+        id: img.id,
+        filename: img.filename,
+      }))
+    );
 
     // Update progress to indicate deletion starting
     onImageProgress?.({
@@ -330,15 +359,25 @@ export function ImageGallery({
 
       // Now try the actual operation - explicitly set deleteFromStorage to true
       if (!onRemoveImage) {
+        console.error(
+          "[DEBUG ImageGallery] onRemoveImage function is not available"
+        );
         throw new Error("onRemoveImage function is not available");
       }
 
       console.log(
-        "[DEBUG ImageGallery] Calling onRemoveImage with deleteFromStorage=true"
+        "[DEBUG ImageGallery] Calling onRemoveImage with deleteFromStorage=true (explicitly boolean true)"
       );
 
       // Call the onRemoveImage with explicit deleteFromStorage=true
-      await onRemoveImage(indices, true);
+      // Make absolutely sure deleteFromStorage is true here (not truthy, but boolean true)
+      const deleteFromStorageParam = true; // Explicitly boolean true
+      console.log(
+        `Type of deleteFromStorageParam: ${typeof deleteFromStorageParam}`
+      );
+
+      // This is the actual API call
+      await onRemoveImage(indices, deleteFromStorageParam);
 
       // Update progress after successful deletion
       onImageProgress?.({
@@ -350,11 +389,20 @@ export function ImageGallery({
 
       console.log("[DEBUG ImageGallery] Batch deletion completed successfully");
 
-      // Force a page reload after a short delay to ensure everything is reset
+      // Remove the automatic page reload to allow the API request to complete
+      // Instead, let the API response trigger any necessary UI updates
+      console.log(
+        "[DEBUG ImageGallery] Deletion complete, waiting for API response"
+      );
+
+      // Only refresh the page if explicitly requested or necessary
+      // For now, commenting out the automatic reload that was causing issues
+      /*
       setTimeout(() => {
         console.log("[DEBUG ImageGallery] Reloading page after delete all");
         window.location.reload();
       }, 1000);
+      */
     } catch (error) {
       console.error("[DEBUG ImageGallery] Error in handleDeleteAll:", error);
       onImageProgress?.({
@@ -828,11 +876,6 @@ export function ImageGallery({
                 return (
                   <div
                     key={index}
-                    onClick={() =>
-                      isEditMode
-                        ? handleImageSelect(actualIndex)
-                        : handleThumbnailClick(actualIndex)
-                    }
                     className={cn(
                       "relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200",
                       isEditMode && "hover:opacity-90"
@@ -855,15 +898,63 @@ export function ImageGallery({
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       onError={() => handleImageError(image.url)}
                     />
+                    <div
+                      onClick={() =>
+                        isEditMode
+                          ? handleImageSelect(actualIndex)
+                          : handleThumbnailClick(actualIndex)
+                      }
+                      className={cn(
+                        "absolute inset-0 rounded-lg transition-colors duration-200",
+                        isSelected
+                          ? "bg-destructive-500 bg-opacity-10"
+                          : "hover:bg-[hsl(var(--background))] bg-opacity-5 dark:hover:bg-[var(--background-primary)]/5"
+                      )}
+                    />
+
                     {isEditMode && (
-                      <div
-                        className={cn(
-                          "absolute inset-0 rounded-lg transition-colors duration-200",
-                          isSelected
-                            ? "bg-destructive-500 bg-opacity-10"
-                            : "hover:bg-[hsl(var(--background))] bg-opacity-5 dark:hover:bg-[var(--background-primary)]/5"
-                        )}
-                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the parent div's onClick
+                          console.log(
+                            `============ INDIVIDUAL IMAGE DELETE CLICKED ============`
+                          );
+                          console.log(
+                            `Image: ${image.id}, filename: ${image.filename}`
+                          );
+                          console.log(
+                            `DeleteFromStorage is being FORCED to TRUE`
+                          );
+                          if (onDeleteSingleImage && image.id) {
+                            console.log(
+                              `Using onDeleteSingleImage for image ${image.id}`
+                            );
+                            onDeleteSingleImage(image.id, image.filename)
+                              .then(() =>
+                                console.log(
+                                  `Delete operation completed for image ${image.id}`
+                                )
+                              )
+                              .catch((err) =>
+                                console.error(
+                                  `Error deleting image ${image.id}:`,
+                                  err
+                                )
+                              );
+                          } else {
+                            // Fallback to the original method
+                            console.log(
+                              `Using onRemoveImage for image at index ${actualIndex} with deleteFromStorage=true`
+                            );
+                            // Force deleteFromStorage to be a boolean true, not just truthy
+                            onRemoveImage([actualIndex], true);
+                          }
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-black/70 dark:bg-[var(--background-primary)]/70 rounded-full text-white hover:bg-black/90 dark:hover:bg-[var(--background-primary)]/90 z-10"
+                        aria-label="Delete image"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-white" />
+                      </button>
                     )}
                   </div>
                 );

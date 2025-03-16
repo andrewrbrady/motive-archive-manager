@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus,
   Check,
   X,
@@ -19,9 +25,11 @@ import {
   Package,
   Download,
   Upload,
+  Pencil,
+  MapPin,
 } from "lucide-react";
 import StudioInventoryList from "./StudioInventoryList";
-import KitsList from "./KitsList";
+import KitsTab from "./KitsTab";
 import KitDetailsModal from "./KitDetailsModal";
 import KitCheckoutModal from "./KitCheckoutModal";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
@@ -35,10 +43,19 @@ import BulkCheckoutModal from "./BulkCheckoutModal";
 import ImportInventoryModal from "./ImportInventoryModal";
 import { LoadingContainer } from "@/components/ui/loading-container";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
+import ContainersTab from "./ContainersTab";
+import StudioInventoryGrid from "./StudioInventoryGrid";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 
 export default function StudioInventoryTab() {
   const { toast } = useToast();
   const [selectedView, setSelectedView] = useState<"items" | "kits">("items");
+  const [viewType, setViewType] = useState<"grid" | "list">("grid");
   const [items, setItems] = useState<StudioInventoryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<StudioInventoryItem[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
@@ -48,8 +65,10 @@ export default function StudioInventoryTab() {
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterCriteria | null>(null);
   const [savedFilters, setSavedFilters] = useState<FilterCriteria[]>([]);
@@ -70,15 +89,23 @@ export default function StudioInventoryTab() {
     "checkout" | "checkin"
   >("checkout");
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [containers, setContainers] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [manufacturers, setManufacturers] = useState<string[]>([]);
 
-  // Fetch inventory items on component mount
+  // Fetch data on component mount
   useEffect(() => {
     fetchInventoryItems();
+    fetchLocations();
+    fetchContainers();
+    fetchCategories();
+    fetchManufacturers();
     fetchKits();
     loadSavedFilters();
   }, []);
 
-  // Filter items when search term, location, or active filter changes
+  // Filter items when search term, location, category, or active filter changes
   useEffect(() => {
     let result = items;
 
@@ -94,7 +121,7 @@ export default function StudioInventoryTab() {
       // Filter by manufacturers
       if (activeFilter.manufacturers && activeFilter.manufacturers.length > 0) {
         result = result.filter((item) =>
-          activeFilter.manufacturers?.includes(item.manufacturer)
+          activeFilter.manufacturers?.includes(item.manufacturer || "")
         );
       }
 
@@ -171,7 +198,7 @@ export default function StudioInventoryTab() {
         result = result.filter(
           (item) =>
             item.name.toLowerCase().includes(term) ||
-            item.manufacturer.toLowerCase().includes(term) ||
+            (item.manufacturer || "").toLowerCase().includes(term) ||
             item.model.toLowerCase().includes(term) ||
             (item.serialNumber &&
               item.serialNumber.toLowerCase().includes(term)) ||
@@ -185,10 +212,15 @@ export default function StudioInventoryTab() {
       if (selectedLocation) {
         result = result.filter((item) => item.location === selectedLocation);
       }
+
+      // Filter by category
+      if (selectedCategory) {
+        result = result.filter((item) => item.category === selectedCategory);
+      }
     }
 
     setFilteredItems(result);
-  }, [items, searchTerm, selectedLocation, activeFilter]);
+  }, [items, searchTerm, selectedLocation, selectedCategory, activeFilter]);
 
   const fetchInventoryItems = async () => {
     try {
@@ -198,11 +230,11 @@ export default function StudioInventoryTab() {
 
       // Convert snake_case to camelCase
       const formattedItems = data.map((item: any) => ({
-        id: item._id,
+        id: item.id || item._id,
         name: item.name,
         category: item.category,
         subCategory: item.sub_category,
-        manufacturer: item.manufacturer,
+        manufacturer: item.manufacturer || "",
         model: item.model,
         serialNumber: item.serial_number,
         purchaseDate: item.purchase_date
@@ -214,7 +246,9 @@ export default function StudioInventoryTab() {
         condition: item.condition,
         notes: item.notes,
         location: item.location,
+        containerId: item.container_id,
         isAvailable: item.is_available,
+        quantity: item.quantity || 1,
         currentKitId: item.current_kit_id,
         images: item.images || [],
         primaryImage: item.primary_image,
@@ -346,14 +380,36 @@ export default function StudioInventoryTab() {
     // Clear basic filters when applying advanced filter
     setSearchTerm("");
     setSelectedLocation(null);
+    setSelectedCategory(null);
   };
 
   const handleClearFilter = () => {
     setActiveFilter(null);
+    setSelectedCategory(null);
+    setSelectedLocation(null);
   };
 
   const handleAddItem = async (newItem: Omit<StudioInventoryItem, "id">) => {
     try {
+      console.log("Sending to API:", newItem);
+
+      // Ensure required fields are present
+      if (!newItem.name || !newItem.category || !newItem.model) {
+        console.error("Missing required fields:", {
+          name: newItem.name,
+          category: newItem.category,
+          model: newItem.model,
+        });
+
+        toast({
+          title: "Validation Error",
+          description:
+            "Please fill in all required fields (Name, Category, Model)",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await fetch("/api/studio_inventory", {
         method: "POST",
         headers: {
@@ -362,12 +418,17 @@ export default function StudioInventoryTab() {
         body: JSON.stringify(newItem),
       });
 
-      if (!response.ok) throw new Error("Failed to add inventory item");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("API Error:", response.status, errorData);
+        throw new Error(errorData.error || "Failed to add inventory item");
+      }
+
       const data = await response.json();
 
       // Convert snake_case to camelCase
       const formattedItem: StudioInventoryItem = {
-        id: data._id,
+        id: data.id || data._id,
         name: data.name,
         category: data.category,
         subCategory: data.sub_category,
@@ -383,7 +444,9 @@ export default function StudioInventoryTab() {
         condition: data.condition,
         notes: data.notes,
         location: data.location,
+        containerId: data.container_id,
         isAvailable: data.is_available,
+        quantity: data.quantity || 1,
         currentKitId: data.current_kit_id,
         images: data.images || [],
         primaryImage: data.primary_image,
@@ -404,8 +467,22 @@ export default function StudioInventoryTab() {
 
       setItems([...items, formattedItem]);
       setIsAddItemModalOpen(false);
+
+      toast({
+        title: "Success",
+        description: "New inventory item created",
+      });
     } catch (error) {
       console.error("Error adding inventory item:", error);
+
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create inventory item",
+        variant: "destructive",
+      });
     }
   };
 
@@ -472,6 +549,48 @@ export default function StudioInventoryTab() {
 
   const handleItemDelete = (itemId: string) => {
     setItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
+  };
+
+  // New function to handle duplicating an inventory item
+  const handleDuplicateItem = (itemToDuplicate: StudioInventoryItem) => {
+    // Create a new item object without the ID and any unique identifiers
+    const duplicatedItem: Omit<StudioInventoryItem, "id"> = {
+      name: `${itemToDuplicate.name} (Copy)`,
+      category: itemToDuplicate.category,
+      subCategory: itemToDuplicate.subCategory,
+      manufacturer: itemToDuplicate.manufacturer || "",
+      model: itemToDuplicate.model,
+      serialNumber: undefined, // Reset serial number as it should be unique
+      purchaseDate: itemToDuplicate.purchaseDate,
+      lastMaintenanceDate: itemToDuplicate.lastMaintenanceDate,
+      condition: itemToDuplicate.condition,
+      notes: itemToDuplicate.notes,
+      location: itemToDuplicate.location,
+      containerId: itemToDuplicate.containerId,
+      isAvailable: true, // Always set as available
+      quantity: itemToDuplicate.quantity || 1, // Preserve the quantity
+      images: itemToDuplicate.images ? [...itemToDuplicate.images] : [],
+      primaryImage: itemToDuplicate.primaryImage,
+      purchasePrice: itemToDuplicate.purchasePrice,
+      currentValue: itemToDuplicate.currentValue,
+      depreciationRate: itemToDuplicate.depreciationRate,
+      insuranceValue: itemToDuplicate.insuranceValue,
+      tags: itemToDuplicate.tags ? [...itemToDuplicate.tags] : [],
+      powerRequirements: itemToDuplicate.powerRequirements,
+      dimensions: itemToDuplicate.dimensions,
+      manualUrl: itemToDuplicate.manualUrl,
+      warrantyExpirationDate: itemToDuplicate.warrantyExpirationDate,
+      serviceProvider: itemToDuplicate.serviceProvider,
+      serviceContactInfo: itemToDuplicate.serviceContactInfo,
+    };
+
+    // Call the existing handleAddItem function to create the new item
+    handleAddItem(duplicatedItem);
+
+    toast({
+      title: "Item Duplicated",
+      description: `A copy of "${itemToDuplicate.name}" has been created.`,
+    });
   };
 
   const handleCancelSelection = () => {
@@ -773,6 +892,8 @@ export default function StudioInventoryTab() {
       "Manufacturer",
       "Model",
       "Serial Number",
+      "Quantity",
+      "Rental Price",
       "Purchase Date",
       "Last Maintenance Date",
       "Condition",
@@ -807,9 +928,11 @@ export default function StudioInventoryTab() {
         item.name,
         item.category,
         item.subCategory || "",
-        item.manufacturer,
+        item.manufacturer || "",
         item.model,
         item.serialNumber || "",
+        (item.quantity || 1).toString(),
+        item.rentalPrice ? `$${item.rentalPrice.toFixed(2)}` : "",
         item.purchaseDate ? item.purchaseDate.toISOString().split("T")[0] : "",
         item.lastMaintenanceDate
           ? item.lastMaintenanceDate.toISOString().split("T")[0]
@@ -873,355 +996,619 @@ export default function StudioInventoryTab() {
     });
   };
 
+  // Fetch locations function
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch("/api/locations");
+      if (!response.ok) throw new Error("Failed to fetch locations");
+      const data = await response.json();
+      // Extract location names
+      const locationNames = data.map((location: any) => location.name);
+      setLocations(locationNames);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load locations",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Add fetch containers function
+  const fetchContainers = async () => {
+    try {
+      const response = await fetch("/api/containers");
+      if (!response.ok) throw new Error("Failed to fetch containers");
+      const data = await response.json();
+      setContainers(data);
+    } catch (error) {
+      console.error("Error fetching containers:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load containers",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Fetch categories function
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/api/studio_inventory/categories");
+      if (!response.ok) throw new Error("Failed to fetch categories");
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
+
+  // Fetch manufacturers function
+  const fetchManufacturers = async () => {
+    try {
+      const response = await fetch("/api/studio_inventory/manufacturers");
+      if (!response.ok) throw new Error("Failed to fetch manufacturers");
+      const data = await response.json();
+      setManufacturers(data);
+    } catch (error) {
+      console.error("Error fetching manufacturers:", error);
+    }
+  };
+
   if (isLoading) {
     return <LoadingContainer />;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        {!isSelectionMode && (
-          <div className="flex gap-2">
-            {selectedView === "items" ? (
-              <Button onClick={() => setIsAddItemModalOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Item
-              </Button>
-            ) : (
-              <Button onClick={() => setIsCreateKitModalOpen(true)}>
-                <Package className="w-4 h-4 mr-2" />
-                Create Kit
-              </Button>
+    <TooltipProvider delayDuration={0}>
+      <div className="space-y-4">
+        {!isSelectionMode && selectedView === "kits" && (
+          <div className="flex justify-between items-center">
+            <Button onClick={() => setIsCreateKitModalOpen(true)}>
+              <Package className="w-4 h-4 mr-2" />
+              Create Kit
+            </Button>
+          </div>
+        )}
+
+        {(isSelectionMode || activeFilter) && (
+          <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+            {isSelectionMode && (
+              <div className="w-full md:w-auto flex gap-2">
+                <Button
+                  onClick={handleCreateKitFromSelection}
+                  variant="default"
+                  disabled={selectedItems.length === 0}
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Create Kit ({selectedItems.length})
+                </Button>
+                <Button
+                  onClick={handleCheckoutItems}
+                  variant="outline"
+                  disabled={selectedItems.length === 0 || checkedOutCount > 0}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Check Out ({selectedItems.length})
+                </Button>
+                <Button
+                  onClick={handleCheckinItems}
+                  variant="outline"
+                  disabled={selectedItems.length === 0 || checkedInCount > 0}
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Check In ({selectedItems.length})
+                </Button>
+                <Button onClick={handleCancelSelection} variant="outline">
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            )}
+
+            {activeFilter && (
+              <div className={isSelectionMode ? "" : "ml-auto"}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearFilter}
+                  className="whitespace-nowrap"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Clear Filter
+                </Button>
+              </div>
             )}
           </div>
         )}
-      </div>
 
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-        <div className="w-full md:w-auto flex gap-2">
-          {isSelectionMode ? (
-            <>
-              <Button
-                onClick={handleCreateKitFromSelection}
-                variant="default"
-                disabled={selectedItems.length === 0}
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Create Kit ({selectedItems.length})
-              </Button>
-              <Button
-                onClick={handleCheckoutItems}
-                variant="outline"
-                disabled={selectedItems.length === 0 || checkedOutCount > 0}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Check Out ({selectedItems.length})
-              </Button>
-              <Button
-                onClick={handleCheckinItems}
-                variant="outline"
-                disabled={selectedItems.length === 0 || checkedInCount > 0}
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                Check In ({selectedItems.length})
-              </Button>
-              <Button onClick={handleCancelSelection} variant="outline">
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                onClick={() => {
-                  setIsSelectionMode(true);
-                  setSelectedItems([]);
-                }}
-                variant="outline"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Kit from Items
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsSelectionMode(true);
-                  setSelectedItems([]);
-                }}
-                variant="outline"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Batch Check Out/In
-              </Button>
-            </>
-          )}
-        </div>
-
-        <div className="w-full md:w-auto flex flex-wrap gap-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 w-full md:w-[200px]"
-              disabled={!!activeFilter}
-            />
-          </div>
-
-          {selectedView === "items" && !activeFilter && (
-            <LocationsFilter
-              selectedLocation={selectedLocation}
-              onLocationChange={setSelectedLocation}
-            />
-          )}
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsAdvancedFilterOpen(true)}
-            className={activeFilter ? "bg-primary text-primary-foreground" : ""}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </Button>
-
-          {activeFilter && (
+        {activeFilter && (
+          <div className="bg-muted p-3 rounded-md flex items-center justify-between">
+            <div className="flex items-center">
+              <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {activeFilter.name || "Custom Filter"}
+              </span>
+            </div>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={handleClearFilter}
-              className="whitespace-nowrap"
+              className="h-7 px-2"
             >
-              <X className="w-4 h-4 mr-2" />
-              Clear Filter
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleExportCSV}
-            title="Export to CSV"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsImportModalOpen(true)}
-            title="Import from CSV"
-          >
-            <Upload className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {activeFilter && (
-        <div className="bg-muted p-3 rounded-md flex items-center justify-between">
-          <div className="flex items-center">
-            <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {activeFilter.name || "Custom Filter"}
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearFilter}
-            className="h-7 px-2"
-          >
-            <X className="w-3 h-3" />
-          </Button>
-        </div>
-      )}
-
-      {isSelectionMode && (
-        <div className="bg-muted p-2 rounded-md flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={handleCancelSelection}>
-              Cancel
-            </Button>
-            <span className="text-sm">
-              {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""}{" "}
-              selected
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBulkEditModalOpen(true)}
-            >
-              Bulk Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCreateKitFromSelection}
-              disabled={selectedItems.length === 0}
-            >
-              Create Kit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCheckoutItems}
-              disabled={selectedItems.length === 0}
-            >
-              Check Out
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCheckinItems}
-              disabled={selectedItems.length === 0}
-            >
-              Check In
+              <X className="w-3 h-3" />
             </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      <CustomTabs
-        items={[
-          {
-            value: "items",
-            label: "Individual Items",
-            content: (
-              <StudioInventoryList
-                items={filteredItems}
-                onItemUpdate={handleItemUpdate}
-                onItemDelete={handleItemDelete}
-                selectedItems={selectedItems}
-                onSelectedItemsChange={setSelectedItems}
-                isSelectionMode={isSelectionMode}
-              />
-            ),
-          },
-          {
-            value: "kits",
-            label: "Kits",
-            content: (
-              <KitsList
-                kits={filteredKits}
-                onEdit={handleEditKit}
-                onDelete={handleDeleteKitConfirm}
-                onView={handleViewKit}
-                onCheckout={handleKitCheckout}
-                onCheckin={handleKitCheckin}
-                selectionMode={false}
-              />
-            ),
-          },
-        ]}
-        defaultValue="items"
-        basePath="/production"
-        paramName="view"
-      />
+        {isSelectionMode && (
+          <div className="bg-muted p-2 rounded-md flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelSelection}
+              >
+                Cancel
+              </Button>
+              <span className="text-sm">
+                {selectedItems.length} item
+                {selectedItems.length !== 1 ? "s" : ""} selected
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBulkEditModalOpen(true)}
+              >
+                Bulk Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateKitFromSelection}
+                disabled={selectedItems.length === 0}
+              >
+                Create Kit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckoutItems}
+                disabled={selectedItems.length === 0}
+              >
+                Check Out
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckinItems}
+                disabled={selectedItems.length === 0}
+              >
+                Check In
+              </Button>
+            </div>
+          </div>
+        )}
 
-      <AddInventoryItemModal
-        isOpen={isAddItemModalOpen}
-        onClose={() => setIsAddItemModalOpen(false)}
-        onAdd={handleAddItem}
-      />
+        <CustomTabs
+          items={[
+            {
+              value: "items",
+              label: "Individual Items",
+              content: (
+                <div>
+                  {isSelectionMode ? (
+                    <></>
+                  ) : (
+                    <div className="mb-4 flex justify-between">
+                      <div className="flex gap-2 items-center">
+                        {/* Grid/List View Selector */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={
+                                viewType === "grid" ? "default" : "outline"
+                              }
+                              size="icon"
+                              onClick={() => setViewType("grid")}
+                            >
+                              <div className="grid grid-cols-2 gap-0.5">
+                                <div className="w-1.5 h-1.5 bg-current rounded-sm" />
+                                <div className="w-1.5 h-1.5 bg-current rounded-sm" />
+                                <div className="w-1.5 h-1.5 bg-current rounded-sm" />
+                                <div className="w-1.5 h-1.5 bg-current rounded-sm" />
+                              </div>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Grid View</TooltipContent>
+                        </Tooltip>
 
-      <CreateKitModal
-        isOpen={isCreateKitModalOpen}
-        onClose={() => {
-          setIsCreateKitModalOpen(false);
-          setSelectedItems([]);
-          setCurrentKit(null);
-        }}
-        onSave={currentKit ? handleUpdateKit : handleCreateKit}
-        kit={currentKit || undefined}
-        isEditing={!!currentKit}
-      />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={
+                                viewType === "list" ? "default" : "outline"
+                              }
+                              size="icon"
+                              onClick={() => setViewType("list")}
+                            >
+                              <div className="flex flex-col gap-0.5">
+                                <div className="w-4 h-1 bg-current rounded-sm" />
+                                <div className="w-4 h-1 bg-current rounded-sm" />
+                                <div className="w-4 h-1 bg-current rounded-sm" />
+                              </div>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>List View</TooltipContent>
+                        </Tooltip>
 
-      {currentKit && (
-        <>
-          <KitDetailsModal
-            isOpen={isKitDetailsModalOpen}
-            onClose={() => {
-              setIsKitDetailsModalOpen(false);
-              setCurrentKit(null);
-            }}
-            kit={currentKit}
-          />
+                        {!activeFilter && (
+                          <div className="relative mr-2">
+                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                            <Input
+                              placeholder="Search..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="pl-8 h-9 w-[200px]"
+                              disabled={!!activeFilter}
+                            />
+                          </div>
+                        )}
 
-          <KitCheckoutModal
-            isOpen={isKitCheckoutModalOpen}
-            onClose={() => {
-              setIsKitCheckoutModalOpen(false);
-              setCurrentKit(null);
-            }}
-            kit={currentKit}
-            mode={kitCheckoutMode}
-            onCheckout={handleCheckoutKit}
-            onCheckin={handleCheckinKit}
-          />
+                        {selectedView === "items" && !activeFilter && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div>
+                                  <Select
+                                    value={selectedLocation || "all"}
+                                    onValueChange={(value) =>
+                                      setSelectedLocation(
+                                        value === "all" ? null : value
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="h-9 w-9 p-0 flex items-center justify-center border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md">
+                                      <MapPin className="h-4 w-4" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="all">
+                                        All Locations
+                                      </SelectItem>
+                                      {locations.map((location) => (
+                                        <SelectItem
+                                          key={location}
+                                          value={location}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <MapPin className="w-3 h-3" />
+                                            {location}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {selectedLocation
+                                  ? `Location: ${selectedLocation}`
+                                  : "Filter by Location"}
+                              </TooltipContent>
+                            </Tooltip>
 
-          <DeleteConfirmationDialog
-            isOpen={isDeleteKitDialogOpen}
-            onClose={() => {
-              setIsDeleteKitDialogOpen(false);
-              setCurrentKit(null);
-            }}
-            onConfirm={handleDeleteKit}
-            title="Delete Kit"
-            description={`Are you sure you want to delete the kit "${currentKit.name}"? This action cannot be undone.`}
-          />
-        </>
-      )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div>
+                                  <Select
+                                    value={selectedCategory || "all"}
+                                    onValueChange={(value) =>
+                                      setSelectedCategory(
+                                        value === "all" ? null : value
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="h-9 w-9 p-0 flex items-center justify-center border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md">
+                                      <Filter className="h-4 w-4" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="all">
+                                        All Categories
+                                      </SelectItem>
+                                      {categories.map((category) => (
+                                        <SelectItem
+                                          key={category}
+                                          value={category}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <Filter className="w-3 h-3" />
+                                            {category}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {selectedCategory
+                                  ? `Category: ${selectedCategory}`
+                                  : "Filter by Category"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
+                      </div>
 
-      <AdvancedFilterModal
-        isOpen={isAdvancedFilterOpen}
-        onClose={() => setIsAdvancedFilterOpen(false)}
-        onApplyFilter={handleApplyFilter}
-        onSaveFilter={handleSaveFilter}
-        savedFilters={savedFilters}
-        onDeleteSavedFilter={handleDeleteSavedFilter}
-        onLoadSavedFilter={handleApplyFilter}
-        initialFilter={activeFilter || undefined}
-      />
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={isEditMode ? "default" : "outline"}
+                              size="icon"
+                              onClick={() => setIsEditMode(!isEditMode)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
+                          </TooltipContent>
+                        </Tooltip>
 
-      <CheckoutModal
-        isOpen={isCheckoutModalOpen}
-        onClose={() => setIsCheckoutModalOpen(false)}
-        selectedItems={items.filter((item) => selectedItems.includes(item.id))}
-        mode={checkoutMode}
-        onSave={handleSaveCheckout}
-      />
+                        {!isSelectionMode && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setIsAddItemModalOpen(true)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Add New Item</TooltipContent>
+                            </Tooltip>
 
-      {isBulkEditModalOpen && (
-        <BulkEditModal
-          isOpen={isBulkEditModalOpen}
-          onClose={() => setIsBulkEditModalOpen(false)}
-          selectedItems={items.filter((item) =>
-            selectedItems.includes(item.id)
-          )}
-          onSave={handleBulkEdit}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setIsAdvancedFilterOpen(true)}
+                                  className={
+                                    activeFilter
+                                      ? "bg-primary text-primary-foreground"
+                                      : ""
+                                  }
+                                >
+                                  <SlidersHorizontal className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Advanced Filter</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={handleExportCSV}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Export to CSV</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setIsImportModalOpen(true)}
+                                >
+                                  <Upload className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Import from CSV</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => {
+                                    setIsSelectionMode(true);
+                                    setSelectedItems([]);
+                                  }}
+                                >
+                                  <Package className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Create Kit from Items
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => {
+                                    setIsSelectionMode(true);
+                                    setSelectedItems([]);
+                                  }}
+                                >
+                                  <div className="relative">
+                                    <LogOut className="h-4 w-4" />
+                                    <LogIn className="h-3 w-3 absolute -top-1 -right-1 text-primary" />
+                                  </div>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Batch Check Out/In
+                              </TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {viewType === "grid" ? (
+                    <StudioInventoryGrid
+                      items={filteredItems}
+                      onItemUpdate={handleItemUpdate}
+                      onItemDelete={handleItemDelete}
+                      onItemDuplicate={handleDuplicateItem}
+                      selectedItems={selectedItems}
+                      onSelectedItemsChange={setSelectedItems}
+                      isSelectionMode={isSelectionMode}
+                      isEditMode={isEditMode}
+                    />
+                  ) : (
+                    <StudioInventoryList
+                      items={filteredItems}
+                      onItemUpdate={handleItemUpdate}
+                      onItemDelete={handleItemDelete}
+                      onItemDuplicate={handleDuplicateItem}
+                      selectedItems={selectedItems}
+                      onSelectedItemsChange={setSelectedItems}
+                      isSelectionMode={isSelectionMode}
+                      isEditMode={isEditMode}
+                    />
+                  )}
+                </div>
+              ),
+            },
+            {
+              value: "kits",
+              label: "Kits",
+              content: <KitsTab />,
+            },
+            {
+              value: "containers",
+              label: "Containers",
+              content: <ContainersTab />,
+            },
+          ]}
+          defaultValue="items"
+          basePath="/production"
+          paramName="view"
         />
-      )}
 
-      {isBulkCheckoutModalOpen && (
-        <BulkCheckoutModal
-          isOpen={isBulkCheckoutModalOpen}
-          onClose={() => setIsBulkCheckoutModalOpen(false)}
+        <AddInventoryItemModal
+          isOpen={isAddItemModalOpen}
+          onClose={() => setIsAddItemModalOpen(false)}
+          onAdd={handleAddItem}
+        />
+
+        <CreateKitModal
+          isOpen={isCreateKitModalOpen}
+          onClose={() => {
+            setIsCreateKitModalOpen(false);
+            setSelectedItems([]);
+            setCurrentKit(null);
+          }}
+          onSave={currentKit ? handleUpdateKit : handleCreateKit}
+          kit={currentKit || undefined}
+          isEditing={!!currentKit}
+        />
+
+        {currentKit && (
+          <>
+            <KitDetailsModal
+              isOpen={isKitDetailsModalOpen}
+              onClose={() => {
+                setIsKitDetailsModalOpen(false);
+                setCurrentKit(null);
+              }}
+              kit={currentKit}
+            />
+
+            <KitCheckoutModal
+              isOpen={isKitCheckoutModalOpen}
+              onClose={() => {
+                setIsKitCheckoutModalOpen(false);
+                setCurrentKit(null);
+              }}
+              kit={currentKit}
+              mode={kitCheckoutMode}
+              onCheckout={handleCheckoutKit}
+              onCheckin={handleCheckinKit}
+            />
+
+            <DeleteConfirmationDialog
+              isOpen={isDeleteKitDialogOpen}
+              onClose={() => {
+                setIsDeleteKitDialogOpen(false);
+                setCurrentKit(null);
+              }}
+              onConfirm={handleDeleteKit}
+              title="Delete Kit"
+              description={`Are you sure you want to delete the kit "${currentKit.name}"? This action cannot be undone.`}
+            />
+          </>
+        )}
+
+        <AdvancedFilterModal
+          isOpen={isAdvancedFilterOpen}
+          onClose={() => setIsAdvancedFilterOpen(false)}
+          onApplyFilter={handleApplyFilter}
+          onSaveFilter={handleSaveFilter}
+          savedFilters={savedFilters}
+          onDeleteSavedFilter={handleDeleteSavedFilter}
+          onLoadSavedFilter={handleApplyFilter}
+          initialFilter={activeFilter || undefined}
+        />
+
+        <CheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => setIsCheckoutModalOpen(false)}
           selectedItems={items.filter((item) =>
             selectedItems.includes(item.id)
           )}
-          mode={bulkCheckoutMode}
+          mode={checkoutMode}
           onSave={handleSaveCheckout}
         />
-      )}
 
-      {isImportModalOpen && (
-        <ImportInventoryModal
-          isOpen={isImportModalOpen}
-          onClose={() => setIsImportModalOpen(false)}
-          onImport={fetchInventoryItems}
-        />
-      )}
-    </div>
+        {isBulkEditModalOpen && (
+          <BulkEditModal
+            isOpen={isBulkEditModalOpen}
+            onClose={() => setIsBulkEditModalOpen(false)}
+            selectedItems={items.filter((item) =>
+              selectedItems.includes(item.id)
+            )}
+            onSave={handleBulkEdit}
+          />
+        )}
+
+        {isBulkCheckoutModalOpen && (
+          <BulkCheckoutModal
+            isOpen={isBulkCheckoutModalOpen}
+            onClose={() => setIsBulkCheckoutModalOpen(false)}
+            selectedItems={items.filter((item) =>
+              selectedItems.includes(item.id)
+            )}
+            mode={bulkCheckoutMode}
+            onSave={handleSaveCheckout}
+          />
+        )}
+
+        {isImportModalOpen && (
+          <ImportInventoryModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onImport={fetchInventoryItems}
+          />
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

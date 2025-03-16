@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { XIcon, HardDriveIcon, Search } from "lucide-react";
 import { RawAssetData } from "@/models/raw_assets";
 import { HardDriveData } from "@/models/hard-drive";
@@ -17,6 +17,7 @@ interface EditRawAssetModalProps {
 // Ensure HardDriveData has required _id as string for UI
 interface HardDriveWithId extends Omit<HardDriveData, "_id"> {
   _id: string;
+  name?: string; // Some drives might use 'name' instead of 'label'
 }
 
 export default function EditRawAssetModal({
@@ -25,6 +26,8 @@ export default function EditRawAssetModal({
   onSave,
   asset,
 }: EditRawAssetModalProps) {
+  // Keep track of the initial asset to avoid resetting form data when the component rerenders
+  const [initialAssetId, setInitialAssetId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<RawAssetData>>({
     date: "",
     description: "",
@@ -38,6 +41,10 @@ export default function EditRawAssetModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingDrives, setIsLoadingDrives] = useState(false);
+  const [hasModifiedForm, setHasModifiedForm] = useState(false);
+  const [selectedDriveIndex, setSelectedDriveIndex] = useState(-1);
+  const [showDriveSuggestions, setShowDriveSuggestions] = useState(false);
+  const driveSearchRef = useRef<HTMLDivElement>(null);
 
   // Reset form data when modal is closed
   useEffect(() => {
@@ -51,6 +58,8 @@ export default function EditRawAssetModal({
       setSelectedCars([]);
       setSelectedDrives([]);
       setError(null);
+      setInitialAssetId(null);
+      setHasModifiedForm(false);
     }
   }, [isOpen]);
 
@@ -81,28 +90,132 @@ export default function EditRawAssetModal({
     fetchDrives();
   }, [driveSearchTerm]);
 
-  // Initialize form data when asset changes
+  // Initialize form data when asset changes, but only if it's a new asset or the modal was just opened
   useEffect(() => {
-    if (asset) {
+    if (!asset) {
+      // Reset form for a new asset
+      setFormData({
+        date: "",
+        description: "",
+        hardDriveIds: [],
+        carIds: [],
+      });
+      setSelectedCars([]);
+      setSelectedDrives([]);
+      setInitialAssetId(null);
+      return;
+    }
+
+    const currentAssetId = asset._id?.toString() || null;
+
+    // Only initialize if:
+    // 1. It's a different asset than we've seen before
+    // 2. Or we haven't modified the form yet
+    if (currentAssetId !== initialAssetId || (!hasModifiedForm && isOpen)) {
+      console.log("Initializing form with asset:", asset);
+
+      // Save this as our initial asset
+      setInitialAssetId(currentAssetId);
+
+      const hardDriveIds = asset.hardDriveIds || [];
+      const carIds = asset.carIds || [];
+
       setFormData({
         date: asset.date || "",
         description: asset.description || "",
-        hardDriveIds: asset.hardDriveIds || [],
-        carIds: asset.carIds || [],
+        hardDriveIds,
+        carIds,
       });
-      setSelectedCars(
-        asset.carIds ? asset.carIds.map((id) => ({ _id: id })) : []
-      );
+
+      // Fetch car details for selected cars
+      const fetchSelectedCars = async () => {
+        try {
+          // Ensure carIds are strings
+          const carIdsAsStrings = carIds.map((id) =>
+            typeof id === "string" ? id : (id as any).toString()
+          );
+
+          if (carIdsAsStrings.length === 0) {
+            setSelectedCars([]);
+            return;
+          }
+
+          console.log("Fetching cars for IDs:", carIdsAsStrings);
+
+          const response = await fetch(
+            `/api/cars?ids=${carIdsAsStrings.join(",")}`
+          );
+
+          if (!response.ok) {
+            console.error(`Failed to fetch cars: ${response.statusText}`);
+            // Fallback to just IDs if fetch fails
+            setSelectedCars(carIdsAsStrings.map((id) => ({ _id: id })));
+            return;
+          }
+
+          const data = await response.json();
+          console.log("Fetched car data:", data);
+
+          if (data && data.cars && Array.isArray(data.cars)) {
+            // Make sure each car has all required fields for display
+            // Only include cars that are actually associated with this asset
+            const processedCars = data.cars
+              .filter((car: any) => {
+                // Ensure we only include cars that match our carIds
+                return carIdsAsStrings.includes(car._id.toString());
+              })
+              .map((car: any) => ({
+                _id: car._id,
+                make: car.make || "Unknown Make",
+                model: car.model || "Unknown Model",
+                year: car.year || null,
+                color: car.exteriorColor || car.color || "",
+              }));
+
+            console.log("Filtered associated cars:", processedCars);
+            console.log("Original car IDs:", carIdsAsStrings);
+            setSelectedCars(processedCars);
+          } else {
+            // Fallback to just IDs if response format is unexpected
+            const fallbackCars = carIdsAsStrings.map((id) => ({
+              _id: id,
+              make: "Unknown",
+              model: "Unknown",
+              year: null,
+              color: "",
+            }));
+            console.log("Setting fallback car data:", fallbackCars);
+            setSelectedCars(fallbackCars);
+          }
+        } catch (error) {
+          console.error("Error fetching selected cars:", error);
+          // Fallback to just IDs if fetch fails
+          const carIdsAsStrings = carIds.map((id) =>
+            typeof id === "string" ? id : (id as any).toString()
+          );
+          const fallbackCars = carIdsAsStrings.map((id) => ({
+            _id: id,
+            make: "Unknown",
+            model: "Unknown",
+            year: null,
+            color: "",
+          }));
+          console.log("Setting fallback car data after error:", fallbackCars);
+          setSelectedCars(fallbackCars);
+        }
+      };
 
       // Fetch selected drives
       const fetchSelectedDrives = async () => {
         try {
           // Ensure hardDriveIds are strings
-          const hardDriveIds = (asset.hardDriveIds || []).map((id) =>
+          const hardDriveIdsAsStrings = hardDriveIds.map((id) =>
             typeof id === "string" ? id : (id as any).toString()
           );
 
-          const promises = hardDriveIds.map(async (hardDriveId) => {
+          console.log("Fetching drives for IDs:", hardDriveIdsAsStrings);
+
+          const promises = hardDriveIdsAsStrings.map(async (hardDriveId) => {
             const response = await fetch(`/api/hard-drives/${hardDriveId}`);
             if (!response.ok) {
               console.error(`Failed to fetch drive ${hardDriveId}`);
@@ -118,6 +231,7 @@ export default function EditRawAssetModal({
           const drives = (await Promise.all(promises)).filter(
             (drive): drive is HardDriveWithId => drive !== null
           );
+          console.log("Fetched drives:", drives);
           setSelectedDrives(drives);
         } catch (error) {
           console.error("Error fetching selected drives:", error);
@@ -125,32 +239,52 @@ export default function EditRawAssetModal({
         }
       };
 
-      if (asset.hardDriveIds?.length) {
+      // Fetch car data
+      fetchSelectedCars();
+
+      // Fetch drive data
+      if (hardDriveIds.length) {
         fetchSelectedDrives();
+      } else {
+        setSelectedDrives([]);
       }
     } else {
-      setFormData({
-        date: "",
-        description: "",
-        hardDriveIds: [],
-        carIds: [],
-      });
-      setSelectedCars([]);
-      setSelectedDrives([]);
+      console.log("Skipping form reset - form has been modified or same asset");
     }
-  }, [asset]);
+  }, [asset, initialAssetId, hasModifiedForm, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
+    // Log the current state for debugging
+    console.log("Form submission - formData:", formData);
+    console.log("Form submission - selectedDrives:", selectedDrives);
+    console.log("Form submission - selectedCars:", selectedCars);
+
     try {
-      await onSave({
+      // Make sure hardDriveIds and carIds are properly extracted
+      const hardDriveIds = selectedDrives.map((drive) => drive._id);
+      const carIds = selectedCars.map((car) => car._id);
+
+      // Create a merged data object
+      const mergedData = {
         ...formData,
-        hardDriveIds: selectedDrives.map((drive) => drive._id),
-        carIds: selectedCars.map((car) => car._id),
-      });
+        hardDriveIds,
+        carIds,
+      };
+
+      console.log("Submitting data:", mergedData);
+
+      // Save the data
+      await onSave(mergedData);
+      console.log("Save successful, closing modal");
+
+      // Reset form modification state
+      setHasModifiedForm(false);
+
+      // Close the modal immediately before any other updates can happen
       onClose();
     } catch (error) {
       console.error("Error saving raw asset:", error);
@@ -162,14 +296,116 @@ export default function EditRawAssetModal({
 
   const handleSelectDrive = (drive: HardDriveWithId) => {
     if (!selectedDrives.find((d) => d._id === drive._id)) {
-      setSelectedDrives([...selectedDrives, drive]);
+      const updatedDrives = [...selectedDrives, drive];
+      console.log("Adding drive:", drive, "Updated drives:", updatedDrives);
+      setSelectedDrives(updatedDrives);
+      // Update formData.hardDriveIds to keep in sync with selectedDrives
+      setFormData((prevData) => ({
+        ...prevData,
+        hardDriveIds: updatedDrives.map((drive) => drive._id),
+      }));
+      // Mark the form as modified
+      setHasModifiedForm(true);
     }
     setDriveSearchTerm("");
   };
 
   const handleRemoveDrive = (driveId: string) => {
-    setSelectedDrives(selectedDrives.filter((drive) => drive._id !== driveId));
+    console.log("Removing drive:", driveId);
+    const updatedDrives = selectedDrives.filter(
+      (drive) => drive._id !== driveId
+    );
+    console.log("Updated drives after removal:", updatedDrives);
+    setSelectedDrives(updatedDrives);
+    // Update formData.hardDriveIds to keep in sync with selectedDrives
+    setFormData((prevData) => ({
+      ...prevData,
+      hardDriveIds: updatedDrives.map((drive) => drive._id),
+    }));
+    // Mark the form as modified
+    setHasModifiedForm(true);
   };
+
+  // Add a function to sync cars with formData
+  const handleCarSelectionChange = (cars: any[]) => {
+    setSelectedCars(cars);
+    setFormData((prevData) => ({
+      ...prevData,
+      carIds: cars.map((car) => car._id),
+    }));
+    // Mark the form as modified
+    setHasModifiedForm(true);
+  };
+
+  // Handle text field changes and mark form as modified
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }));
+    setHasModifiedForm(true);
+  };
+
+  // Filter available drives based on search term and exclude already selected drives
+  const filteredDrives = availableDrives.filter(
+    (drive) =>
+      // Include drive if it matches search term (or if search term is empty)
+      (driveSearchTerm === "" ||
+        drive.label?.toLowerCase().includes(driveSearchTerm.toLowerCase()) ||
+        drive.name?.toLowerCase().includes(driveSearchTerm.toLowerCase())) &&
+      // Exclude drives already selected
+      !selectedDrives.some((selected) => selected._id === drive._id)
+  );
+
+  // Reset selected index when drive suggestions change
+  useEffect(() => {
+    setSelectedDriveIndex(-1);
+  }, [filteredDrives]);
+
+  // Reset selectedDriveIndex when search term changes
+  useEffect(() => {
+    setSelectedDriveIndex(-1);
+  }, [driveSearchTerm]);
+
+  const handleDriveKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDriveSuggestions || isLoadingDrives || filteredDrives.length === 0)
+      return;
+
+    // Navigate through suggestions with arrow keys
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedDriveIndex((prev) =>
+        prev < filteredDrives.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedDriveIndex((prev) =>
+        prev > 0 ? prev - 1 : filteredDrives.length - 1
+      );
+    } else if (e.key === "Enter" && selectedDriveIndex >= 0) {
+      e.preventDefault();
+      const selectedDrive = filteredDrives[selectedDriveIndex];
+      handleSelectDrive(selectedDrive);
+    } else if (e.key === "Escape") {
+      setShowDriveSuggestions(false);
+    }
+  };
+
+  // Handle click outside to close drive suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        driveSearchRef.current &&
+        !driveSearchRef.current.contains(event.target as Node)
+      ) {
+        setShowDriveSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -201,10 +437,9 @@ export default function EditRawAssetModal({
             </label>
             <input
               type="text"
+              name="date"
               value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
+              onChange={handleInputChange}
               placeholder="YYMMDD"
               pattern="\d{6}"
               required
@@ -218,10 +453,9 @@ export default function EditRawAssetModal({
             </label>
             <input
               type="text"
+              name="description"
               value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
+              onChange={handleInputChange}
               required
               className="w-full px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
             />
@@ -232,53 +466,65 @@ export default function EditRawAssetModal({
               Storage Locations*
             </label>
             <div className="space-y-4">
-              <div className="relative">
+              <div ref={driveSearchRef} className="relative">
                 <input
                   type="text"
                   value={driveSearchTerm}
-                  onChange={(e) => setDriveSearchTerm(e.target.value)}
-                  placeholder="Search hard drives..."
+                  onChange={(e) => {
+                    setDriveSearchTerm(e.target.value);
+                    setShowDriveSuggestions(true);
+                  }}
+                  onFocus={() => setShowDriveSuggestions(true)}
+                  onKeyDown={handleDriveKeyDown}
+                  placeholder="Search storage locations..."
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--foreground-muted))] focus:outline-none focus:border-[hsl(var(--info))] focus:ring-1 focus:ring-[hsl(var(--info))]"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[hsl(var(--foreground-muted))]" />
-              </div>
 
-              {driveSearchTerm && (
-                <div className="border border-[hsl(var(--border))] rounded-lg max-h-48 overflow-y-auto">
-                  {isLoadingDrives ? (
-                    <div className="p-2 text-[hsl(var(--muted-foreground))]">
-                      Loading...
-                    </div>
-                  ) : availableDrives.length > 0 ? (
-                    availableDrives.map((drive) => (
-                      <div
-                        key={drive._id}
-                        onClick={() => handleSelectDrive(drive)}
-                        className="p-2 hover:bg-[hsl(var(--accent))] cursor-pointer flex items-center gap-2"
-                      >
-                        <HardDriveIcon className="w-4 h-4" />
-                        <span>{drive.label}</span>
+                {showDriveSuggestions && driveSearchTerm && (
+                  <div className="absolute z-10 w-full mt-1 border border-[hsl(var(--border))] rounded-lg max-h-48 overflow-y-auto bg-[hsl(var(--background))]">
+                    {isLoadingDrives ? (
+                      <div className="p-2 text-[hsl(var(--foreground-muted))]">
+                        Loading...
                       </div>
-                    ))
-                  ) : (
-                    <div className="p-2 text-[hsl(var(--muted-foreground))]">
-                      No drives found
-                    </div>
-                  )}
-                </div>
-              )}
+                    ) : filteredDrives.length > 0 ? (
+                      filteredDrives.map((drive, index) => (
+                        <div
+                          key={drive._id}
+                          className={`p-2 cursor-pointer ${
+                            index === selectedDriveIndex
+                              ? "bg-[hsl(var(--accent))]"
+                              : "hover:bg-[hsl(var(--accent))]"
+                          } text-[hsl(var(--foreground))]`}
+                          onClick={() => handleSelectDrive(drive)}
+                          onMouseEnter={() => setSelectedDriveIndex(index)}
+                        >
+                          {drive.label || drive.name}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-2 text-[hsl(var(--foreground-muted))]">
+                        No storage locations found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-wrap gap-2">
                 {selectedDrives.map((drive) => (
                   <div
-                    key={drive._id}
+                    key={`selected-drive-${drive._id}`}
                     className="inline-flex items-center gap-2 px-3 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-full text-sm"
                   >
                     <HardDriveIcon className="w-3 h-3" />
                     {drive.label}
                     <button
                       type="button"
-                      onClick={() => handleRemoveDrive(drive._id)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent event bubbling
+                        handleRemoveDrive(drive._id);
+                      }}
                       className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
                     >
                       <XIcon className="w-3 h-3" />
@@ -295,7 +541,7 @@ export default function EditRawAssetModal({
             </label>
             <CarSelector
               selectedCars={selectedCars}
-              onSelect={setSelectedCars}
+              onSelect={handleCarSelectionChange}
             />
           </div>
 

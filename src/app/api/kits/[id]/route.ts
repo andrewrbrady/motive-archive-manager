@@ -201,7 +201,7 @@ export async function PUT(
           {
             $set: {
               current_kit_id: params.id,
-              is_available: false,
+              is_available: true,
               kit_status: "in-kit",
             },
           }

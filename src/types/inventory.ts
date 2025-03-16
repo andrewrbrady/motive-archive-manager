@@ -121,7 +121,7 @@ export interface StudioInventoryItem {
   name: string;
   category: InventoryCategory;
   subCategory?: string;
-  manufacturer: string;
+  manufacturer?: string;
   model: string;
   serialNumber?: string;
   purchaseDate?: Date;
@@ -129,12 +129,15 @@ export interface StudioInventoryItem {
   condition: "excellent" | "good" | "fair" | "poor" | "needs-repair";
   notes?: string;
   location?: string;
+  containerId?: string;
   isAvailable: boolean;
   currentKitId?: string;
+  quantity: number;
   images?: string[];
   primaryImage?: string;
   purchasePrice?: number;
   currentValue?: number;
+  rentalPrice?: number;
   depreciationRate?: number;
   insuranceValue?: number;
   tags: string[];
