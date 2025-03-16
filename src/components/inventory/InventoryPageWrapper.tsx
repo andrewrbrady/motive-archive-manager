@@ -11,7 +11,7 @@ export default function InventoryPageWrapper({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const showTabs = pathname.includes("/market") || pathname === "/inventory";
+  const showTabs = pathname?.includes("/market") || pathname === "/inventory";
 
   return (
     <div className="min-h-screen bg-background">

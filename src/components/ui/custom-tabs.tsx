@@ -27,7 +27,7 @@ export function CustomTabs({
 }: CustomTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get(paramName);
+  const tabParam = searchParams?.get(paramName);
 
   // Use the URL parameter if available, otherwise use the defaultValue or the first tab
   const initialTab = tabParam || defaultValue || items[0]?.value;
@@ -38,7 +38,7 @@ export function CustomTabs({
     setActiveTab(value);
 
     // Create a new URLSearchParams object from the current search params
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams?.toString() || "");
 
     // Update the tab parameter
     params.set(paramName, value);

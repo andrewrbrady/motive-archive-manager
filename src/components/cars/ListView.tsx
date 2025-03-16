@@ -26,7 +26,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
   const searchParams = useSearchParams();
 
   const handleSort = (field: SortField) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     const currentSort = params.get("sort");
     const [currentField, currentDirection] = (currentSort || "").split("_");
 
@@ -69,7 +69,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
   };
 
   // Get current sort state from URL
-  const currentSort = searchParams.get("sort") || "";
+  const currentSort = searchParams?.get("sort") || "";
   const [currentField, currentDirection] = currentSort.split("_");
 
   const SortIndicator = ({ field }: { field: SortField }) => {

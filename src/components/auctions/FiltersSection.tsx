@@ -72,7 +72,7 @@ export function FiltersSection({
     newFilters[key] = value;
     setFilters(newFilters);
 
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
 
     const setOrDeleteParam = (
       key: string,
@@ -121,7 +121,7 @@ export function FiltersSection({
     setOrDeleteParam("noReserve", newFilters.noReserve);
 
     // Preserve the search parameter if it exists
-    const search = searchParams.get("search");
+    const search = searchParams?.get("search");
     if (search) {
       params.set("search", search);
     }
@@ -133,7 +133,7 @@ export function FiltersSection({
   };
 
   const clearFilters = () => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     [
       "make",
       "minYear",
@@ -143,7 +143,7 @@ export function FiltersSection({
       "endDate",
     ].forEach((key) => params.delete(key));
 
-    const search = searchParams.get("search");
+    const search = searchParams?.get("search");
     if (search) {
       params.set("search", search);
     }

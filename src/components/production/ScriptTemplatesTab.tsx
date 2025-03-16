@@ -95,7 +95,7 @@ export default function ScriptTemplatesTab() {
   }, []);
 
   useEffect(() => {
-    const templateId = searchParams.get("template");
+    const templateId = searchParams?.get("template");
     if (templateId && templates.length > 0) {
       const template = templates.find((t) => t.id === templateId);
       if (template) {
@@ -116,7 +116,7 @@ export default function ScriptTemplatesTab() {
       setTemplates(data);
 
       // Select first template if none selected
-      if (data.length > 0 && !searchParams.get("template")) {
+      if (data.length > 0 && !searchParams?.get("template")) {
         handleTemplateSelect(data[0]);
       }
     } catch (error) {
@@ -129,7 +129,7 @@ export default function ScriptTemplatesTab() {
 
   const handleTemplateSelect = (template: Template) => {
     setSelectedTemplate(template);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("template", template.id);
     router.push(`?${params.toString()}`);
   };

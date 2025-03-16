@@ -19,7 +19,7 @@ export default function AdminTabs() {
 
   // Set initial tab based on URL query parameter
   useEffect(() => {
-    const tabParam = searchParams.get("tab");
+    const tabParam = searchParams?.get("tab");
     if (
       tabParam &&
       ["users", "clients", "locations", "makes"].includes(tabParam)

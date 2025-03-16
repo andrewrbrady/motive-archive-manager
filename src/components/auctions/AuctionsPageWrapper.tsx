@@ -11,7 +11,7 @@ export default function AuctionsPageWrapper({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const showTabs = pathname.includes("/market") || pathname === "/auctions";
+  const showTabs = pathname?.includes("/market") || pathname === "/auctions";
 
   return (
     <div className="min-h-screen bg-background">

@@ -63,7 +63,7 @@ export default function ShotList({ carId }: ShotListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  const showDetails = searchParams.get("list") !== null;
+  const showDetails = searchParams?.get("list") !== null;
 
   const shotForm = useForm<Shot>({
     defaultValues: {
@@ -93,7 +93,7 @@ export default function ShotList({ carId }: ShotListProps) {
   }, [carId]);
 
   useEffect(() => {
-    const listId = searchParams.get("list");
+    const listId = searchParams?.get("list");
     if (listId && shotLists.length > 0) {
       const list = shotLists.find((l) => l.id === listId);
       if (list) {
@@ -105,7 +105,7 @@ export default function ShotList({ carId }: ShotListProps) {
   }, [searchParams, shotLists]);
 
   const updateUrlParams = (listId: string | null) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams?.toString() || "");
     if (listId) {
       params.set("list", listId);
     } else {

@@ -9,16 +9,16 @@ export default function MarketTabs() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tab = searchParams.get("tab") || "inventory";
+  const tab = searchParams?.get("tab") || "inventory";
 
   // Determine the active tab based on the current path or search param
-  const activeTab = pathname.includes("/market")
+  const activeTab = pathname?.includes("/market")
     ? tab || "inventory"
-    : pathname.includes("/inventory")
+    : pathname?.includes("/inventory")
     ? "inventory"
-    : pathname.includes("/auctions")
+    : pathname?.includes("/auctions")
     ? "auctions"
-    : pathname.includes("/youtube")
+    : pathname?.includes("/youtube")
     ? "youtube"
     : "inventory";
 

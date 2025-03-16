@@ -152,8 +152,8 @@ export default function CreateKitModal({
     const searchLower = searchQuery.toLowerCase();
     return (
       item.name.toLowerCase().includes(searchLower) ||
-      item.manufacturer.toLowerCase().includes(searchLower) ||
-      item.model.toLowerCase().includes(searchLower) ||
+      (item.manufacturer?.toLowerCase() || "").includes(searchLower) ||
+      (item.model?.toLowerCase() || "").includes(searchLower) ||
       item.category.toLowerCase().includes(searchLower)
     );
   });

@@ -44,7 +44,7 @@ export default function CarFiltersSection({
 
     setFilters(newFilters);
 
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
 
     // Update the URL parameters
     Object.entries(newFilters).forEach(([key, val]) => {
@@ -72,8 +72,8 @@ export default function CarFiltersSection({
     });
 
     // Preserve view mode and page size
-    const view = searchParams.get("view");
-    const pageSize = searchParams.get("pageSize");
+    const view = searchParams?.get("view");
+    const pageSize = searchParams?.get("pageSize");
     if (view) params.set("view", view);
     if (pageSize) params.set("pageSize", pageSize);
     params.set("page", "1"); // Reset to first page
@@ -94,8 +94,8 @@ export default function CarFiltersSection({
     setFilters(emptyFilters);
 
     const params = new URLSearchParams();
-    const view = searchParams.get("view");
-    const pageSize = searchParams.get("pageSize");
+    const view = searchParams?.get("view");
+    const pageSize = searchParams?.get("pageSize");
     if (view) params.set("view", view);
     if (pageSize) params.set("pageSize", pageSize);
     params.set("page", "1");

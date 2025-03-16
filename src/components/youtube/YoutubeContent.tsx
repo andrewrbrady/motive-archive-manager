@@ -14,7 +14,7 @@ import YoutubeAddCollectionDialog from "./YoutubeAddCollectionDialog";
 
 export default function YoutubeContent() {
   const searchParams = useSearchParams();
-  const youtubeTab = searchParams.get("youtube_tab") || "channels";
+  const youtubeTab = searchParams?.get("youtube_tab") || "channels";
 
   const [isAddChannelOpen, setIsAddChannelOpen] = useState(false);
   const [isAddVideoOpen, setIsAddVideoOpen] = useState(false);

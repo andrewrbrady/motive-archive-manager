@@ -9,10 +9,10 @@ import DeliverablesCalendar from "@/components/deliverables/DeliverablesCalendar
 export default function DeliverablesTabs() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const view = searchParams.get("view") || "list";
+  const view = searchParams?.get("view") || "list";
 
   const handleTabChange = (value: string) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("view", value);
     router.push(`/deliverables?${params.toString()}`);
   };

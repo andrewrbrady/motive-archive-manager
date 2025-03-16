@@ -16,17 +16,17 @@ export default function ProductionTab({ carId }: ProductionTabProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState(
-    searchParams.get("section") || "shoots"
+    searchParams?.get("section") || "shoots"
   );
 
   const updateUrlParams = (section: string) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("section", section);
     router.replace(`?${params.toString()}`);
   };
 
   useEffect(() => {
-    const section = searchParams.get("section");
+    const section = searchParams?.get("section");
     if (section) {
       setActiveSection(section);
     }

@@ -11,7 +11,7 @@ interface ViewToggleProps {
 
 export function ViewToggle({ currentView }: ViewToggleProps) {
   const searchParams = useSearchParams();
-  const params = new URLSearchParams(searchParams.toString());
+  const params = new URLSearchParams(searchParams?.toString() || "");
 
   function getViewUrl(view: string) {
     params.set("view", view);

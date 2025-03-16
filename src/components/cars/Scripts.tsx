@@ -144,12 +144,12 @@ export default function Scripts({ carId }: ScriptsProps) {
   });
 
   // Replace isEditing state with a function that reads from URL
-  const isEditing = searchParams.get("edit") === "true";
+  const isEditing = searchParams?.get("edit") === "true";
 
   // Replace setIsEditing with a function that updates the URL
   const setIsEditing = useCallback(
     (value: boolean) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() || "");
       if (value) {
         params.set("edit", "true");
       } else {

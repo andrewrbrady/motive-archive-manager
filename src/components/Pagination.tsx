@@ -27,7 +27,7 @@ const Pagination = ({
     if (onChange) {
       onChange(page);
     } else if (useUrlPagination) {
-      const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(searchParams?.toString() || "");
       params.set("page", page.toString());
       params.set("pageSize", pageSize.toString());
 
@@ -35,7 +35,7 @@ const Pagination = ({
       let targetPath = pathname;
 
       // If we're on the market page with a tab, ensure we preserve the tab parameter
-      if (pathname.includes("/market") && params.has("tab")) {
+      if (pathname?.includes("/market") && params.has("tab")) {
         // Tab parameter is already in the params, so we keep it
       } else if (pathname === "/inventory" || pathname === "/auctions") {
         // We're on a direct page, so we keep the current path

@@ -76,16 +76,16 @@ export default function EventsTab({ carId }: { carId: string }) {
   });
 
   // Get the view from URL params or default to "list"
-  const urlView = searchParams.get("view");
+  const urlView = searchParams?.get("view");
   const view = urlView === "grid" ? "calendar" : urlView || "list";
 
   const updateViewInUrl = (newView: string) => {
     // Create a new URLSearchParams object from the current params
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     // Update or add the view parameter
     params.set("view", newView);
     // Keep other existing parameters
-    const existingParams = Array.from(searchParams.entries()).filter(
+    const existingParams = Array.from(searchParams?.entries() || []).filter(
       ([key]) => key !== "view"
     );
     existingParams.forEach(([key, value]) => {

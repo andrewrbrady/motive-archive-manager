@@ -15,7 +15,7 @@ export default function InventoryItemPage() {
   React.useEffect(() => {
     const fetchItem = async () => {
       try {
-        const response = await fetch(`/api/inventory/${params.id}`);
+        const response = await fetch(`/api/inventory/${params?.id}`);
         const data = await response.json();
         setItem(data);
       } catch (error) {
@@ -25,10 +25,10 @@ export default function InventoryItemPage() {
       }
     };
 
-    if (params.id) {
+    if (params?.id) {
       fetchItem();
     }
-  }, [params.id]);
+  }, [params?.id]);
 
   if (loading) {
     return (

@@ -42,7 +42,7 @@ interface HardDrive {
 export default function AddStoragePage() {
   const router = useRouter();
   const params = useParams();
-  const assetId = params.id as string;
+  const assetId = params?.id as string;
 
   const [asset, setAsset] = useState<RawAsset | null>(null);
   const [availableDrives, setAvailableDrives] = useState<HardDrive[]>([]);

@@ -16,7 +16,7 @@ export function useUrlParams() {
    * @param key The parameter key to retrieve
    * @returns The parameter value or null if not present
    */
-  const getParam = (key: string) => searchParams.get(key);
+  const getParam = (key: string) => searchParams?.get(key);
 
   /**
    * Update URL parameters with context awareness
@@ -31,7 +31,7 @@ export function useUrlParams() {
       context?: string; // Current context (e.g., 'tab:hard-drives')
     } = {}
   ) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
 
     // Clear unrelated parameters if requested
     if (options.clearOthers) {

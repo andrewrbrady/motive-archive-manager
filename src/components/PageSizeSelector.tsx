@@ -15,7 +15,7 @@ const PageSizeSelector = ({
   const searchParams = useSearchParams();
 
   const handlePageSizeChange = (newSize: string) => {
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("pageSize", newSize);
     params.set("page", "1"); // Reset to first page when changing page size
     router.push(`${pathname}?${params.toString()}`);

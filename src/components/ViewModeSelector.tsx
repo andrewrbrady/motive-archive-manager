@@ -12,7 +12,7 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
   const searchParams = useSearchParams();
 
   const handleViewChange = (view: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("view", view);
     router.push(`?${params.toString()}`);
   };

@@ -85,7 +85,7 @@ export default function FiltersSection({
     newFilters[key] = value;
     setFilters(newFilters);
 
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
 
     // Helper function to handle filter parameters
     const setOrDeleteParam = (
@@ -129,7 +129,7 @@ export default function FiltersSection({
     setOrDeleteParam("maxYear", newFilters.maxYear);
 
     // Preserve the search parameter if it exists
-    const search = searchParams.get("search");
+    const search = searchParams?.get("search");
     if (search) {
       params.set("search", search);
     }
@@ -141,7 +141,7 @@ export default function FiltersSection({
   };
 
   const _applyFilters = (newFilters: typeof filters) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
 
     // Helper function to handle filter parameters
     const setOrDeleteParam = (
@@ -168,7 +168,7 @@ export default function FiltersSection({
     setOrDeleteParam("maxYear", newFilters.maxYear);
 
     // Preserve the search parameter if it exists
-    const search = searchParams.get("search");
+    const search = searchParams?.get("search");
     if (search) {
       params.set("search", search);
     }
@@ -180,7 +180,7 @@ export default function FiltersSection({
   };
 
   const clearFilters = () => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     [
       "make",
       "model",
@@ -195,7 +195,7 @@ export default function FiltersSection({
     ].forEach((key) => params.delete(key));
 
     // Preserve the search parameter if it exists
-    const search = searchParams.get("search");
+    const search = searchParams?.get("search");
     if (search) {
       params.set("search", search);
     }

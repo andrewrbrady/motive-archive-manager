@@ -39,7 +39,8 @@ interface User {
 }
 
 export default function UserDashboard() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params?.id as string;
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 

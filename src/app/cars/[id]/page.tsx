@@ -503,7 +503,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>(() => {
     // Initialize from URL search params or hash
-    const tab = searchParams.get("tab");
+    const tab = searchParams?.get("tab");
     if (tab) return tab;
     if (typeof window !== "undefined" && window.location.hash) {
       return window.location.hash.slice(1);
@@ -862,7 +862,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
   // Sync URL with active tab
   useEffect(() => {
-    const tab = searchParams.get("tab");
+    const tab = searchParams?.get("tab");
     if (tab && tab !== activeTab) {
       setActiveTab(tab);
     } else if (typeof window !== "undefined" && window.location.hash) {
@@ -876,7 +876,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     // Update URL with the new tab value
-    const newParams = new URLSearchParams(searchParams.toString());
+    const newParams = new URLSearchParams(searchParams?.toString() || "");
     newParams.set("tab", value);
     router.push(`/cars/${params.id}?${newParams.toString()}#${value}`, {
       scroll: false,

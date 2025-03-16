@@ -73,7 +73,7 @@ export default function SortSelector({
   const searchParams = useSearchParams();
 
   const handleSortChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("sort", value);
     params.set("page", "1"); // Reset to first page when sorting changes
     router.push(`/cars?${params.toString()}`);
