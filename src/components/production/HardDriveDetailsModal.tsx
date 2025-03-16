@@ -217,7 +217,7 @@ export default function HardDriveDetailsModal({
       const data = await response.json();
 
       const labels: Record<string, string> = {};
-      data.drives.forEach((drive: any) => {
+      (data.drives || data.data || []).forEach((drive: any) => {
         labels[drive._id] = drive.label;
       });
 

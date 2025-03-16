@@ -75,10 +75,12 @@ export default function EditRawAssetModal({
         const data = await response.json();
         // Ensure _id is string
         setAvailableDrives(
-          data.drives.map((drive: HardDriveData & { _id: ObjectId }) => ({
-            ...drive,
-            _id: drive._id.toString(),
-          }))
+          (data.drives || data.data || []).map(
+            (drive: HardDriveData & { _id: ObjectId }) => ({
+              ...drive,
+              _id: drive._id.toString(),
+            })
+          )
         );
       } catch (error) {
         console.error("Error fetching hard drives:", error);
