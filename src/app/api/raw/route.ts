@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getMongoClient, getDatabase, validateConnection } from "@/lib/mongodb";
+import {
+  getMongoClient,
+  getDatabase,
+  validateConnection,
+  ensureCollectionExists,
+  type MongoDebugInfo,
+} from "@/lib/mongodb";
 import { RawAsset, RawAssetData } from "../../../models/raw_assets";
 import { ObjectId } from "mongodb";
 
@@ -31,334 +37,197 @@ const withTimeout = async <T>(
 };
 
 export async function GET(request: Request) {
-  console.time("raw-assets-api");
+  const { searchParams } = new URL(request.url);
+  const currentPage = Number(searchParams.get("page") || "1");
+  const limit = Number(searchParams.get("limit") || "10");
+  const skip = (currentPage - 1) * limit;
+  const sort = searchParams.get("sort") || "createdAt";
+  const direction = searchParams.get("direction") === "asc" ? 1 : -1;
+  const search = searchParams.get("search") || "";
+  const client = searchParams.get("client") || "";
+  const hardDriveId = searchParams.get("hardDriveId") || "";
+
+  // Create debug info object
+  const debugInfo: MongoDebugInfo = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+    vercel: process.env.VERCEL === "1",
+    database: process.env.MONGODB_DB || "motive_archive",
+    connectionPoolSize: 10,
+    connectionStatus: "error",
+    retryCount: 0,
+  };
+
+  let mongoClient;
+  let hasCollection = false;
   let retryCount = 0;
   const maxRetries = 3;
-  let lastError: Error | null = null;
 
+  // Function to attempt fetching with retry
   async function attemptFetch() {
     try {
-      const { searchParams } = new URL(request.url);
-      const page = parseInt(searchParams.get("page") || "1");
-      const limit = parseInt(searchParams.get("limit") || "10");
-      const search = searchParams.get("search") || "";
-      const skip = (page - 1) * limit;
-
-      console.log(
-        `Fetching raw assets: page=${page}, limit=${limit}, search=${search}`
-      );
-
-      // Validate connection before proceeding (new check)
+      // Check connection validity first
       const isConnected = await validateConnection();
       if (!isConnected) {
-        console.error(
-          "MongoDB connection validation failed, cannot proceed with request"
-        );
+        throw new Error("MongoDB connection validation failed");
+      }
+
+      // Get MongoDB client
+      mongoClient = await getMongoClient(2, 500);
+
+      // Use our enhanced collection check function
+      const { exists, client: collectionClient } = await ensureCollectionExists(
+        "raw_assets",
+        mongoClient
+      );
+      mongoClient = collectionClient;
+      hasCollection = exists;
+
+      debugInfo.hasCollection = hasCollection;
+      debugInfo.connectionStatus = "success";
+
+      // If collection doesn't exist, return empty result
+      if (!hasCollection) {
         return NextResponse.json(
           {
-            error: "Database connection error",
-            message: "Failed to establish database connection",
-            assets: [],
-            total: 0,
-            currentPage: page,
-            limit,
-            totalPages: 0,
+            data: [],
+            meta: {
+              page: currentPage,
+              limit,
+              total: 0,
+              totalPages: 0,
+            },
             debug: {
-              environment: process.env.NODE_ENV,
-              vercel: process.env.VERCEL === "1",
-              timestamp: new Date().toISOString(),
-              retryCount,
-              database: process.env.MONGODB_DB || "motive_archive",
-              connectionStatus: "failed",
+              ...debugInfo,
+              returnedCount: 0,
+              totalCount: 0,
             },
           },
-          { status: 503 } // Service Unavailable
+          { status: 200 }
         );
       }
 
-      // Use enhanced getMongoClient with retry mechanism
-      const client = await getMongoClient(3, 500);
-      const db = client.db();
+      // Make sure client is defined before using it
+      if (!mongoClient) {
+        throw new Error("MongoDB client is undefined after collection check");
+      }
+
+      // Get database and collection
+      const db = mongoClient.db();
       const rawCollection = db.collection("raw_assets");
 
       // Build query
-      const query: any = {};
+      const query: Record<string, any> = {};
 
       if (search) {
-        console.time("search-processing");
-        // Split search terms and escape special regex characters
-        const searchTerms = search
-          .split(/\s+/)
-          .filter((term) => term)
-          .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+        query.$or = [
+          { description: { $regex: search, $options: "i" } },
+          { client: { $regex: search, $options: "i" } },
+        ];
+      }
 
-        console.log("Search terms:", searchTerms);
+      if (client) {
+        query.client = { $regex: client, $options: "i" };
+      }
 
-        // Create a regex that matches any of the terms
-        const searchRegex = {
-          $regex:
-            searchTerms.length > 1
-              ? searchTerms.join("|") // Match any of the terms
-              : searchTerms[0] || "",
-          $options: "i",
-        };
-
-        // Look for year patterns (4 digits)
-        const yearTerms = searchTerms
-          .filter((term) => /^\d{4}$/.test(term))
-          .map((term) => parseInt(term));
-
-        // Search directly without preprocessing car and drive relationships for better performance
-        query.$or = [{ date: searchRegex }, { description: searchRegex }];
-
-        // If there are specific year terms, add direct search on those years
-        if (yearTerms.length > 0) {
-          query.$or.push({
-            date: {
-              $in: yearTerms.map((year) => new RegExp(`${year}`, "i")),
-            },
-          });
+      if (hardDriveId) {
+        try {
+          // Check if it's a valid ObjectId
+          query.hardDriveIds = new ObjectId(hardDriveId);
+        } catch (e) {
+          query.hardDriveIds = hardDriveId;
         }
-        console.timeEnd("search-processing");
       }
 
-      // Quick check if the collection exists and contains data
-      console.time("collection-check");
-      const collectionExists = await withTimeout(
-        rawCollection.findOne({}, { projection: { _id: 1 } }),
-        2000,
-        "raw-assets-collection-check"
-      );
-      console.timeEnd("collection-check");
-
-      console.log(
-        collectionExists
-          ? "Raw assets collection exists with data"
-          : "Raw assets collection may be empty"
-      );
-
-      console.time("count-query");
-      // Get total count for pagination (with timeout)
-      const totalCount = await withTimeout(
-        new Promise<number>((resolve) => {
-          rawCollection
-            .countDocuments(query)
-            .then((count) => resolve(count))
-            .catch((err) => {
-              console.error("Error in count query:", err);
-              resolve(0); // Use default on error
-            });
-        }),
-        5000,
-        "raw-assets-count"
-      );
-
+      // Get count for pagination
+      const totalCount = await rawCollection.countDocuments(query);
       const totalPages = Math.ceil(totalCount / limit);
-      console.timeEnd("count-query");
-      console.log(`Found ${totalCount} raw assets matching criteria`);
 
-      // Create pipeline for the main query
-      const pipeline = [
-        { $match: query },
-        { $sort: { date: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-        // Use simplified lookups with minimal data projection for performance
-        {
-          $lookup: {
-            from: "cars",
-            localField: "carIds",
-            foreignField: "_id",
-            as: "cars",
-            pipeline: [
-              {
-                $project: {
-                  _id: 1,
-                  make: 1,
-                  model: 1,
-                  year: 1,
-                  color: 1,
-                },
-              },
-            ],
-          },
-        },
-        {
-          $lookup: {
-            from: "hard_drives",
-            localField: "hardDriveIds",
-            foreignField: "_id",
-            as: "hardDrives",
-            pipeline: [
-              {
-                $project: {
-                  _id: 1,
-                  label: 1,
-                  status: 1,
-                },
-              },
-            ],
-          },
-        },
-      ];
+      // Get sorted and paginated results
+      const sortOptions: Record<string, 1 | -1> = {};
+      sortOptions[sort] = direction;
 
-      console.time("main-query");
-      // Execute the main query with timeout
-      const assets = await withTimeout(
-        rawCollection.aggregate(pipeline).toArray(),
-        10000,
-        "raw-assets-query"
-      );
-      console.timeEnd("main-query");
-      console.log(`Query returned ${assets.length} raw assets`);
+      const rawAssets = await rawCollection
+        .find(query)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
 
-      // Format response
-      const formattedAssets = assets.map((asset) => ({
-        ...asset,
-        _id: asset._id.toString(),
-        carIds: asset.carIds?.map((id: ObjectId) => id.toString()) || [],
-        hardDriveIds:
-          asset.hardDriveIds?.map((id: ObjectId) => id.toString()) || [],
-        cars:
-          asset.cars?.map((car: any) => ({
-            ...car,
-            _id: car._id.toString(),
-          })) || [],
-        hardDrives:
-          asset.hardDrives?.map((drive: any) => ({
-            ...drive,
-            _id: drive._id.toString(),
-          })) || [],
-      }));
-
-      console.timeEnd("raw-assets-api");
-      console.log(
-        `Returning ${formattedAssets.length} raw assets out of ${totalCount} total`
-      );
-
-      return NextResponse.json({
-        assets: formattedAssets,
-        total: totalCount,
-        currentPage: page,
-        limit,
-        totalPages,
-        debug: {
-          environment: process.env.NODE_ENV,
-          vercel: process.env.VERCEL === "1",
-          timestamp: new Date().toISOString(),
-          retryCount,
-          database: process.env.MONGODB_DB || "motive_archive",
-          connectionPoolSize: client.options?.maxPoolSize,
-          hasCollection: Boolean(collectionExists),
-          returnedCount: formattedAssets.length,
-          totalCount,
-          connectionStatus: "success",
-        },
-      });
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      console.error(
-        `Error fetching raw assets (attempt ${retryCount + 1}):`,
-        error
-      );
-
-      // Determine if this is a connection error
-      const errorMessage = lastError.message.toLowerCase();
-      const isConnectionError =
-        errorMessage.includes("connect") ||
-        errorMessage.includes("network") ||
-        errorMessage.includes("timeout") ||
-        errorMessage.includes("topology");
-
-      // Extract request parameters or use defaults
-      let currentPage = 1;
-      let currentLimit = 10;
-      try {
-        const { searchParams } = new URL(request.url);
-        currentPage = parseInt(searchParams.get("page") || "1");
-        currentLimit = parseInt(searchParams.get("limit") || "10");
-      } catch (parseError) {
-        console.error("Error parsing URL parameters:", parseError);
-      }
-
-      if (retryCount < maxRetries && (isConnectionError || retryCount === 0)) {
-        retryCount++;
-        const delay = Math.pow(1.5, retryCount) * 500; // Less aggressive backoff
-        console.log(`Retrying in ${delay}ms... (attempt ${retryCount + 1})`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        return attemptFetch();
-      }
-
-      // Type assertion to ensure TypeScript knows lastError is an Error when it's not null
-      const errorDetail = lastError
-        ? (lastError as Error).message
-        : "Unknown error";
+      // Update debug info
+      debugInfo.returnedCount = rawAssets.length;
+      debugInfo.totalCount = totalCount;
+      debugInfo.retryCount = retryCount;
 
       return NextResponse.json(
         {
-          error: "Failed to fetch raw assets",
-          message: error instanceof Error ? error.message : String(error),
-          details: errorDetail,
-          assets: [],
-          total: 0,
-          currentPage,
-          limit: currentLimit,
-          totalPages: 0,
-          debug: {
-            environment: process.env.NODE_ENV,
-            vercel: process.env.VERCEL === "1",
-            timestamp: new Date().toISOString(),
-            retryCount,
-            database: process.env.MONGODB_DB || "motive_archive",
-            errorName: error instanceof Error ? error.name : "Unknown",
-            connectionError: isConnectionError,
-            errorType: isConnectionError ? "connection" : "query",
+          data: rawAssets,
+          meta: {
+            page: currentPage,
+            limit,
+            total: totalCount,
+            totalPages,
           },
-          stack:
-            process.env.NODE_ENV === "development"
-              ? error instanceof Error
-                ? error.stack
-                : undefined
-              : undefined,
+          debug: debugInfo,
         },
-        { status: isConnectionError ? 503 : 500 } // Use 503 for connection errors
+        { status: 200 }
       );
+    } catch (error) {
+      // Check if we should retry
+      if (retryCount < maxRetries) {
+        retryCount++;
+        debugInfo.retryCount = retryCount;
+        console.log(
+          `Retrying raw assets fetch (attempt ${retryCount} of ${maxRetries})`
+        );
+
+        // Exponential backoff
+        const delay = Math.min(100 * Math.pow(2, retryCount), 1000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+
+        return attemptFetch();
+      }
+
+      // All retries failed, throw the error
+      throw error;
     }
   }
 
   try {
     return await attemptFetch();
   } catch (error) {
-    console.error("All attempts to fetch raw assets failed:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`Error fetching raw assets: ${errorMessage}`);
 
-    // Type assertion here as well
-    const errorDetail = lastError
-      ? (lastError as Error).message
-      : "Unknown error";
+    // Handle different types of errors
+    const isConnectionError =
+      errorMessage.includes("connect") ||
+      errorMessage.includes("timeout") ||
+      errorMessage.includes("network");
 
-    // Default values for outer catch block
-    const defaultPage = 1;
-    const defaultLimit = 10;
+    const statusCode = isConnectionError ? 503 : 500;
 
     return NextResponse.json(
       {
         error: "Failed to fetch raw assets",
-        message: error instanceof Error ? error.message : String(error),
-        details: errorDetail,
-        assets: [],
-        total: 0,
-        currentPage: defaultPage,
-        limit: defaultLimit,
-        totalPages: 0,
-        stack:
-          process.env.NODE_ENV === "development"
-            ? error instanceof Error
-              ? error.stack
-              : undefined
-            : undefined,
+        message: errorMessage,
+        data: [],
+        meta: {
+          page: currentPage,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+        debug: {
+          ...debugInfo,
+          connectionStatus: "error",
+          connectionError: errorMessage,
+          retryCount,
+          hasCollection,
+        },
       },
-      { status: 503 } // Service Unavailable for outer catch
+      { status: statusCode }
     );
   }
 }

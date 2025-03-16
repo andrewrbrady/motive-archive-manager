@@ -3,6 +3,8 @@ import { HardDrive, HardDriveData } from "@/models/hard-drive";
 import clientPromise, {
   getMongoClient,
   validateConnection,
+  ensureCollectionExists,
+  type MongoDebugInfo,
 } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { toObjectId } from "@/lib/mongodb-types";
@@ -22,278 +24,162 @@ type PipelineStage = {
 };
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const currentPage = Number(searchParams.get("page") || "1");
+  const limit = Number(searchParams.get("limit") || "25");
+  const skip = (currentPage - 1) * limit;
+  const sort = searchParams.get("sort") || "";
+  const direction = searchParams.get("direction") === "desc" ? -1 : 1;
+
+  // Construct sort options
+  const sortOptions: Record<string, 1 | -1> = {};
+  if (sort) {
+    sortOptions[sort] = direction;
+  } else {
+    // Default sort by createdAt desc if no sort specified
+    sortOptions["createdAt"] = -1;
+  }
+
+  // Create the debug info object
+  const debugInfo: MongoDebugInfo = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+    vercel: process.env.VERCEL === "1",
+    database: process.env.MONGODB_DB || "motive_archive",
+    connectionPoolSize: 10,
+    connectionStatus: "error",
+  };
+
+  let client;
+  let hasCollection = false;
+
   try {
-    console.time("hard-drives-api");
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const search = searchParams.get("search") || "";
-    const status = searchParams.get("status");
-    const id = searchParams.get("id");
-    const location = searchParams.get("location") || "";
-    const includeAssets = searchParams.get("include_assets") === "true";
-    const skip = (page - 1) * limit;
-
-    console.log(
-      `Fetching hard drives: page=${page}, limit=${limit}, search=${search}, location=${location}, includeAssets=${includeAssets}`
-    );
-
-    // Validate connection before proceeding (new check)
+    // Validate connection first
     const isConnected = await validateConnection();
     if (!isConnected) {
-      console.error(
-        "MongoDB connection validation failed, cannot proceed with request"
-      );
       return NextResponse.json(
         {
-          error: "Database connection error",
-          message: "Failed to establish database connection",
-          drives: [],
-          total: 0,
-          currentPage: page,
-          totalPages: 0,
+          error: "Failed to validate MongoDB connection",
+          data: [],
+          meta: {
+            page: currentPage,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
           debug: {
-            environment: process.env.NODE_ENV,
-            vercel: process.env.VERCEL === "1" ? true : false,
-            timestamp: new Date().toISOString(),
-            database: process.env.MONGODB_DB || "motive_archive",
-            connectionStatus: "failed",
+            ...debugInfo,
+            connectionStatus: "error",
+            connectionError: "Connection validation failed",
           },
         },
-        { status: 503 } // Service Unavailable
+        { status: 500 }
       );
     }
 
-    // Use the enhanced getMongoClient with retry logic
-    const client = await getMongoClient(5, 500); // 5 retries with 500ms initial delay
+    // Attempt to get the MongoDB client with more aggressive retry
+    client = await getMongoClient(3, 500);
+
+    // Use our more robust collection check
+    const { exists, client: collectionClient } = await ensureCollectionExists(
+      "hard_drives",
+      client
+    );
+    client = collectionClient; // Use the client returned from ensureCollectionExists
+    hasCollection = exists;
+
+    debugInfo.hasCollection = hasCollection;
+    debugInfo.connectionStatus = "success";
+
+    // If collection does not exist, return empty result
+    if (!hasCollection) {
+      return NextResponse.json(
+        {
+          data: [],
+          meta: {
+            page: currentPage,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+          debug: {
+            ...debugInfo,
+            returnedCount: 0,
+            totalCount: 0,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // Make sure client is defined before using it
+    if (!client) {
+      throw new Error("MongoDB client is undefined after collection check");
+    }
+
+    // Get the collection
     const db = client.db();
     const collection = db.collection("hard_drives");
 
-    // Build match query
-    const match: any = {};
-    if (search) {
-      const searchRegex = { $regex: search, $options: "i" };
-      match.$or = [
-        { label: searchRegex },
-        { systemName: searchRegex },
-        { notes: searchRegex },
-      ];
-    }
-    if (status) {
-      match.status = status;
-    }
-    if (id) {
-      try {
-        match._id = new ObjectId(id);
-      } catch {
-        // If id is not a valid ObjectId, try searching by label
-        match.label = id;
-      }
-    }
-    if (location) {
-      match.locationId = location;
-    }
+    // Count total documents for pagination
+    const totalDocumentsPromise = collection.countDocuments();
 
-    // First do a quick check if any documents exist in this collection
-    console.time("hard-drives-collection-check");
-    const collectionCheck = await collection.findOne(
-      {},
-      { projection: { _id: 1 } }
-    );
-    console.timeEnd("hard-drives-collection-check");
+    // Get the drives with pagination and sorting
+    const drivesPromise = collection
+      .find({})
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .toArray();
 
-    if (!collectionCheck) {
-      console.warn("No hard drives found in collection - it may be empty");
-    } else {
-      console.log("Hard drives collection exists and contains data");
-    }
+    // Wait for both promises to resolve
+    const [totalDocuments, drives] = await Promise.all([
+      totalDocumentsPromise,
+      drivesPromise,
+    ]);
 
-    // Get total count for pagination with timeout handling
-    console.time("hard-drives-count");
-    const countPromise = new Promise<number>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        console.warn("Count query timed out, using default count of 0");
-        resolve(0);
-      }, 5000);
+    const totalPages = Math.ceil(totalDocuments / limit);
 
-      collection
-        .countDocuments(match)
-        .then((count) => {
-          clearTimeout(timeoutId);
-          resolve(count);
-        })
-        .catch((err) => {
-          clearTimeout(timeoutId);
-          console.error("Error in count query:", err);
-          resolve(0);
-        });
-    });
+    // Update debug info with counts
+    debugInfo.returnedCount = drives.length;
+    debugInfo.totalCount = totalDocuments;
 
-    const totalCount = await countPromise;
-    const totalPages = Math.ceil(totalCount / limit);
-    console.timeEnd("hard-drives-count");
-    console.log(`Found ${totalCount} hard drives matching criteria`);
-
-    // Create aggregation pipeline
-    const pipeline: PipelineStage[] = [
-      { $match: match },
-      { $sort: { updatedAt: -1 } },
-      { $skip: skip },
-      { $limit: limit },
-    ];
-
-    // Add location details lookup if requested
-    if (includeAssets) {
-      // Add location lookup
-      pipeline.push({
-        $lookup: {
-          from: "locations",
-          localField: "locationId",
-          foreignField: "_id",
-          as: "locationDetails",
+    return NextResponse.json(
+      {
+        data: drives,
+        meta: {
+          page: currentPage,
+          limit,
+          total: totalDocuments,
+          totalPages,
         },
-      });
-
-      // Limit returned location data to the first match
-      pipeline.push({
-        $addFields: {
-          locationDetails: { $arrayElemAt: ["$locationDetails", 0] },
-        },
-      });
-
-      // Add raw assets lookup (only if the drive has rawAssets)
-      pipeline.push({
-        $lookup: {
-          from: "raw_assets",
-          localField: "rawAssets",
-          foreignField: "_id",
-          as: "rawAssetDetails",
-        },
-      });
-
-      // Add a field to limit number of raw assets details returned
-      // This prevents returning too much data
-      pipeline.push({
-        $addFields: {
-          rawAssetDetails: { $slice: ["$rawAssetDetails", 0, 20] },
-        },
-      });
-    }
-
-    // Execute aggregation with timeout handling
-    console.time("hard-drives-aggregation");
-    const aggregationPromise = new Promise<any[]>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        console.warn("Aggregation query timed out after 10 seconds");
-        resolve([]);
-      }, 10000);
-
-      collection
-        .aggregate(pipeline)
-        .toArray()
-        .then((results) => {
-          clearTimeout(timeoutId);
-          resolve(results);
-        })
-        .catch((err) => {
-          clearTimeout(timeoutId);
-          console.error("Error in aggregation query:", err);
-          resolve([]);
-        });
-    });
-
-    const hardDrives = await aggregationPromise;
-    console.timeEnd("hard-drives-aggregation");
-    console.log(`Aggregation returned ${hardDrives.length} hard drives`);
-
-    // Format the results
-    const formattedDrives = hardDrives.map((drive) => {
-      const formattedDrive: any = {
-        ...drive,
-        _id: drive._id.toString(),
-        rawAssets: drive.rawAssets?.map((id: ObjectId) => id.toString()) || [],
-      };
-
-      // Format locationDetails if exists
-      if (formattedDrive.locationDetails) {
-        formattedDrive.locationDetails = {
-          ...formattedDrive.locationDetails,
-          _id: formattedDrive.locationDetails._id.toString(),
-        };
-      }
-
-      // Format rawAssetDetails if exists
-      if (formattedDrive.rawAssetDetails) {
-        formattedDrive.rawAssetDetails = formattedDrive.rawAssetDetails.map(
-          (asset: any) => ({
-            ...asset,
-            _id: asset._id.toString(),
-          })
-        );
-      }
-
-      return formattedDrive;
-    });
-
-    console.timeEnd("hard-drives-api");
-    console.log(
-      `Returning ${formattedDrives.length} hard drives out of ${totalCount} total`
-    );
-
-    return NextResponse.json({
-      drives: formattedDrives,
-      total: totalCount,
-      currentPage: page,
-      totalPages,
-      debug: {
-        environment: process.env.NODE_ENV,
-        vercel: process.env.VERCEL === "1" ? true : false,
-        timestamp: new Date().toISOString(),
-        database: process.env.MONGODB_DB || "motive_archive",
-        connectionPoolSize: client.options?.maxPoolSize,
-        hasCollection: Boolean(collectionCheck),
-        returnedCount: formattedDrives.length,
-        totalCount,
-        connectionStatus: "success",
+        debug: debugInfo,
       },
-    });
+      { status: 200 }
+    );
   } catch (error) {
-    console.error("Error fetching hard drives:", error);
-
-    // Determine if this is a connection error
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const isConnectionError =
-      errorMessage.toLowerCase().includes("connect") ||
-      errorMessage.toLowerCase().includes("network") ||
-      errorMessage.toLowerCase().includes("timeout") ||
-      errorMessage.toLowerCase().includes("topology");
-
-    // Provide more details in the error response
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`Error fetching hard drives: ${errorMessage}`);
     return NextResponse.json(
       {
         error: "Failed to fetch hard drives",
         message: errorMessage,
-        drives: [],
-        total: 0,
-        currentPage: 1,
-        totalPages: 0,
-        debug: {
-          environment: process.env.NODE_ENV,
-          vercel: process.env.VERCEL === "1" ? true : false,
-          timestamp: new Date().toISOString(),
-          database: process.env.MONGODB_DB || "motive_archive",
-          errorName: error instanceof Error ? error.name : "Unknown",
-          connectionError: isConnectionError,
-          errorType: isConnectionError ? "connection" : "query",
+        data: [],
+        meta: {
+          page: currentPage,
+          limit,
+          total: 0,
+          totalPages: 0,
         },
-        stack:
-          process.env.NODE_ENV === "development"
-            ? error instanceof Error
-              ? error.stack
-              : undefined
-            : undefined,
+        debug: {
+          ...debugInfo,
+          connectionStatus: "error",
+          connectionError: errorMessage,
+          hasCollection,
+        },
       },
-      { status: isConnectionError ? 503 : 500 } // Use 503 for connection errors
+      { status: 500 }
     );
   }
 }

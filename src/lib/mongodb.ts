@@ -329,3 +329,125 @@ dbConnect().catch(console.error);
 });
 
 export default clientPromise;
+
+// Add debug info to returned values
+export interface MongoDebugInfo {
+  timestamp: string;
+  environment: string;
+  vercel: boolean;
+  database: string;
+  connectionPoolSize: number;
+  hasCollection?: boolean;
+  returnedCount?: number;
+  totalCount?: number;
+  connectionStatus: "success" | "error";
+  connectionError?: string;
+  retryCount?: number;
+}
+
+// Add this function to handle more robust collection checking
+export async function ensureCollectionExists(
+  collectionName: string,
+  dbClient?: MongoClient
+): Promise<{ exists: boolean; client?: MongoClient }> {
+  const DB_NAME = process.env.MONGODB_DB || "motive_archive";
+  const ALT_DB_NAME = DB_NAME === "motive_archive" ? "motive-archive" : null;
+
+  let client: MongoClient | undefined = dbClient;
+  let ownClient = false;
+
+  try {
+    // If no client provided, create one
+    if (!client) {
+      client = await getMongoClient();
+      ownClient = true;
+    }
+
+    // Check the primary database first
+    const db = client.db(DB_NAME);
+    const collections = await db.listCollections().toArray();
+
+    // Check if collection exists - case sensitive
+    let exists = collections.some((c) => c.name === collectionName);
+
+    if (exists) {
+      return { exists: true, client };
+    }
+
+    // Try case-insensitive match if not found
+    const caseInsensitiveMatch = collections.find(
+      (c) => c.name.toLowerCase() === collectionName.toLowerCase()
+    );
+
+    if (caseInsensitiveMatch) {
+      console.log(
+        `Found collection with different case: ${caseInsensitiveMatch.name}`
+      );
+      return { exists: true, client };
+    }
+
+    // If still not found and we have an alternative database, check it
+    if (!exists && ALT_DB_NAME) {
+      try {
+        const altDb = client.db(ALT_DB_NAME);
+        const altCollections = await altDb.listCollections().toArray();
+
+        // Check in alternative database
+        exists = altCollections.some((c) => c.name === collectionName);
+
+        if (exists) {
+          console.log(
+            `Found collection in alternative database: ${ALT_DB_NAME}`
+          );
+          return { exists: true, client };
+        }
+
+        // Try case-insensitive match in alternative DB
+        const altCaseInsensitiveMatch = altCollections.find(
+          (c) => c.name.toLowerCase() === collectionName.toLowerCase()
+        );
+
+        if (altCaseInsensitiveMatch) {
+          console.log(
+            `Found collection with different case in alternative database: ${altCaseInsensitiveMatch.name}`
+          );
+          return { exists: true, client };
+        }
+      } catch (error) {
+        console.error(
+          `Error checking alternative database: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+
+    // As a last resort, try to directly access the collection
+    // Some MongoDB configurations might allow this even if listCollections doesn't show it
+    try {
+      const count = await db
+        .collection(collectionName)
+        .countDocuments({}, { limit: 1 });
+      if (count >= 0) {
+        // If we can successfully run this, the collection exists or can be auto-created
+        return { exists: true, client };
+      }
+    } catch (error) {
+      // Ignore errors here, since we're just trying as a last resort
+    }
+
+    return { exists: false, client };
+  } catch (error) {
+    console.error(
+      `Error checking for collection: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return { exists: false, client };
+  } finally {
+    // Close the client only if we created it
+    if (ownClient && client && !dbClient) {
+      await client.close();
+    }
+  }
+}
