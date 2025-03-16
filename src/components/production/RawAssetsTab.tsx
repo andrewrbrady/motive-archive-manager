@@ -307,6 +307,9 @@ export default function RawAssetsTab() {
         const data = await response.json();
         console.timeEnd("fetch-raw-assets");
 
+        // Log the API response structure to help debug
+        console.log("Raw Assets API Response structure:", Object.keys(data));
+
         // Log debug info if available
         if (data.debug) {
           console.log("Raw assets API debug info:", data.debug);
@@ -850,22 +853,27 @@ export default function RawAssetsTab() {
       if (!asset) return;
 
       // Ensure hardDriveIds is an array, even if it's undefined or null
-      const driveIds = Array.isArray(asset.hardDriveIds)
+      const hardDriveIds = Array.isArray(asset)
+        ? asset // If asset is already an array, use it directly (for batch fetching)
+        : Array.isArray(asset.hardDriveIds)
         ? asset.hardDriveIds
         : [];
 
-      if (driveIds.length === 0) {
-        console.log("Asset has no drive IDs or invalid driveIds format", asset);
+      if (!hardDriveIds || hardDriveIds.length === 0) {
+        console.log(
+          "Asset has no drive IDs or invalid hardDriveIds format",
+          asset
+        );
         return;
       }
 
-      console.log(`Fetching labels for ${driveIds.length} drives`);
+      console.log(`Fetching labels for ${hardDriveIds.length} drives`);
 
       // Format IDs to strings with safety checks
-      const formattedDriveIds = driveIds
+      const formattedDriveIds = hardDriveIds
         .filter(
           (id: string | null | undefined) => id !== null && id !== undefined
-        ) // Remove null/undefined entries
+        )
         .map((id: string | { toString?: () => string }) =>
           typeof id === "string" ? id : id?.toString ? id.toString() : ""
         )
@@ -906,10 +914,14 @@ export default function RawAssetsTab() {
         }
 
         const data = await response.json();
-        console.log("Drive labels API response:", Object.keys(data));
+        console.log("API Response data structure:", Object.keys(data));
+
+        if (data.debug) {
+          console.log("Hard drives API debug info:", data.debug);
+        }
 
         // Process different response formats with better safety checks
-        let drivesList = [];
+        let drivesList: any[] = [];
 
         if (data?.data && Array.isArray(data.data)) {
           console.log(`Using data.data array with ${data.data.length} items`);
@@ -931,7 +943,11 @@ export default function RawAssetsTab() {
           return;
         }
 
-        if (drivesList.length === 0) {
+        console.log(
+          `Received ${drivesList.length} hard drives out of ${missingLabels.length} total`
+        );
+
+        if (!drivesList || drivesList.length === 0) {
           console.warn("No drives found in response");
           return;
         }
@@ -967,7 +983,8 @@ export default function RawAssetsTab() {
       } catch (error) {
         console.error("Error fetching drive labels:", error);
         // For any error, still attempt individual fetches as a fallback
-        for (const driveId of formattedDriveIds) {
+        const idsToFetch = formattedDriveIds || [];
+        for (const driveId of idsToFetch) {
           if (!driveLabels[driveId]) {
             try {
               await fetchIndividualDrive(driveId);
@@ -1272,8 +1289,12 @@ export default function RawAssetsTab() {
                   <td className="py-3 px-2">
                     <div className="flex flex-wrap gap-2">
                       {Array.isArray(asset.hardDriveIds) &&
+                      asset.hardDriveIds.length > 0 ? (
                         asset.hardDriveIds
-                          .filter((id: any) => id) // Filter out null/undefined/empty IDs
+                          .filter(
+                            (id: any) =>
+                              id !== null && id !== undefined && id !== ""
+                          ) // Filter out null/undefined/empty IDs
                           .map((hardDriveId: any, index) => {
                             const hardDriveIdStr = hardDriveId
                               ? typeof hardDriveId === "string"
@@ -1282,6 +1303,8 @@ export default function RawAssetsTab() {
                                 ? hardDriveId.toString()
                                 : ""
                               : "";
+
+                            if (!hardDriveIdStr) return null; // Skip empty IDs
 
                             // Get the actual drive label from our state
                             let driveLabel = getDriveLabel(hardDriveIdStr);
@@ -1314,7 +1337,12 @@ export default function RawAssetsTab() {
                                 {displayLabel}
                               </span>
                             );
-                          })}
+                          })
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          No storage locations
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-2 text-right">
