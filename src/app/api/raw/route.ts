@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMongoClient, getDatabase } from "@/lib/mongodb";
+import { getMongoClient, getDatabase, validateConnection } from "@/lib/mongodb";
 import { RawAsset, RawAssetData } from "../../../models/raw_assets";
 import { ObjectId } from "mongodb";
 
@@ -48,8 +48,36 @@ export async function GET(request: Request) {
         `Fetching raw assets: page=${page}, limit=${limit}, search=${search}`
       );
 
+      // Validate connection before proceeding (new check)
+      const isConnected = await validateConnection();
+      if (!isConnected) {
+        console.error(
+          "MongoDB connection validation failed, cannot proceed with request"
+        );
+        return NextResponse.json(
+          {
+            error: "Database connection error",
+            message: "Failed to establish database connection",
+            assets: [],
+            total: 0,
+            currentPage: page,
+            limit,
+            totalPages: 0,
+            debug: {
+              environment: process.env.NODE_ENV,
+              vercel: process.env.VERCEL === "1",
+              timestamp: new Date().toISOString(),
+              retryCount,
+              database: process.env.MONGODB_DB || "motive_archive",
+              connectionStatus: "failed",
+            },
+          },
+          { status: 503 } // Service Unavailable
+        );
+      }
+
       // Use enhanced getMongoClient with retry mechanism
-      const client = await getMongoClient(3, 1000);
+      const client = await getMongoClient(3, 500);
       const db = client.db();
       const rawCollection = db.collection("raw_assets");
 
@@ -224,6 +252,7 @@ export async function GET(request: Request) {
           hasCollection: Boolean(collectionExists),
           returnedCount: formattedAssets.length,
           totalCount,
+          connectionStatus: "success",
         },
       });
     } catch (error) {
@@ -234,9 +263,28 @@ export async function GET(request: Request) {
         error
       );
 
-      if (retryCount < maxRetries) {
+      // Determine if this is a connection error
+      const errorMessage = lastError.message.toLowerCase();
+      const isConnectionError =
+        errorMessage.includes("connect") ||
+        errorMessage.includes("network") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("topology");
+
+      // Extract request parameters or use defaults
+      let currentPage = 1;
+      let currentLimit = 10;
+      try {
+        const { searchParams } = new URL(request.url);
+        currentPage = parseInt(searchParams.get("page") || "1");
+        currentLimit = parseInt(searchParams.get("limit") || "10");
+      } catch (parseError) {
+        console.error("Error parsing URL parameters:", parseError);
+      }
+
+      if (retryCount < maxRetries && (isConnectionError || retryCount === 0)) {
         retryCount++;
-        const delay = Math.pow(2, retryCount) * 500; // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(1.5, retryCount) * 500; // Less aggressive backoff
         console.log(`Retrying in ${delay}ms... (attempt ${retryCount + 1})`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return attemptFetch();
@@ -252,6 +300,11 @@ export async function GET(request: Request) {
           error: "Failed to fetch raw assets",
           message: error instanceof Error ? error.message : String(error),
           details: errorDetail,
+          assets: [],
+          total: 0,
+          currentPage,
+          limit: currentLimit,
+          totalPages: 0,
           debug: {
             environment: process.env.NODE_ENV,
             vercel: process.env.VERCEL === "1",
@@ -259,6 +312,8 @@ export async function GET(request: Request) {
             retryCount,
             database: process.env.MONGODB_DB || "motive_archive",
             errorName: error instanceof Error ? error.name : "Unknown",
+            connectionError: isConnectionError,
+            errorType: isConnectionError ? "connection" : "query",
           },
           stack:
             process.env.NODE_ENV === "development"
@@ -267,7 +322,7 @@ export async function GET(request: Request) {
                 : undefined
               : undefined,
         },
-        { status: 500 }
+        { status: isConnectionError ? 503 : 500 } // Use 503 for connection errors
       );
     }
   }
@@ -282,11 +337,20 @@ export async function GET(request: Request) {
       ? (lastError as Error).message
       : "Unknown error";
 
+    // Default values for outer catch block
+    const defaultPage = 1;
+    const defaultLimit = 10;
+
     return NextResponse.json(
       {
         error: "Failed to fetch raw assets",
         message: error instanceof Error ? error.message : String(error),
         details: errorDetail,
+        assets: [],
+        total: 0,
+        currentPage: defaultPage,
+        limit: defaultLimit,
+        totalPages: 0,
         stack:
           process.env.NODE_ENV === "development"
             ? error instanceof Error
@@ -294,7 +358,7 @@ export async function GET(request: Request) {
               : undefined
             : undefined,
       },
-      { status: 500 }
+      { status: 503 } // Service Unavailable for outer catch
     );
   }
 }

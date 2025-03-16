@@ -22,13 +22,19 @@ const options: MongoClientOptions = {
 // Detect if running on Vercel
 const isVercel = process.env.VERCEL === "1";
 
-// Adjust options for Vercel environment
+// Adjust options for Vercel environment - optimized for better reliability
 if (isVercel) {
-  // Optimize for serverless - reduce pool size further
+  // More aggressive settings for serverless functions
   options.maxPoolSize = 5;
   options.minPoolSize = 0; // No persistent connections
+  options.serverSelectionTimeoutMS = 15000; // Shorter timeout for faster failures (down from 30000)
+  options.connectTimeoutMS = 15000; // Shorter connection timeout (down from 30000)
+  options.socketTimeoutMS = 30000; // Shorter socket timeout (down from 60000)
+  options.waitQueueTimeoutMS = 5000; // Shorter wait queue timeout (down from 10000)
+  options.heartbeatFrequencyMS = 15000; // More frequent heartbeats (default 10000)
+  options.family = 4; // Force IPv4 (can help with some connectivity issues)
   console.log(
-    "Detected Vercel environment, optimizing MongoDB connection settings"
+    "Detected Vercel environment, using optimized MongoDB connection settings"
   );
 }
 
@@ -43,6 +49,8 @@ console.log("MongoDB Configuration:", {
   waitQueueTimeoutMS: options.waitQueueTimeoutMS,
   retryWrites: options.retryWrites,
   retryReads: options.retryReads,
+  heartbeatFrequencyMS: options.heartbeatFrequencyMS,
+  family: options.family,
   isVercel,
 });
 
@@ -148,7 +156,7 @@ function createMongoClient(): Promise<MongoClient> {
 
   client = new MongoClient(uri, options);
 
-  // Create new connection promise
+  // Create new connection promise with improved error handling
   return client
     .connect()
     .then((client) => {
@@ -165,6 +173,25 @@ function createMongoClient(): Promise<MongoClient> {
         environment: process.env.NODE_ENV,
         vercel: process.env.VERCEL === "1",
       });
+
+      // Try to determine if this is an auth error or network issue
+      const errorMessage = err.toString().toLowerCase();
+      if (
+        errorMessage.includes("authentication") ||
+        errorMessage.includes("auth failed")
+      ) {
+        console.error(
+          "This appears to be an authentication error. Check your MongoDB username and password."
+        );
+      } else if (
+        errorMessage.includes("network") ||
+        errorMessage.includes("timeout")
+      ) {
+        console.error(
+          "This appears to be a network connectivity issue. Check your MongoDB Atlas network settings."
+        );
+      }
+
       throw err;
     });
 }
@@ -188,6 +215,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Add exponential backoff retry mechanism for serverless environments
+// Improved version with more aggressive retry strategy
 export async function getMongoClient(
   retries = 3,
   delay = 500
@@ -195,6 +223,7 @@ export async function getMongoClient(
   try {
     // If we should force a new connection, clear the cached promise
     if (shouldForceNewConnection()) {
+      console.log("Forcing new MongoDB connection due to TTL expiration");
       global._mongoClientPromise = createMongoClient();
       clientPromise = global._mongoClientPromise;
     }
@@ -206,13 +235,42 @@ export async function getMongoClient(
       throw err;
     }
 
-    const retryDelay = delay * Math.pow(2, 3 - retries); // Exponential backoff
+    // More aggressive exponential backoff for Vercel environment
+    const baseDelay = isVercel ? 300 : delay; // Shorter base delay for Vercel
+    const retryDelay = baseDelay * Math.pow(1.5, 3 - retries); // Less aggressive exponential factor
     console.log(
       `MongoDB connection failed, retrying in ${retryDelay}ms... (${retries} attempts left)`
     );
 
     await new Promise((resolve) => setTimeout(resolve, retryDelay));
     return getMongoClient(retries - 1, delay);
+  }
+}
+
+// Add a connection validation function
+export async function validateConnection(): Promise<boolean> {
+  try {
+    console.time("mongodb-validate");
+    const client = await getMongoClient(1, 500);
+    const db = client.db(DB_NAME);
+
+    // Test connection with a lightweight ping operation
+    const result = await db.command({ ping: 1 });
+    console.timeEnd("mongodb-validate");
+
+    if (result && result.ok === 1) {
+      console.log("MongoDB connection validated successfully");
+      return true;
+    } else {
+      console.error(
+        "MongoDB connection validation failed: unexpected response",
+        result
+      );
+      return false;
+    }
+  } catch (error) {
+    console.error("Failed to validate MongoDB connection:", error);
+    return false;
   }
 }
 

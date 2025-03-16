@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { HardDrive, HardDriveData } from "@/models/hard-drive";
-import clientPromise, { getMongoClient } from "@/lib/mongodb";
+import clientPromise, {
+  getMongoClient,
+  validateConnection,
+} from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { toObjectId } from "@/lib/mongodb-types";
 
@@ -35,8 +38,34 @@ export async function GET(request: Request) {
       `Fetching hard drives: page=${page}, limit=${limit}, search=${search}, location=${location}, includeAssets=${includeAssets}`
     );
 
+    // Validate connection before proceeding (new check)
+    const isConnected = await validateConnection();
+    if (!isConnected) {
+      console.error(
+        "MongoDB connection validation failed, cannot proceed with request"
+      );
+      return NextResponse.json(
+        {
+          error: "Database connection error",
+          message: "Failed to establish database connection",
+          drives: [],
+          total: 0,
+          currentPage: page,
+          totalPages: 0,
+          debug: {
+            environment: process.env.NODE_ENV,
+            vercel: process.env.VERCEL === "1" ? true : false,
+            timestamp: new Date().toISOString(),
+            database: process.env.MONGODB_DB || "motive_archive",
+            connectionStatus: "failed",
+          },
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+
     // Use the enhanced getMongoClient with retry logic
-    const client = await getMongoClient(5, 1000); // 5 retries with 1s initial delay
+    const client = await getMongoClient(5, 500); // 5 retries with 500ms initial delay
     const db = client.db();
     const collection = db.collection("hard_drives");
 
@@ -225,21 +254,37 @@ export async function GET(request: Request) {
         hasCollection: Boolean(collectionCheck),
         returnedCount: formattedDrives.length,
         totalCount,
+        connectionStatus: "success",
       },
     });
   } catch (error) {
     console.error("Error fetching hard drives:", error);
+
+    // Determine if this is a connection error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isConnectionError =
+      errorMessage.toLowerCase().includes("connect") ||
+      errorMessage.toLowerCase().includes("network") ||
+      errorMessage.toLowerCase().includes("timeout") ||
+      errorMessage.toLowerCase().includes("topology");
+
     // Provide more details in the error response
     return NextResponse.json(
       {
         error: "Failed to fetch hard drives",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage,
+        drives: [],
+        total: 0,
+        currentPage: 1,
+        totalPages: 0,
         debug: {
           environment: process.env.NODE_ENV,
           vercel: process.env.VERCEL === "1" ? true : false,
           timestamp: new Date().toISOString(),
           database: process.env.MONGODB_DB || "motive_archive",
           errorName: error instanceof Error ? error.name : "Unknown",
+          connectionError: isConnectionError,
+          errorType: isConnectionError ? "connection" : "query",
         },
         stack:
           process.env.NODE_ENV === "development"
@@ -248,7 +293,7 @@ export async function GET(request: Request) {
               : undefined
             : undefined,
       },
-      { status: 500 }
+      { status: isConnectionError ? 503 : 500 } // Use 503 for connection errors
     );
   }
 }
