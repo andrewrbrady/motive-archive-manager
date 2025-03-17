@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { logos } from "@/data/site-content";
 import { useTheme } from "@/components/ThemeProvider";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 // Common classes for consistent styling
 const navClasses =
@@ -81,6 +82,7 @@ export default function Navbar({ className }: NavbarProps) {
             <a href="#" className={iconButtonClasses} aria-label="Email">
               <Mail className="w-5 h-5" />
             </a>
+            <UserMenu />
           </div>
         </div>
       </nav>

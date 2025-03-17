@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/mongodb";
 import { User } from "@/models/User";
 import { dbConnect } from "@/lib/mongodb";
 import bcrypt from "bcrypt";
+import { Types } from "mongoose";
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Return success response (excluding sensitive info)
     return NextResponse.json(
       {
-        id: newUser._id.toString(),
+        id: (newUser._id as Types.ObjectId).toString(),
         name: newUser.name,
         email: newUser.email,
         roles: newUser.roles,
