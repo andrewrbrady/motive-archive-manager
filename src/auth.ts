@@ -3,6 +3,26 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { User } from "@/models/User";
 import { dbConnect } from "@/lib/mongodb";
 
+// Dynamic URL detection for various environments
+const getBaseUrl = () => {
+  // Check for VERCEL_URL environment variable (Vercel deployments)
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  // Check for explicit AUTH_URL or NEXTAUTH_URL
+  if (process.env.AUTH_URL) {
+    return process.env.AUTH_URL;
+  }
+
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+
+  // Default to localhost for development
+  return "http://localhost:3000";
+};
+
 // Extend the built-in NextAuth User type to include our custom properties
 interface CustomUser extends DefaultUser {
   roles?: string[];
@@ -23,6 +43,8 @@ declare module "next-auth" {
  * This file is required for NextAuth v5 beta
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Trust the host header from Vercel to handle dynamic URLs
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: "Credentials",
