@@ -145,3 +145,49 @@ export function formatDate(date: Date | string | number | undefined): string {
     year: "numeric",
   });
 }
+
+export function getInitials(name: string): string {
+  if (!name) return "U";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
+}
+
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "An unknown error occurred";
+}
+
+// Check if user has specific role
+export function hasRole(
+  userRoles: string[] | undefined,
+  requiredRole: string | string[]
+): boolean {
+  if (!userRoles || userRoles.length === 0) return false;
+
+  const rolesToCheck = Array.isArray(requiredRole)
+    ? requiredRole
+    : [requiredRole];
+
+  return userRoles.some((role) => rolesToCheck.includes(role));
+}
+
+// Check if user has any of the specified permissions
+export function hasPermission(
+  userPermissions: string[] | undefined,
+  requiredPermission: string | string[]
+): boolean {
+  if (!userPermissions || userPermissions.length === 0) return false;
+
+  const permissionsToCheck = Array.isArray(requiredPermission)
+    ? requiredPermission
+    : [requiredPermission];
+
+  return userPermissions.some((permission) =>
+    permissionsToCheck.includes(permission)
+  );
+}

@@ -42,7 +42,7 @@ export default function HardDriveModal({
     type: "HDD",
     interface: "USB",
     status: "Available",
-    locationId: "",
+    locationId: "none",
     notes: "",
     rawAssets: [],
   });
@@ -63,6 +63,7 @@ export default function HardDriveModal({
       setFormData({
         ...drive,
         _id: undefined, // Don't include _id in form data
+        locationId: drive.locationId || "none",
       });
     } else {
       // Reset form when adding new drive
@@ -77,7 +78,7 @@ export default function HardDriveModal({
         type: "HDD",
         interface: "USB",
         status: "Available",
-        locationId: "",
+        locationId: "none",
         notes: "",
         rawAssets: [],
       });
@@ -122,6 +123,7 @@ export default function HardDriveModal({
         type: formData.type,
         interface: formData.interface,
         status: formData.status || "Available",
+        locationId: formData.locationId === "none" ? "" : formData.locationId,
         rawAssets: formData.rawAssets || [],
       };
 
@@ -470,9 +472,12 @@ export default function HardDriveModal({
             <label className="block text-sm font-medium mb-1">Location</label>
             <div className="flex gap-2 items-center">
               <Select
-                value={formData.locationId || ""}
+                value={formData.locationId || "none"}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, locationId: value })
+                  setFormData({
+                    ...formData,
+                    locationId: value === "none" ? "" : value,
+                  })
                 }
                 disabled={isLoadingLocations}
               >
@@ -480,7 +485,7 @@ export default function HardDriveModal({
                   <SelectValue placeholder="Select a location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}

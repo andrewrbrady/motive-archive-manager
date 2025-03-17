@@ -1,8 +1,8 @@
 import "./globals.css";
 import { Metadata } from "next";
-import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { Inter } from "next/font/google";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -34,7 +34,7 @@ export default function RootLayout({
       <body
         className={`min-h-screen bg-background antialiased ${inter.className}`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <Providers>{children}</Providers>
         <Toaster />
       </body>
     </html>

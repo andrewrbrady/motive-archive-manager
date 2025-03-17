@@ -1,6 +1,7 @@
 ---
 description: ules for AI model usage and configurations
 globs: src/app/api/**/*.ts", "src/lib/**/*.ts"
+alwaysApply: false
 ---
 When working with AI models in this project:
 

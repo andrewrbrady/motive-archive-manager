@@ -36,6 +36,12 @@ import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface RawAssetDetail {
   _id: string;
@@ -91,7 +97,8 @@ export default function HardDrivesTab() {
   const [isAddingDrive, setIsAddingDrive] = useState(false);
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>(() => {
-    return getParam("location") || "";
+    const locationParam = getParam("location");
+    return locationParam || "all";
   });
 
   const [hardDriveIds, setHardDriveIds] = useState<
@@ -220,7 +227,7 @@ export default function HardDrivesTab() {
         searchTerm
       )}&limit=${itemsPerPage}&include_assets=true`;
 
-      if (selectedLocation) {
+      if (selectedLocation && selectedLocation !== "all") {
         url += `&location=${selectedLocation}`;
       }
 
@@ -462,10 +469,10 @@ export default function HardDrivesTab() {
 
   const handleLocationChange = (value: string) => {
     const locationValue = value === "all" ? "" : value;
-    setSelectedLocation(locationValue);
+    setSelectedLocation(value);
     setCurrentPage(1);
     updateParams({
-      location: locationValue || null,
+      location: value === "all" ? null : value,
       page: "1",
     });
   };
@@ -733,61 +740,56 @@ export default function HardDrivesTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <Button onClick={handleAddDrive}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Drive
-        </Button>
-      </div>
-
-      <div className="flex justify-between items-center">
-        <ViewModeSelector currentView={currentView} />
-      </div>
-
       <div className="flex justify-between items-center gap-4">
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search by label, system name, or location..."
-            className="w-full px-4 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
+            placeholder="Search by drive label, type, capacity, interface, status..."
+            className="w-full px-4 py-2 pl-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
           />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
         </div>
 
-        <div className="w-64">
-          <Select
-            value={selectedLocation || "all"}
-            onValueChange={handleLocationChange}
-          >
-            <SelectTrigger className="bg-[hsl(var(--background))]">
-              <SelectValue placeholder="Filter by location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3 h-3" />
-                    {location.name}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={selectedLocation} onValueChange={handleLocationChange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Locations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations.map((location) => (
+              <SelectItem key={location.id} value={location.id}>
+                {location.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <select
           value={itemsPerPage}
           onChange={(e) => handleLimitChange(Number(e.target.value))}
           className="px-3 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
         >
-          {LIMIT_OPTIONS.map((option) => (
+          {[10, 25, 50, 100].map((option) => (
             <option key={option} value={option}>
               {option} per page
             </option>
           ))}
         </select>
+
+        <ViewModeSelector currentView={currentView} />
+
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={handleAddDrive}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Drive</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {loading ? (
@@ -835,7 +837,7 @@ export default function HardDrivesTab() {
       ) : drives.length === 0 ? (
         <div className="text-center py-4">No hard drives found</div>
       ) : currentView === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {drives.map((drive) => (
             <div
               key={drive._id?.toString() || Math.random().toString()}

@@ -1,13 +1,16 @@
 "use strict";
 import mongoose, { Model, Document } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
+import bcrypt from "bcrypt";
 
 // Ensure database connection is established
 dbConnect().catch(console.error);
 
-export interface IUser extends Document {
+// Base interface for user properties
+export interface IUserBase {
   name: string;
   email: string;
+  password?: string;
   roles: string[];
   status: string;
   creativeRoles: string[];
@@ -23,6 +26,24 @@ export interface IUser extends Document {
     specialties?: string[];
     portfolio_url?: string;
   };
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  emailVerified?: boolean;
+}
+
+// Interface for user methods
+export interface IUserMethods {
+  comparePassword(candidatePassword: string): Promise<boolean>;
+  toPublicJSON(): Record<string, any>;
+}
+
+// Combined interface for user document with methods
+export interface IUser extends IUserBase, Document, IUserMethods {}
+
+// Interface for user model static methods
+export interface UserModel extends Model<IUser, {}, IUserMethods> {
+  findByEmail(email: string): Promise<IUser | null>;
+  findByResetToken(token: string): Promise<IUser | null>;
 }
 
 const userSchema = new mongoose.Schema(
@@ -40,6 +61,17 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, "Please enter a valid email address"],
       index: true,
+    },
+    password: {
+      type: String,
+      minlength: [8, "Password must be at least 8 characters long"],
+      select: false, // Don't include password in query results by default
+    },
+    passwordResetToken: String,
+    passwordResetExpires: Date,
+    emailVerified: {
+      type: Boolean,
+      default: false,
     },
     roles: {
       type: [String],
@@ -116,16 +148,57 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+  // Only hash the password if it has been modified (or is new)
+  if (!this.isModified("password")) return next();
+
+  try {
+    // Generate a salt
+    const salt = await bcrypt.genSalt(10);
+    // Hash the password along with the new salt
+    if (this.password) {
+      const hashedPassword = await bcrypt.hash(this.password, salt);
+      // Replace the plaintext password with the hashed one
+      this.password = hashedPassword;
+    }
+    next();
+  } catch (error) {
+    next(error as Error);
+  }
+});
+
+// Add method to check password
+userSchema.methods.comparePassword = async function (
+  candidatePassword: string
+): Promise<boolean> {
+  // If no password set, authentication can't succeed
+  if (!this.password) return false;
+
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
 // Add instance methods
 userSchema.methods.toPublicJSON = function () {
   const obj = this.toObject();
+  // Remove sensitive data
+  delete obj.password;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
   delete obj.__v;
   return obj;
 };
 
 // Add static methods
-userSchema.statics.findByEmail = function (email) {
+userSchema.statics.findByEmail = function (email: string) {
   return this.findOne({ email: email.toLowerCase() });
+};
+
+userSchema.statics.findByResetToken = function (token: string) {
+  return this.findOne({
+    passwordResetToken: token,
+    passwordResetExpires: { $gt: Date.now() },
+  });
 };
 
 // Add virtual properties
@@ -134,6 +207,7 @@ userSchema.virtual("isActive").get(function () {
 });
 
 // Export the model using the singleton pattern
-const User = mongoose.models.User || mongoose.model("User", userSchema);
+const User = (mongoose.models.User ||
+  mongoose.model<IUser, UserModel>("User", userSchema)) as UserModel;
 
 export { User };

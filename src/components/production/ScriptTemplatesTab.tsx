@@ -32,6 +32,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Platform = "instagram_reels" | "youtube_shorts" | "youtube" | "stream_otv";
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
@@ -291,6 +297,68 @@ export default function ScriptTemplatesTab({
 
   return (
     <div className="space-y-6">
+      {!isCreating && !editingTemplate && (
+        <div className="flex gap-2 mb-4">
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsCreating(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add Template</TooltipContent>
+            </Tooltip>
+
+            {selectedTemplate && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleEdit(selectedTemplate)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit Template</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDuplicate(selectedTemplate)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Duplicate Template</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDelete(selectedTemplate.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Template</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </TooltipProvider>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <Dialog open={isCreating} onOpenChange={setIsCreating}>
           <div className="hidden">
@@ -670,7 +738,7 @@ export default function ScriptTemplatesTab({
                                   <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                                     Audio
                                   </th>
-                                  <th className="px-3 py-2 text-left border-b border-[hsl(var(--border))] font-medium text-sm">
+                                  <th className="px-3 py-2 text-left border-b border-r border-[hsl(var(--border))] font-medium text-sm">
                                     GFX
                                   </th>
                                   {editingTemplate?.id ===
