@@ -11,6 +11,7 @@ import {
   Trash2Icon,
   HardDriveIcon,
   Plus,
+  Search,
 } from "lucide-react";
 import EditRawAssetModal from "./EditRawAssetModal";
 import RawAssetDetailsModal from "./RawAssetDetailsModal";
@@ -22,6 +23,12 @@ import { useUrlParams } from "@/hooks/useUrlParams";
 import { PaginationWithUrl } from "@/components/ui/pagination-with-url";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const LIMIT_OPTIONS = [10, 25, 50, 100];
 
@@ -1090,36 +1097,13 @@ export default function RawAssetsTab() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Raw Assets</h2>
-          <div className="space-x-2">
-            <Button
-              variant="outline"
-              onClick={handleAddAssetClick}
-              className="space-x-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Asset</span>
-            </Button>
-            <Button
-              onClick={() => setIsImportModalOpen(true)}
-              className="space-x-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Import Assets</span>
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          {fetchAttempts > 0 && (
-            <p className="text-center mb-4 text-gray-500 dark:text-gray-400">
-              Loading... (attempt {fetchAttempts} of {maxRetries})
-            </p>
-          )}
-          <LoadingContainer fullHeight />
-        </div>
+      <div className="h-full w-full flex flex-col items-center justify-center">
+        {fetchAttempts > 0 && (
+          <p className="mb-4 text-muted-foreground">
+            Loading... (attempt {fetchAttempts} of {maxRetries})
+          </p>
+        )}
+        <LoadingContainer fullHeight />
       </div>
     );
   }
@@ -1186,39 +1170,18 @@ export default function RawAssetsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
-          <button
-            onClick={handleDeleteAll}
-            className="flex items-center gap-2 px-4 py-2 bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] rounded hover:bg-[hsl(var(--destructive))/90]"
-          >
-            <Trash2Icon className="w-4 h-4" />
-            Delete All
-          </button>
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded hover:bg-[hsl(var(--secondary))/90]"
-          >
-            <FolderIcon className="w-4 h-4" />
-            Import CSV
-          </button>
-          <Button onClick={handleAddAssetClick}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Asset
-          </Button>
-        </div>
-      </div>
-
       <div className="flex justify-between items-center gap-4">
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search by date, description, storage location, car year, make, model, or color..."
-            className="w-full px-4 py-2 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
+            className="w-full px-4 py-2 pl-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
           />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
         </div>
+
         <select
           value={itemsPerPage}
           onChange={(e) => handleLimitChange(Number(e.target.value))}
@@ -1230,6 +1193,50 @@ export default function RawAssetsTab() {
             </option>
           ))}
         </select>
+
+        <div className="flex gap-2">
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleAddAssetClick}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add Asset</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsImportModalOpen(true)}
+                >
+                  <FolderIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Import CSV</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleDeleteAll}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2Icon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete All</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       <div className="overflow-x-auto shadow-md rounded-lg border border-[hsl(var(--border))]">

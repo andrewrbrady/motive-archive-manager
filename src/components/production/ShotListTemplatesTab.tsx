@@ -34,6 +34,12 @@ import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import ResponsiveImage from "@/components/ui/ResponsiveImage";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface ShotTemplate {
   title: string;
@@ -1147,380 +1153,438 @@ export default function ShotListTemplatesTab({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <Dialog
-          open={isCreating}
-          onOpenChange={(open) => {
-            setIsCreating(open);
-            if (open && !editingTemplate) {
-              // Reset the form when opening the dialog for a new template
-              form.reset({
-                name: "",
-                description: "",
-                shots: [],
-                thumbnail: "",
-              });
-            }
-          }}
-        >
-          {/* New Template button hidden - used only programmatically */}
-          <div className="hidden">
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Template
-              </Button>
-            </DialogTrigger>
-          </div>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Template</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(handleSubmit)}
-                className="space-y-4"
+    <TooltipProvider delayDuration={0}>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsCreating(true)}
               >
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Template Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., Standard Car Shoot"
-                          {...field}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Describe the purpose of this template..."
-                          {...field}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end">
-                  <Button type="submit">Create Template</Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add New Template</TooltipContent>
+          </Tooltip>
+          <Dialog
+            open={isCreating}
+            onOpenChange={(open) => {
+              setIsCreating(open);
+              if (open && !editingTemplate) {
+                // Reset the form when opening the dialog for a new template
+                form.reset({
+                  name: "",
+                  description: "",
+                  shots: [],
+                  thumbnail: "",
+                });
+              }
+            }}
+          >
+            {/* New Template button hidden - used only programmatically */}
+            <div className="hidden">
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Template
+                </Button>
+              </DialogTrigger>
+            </div>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Template</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(handleSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Template Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Standard Car Shoot"
+                            {...field}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the purpose of this template..."
+                            {...field}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end">
+                    <Button type="submit">Create Template</Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-      {isLoading ? (
-        <div className="text-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            Loading templates...
-          </p>
-        </div>
-      ) : templates.length === 0 ? (
-        <div className="text-center py-4 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-          No templates yet. Create a new template to get started.
-        </div>
-      ) : (
-        <div className="grid grid-cols-[300px,1fr] gap-6">
-          {/* Template List */}
-          <div className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg">
-            <ScrollArea className="h-[calc(100vh-300px)]">
-              <div className="p-2 space-y-1">
-                {templates.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => handleTemplateSelect(template)}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                      selectedTemplate?.id === template.id
-                        ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
-                        : "hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{template.name}</div>
-                        <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                          {template.shots.length} shots
+        {isLoading ? (
+          <div className="text-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+            <p className="mt-2 text-sm text-muted-foreground">
+              Loading templates...
+            </p>
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="text-center py-4 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+            No templates yet. Create a new template to get started.
+          </div>
+        ) : (
+          <div className="grid grid-cols-[300px,1fr] gap-6">
+            {/* Template List */}
+            <div className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg">
+              <ScrollArea className="h-[calc(100vh-300px)]">
+                <div className="p-2 space-y-1">
+                  {templates.map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => handleTemplateSelect(template)}
+                      className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                        selectedTemplate?.id === template.id
+                          ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+                          : "hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{template.name}</div>
+                          <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+                            {template.shots.length} shots
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
 
-          {/* Template Details */}
-          <div className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
-            {selectedTemplate ? (
-              <div className="space-y-6">
-                {editingTemplate?.id === selectedTemplate.id ? (
-                  <Form {...form}>
-                    <form
-                      onSubmit={form.handleSubmit(handleSubmit)}
-                      className="space-y-4"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 space-y-4">
-                          <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input
-                                    className="text-xl font-medium bg-transparent border-none focus:border-none focus-visible:ring-0 px-0"
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Textarea
-                                    className="bg-transparent border-none focus:border-none focus-visible:ring-0 px-0 resize-none"
-                                    {...field}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+            {/* Template Details */}
+            <div className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-6">
+              {selectedTemplate ? (
+                <div className="space-y-6">
+                  {editingTemplate?.id === selectedTemplate.id ? (
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(handleSubmit)}
+                        className="space-y-4"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input
+                                      className="text-xl font-medium bg-transparent border-none focus:border-none focus-visible:ring-0 px-0"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      className="bg-transparent border-none focus:border-none focus-visible:ring-0 px-0 resize-none"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
 
-                          <FormField
-                            control={form.control}
-                            name="thumbnail"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-sm text-[hsl(var(--foreground-muted))]">
-                                  Thumbnail
-                                </FormLabel>
-                                <div className="space-y-2">
-                                  {field.value ? (
-                                    <div className="relative w-48 rounded-md overflow-hidden border border-[hsl(var(--border))]">
-                                      <ResponsiveImage
-                                        src={
-                                          field.value.endsWith("/public")
-                                            ? field.value
-                                            : `${field.value}/public`
+                            <FormField
+                              control={form.control}
+                              name="thumbnail"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm text-[hsl(var(--foreground-muted))]">
+                                    Thumbnail
+                                  </FormLabel>
+                                  <div className="space-y-2">
+                                    {field.value ? (
+                                      <div className="relative w-48 rounded-md overflow-hidden border border-[hsl(var(--border))]">
+                                        <ResponsiveImage
+                                          src={
+                                            field.value.endsWith("/public")
+                                              ? field.value
+                                              : `${field.value}/public`
+                                          }
+                                          alt="Template thumbnail"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className="w-48 rounded-md border border-dashed border-[hsl(var(--border))] flex flex-col items-center justify-center cursor-pointer hover:bg-[hsl(var(--background-subtle))] transition-colors"
+                                        onDragOver={(e) => handleDragOver(e)}
+                                        onDrop={(e) => handleDrop(e, 0)}
+                                        onClick={() =>
+                                          fileInputRef.current?.click()
                                         }
-                                        alt="Template thumbnail"
+                                      >
+                                        <div className="relative w-full h-36 flex items-center justify-center">
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                            {uploadingThumbnail ? (
+                                              <>
+                                                <Loader2 className="w-8 h-8 text-[hsl(var(--foreground-muted))] mb-2 animate-spin" />
+                                                <p className="text-xs text-center text-[hsl(var(--foreground-muted))]">
+                                                  Uploading...
+                                                </p>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <ImageIcon className="w-8 h-8 text-[hsl(var(--foreground-muted))] mb-2" />
+                                                <p className="text-xs text-center text-[hsl(var(--foreground-muted))]">
+                                                  Drag & drop an image
+                                                  <br />
+                                                  or click to upload
+                                                </p>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          fileInputRef.current?.click()
+                                        }
+                                        disabled={uploadingThumbnail}
+                                      >
+                                        {uploadingThumbnail ? (
+                                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        ) : (
+                                          <ImageIcon className="w-4 h-4 mr-2" />
+                                        )}
+                                        {field.value
+                                          ? "Change Thumbnail"
+                                          : "Upload Thumbnail"}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => openImageBrowser()}
+                                      >
+                                        <Search className="w-4 h-4 mr-2" />
+                                        Browse Images
+                                      </Button>
+                                      {field.value && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            form.setValue("thumbnail", "")
+                                          }
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Remove
+                                        </Button>
+                                      )}
+                                      <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleThumbnailUpload}
                                       />
                                     </div>
-                                  ) : (
-                                    <div
-                                      className="w-48 rounded-md border border-dashed border-[hsl(var(--border))] flex flex-col items-center justify-center cursor-pointer hover:bg-[hsl(var(--background-subtle))] transition-colors"
-                                      onDragOver={(e) => handleDragOver(e)}
-                                      onDrop={(e) => handleDrop(e, 0)}
-                                      onClick={() =>
-                                        fileInputRef.current?.click()
-                                      }
-                                    >
-                                      <div className="relative w-full h-36 flex items-center justify-center">
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button type="submit" variant="ghost" size="sm">
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancelEdit}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium">Shots</h4>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() =>
+                                  multipleFilesInputRef.current?.click()
+                                }
+                              >
+                                <Upload className="w-4 h-4 mr-2" />
+                                Upload Multiple
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleAddShot}
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Shot
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Multiple files input */}
+                          <input
+                            ref={multipleFilesInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleMultipleFilesSelect}
+                          />
+
+                          {/* Drag and drop area for multiple files */}
+                          <div
+                            className={`border-2 border-dashed rounded-lg p-6 mb-4 transition-colors ${
+                              isDraggingFiles
+                                ? "border-primary bg-primary/5"
+                                : "border-[hsl(var(--border))]"
+                            }`}
+                            onDragOver={handleMultipleFilesDragOver}
+                            onDragLeave={handleMultipleFilesDragLeave}
+                            onDrop={handleMultipleFilesDrop}
+                            onClick={() =>
+                              multipleFilesInputRef.current?.click()
+                            }
+                          >
+                            <div className="flex flex-col items-center justify-center text-center">
+                              <Upload className="w-10 h-10 mb-2 text-[hsl(var(--foreground-muted))]" />
+                              <p className="text-sm font-medium mb-1">
+                                Drag & drop multiple images here
+                              </p>
+                              <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                                Each image will be added as a new shot
+                              </p>
+                            </div>
+                          </div>
+
+                          {form.watch("shots")?.map((shot, index) => (
+                            <div
+                              key={index}
+                              id={`shot-${index}`}
+                              className="space-y-4 p-4 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg shot-item"
+                            >
+                              <div className="shot-item-header">
+                                <h5 className="font-medium">
+                                  Shot {index + 1}
+                                </h5>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveShot(index)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+
+                              <div className="shot-item-content">
+                                <div className="shot-item-left">
+                                  {/* Thumbnail */}
+                                  <div className="thumbnail-container">
+                                    {shot.thumbnail ? (
+                                      <ResponsiveImage
+                                        src={getThumbnailUrl(shot.thumbnail)}
+                                        alt={shot.title || "Shot thumbnail"}
+                                        className="bg-muted rounded-md overflow-hidden"
+                                      />
+                                    ) : (
+                                      <div
+                                        className={`relative rounded-md border border-dashed border-[hsl(var(--border))] ${
+                                          uploadingShotThumbnail === index
+                                            ? ""
+                                            : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
+                                        } transition-colors`}
+                                        style={{ aspectRatio: "4/3" }}
+                                        onClick={(e) => {
+                                          if (uploadingShotThumbnail === index)
+                                            return;
+                                          e.preventDefault();
+                                          if (
+                                            viewModeShotFileInputRefs.current[
+                                              index
+                                            ]
+                                          ) {
+                                            viewModeShotFileInputRefs.current[
+                                              index
+                                            ]?.click();
+                                          }
+                                        }}
+                                      >
                                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                          {uploadingThumbnail ? (
+                                          {uploadingShotThumbnail === index ? (
                                             <>
-                                              <Loader2 className="w-8 h-8 text-[hsl(var(--foreground-muted))] mb-2 animate-spin" />
-                                              <p className="text-xs text-center text-[hsl(var(--foreground-muted))]">
+                                              <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
+                                              <span className="text-xs text-muted-foreground">
                                                 Uploading...
-                                              </p>
+                                              </span>
                                             </>
                                           ) : (
                                             <>
-                                              <ImageIcon className="w-8 h-8 text-[hsl(var(--foreground-muted))] mb-2" />
-                                              <p className="text-xs text-center text-[hsl(var(--foreground-muted))]">
-                                                Drag & drop an image
+                                              <ImageIcon className="w-8 h-8 mb-2 text-muted-foreground" />
+                                              <span className="text-xs text-muted-foreground">
+                                                No thumbnail
                                                 <br />
-                                                or click to upload
-                                              </p>
+                                                Click to upload
+                                              </span>
                                             </>
                                           )}
                                         </div>
                                       </div>
-                                    </div>
-                                  )}
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() =>
-                                        fileInputRef.current?.click()
-                                      }
-                                      disabled={uploadingThumbnail}
-                                    >
-                                      {uploadingThumbnail ? (
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                      ) : (
-                                        <ImageIcon className="w-4 h-4 mr-2" />
-                                      )}
-                                      {field.value
-                                        ? "Change Thumbnail"
-                                        : "Upload Thumbnail"}
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openImageBrowser()}
-                                    >
-                                      <Search className="w-4 h-4 mr-2" />
-                                      Browse Images
-                                    </Button>
-                                    {field.value && (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          form.setValue("thumbnail", "")
-                                        }
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Remove
-                                      </Button>
                                     )}
-                                    <input
-                                      ref={fileInputRef}
-                                      type="file"
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={handleThumbnailUpload}
-                                    />
                                   </div>
-                                </div>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button type="submit" variant="ghost" size="sm">
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleCancelEdit}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
 
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-medium">Shots</h4>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                multipleFilesInputRef.current?.click()
-                              }
-                            >
-                              <Upload className="w-4 h-4 mr-2" />
-                              Upload Multiple
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={handleAddShot}
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add Shot
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Multiple files input */}
-                        <input
-                          ref={multipleFilesInputRef}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleMultipleFilesSelect}
-                        />
-
-                        {/* Drag and drop area for multiple files */}
-                        <div
-                          className={`border-2 border-dashed rounded-lg p-6 mb-4 transition-colors ${
-                            isDraggingFiles
-                              ? "border-primary bg-primary/5"
-                              : "border-[hsl(var(--border))]"
-                          }`}
-                          onDragOver={handleMultipleFilesDragOver}
-                          onDragLeave={handleMultipleFilesDragLeave}
-                          onDrop={handleMultipleFilesDrop}
-                          onClick={() => multipleFilesInputRef.current?.click()}
-                        >
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <Upload className="w-10 h-10 mb-2 text-[hsl(var(--foreground-muted))]" />
-                            <p className="text-sm font-medium mb-1">
-                              Drag & drop multiple images here
-                            </p>
-                            <p className="text-xs text-[hsl(var(--foreground-muted))]">
-                              Each image will be added as a new shot
-                            </p>
-                          </div>
-                        </div>
-
-                        {form.watch("shots")?.map((shot, index) => (
-                          <div
-                            key={index}
-                            id={`shot-${index}`}
-                            className="space-y-4 p-4 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg shot-item"
-                          >
-                            <div className="shot-item-header">
-                              <h5 className="font-medium">Shot {index + 1}</h5>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveShot(index)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-
-                            <div className="shot-item-content">
-                              <div className="shot-item-left">
-                                {/* Thumbnail */}
-                                <div className="thumbnail-container">
-                                  {shot.thumbnail ? (
-                                    <ResponsiveImage
-                                      src={getThumbnailUrl(shot.thumbnail)}
-                                      alt={shot.title || "Shot thumbnail"}
-                                      className="bg-muted rounded-md overflow-hidden"
-                                    />
-                                  ) : (
-                                    <div
-                                      className={`relative rounded-md border border-dashed border-[hsl(var(--border))] ${
-                                        uploadingShotThumbnail === index
-                                          ? ""
-                                          : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
-                                      } transition-colors`}
-                                      style={{ aspectRatio: "4/3" }}
+                                  {/* Buttons */}
+                                  <div className="button-container">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
                                       onClick={(e) => {
-                                        if (uploadingShotThumbnail === index)
-                                          return;
                                         e.preventDefault();
                                         if (
                                           viewModeShotFileInputRefs.current[
@@ -1533,320 +1597,322 @@ export default function ShotListTemplatesTab({
                                         }
                                       }}
                                     >
-                                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                        {uploadingShotThumbnail === index ? (
-                                          <>
-                                            <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
-                                            <span className="text-xs text-muted-foreground">
-                                              Uploading...
-                                            </span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <ImageIcon className="w-8 h-8 mb-2 text-muted-foreground" />
-                                            <span className="text-xs text-muted-foreground">
-                                              No thumbnail
-                                              <br />
-                                              Click to upload
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
+                                      <Upload className="w-4 h-4 mr-2" />
+                                      {shot.thumbnail ? "Change" : "Upload"}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => {
+                                        openImageBrowser(index);
+                                      }}
+                                    >
+                                      <Search className="w-4 h-4 mr-2" />
+                                      Browse
+                                    </Button>
+                                    <input
+                                      ref={(el) => {
+                                        shotFileInputRefs.current[index] = el;
+                                      }}
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      data-shot-index={index}
+                                      onChange={(e) =>
+                                        handleShotThumbnailUpload(e, index)
+                                      }
+                                    />
+                                  </div>
                                 </div>
 
-                                {/* Buttons */}
-                                <div className="button-container">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      if (
-                                        viewModeShotFileInputRefs.current[index]
-                                      ) {
-                                        viewModeShotFileInputRefs.current[
-                                          index
-                                        ]?.click();
-                                      }
-                                    }}
-                                  >
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    {shot.thumbnail ? "Change" : "Upload"}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      openImageBrowser(index);
-                                    }}
-                                  >
-                                    <Search className="w-4 h-4 mr-2" />
-                                    Browse
-                                  </Button>
-                                  <input
-                                    ref={(el) => {
-                                      shotFileInputRefs.current[index] = el;
-                                    }}
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    data-shot-index={index}
-                                    onChange={(e) =>
-                                      handleShotThumbnailUpload(e, index)
+                                {/* Form fields */}
+                                <div className="shot-item-right space-y-4">
+                                  <FormField
+                                    control={form.control}
+                                    name={`shots.${index}.title`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Title</FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            placeholder="e.g., Front 3/4 View"
+                                            {...field}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={`shots.${index}.description`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Description</FormLabel>
+                                        <FormControl>
+                                          <Textarea
+                                            placeholder="Describe the shot composition..."
+                                            {...field}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                      control={form.control}
+                                      name={`shots.${index}.angle`}
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Angle</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              placeholder="e.g., Low angle, eye level"
+                                              {...field}
+                                            />
+                                          </FormControl>
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={form.control}
+                                      name={`shots.${index}.lighting`}
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Lighting</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              placeholder="e.g., Natural, Studio"
+                                              {...field}
+                                            />
+                                          </FormControl>
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                  <FormField
+                                    control={form.control}
+                                    name={`shots.${index}.notes`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Notes</FormLabel>
+                                        <FormControl>
+                                          <Textarea
+                                            placeholder="Additional notes or instructions..."
+                                            {...field}
+                                          />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </form>
+                    </Form>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h2 className="text-xl font-medium">
+                            {selectedTemplate?.name}
+                          </h2>
+                          <p className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
+                            {selectedTemplate?.description}
+                          </p>
+
+                          {selectedTemplate?.thumbnail &&
+                            typeof selectedTemplate.thumbnail === "string" && (
+                              <div className="mt-4">
+                                <p className="text-sm text-[hsl(var(--foreground-muted))] mb-2">
+                                  Thumbnail
+                                </p>
+                                <div className="relative w-48 rounded-md overflow-hidden border border-[hsl(var(--border))]">
+                                  <ResponsiveImage
+                                    src={getThumbnailUrl(
+                                      selectedTemplate.thumbnail
+                                    )}
+                                    alt={
+                                      selectedTemplate.name ||
+                                      "Template thumbnail"
                                     }
                                   />
                                 </div>
                               </div>
-
-                              {/* Form fields */}
-                              <div className="shot-item-right space-y-4">
-                                <FormField
-                                  control={form.control}
-                                  name={`shots.${index}.title`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Title</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          placeholder="e.g., Front 3/4 View"
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name={`shots.${index}.description`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Description</FormLabel>
-                                      <FormControl>
-                                        <Textarea
-                                          placeholder="Describe the shot composition..."
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <div className="grid grid-cols-2 gap-4">
-                                  <FormField
-                                    control={form.control}
-                                    name={`shots.${index}.angle`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Angle</FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            placeholder="e.g., Low angle, eye level"
-                                            {...field}
-                                          />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                  <FormField
-                                    control={form.control}
-                                    name={`shots.${index}.lighting`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Lighting</FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            placeholder="e.g., Natural, Studio"
-                                            {...field}
-                                          />
-                                        </FormControl>
-                                      </FormItem>
-                                    )}
-                                  />
-                                </div>
-                                <FormField
-                                  control={form.control}
-                                  name={`shots.${index}.notes`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Notes</FormLabel>
-                                      <FormControl>
-                                        <Textarea
-                                          placeholder="Additional notes or instructions..."
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              selectedTemplate &&
+                              handleDuplicate(selectedTemplate)
+                            }
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Duplicate
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              selectedTemplate && handleEdit(selectedTemplate)
+                            }
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              selectedTemplate &&
+                              handleDelete(selectedTemplate.id)
+                            }
+                            className="text-destructive-500 hover:text-destructive-700 hover:bg-destructive-50 dark:hover:bg-destructive-950"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                    </form>
-                  </Form>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h2 className="text-xl font-medium">
-                          {selectedTemplate?.name}
-                        </h2>
-                        <p className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
-                          {selectedTemplate?.description}
-                        </p>
 
-                        {selectedTemplate?.thumbnail &&
-                          typeof selectedTemplate.thumbnail === "string" && (
-                            <div className="mt-4">
-                              <p className="text-sm text-[hsl(var(--foreground-muted))] mb-2">
-                                Thumbnail
-                              </p>
-                              <div className="relative w-48 rounded-md overflow-hidden border border-[hsl(var(--border))]">
-                                <ResponsiveImage
-                                  src={getThumbnailUrl(
-                                    selectedTemplate.thumbnail
-                                  )}
-                                  alt={
-                                    selectedTemplate.name ||
-                                    "Template thumbnail"
-                                  }
-                                />
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            selectedTemplate &&
-                            handleDuplicate(selectedTemplate)
-                          }
-                        >
-                          <Copy className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            selectedTemplate && handleEdit(selectedTemplate)
-                          }
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            selectedTemplate &&
-                            handleDelete(selectedTemplate.id)
-                          }
-                          className="text-destructive-500 hover:text-destructive-700 hover:bg-destructive-50 dark:hover:bg-destructive-950"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-lg font-medium">Shots</h3>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              document
+                                .getElementById("viewModeMultipleFilesInput")
+                                ?.click()
+                            }
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Add Multiple Shots
+                          </Button>
+                        </div>
 
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Shots</h3>
-                        <Button
-                          variant="outline"
-                          size="sm"
+                        {/* Multiple files input for view mode */}
+                        <input
+                          id="viewModeMultipleFilesInput"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleViewModeMultipleFilesSelect}
+                        />
+
+                        {/* Drag and drop area for multiple files in view mode */}
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-6 mb-4 transition-colors ${
+                            isDraggingFiles
+                              ? "border-primary bg-primary/5"
+                              : "border-[hsl(var(--border))]"
+                          }`}
+                          onDragOver={handleMultipleFilesDragOver}
+                          onDragLeave={handleMultipleFilesDragLeave}
+                          onDrop={handleViewModeMultipleFilesDrop}
                           onClick={() =>
                             document
                               .getElementById("viewModeMultipleFilesInput")
                               ?.click()
                           }
                         >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Add Multiple Shots
-                        </Button>
-                      </div>
-
-                      {/* Multiple files input for view mode */}
-                      <input
-                        id="viewModeMultipleFilesInput"
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handleViewModeMultipleFilesSelect}
-                      />
-
-                      {/* Drag and drop area for multiple files in view mode */}
-                      <div
-                        className={`border-2 border-dashed rounded-lg p-6 mb-4 transition-colors ${
-                          isDraggingFiles
-                            ? "border-primary bg-primary/5"
-                            : "border-[hsl(var(--border))]"
-                        }`}
-                        onDragOver={handleMultipleFilesDragOver}
-                        onDragLeave={handleMultipleFilesDragLeave}
-                        onDrop={handleViewModeMultipleFilesDrop}
-                        onClick={() =>
-                          document
-                            .getElementById("viewModeMultipleFilesInput")
-                            ?.click()
-                        }
-                      >
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <Upload className="w-10 h-10 mb-2 text-[hsl(var(--foreground-muted))]" />
-                          <p className="text-sm font-medium mb-1">
-                            Drag & drop multiple images here
-                          </p>
-                          <p className="text-xs text-[hsl(var(--foreground-muted))]">
-                            Each image will be added as a new shot
-                          </p>
+                          <div className="flex flex-col items-center justify-center text-center">
+                            <Upload className="w-10 h-10 mb-2 text-[hsl(var(--foreground-muted))]" />
+                            <p className="text-sm font-medium mb-1">
+                              Drag & drop multiple images here
+                            </p>
+                            <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                              Each image will be added as a new shot
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="grid gap-4">
-                        {selectedTemplate?.shots.map((shot, index) => (
-                          <div
-                            key={index}
-                            className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4 shot-item"
-                          >
-                            <div className="shot-item-header">
-                              <h5 className="font-medium">Shot {index + 1}</h5>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveShot(index)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                        <div className="grid gap-4">
+                          {selectedTemplate?.shots.map((shot, index) => (
+                            <div
+                              key={index}
+                              className="border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg p-4 shot-item"
+                            >
+                              <div className="shot-item-header">
+                                <h5 className="font-medium">
+                                  Shot {index + 1}
+                                </h5>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveShot(index)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
 
-                            <div className="shot-item-content">
-                              <div className="shot-item-left">
-                                {/* Thumbnail */}
-                                <div className="thumbnail-container">
-                                  {shot.thumbnail ? (
-                                    <ResponsiveImage
-                                      src={getThumbnailUrl(shot.thumbnail)}
-                                      alt={shot.title || "Shot thumbnail"}
-                                      className="bg-muted rounded-md overflow-hidden"
-                                    />
-                                  ) : (
-                                    <div
-                                      className={`relative rounded-md border border-dashed border-[hsl(var(--border))] ${
-                                        uploadingShotThumbnail === index
-                                          ? ""
-                                          : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
-                                      } transition-colors`}
-                                      style={{ aspectRatio: "4/3" }}
+                              <div className="shot-item-content">
+                                <div className="shot-item-left">
+                                  {/* Thumbnail */}
+                                  <div className="thumbnail-container">
+                                    {shot.thumbnail ? (
+                                      <ResponsiveImage
+                                        src={getThumbnailUrl(shot.thumbnail)}
+                                        alt={shot.title || "Shot thumbnail"}
+                                        className="bg-muted rounded-md overflow-hidden"
+                                      />
+                                    ) : (
+                                      <div
+                                        className={`relative rounded-md border border-dashed border-[hsl(var(--border))] ${
+                                          uploadingShotThumbnail === index
+                                            ? ""
+                                            : "cursor-pointer hover:bg-[hsl(var(--background-subtle))]"
+                                        } transition-colors`}
+                                        style={{ aspectRatio: "4/3" }}
+                                        onClick={(e) => {
+                                          if (uploadingShotThumbnail === index)
+                                            return;
+                                          e.preventDefault();
+                                          if (
+                                            shotFileInputRefs.current[index]
+                                          ) {
+                                            shotFileInputRefs.current[
+                                              index
+                                            ]?.click();
+                                          }
+                                        }}
+                                      >
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                          {uploadingShotThumbnail === index ? (
+                                            <>
+                                              <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
+                                              <span className="text-xs text-muted-foreground">
+                                                Uploading...
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ImageIcon className="w-8 h-8 mb-2 text-muted-foreground" />
+                                              <span className="text-xs text-muted-foreground">
+                                                No thumbnail
+                                                <br />
+                                                Click to upload
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Buttons */}
+                                  <div className="button-container">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
                                       onClick={(e) => {
-                                        if (uploadingShotThumbnail === index)
-                                          return;
                                         e.preventDefault();
                                         if (shotFileInputRefs.current[index]) {
                                           shotFileInputRefs.current[
@@ -1855,126 +1921,93 @@ export default function ShotListTemplatesTab({
                                         }
                                       }}
                                     >
-                                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                        {uploadingShotThumbnail === index ? (
-                                          <>
-                                            <Loader2 className="w-8 h-8 mb-2 text-muted-foreground animate-spin" />
-                                            <span className="text-xs text-muted-foreground">
-                                              Uploading...
-                                            </span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <ImageIcon className="w-8 h-8 mb-2 text-muted-foreground" />
-                                            <span className="text-xs text-muted-foreground">
-                                              No thumbnail
-                                              <br />
-                                              Click to upload
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
+                                      <Upload className="w-4 h-4 mr-2" />
+                                      {shot.thumbnail ? "Change" : "Upload"}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => {
+                                        openImageBrowser(index, true);
+                                      }}
+                                    >
+                                      <Search className="w-4 h-4 mr-2" />
+                                      Browse
+                                    </Button>
+                                    <input
+                                      ref={(el) => {
+                                        viewModeShotFileInputRefs.current[
+                                          index
+                                        ] = el;
+                                      }}
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      data-shot-index={index}
+                                      onChange={(e) =>
+                                        handleViewModeShotThumbnailUpload(
+                                          e,
+                                          index
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Shot details */}
+                                <div className="shot-item-right">
+                                  {shot.title && (
+                                    <h4 className="font-medium">
+                                      {shot.title}
+                                    </h4>
+                                  )}
+                                  {shot.description && (
+                                    <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
+                                      {shot.description}
+                                    </p>
+                                  )}
+
+                                  {(shot.angle ||
+                                    shot.lighting ||
+                                    shot.notes) && (
+                                    <div className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] space-y-1 mt-2">
+                                      {shot.angle && <p>Angle: {shot.angle}</p>}
+                                      {shot.lighting && (
+                                        <p>Lighting: {shot.lighting}</p>
+                                      )}
+                                      {shot.notes && <p>Notes: {shot.notes}</p>}
                                     </div>
                                   )}
                                 </div>
-
-                                {/* Buttons */}
-                                <div className="button-container">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      if (shotFileInputRefs.current[index]) {
-                                        shotFileInputRefs.current[
-                                          index
-                                        ]?.click();
-                                      }
-                                    }}
-                                  >
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    {shot.thumbnail ? "Change" : "Upload"}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      openImageBrowser(index, true);
-                                    }}
-                                  >
-                                    <Search className="w-4 h-4 mr-2" />
-                                    Browse
-                                  </Button>
-                                  <input
-                                    ref={(el) => {
-                                      viewModeShotFileInputRefs.current[index] =
-                                        el;
-                                    }}
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    data-shot-index={index}
-                                    onChange={(e) =>
-                                      handleViewModeShotThumbnailUpload(
-                                        e,
-                                        index
-                                      )
-                                    }
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Shot details */}
-                              <div className="shot-item-right">
-                                {shot.title && (
-                                  <h4 className="font-medium">{shot.title}</h4>
-                                )}
-                                {shot.description && (
-                                  <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-                                    {shot.description}
-                                  </p>
-                                )}
-
-                                {(shot.angle ||
-                                  shot.lighting ||
-                                  shot.notes) && (
-                                  <div className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] space-y-1 mt-2">
-                                    {shot.angle && <p>Angle: {shot.angle}</p>}
-                                    {shot.lighting && (
-                                      <p>Lighting: {shot.lighting}</p>
-                                    )}
-                                    {shot.notes && <p>Notes: {shot.notes}</p>}
-                                  </div>
-                                )}
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="text-center text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                Select a template from the list to view its details
-              </div>
-            )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+                  Select a template from the list to view its details
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Image Browser Dialog */}
-      <Dialog open={isImageBrowserOpen} onOpenChange={setIsImageBrowserOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Browse Images</DialogTitle>
-          </DialogHeader>
-          <div className="p-4">
-            <ImageBrowser onSelectImage={handleSelectImage} />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+        {/* Image Browser Dialog */}
+        <Dialog open={isImageBrowserOpen} onOpenChange={setIsImageBrowserOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Browse Images</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ImageBrowser onSelectImage={handleSelectImage} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
