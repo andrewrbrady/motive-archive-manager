@@ -24,7 +24,8 @@
     "theme:convert-semantic": "tsx scripts/convert-semantic-colors.ts",
     "migrate:hard-drives": "tsx src/scripts/migrate-hard-drives.ts",
     "migrate:raw-locations": "tsx src/scripts/migrate-raw-locations.ts",
-    "reconcile-raw-assets": "tsx src/scripts/reconcile-raw-assets-hard-drives.ts"
+    "reconcile-raw-assets": "tsx src/scripts/reconcile-raw-assets-hard-drives.ts",
+    "migrate:created-at": "tsx src/scripts/migrate-created-at.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",

@@ -37,28 +37,41 @@ export async function PUT(
     const eventModel = new EventModel(db);
     const eventId = new ObjectId(params.eventId);
     const data = await request.json();
-    const { _id, car_id, created_at, start, end, ...updateData } = data;
 
-    // Map start/end to scheduled_date/end_date and ensure assignees is an array
+    console.log("Updating event with data:", data); // Debug log
+
+    // Ensure assignees is always an array
+    const assignees = Array.isArray(data.assignees) ? data.assignees : [];
+
+    // Map the frontend fields to database fields
     const mappedUpdates = {
-      ...updateData,
-      ...(start && { scheduled_date: start }),
-      ...(end && { end_date: end }),
-      ...(updateData.assignees && {
-        assignees: Array.isArray(updateData.assignees)
-          ? updateData.assignees
-          : [],
-      }),
-      updated_at: new Date(),
+      ...(data.type && { type: data.type }),
+      ...(data.description && { description: data.description }),
+      ...(data.status && { status: data.status }),
+      ...(data.start && { scheduled_date: data.start }),
+      ...(data.end && { end_date: data.end }),
+      ...(typeof data.isAllDay === "boolean" && { is_all_day: data.isAllDay }),
+      assignees, // Always update assignees array
+      updated_at: new Date(), // Ensure proper Date object
     };
+
+    console.log("Mapped updates:", mappedUpdates); // Debug log
 
     const success = await eventModel.update(eventId, mappedUpdates);
 
     if (!success) {
+      console.log("Event not found or update failed"); // Debug log
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    // Fetch the updated event to verify changes
+    const updatedEvent = await eventModel.findById(eventId);
+    console.log("Updated event:", updatedEvent); // Debug log
+
+    return NextResponse.json({
+      success: true,
+      event: updatedEvent,
+    });
   } catch (error) {
     console.error("Error updating event:", error);
     return NextResponse.json(

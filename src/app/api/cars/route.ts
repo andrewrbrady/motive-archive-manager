@@ -417,20 +417,14 @@ export async function GET(request: Request) {
       // Get the actual database field name
       const dbSortField = sortFieldMap[sortField] || "createdAt";
 
-      // If sorting by createdAt but it doesn't exist on documents, use _id as a fallback
+      // For createdAt sorting, ensure we handle both Date objects and string dates
       if (dbSortField === "createdAt") {
-        // Check if any car has createdAt field
-        const hasCreatedAt = await carsCollection.countDocuments({
-          createdAt: { $exists: true },
-        });
-        if (hasCreatedAt === 0) {
-          console.log(
-            "No cars have createdAt field, using _id for sorting instead"
-          );
-          sortOptions["_id"] = sortDirection === "desc" ? -1 : 1;
-        } else {
-          sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
-        }
+        // Use $ifNull to handle documents without createdAt, falling back to _id timestamp
+        sortOptions["$sort"] = {
+          $ifNull: ["$createdAt", { $toDate: "$_id" }],
+        };
+        // Add _id as secondary sort for consistency
+        sortOptions["_id"] = sortDirection === "desc" ? -1 : 1;
       } else {
         sortOptions[dbSortField] = sortDirection === "desc" ? -1 : 1;
       }
@@ -440,22 +434,122 @@ export async function GET(request: Request) {
         dbField: dbSortField,
         direction: sortDirection,
         finalSortOptions: sortOptions,
-        query,
       });
 
       // Get total count for pagination
       const totalCount = await carsCollection.countDocuments(query);
       const totalPages = Math.ceil(totalCount / pageSize);
 
-      // Execute query with pagination and sorting
-      const cars = await carsCollection
-        .find(query)
-        .sort(sortOptions)
-        .skip((page - 1) * pageSize)
-        .limit(pageSize)
-        .toArray();
+      // Execute query with aggregation pipeline for consistent date handling
+      const pipeline = [
+        { $match: query },
+        {
+          $addFields: {
+            sortDate: {
+              $cond: {
+                if: { $eq: [{ $type: "$createdAt" }, "string"] },
+                then: { $dateFromString: { dateString: "$createdAt" } },
+                else: {
+                  $ifNull: ["$createdAt", { $toDate: "$_id" }],
+                },
+              },
+            },
+          },
+        },
+        {
+          $sort: {
+            sortDate: sortDirection === "desc" ? -1 : 1,
+            _id: sortDirection === "desc" ? -1 : 1,
+          },
+        },
+        { $skip: (page - 1) * pageSize },
+        { $limit: pageSize },
+        {
+          $addFields: {
+            createdAt: "$sortDate", // Replace string dates with proper Date objects
+          },
+        },
+        { $unset: "sortDate" },
+      ];
 
-      console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
+      const cars = await carsCollection.aggregate(pipeline).toArray();
+
+      // Add detailed date debugging
+      if (cars.length > 0) {
+        console.log("\n=== DETAILED SORTING DEBUG ===");
+        console.log("Sort options being used:", sortOptions);
+        console.log("\nFirst 5 cars in results:");
+        cars.slice(0, 5).forEach((car, index) => {
+          const idTimestamp = new ObjectId(car._id).getTimestamp();
+          console.log(`\nCar ${index + 1}:`, {
+            _id: car._id.toString(),
+            make: car.make,
+            model: car.model,
+            createdAt: car.createdAt,
+            createdAtType: typeof car.createdAt,
+            createdAtString: car.createdAt
+              ? car.createdAt.toISOString()
+              : "null",
+            idTimestamp: idTimestamp,
+            idTimestampString: idTimestamp.toISOString(),
+            isDate: car.createdAt instanceof Date,
+            timestamp:
+              car.createdAt instanceof Date ? car.createdAt.getTime() : null,
+            rawCreatedAt: JSON.stringify(car.createdAt),
+          });
+        });
+
+        // Check if our specific car is in the results
+        const targetCar = cars.find(
+          (car) => car._id.toString() === "67d886df8259a774348b9ecb"
+        );
+        if (targetCar) {
+          console.log(
+            "\nTarget car found at position:",
+            cars.findIndex(
+              (car) => car._id.toString() === "67d886df8259a774348b9ecb"
+            ) + 1
+          );
+
+          // Safely handle createdAt date
+          let createdAtDate = null;
+          let createdAtString = null;
+
+          if (targetCar.createdAt) {
+            if (targetCar.createdAt instanceof Date) {
+              createdAtDate = targetCar.createdAt;
+              createdAtString = targetCar.createdAt.toISOString();
+            } else if (typeof targetCar.createdAt === "string") {
+              try {
+                createdAtDate = new Date(targetCar.createdAt);
+                createdAtString = targetCar.createdAt;
+              } catch (e) {
+                console.error("Failed to parse createdAt date:", e);
+              }
+            }
+          }
+
+          console.log("Target car details:", {
+            _id: targetCar._id.toString(),
+            make: targetCar.make,
+            model: targetCar.model,
+            createdAt: createdAtDate,
+            createdAtType: typeof targetCar.createdAt,
+            createdAtString: createdAtString,
+            idTimestamp: new ObjectId(targetCar._id).getTimestamp(),
+            idTimestampString: new ObjectId(targetCar._id)
+              .getTimestamp()
+              .toISOString(),
+            isDate: targetCar.createdAt instanceof Date,
+            timestamp: createdAtDate?.getTime() || null,
+            rawCreatedAt: JSON.stringify(targetCar.createdAt),
+          });
+        } else {
+          console.log("\nTarget car not found in this page of results");
+        }
+      }
+
+      console.log("\nFinal MongoDB query:", JSON.stringify(query, null, 2));
       console.log("Found", cars.length, "cars matching the query");
       console.log("Total cars in database matching query:", totalCount);
       console.log("Total pages:", totalPages, "Page size:", pageSize);

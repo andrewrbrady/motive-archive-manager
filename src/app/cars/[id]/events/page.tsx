@@ -7,10 +7,21 @@ import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
 import CreateEventButton from "@/components/events/CreateEventButton";
 import ListView from "@/components/events/ListView";
+import { Button } from "@/components/ui/button";
+import { Package, Copy, Plus } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function EventsPage({ params }: { params: { id: string } }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showBatchManager, setShowBatchManager] = useState(false);
+  const [showBatchTemplates, setShowBatchTemplates] = useState(false);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     setIsLoading(true);
@@ -68,24 +79,71 @@ export default function EventsPage({ params }: { params: { id: string } }) {
   }, [fetchEvents]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Events</h2>
-        <div className="flex gap-2">
-          <EventBatchManager />
+    <TooltipProvider delayDuration={0}>
+      <div className="space-y-4">
+        <div className="flex justify-end items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowCreateEvent(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Event</TooltipContent>
+          </Tooltip>
+
+          <div className="border-l pl-2" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowBatchManager(true)}
+              >
+                <Package className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Batch Manager</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowBatchTemplates(true)}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create from Template</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <ListView
+          events={events}
+          onUpdateEvent={handleUpdateEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onEventUpdated={fetchEvents}
+        />
+
+        {showBatchManager && <EventBatchManager />}
+
+        {showBatchTemplates && (
           <EventBatchTemplates
             carId={params.id}
             onEventsCreated={fetchEvents}
           />
+        )}
+
+        {showCreateEvent && (
           <CreateEventButton carId={params.id} onEventCreated={fetchEvents} />
-        </div>
+        )}
       </div>
-      <ListView
-        events={events}
-        onUpdateEvent={handleUpdateEvent}
-        onDeleteEvent={handleDeleteEvent}
-        onEventUpdated={fetchEvents}
-      />
-    </div>
+    </TooltipProvider>
   );
 }

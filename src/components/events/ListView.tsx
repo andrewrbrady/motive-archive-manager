@@ -32,12 +32,20 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import isEqual from "lodash/isEqual";
 
 export interface ListViewProps {
   events: Event[];
   onUpdateEvent: (eventId: string, updates: Partial<Event>) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
   onEventUpdated: () => void;
+  isEditMode?: boolean;
 }
 
 interface Car {
@@ -66,12 +74,17 @@ export default function ListView({
   onUpdateEvent,
   onDeleteEvent,
   onEventUpdated,
+  isEditMode: parentEditMode,
 }: ListViewProps) {
   const [editingEvents, setEditingEvents] = useState<EditingEvent[]>(events);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [localEditMode, setLocalEditMode] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+
+  // Use parent's edit mode if provided, otherwise use local state
+  const isEditMode =
+    parentEditMode !== undefined ? parentEditMode : localEditMode;
 
   // Update useEffect to preserve more state when syncing events
   useEffect(() => {
@@ -169,53 +182,26 @@ export default function ListView({
 
   const toggleEditMode = () => {
     if (isEditMode) {
-      // When exiting edit mode, save all changes
-      editingEvents.forEach(async (editedEvent) => {
-        const originalEvent = events.find((e) => e.id === editedEvent.id);
-        if (!originalEvent) return;
-
-        const updates: Partial<Event> = {};
-        if (editedEvent.description !== originalEvent.description) {
-          updates.description = editedEvent.description;
-        }
-        if (editedEvent.start !== originalEvent.start) {
-          updates.start = editedEvent.start;
-        }
-        if (editedEvent.end !== originalEvent.end) {
-          updates.end = editedEvent.end;
-        }
-        if (editedEvent.type !== originalEvent.type) {
-          updates.type = editedEvent.type;
-        }
-
-        // Ensure both arrays are properly initialized
-        const editedAssignees = Array.isArray(editedEvent.assignees)
-          ? editedEvent.assignees
-          : [];
-        const originalAssignees = Array.isArray(originalEvent.assignees)
-          ? originalEvent.assignees
-          : [];
-
-        if (
-          JSON.stringify(editedAssignees) !== JSON.stringify(originalAssignees)
-        ) {
-          updates.assignees = editedAssignees;
-        }
-
-        console.log("Saving updates for event:", editedEvent.id, updates);
-        if (Object.keys(updates).length > 0) {
-          try {
-            await onUpdateEvent(editedEvent.id, updates);
-            console.log("Successfully updated event:", editedEvent.id);
-          } catch (error) {
-            console.error("Error updating event:", error);
+      // Save all changes
+      Promise.all(
+        editingEvents.map(async (event) => {
+          const originalEvent = events.find((e) => e.id === event.id);
+          if (originalEvent && !isEqual(event, originalEvent)) {
+            await onUpdateEvent(event.id, event);
           }
-        }
-      });
-      // Reset to original events
-      setEditingEvents(events);
+        })
+      )
+        .then(() => {
+          toast.success("All changes saved successfully");
+          onEventUpdated();
+        })
+        .catch((error) => {
+          console.error("Error saving changes:", error);
+          toast.error("Failed to save some changes");
+          setEditingEvents(events);
+        });
     }
-    setIsEditMode(!isEditMode);
+    setLocalEditMode(!localEditMode);
   };
 
   const updateEventField = async (
@@ -316,11 +302,9 @@ export default function ListView({
     }
 
     try {
-      // Delete all selected events
       await Promise.all(
         selectedEvents.map((eventId) => onDeleteEvent(eventId))
       );
-
       toast.success(`Successfully deleted ${selectedEvents.length} events`);
       setSelectedEvents([]);
       onEventUpdated();
@@ -332,54 +316,6 @@ export default function ListView({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
-          <Button
-            variant={isBatchMode ? "default" : "outline"}
-            onClick={toggleBatchMode}
-          >
-            {isBatchMode ? "Exit Batch Mode" : "Batch Delete"}
-          </Button>
-          {isBatchMode && (
-            <>
-              <Button variant="outline" onClick={toggleAllEvents}>
-                {selectedEvents.length === events.length ? (
-                  <CheckSquare className="w-4 h-4 mr-2" />
-                ) : (
-                  <Square className="w-4 h-4 mr-2" />
-                )}
-                Select All
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleBatchDelete}
-                disabled={selectedEvents.length === 0}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected ({selectedEvents.length})
-              </Button>
-            </>
-          )}
-        </div>
-        <Button
-          variant={isEditMode ? "default" : "outline"}
-          onClick={toggleEditMode}
-          className="ml-2"
-        >
-          {isEditMode ? (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Save All
-            </>
-          ) : (
-            <>
-              <Pencil className="w-4 h-4 mr-2" />
-              Edit All
-            </>
-          )}
-        </Button>
-      </div>
-
       <Table>
         <TableHeader>
           <TableRow>

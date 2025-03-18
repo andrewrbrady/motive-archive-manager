@@ -112,16 +112,41 @@ export class EventModel {
     return this.collection.find(filter).sort({ scheduled_date: 1 }).toArray();
   }
 
-  async update(id: ObjectId, updates: Partial<DbEvent>) {
-    if ("assignees" in updates && !Array.isArray(updates.assignees)) {
-      updates.assignees = [];
-    }
+  async update(id: ObjectId, updates: Partial<DbEvent>): Promise<boolean> {
+    try {
+      console.log("Updating event:", id, "with updates:", updates); // Debug log
 
-    const result = await this.collection.updateOne(
-      { _id: id },
-      { $set: { ...updates, updated_at: new Date() } }
-    );
-    return result.modifiedCount > 0;
+      // Validate assignees if present
+      if (updates.assignees !== undefined) {
+        if (!Array.isArray(updates.assignees)) {
+          console.error("Invalid assignees format:", updates.assignees);
+          return false;
+        }
+      }
+
+      // Ensure dates are proper Date objects
+      if (updates.updated_at && !(updates.updated_at instanceof Date)) {
+        updates.updated_at = new Date(updates.updated_at);
+      }
+
+      const result = await this.collection.updateOne(
+        { _id: id },
+        {
+          $set: {
+            ...updates,
+            // Always update the updated_at timestamp
+            updated_at: updates.updated_at || new Date(),
+          },
+        }
+      );
+
+      console.log("Update result:", result); // Debug log
+
+      return result.matchedCount > 0;
+    } catch (error) {
+      console.error("Error updating event:", error);
+      return false;
+    }
   }
 
   async delete(id: ObjectId) {

@@ -39,15 +39,15 @@ const BUSINESS_TYPES = [
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().min(1, "Phone number is required"),
-  businessType: z.string().min(1, "Business type is required"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  businessType: z.string().optional(),
   address: z.object({
-    street: z.string().min(1, "Street address is required"),
-    city: z.string().min(1, "City is required"),
-    state: z.string().min(1, "State is required"),
-    zipCode: z.string().min(1, "ZIP code is required"),
-    country: z.string().min(1, "Country is required"),
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+    country: z.string().optional(),
   }),
   socialMedia: z.object({
     instagram: z.string().optional(),
@@ -58,11 +58,13 @@ const formSchema = z.object({
 interface CreateClientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 export default function CreateClientDialog({
   open,
   onOpenChange,
+  onSuccess,
 }: CreateClientDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -113,6 +115,7 @@ export default function CreateClientDialog({
       });
 
       form.reset();
+      onSuccess?.();
       onOpenChange(false);
     } catch (error) {
       console.error("Error creating client:", error);

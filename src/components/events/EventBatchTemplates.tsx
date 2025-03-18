@@ -130,13 +130,13 @@ export default function EventBatchTemplates({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
+      <DialogTrigger data-batch-templates-trigger asChild>
         <Button variant="outline" className="whitespace-nowrap">
           <CalendarDays className="w-4 h-4 mr-2" />
           Create from Template
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create Events from Template</DialogTitle>
         </DialogHeader>

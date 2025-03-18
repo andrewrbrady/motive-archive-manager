@@ -10,11 +10,52 @@ import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
 import SortSelector from "@/components/ui/SortSelector";
-import { Car, Client } from "@/types/car";
+import { Car } from "@/types/car";
+import { Client } from "@/types/contact";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Make } from "@/lib/fetchMakes";
+
+// Interface for client data with string IDs instead of ObjectIds
+export interface ClientWithStringId {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+  };
+  socialMedia?: {
+    instagram?: string;
+    website?: string;
+  };
+  businessType?: string;
+  primaryContactId?: string | null;
+  documents?: Array<{
+    _id: string;
+    type: string;
+    title: string;
+    fileName: string;
+    uploadDate: Date;
+  }>;
+  cars?: Array<{
+    _id: string;
+    make: string;
+    model: string;
+    year: number;
+    vin?: string;
+    status: string;
+  }>;
+  status: "active" | "inactive";
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface CarsPageClientProps {
   cars: Car[];
@@ -35,7 +76,7 @@ interface CarsPageClientProps {
     search?: string;
   };
   makes: Make[];
-  clients: Client[];
+  clients: ClientWithStringId[];
 }
 
 export default function CarsPageClient({

@@ -7,8 +7,14 @@ import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
 import CreateEventButton from "@/components/events/CreateEventButton";
 import { Button } from "@/components/ui/button";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, List, Package, Plus, Copy, Pencil } from "lucide-react";
 import { LoadingContainer } from "@/components/ui/loading";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface EventsTabProps {
   carId: string;
@@ -18,6 +24,10 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState("list");
+  const [showBatchManager, setShowBatchManager] = useState(false);
+  const [showBatchTemplates, setShowBatchTemplates] = useState(false);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const fetchEvents = async () => {
     try {
@@ -96,47 +106,117 @@ export default function EventsTab({ carId }: EventsTabProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Events</h2>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant={view === "list" ? "default" : "outline"}
-              onClick={() => setView("list")}
-            >
-              List View
-            </Button>
-            <Button
-              variant={view === "calendar" ? "default" : "outline"}
-              onClick={() => setView("calendar")}
-            >
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Calendar View
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 border-l pl-4">
-            <EventBatchManager />
-            <EventBatchTemplates carId={carId} onEventsCreated={fetchEvents} />
-            <CreateEventButton carId={carId} onEventCreated={fetchEvents} />
-          </div>
-        </div>
-      </div>
+    <TooltipProvider delayDuration={0}>
+      <div className="space-y-4">
+        <div className="flex justify-end items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={view === "list" ? "default" : "outline"}
+                size="icon"
+                onClick={() => setView("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>List View</TooltipContent>
+          </Tooltip>
 
-      {view === "list" ? (
-        <ListView
-          events={events}
-          onUpdateEvent={handleUpdateEvent}
-          onDeleteEvent={handleDeleteEvent}
-          onEventUpdated={fetchEvents}
-        />
-      ) : (
-        <EventsCalendar
-          events={events}
-          onUpdateEvent={handleUpdateEvent}
-          onDeleteEvent={handleDeleteEvent}
-        />
-      )}
-    </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={view === "calendar" ? "default" : "outline"}
+                size="icon"
+                onClick={() => setView("calendar")}
+              >
+                <CalendarDays className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Calendar View</TooltipContent>
+          </Tooltip>
+
+          <div className="border-l pl-2" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isEditMode ? "default" : "outline"}
+                size="icon"
+                onClick={() => setIsEditMode(!isEditMode)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit All</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowBatchManager(true)}
+              >
+                <Package className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Batch Manager</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowBatchTemplates(true)}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create from Template</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowCreateEvent(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add Event</TooltipContent>
+          </Tooltip>
+        </div>
+
+        {view === "list" ? (
+          <ListView
+            events={events}
+            onUpdateEvent={handleUpdateEvent}
+            onDeleteEvent={handleDeleteEvent}
+            onEventUpdated={fetchEvents}
+            isEditMode={isEditMode}
+          />
+        ) : (
+          <EventsCalendar
+            events={events}
+            onUpdateEvent={handleUpdateEvent}
+            onDeleteEvent={handleDeleteEvent}
+            isEditMode={isEditMode}
+          />
+        )}
+
+        {showBatchManager && <EventBatchManager />}
+
+        {showBatchTemplates && (
+          <EventBatchTemplates carId={carId} onEventsCreated={fetchEvents} />
+        )}
+
+        {showCreateEvent && (
+          <CreateEventButton carId={carId} onEventCreated={fetchEvents} />
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

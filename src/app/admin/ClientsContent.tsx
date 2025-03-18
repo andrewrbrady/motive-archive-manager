@@ -15,9 +15,14 @@ export default function ClientsContent() {
     status: null,
     businessType: null,
   });
+  const [key, setKey] = useState(0);
 
   const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters);
+  };
+
+  const handleCreateSuccess = () => {
+    setKey((prev) => prev + 1);
   };
 
   return (
@@ -39,11 +44,12 @@ export default function ClientsContent() {
         </Button>
       </FilterContainer>
 
-      <ClientsTable filters={filters} />
+      <ClientsTable key={key} filters={filters} />
 
       <CreateClientDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
+        onSuccess={handleCreateSuccess}
       />
     </div>
   );

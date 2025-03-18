@@ -3,7 +3,8 @@
 
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Client } from "@/types/car";
+import { Client } from "@/types/contact";
+import { ClientWithStringId } from "@/app/cars/CarsPageClient";
 import {
   FilterSection,
   FilterItem,
@@ -24,7 +25,7 @@ interface CarFiltersSectionProps {
     search?: string;
   };
   makes: string[];
-  clients: Client[];
+  clients: Client[] | ClientWithStringId[];
 }
 
 export default function CarFiltersSection({
@@ -135,7 +136,10 @@ export default function CarFiltersSection({
             >
               <option value="">Any Client</option>
               {clients.map((client) => (
-                <option key={client._id} value={client._id}>
+                <option
+                  key={client._id.toString()}
+                  value={client._id.toString()}
+                >
                   {client.name}
                 </option>
               ))}

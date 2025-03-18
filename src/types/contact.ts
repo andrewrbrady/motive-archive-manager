@@ -17,20 +17,20 @@ export interface Contact {
 export interface Client {
   _id: ObjectId;
   name: string;
-  email: string;
-  phone: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
+  email?: string;
+  phone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
   };
-  socialMedia: {
-    instagram: string;
+  socialMedia?: {
+    instagram?: string;
     website?: string;
   };
-  businessType: string;
+  businessType?: string;
   primaryContactId?: ObjectId | null;
   documents?: Array<{
     _id: ObjectId;

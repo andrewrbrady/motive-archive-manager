@@ -26,10 +26,11 @@ import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
 import CalendarTab from "@/components/cars/CalendarTab";
-import ProductionTab from "@/components/cars/ProductionTab";
-import { MeasurementValue } from "@/types/measurements";
-import { Car } from "@/types/car";
 import ShotList from "@/components/cars/ShotList";
+import Scripts from "@/components/cars/Scripts";
+import { Car } from "@/types/car";
+import { MeasurementValue } from "@/types/measurements";
+import PhotoShoots from "@/components/cars/PhotoShoots";
 
 interface Power {
   hp: number;
@@ -1734,9 +1735,19 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 ),
               },
               {
-                value: "production",
-                label: "Production",
-                content: <ProductionTab carId={id} />,
+                value: "shoots",
+                label: "Photo Shoots",
+                content: <PhotoShoots carId={id} />,
+              },
+              {
+                value: "shot-lists",
+                label: "Shot Lists",
+                content: <ShotList carId={id} />,
+              },
+              {
+                value: "scripts",
+                label: "Scripts",
+                content: <Scripts carId={id} />,
               },
               {
                 value: "bat",

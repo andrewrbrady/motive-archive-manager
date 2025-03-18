@@ -59,6 +59,7 @@ interface EventsCalendarProps {
   onDeleteEvent: (eventId: string) => Promise<void>;
   selectedEventTypes?: SelectOption[];
   onEventTypesChange?: (types: SelectOption[]) => void;
+  isEditMode?: boolean;
 }
 
 interface User {
@@ -124,6 +125,7 @@ export default function EventsCalendar({
   onDeleteEvent,
   selectedEventTypes = [],
   onEventTypesChange,
+  isEditMode: parentEditMode,
 }: EventsCalendarProps) {
   const [view, setView] = useState<View>("month");
   const [date, setDate] = useState(new Date());
@@ -132,6 +134,11 @@ export default function EventsCalendar({
   const [selectedEvent, setSelectedEvent] = useState<EditingEvent | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [localEditMode, setLocalEditMode] = useState(false);
+
+  // Use parent's edit mode if provided, otherwise use local state
+  const isEditMode =
+    parentEditMode !== undefined ? parentEditMode : localEditMode;
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -213,7 +220,8 @@ export default function EventsCalendar({
     return {
       className: cn(
         "transition-colors",
-        isToday && "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
+        isToday &&
+          "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
       ),
     };
   };

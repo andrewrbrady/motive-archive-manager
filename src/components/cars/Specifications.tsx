@@ -5,7 +5,7 @@ import { getUnitsForType } from "@/constants/units";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { Client } from "@/types/car";
+import { Client } from "@/types/contact";
 import { toast } from "react-hot-toast";
 
 // Define the car data structure as we receive it from the API
@@ -410,7 +410,7 @@ const Specifications = ({
         // If we have a client ID but no clientInfo and we have clients data
         if (car.client && !car.clientInfo && data.clients?.length > 0) {
           const clientMatch = data.clients.find(
-            (c: Client) => c._id === car.client
+            (c: Client) => c._id.toString() === car.client
           );
           if (clientMatch) {
             setLocalSpecs((prev) => ({
@@ -619,7 +619,10 @@ const Specifications = ({
               >
                 <option value="">Select client</option>
                 {clients.map((client) => (
-                  <option key={client._id} value={client._id}>
+                  <option
+                    key={client._id.toString()}
+                    value={client._id.toString()}
+                  >
                     {client.name}
                   </option>
                 ))}
@@ -627,7 +630,8 @@ const Specifications = ({
             ) : (
               localSpecs.clientInfo?.name ||
               (localSpecs.client &&
-                clients.find((c) => c._id === localSpecs.client)?.name) ||
+                clients.find((c) => c._id.toString() === localSpecs.client)
+                  ?.name) ||
               "N/A"
             )}
           </span>
