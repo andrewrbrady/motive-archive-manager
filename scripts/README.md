@@ -1,6 +1,104 @@
 # Motive Archive Manager Scripts
 
-This directory contains utility scripts for the Motive Archive Manager.
+This directory contains utility scripts for managing the Motive Archive Manager database.
+
+## Available Scripts
+
+### Remove Duplicate Images
+
+The `remove-duplicate-images.js` script identifies and removes duplicate car images from the database. Duplicates are identified based on identical URLs.
+
+#### What it does:
+
+1. Fetches all cars from the database
+2. For each car, checks for duplicate images based on URL
+3. Keeps one instance of each unique image and removes duplicates
+4. Updates the car's `imageIds` array to remove references to deleted images
+5. Identifies and fixes references to non-existent image IDs
+6. Checks for orphaned images (images not referenced by any car)
+
+#### Usage
+
+First, ensure you have the correct environment variables set up in a `.env` file (in the scripts directory):
+
+```
+MONGODB_URI=mongodb://username:password@host:port/database
+MONGODB_DB=motive_archive
+```
+
+You can run the script in two modes:
+
+**Dry Run (No Deletion):**
+
+```bash
+# Using npm scripts
+cd scripts
+npm run remove-duplicates:dry
+
+# Or directly
+node remove-duplicate-images.js
+```
+
+**Delete Mode:**
+
+```bash
+# Using npm scripts
+cd scripts
+npm run remove-duplicates
+
+# Or directly
+node remove-duplicate-images.js --delete
+```
+
+**Important:** Always run in dry-run mode first to see what would be deleted, before running in delete mode.
+
+### Standardize Data
+
+The `standardize.js` script standardizes data formats in the database.
+
+```bash
+# Using npm scripts
+cd scripts
+npm run standardize
+
+# Or directly
+node run-standardize.js
+```
+
+## sanitize-car-images.js
+
+This script helps clean up the database by removing the deprecated `images` property from car documents that have both `images` and `imageIds` fields.
+
+### Background
+
+In our codebase, we're standardizing on using only `imageIds` (arrays of ObjectIds that point to documents in the "images" collection) for storing image references. Some car documents still have the deprecated `images` field, which needs to be removed.
+
+### Usage
+
+```bash
+node sanitize-car-images.js
+```
+
+The script will:
+
+1. Connect to the MongoDB database
+2. Find all car documents that have both `images` and `imageIds` fields
+3. Remove the `images` property from these documents
+4. Report on how many documents were affected
+
+### Notes
+
+- This is a one-time cleanup script that should be run to standardize the database
+- After running, verify that the car API endpoints are still working correctly
+- All car API endpoints have been updated to use `imageIds` instead of `images`
+
+## Adding New Scripts
+
+To add a new script:
+
+1. Create your JavaScript file in the `scripts` directory
+2. Add the script to `package.json` in the scripts section
+3. Update this README.md with documentation about your script
 
 ## Standardize Raw Assets Script
 

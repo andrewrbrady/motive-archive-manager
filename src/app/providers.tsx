@@ -2,6 +2,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { LabelsProvider } from "@/contexts/LabelsContext";
 import React from "react";
 
 interface ProvidersProps {
@@ -11,7 +12,9 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
-      <ThemeProvider>{children}</ThemeProvider>
+      <ThemeProvider>
+        <LabelsProvider>{children}</LabelsProvider>
+      </ThemeProvider>
     </SessionProvider>
   );
 }

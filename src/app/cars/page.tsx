@@ -49,7 +49,7 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     });
 
     // Create the URL differently based on environment
-    // This avoids URL parsing issues in server components
+    // Using simplified API endpoint for better image handling
     let url: string;
 
     if (typeof window === "undefined") {
@@ -60,11 +60,14 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
         ? "http://localhost:3000"
         : "";
 
-      url = new URL(`/api/cars?${queryParams.toString()}`, baseUrl).toString();
+      url = new URL(
+        `/api/cars/simple?${queryParams.toString()}`,
+        baseUrl
+      ).toString();
       console.log("Server-side cars URL:", url);
     } else {
       // Client-side: Use relative URL (will be automatically resolved)
-      url = `/api/cars?${queryParams.toString()}`;
+      url = `/api/cars/simple?${queryParams.toString()}`;
       console.log("Client-side cars URL:", url);
     }
 
@@ -98,11 +101,29 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       throw new Error("Invalid response data from cars API");
     }
 
+    // Debug the first car's image data
+    if (data.cars.length > 0) {
+      const firstCar = data.cars[0];
+      console.log("DEBUG: First car image data:", {
+        carId: firstCar._id,
+        imagesType: firstCar.images
+          ? Array.isArray(firstCar.images)
+            ? "array"
+            : "object"
+          : "undefined",
+        hasImageIds: Boolean(firstCar.imageIds?.length),
+        imagesCount: firstCar.images?.length || 0,
+        sampleImage: firstCar.images?.length
+          ? `URL: ${firstCar.images[0].url.substring(0, 50)}...`
+          : "None",
+      });
+    }
+
     return {
       cars: data.cars as Car[],
-      totalPages: data.totalPages,
-      currentPage: page,
-      totalCount: data.totalCount,
+      totalPages: data.pagination.totalPages,
+      currentPage: data.pagination.currentPage,
+      totalCount: data.pagination.totalCount,
     };
   } catch (error) {
     console.error("Error fetching cars:", error);

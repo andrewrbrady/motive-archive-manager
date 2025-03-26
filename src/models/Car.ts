@@ -66,7 +66,23 @@ const Car =
         },
         description: String,
         history_report: String,
-        images: [String],
+        // DEPRECATED: Use imageIds instead
+        // This field should be removed in future versions
+        images: {
+          type: Map,
+          of: [String],
+          default: new Map([
+            ["exterior", []],
+            ["interior", []],
+            ["engine", []],
+            ["damage", []],
+            ["documents", []],
+            ["other", []],
+          ]),
+        },
+        // Array of ObjectIds referencing documents in the 'images' collection
+        // This is the preferred way to store image references
+        imageIds: [String],
         type: String,
         vin: String,
         interior_color: String,

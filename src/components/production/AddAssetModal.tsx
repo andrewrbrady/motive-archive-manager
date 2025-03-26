@@ -1,13 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { XIcon, HardDriveIcon, Search } from "lucide-react";
+import { XIcon, HardDriveIcon, Search, CarIcon } from "lucide-react";
 import { HardDriveData } from "@/models/hard-drive";
 import { ObjectId } from "@/lib/types";
+import { Car } from "@/types/car";
 import CarSelector from "@/components/CarSelector";
 import { UrlModal } from "@/components/ui/url-modal";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
+
+interface HardDriveWithId {
+  _id: string;
+  label: string;
+  name: string;
+}
 
 interface AddAssetModalProps {
   isOpen: boolean;
@@ -16,14 +23,8 @@ interface AddAssetModalProps {
     date: string;
     description: string;
     hardDriveIds: string[];
-    cars: any[];
     carIds: string[];
   }) => void;
-}
-
-// Ensure HardDriveData has required _id as string for UI
-interface HardDriveWithId extends Omit<HardDriveData, "_id"> {
-  _id: string;
 }
 
 export default function AddAssetModal({
@@ -35,16 +36,14 @@ export default function AddAssetModal({
     date: string;
     description: string;
     hardDriveIds: string[];
-    cars: any[];
     carIds: string[];
   }>({
     date: "",
     description: "",
     hardDriveIds: [],
-    cars: [],
     carIds: [],
   });
-  const [selectedCars, setSelectedCars] = useState<any[]>([]);
+  const [selectedCars, setSelectedCars] = useState<Car[]>([]);
   const [selectedDrives, setSelectedDrives] = useState<HardDriveWithId[]>([]);
   const [availableDrives, setAvailableDrives] = useState<HardDriveWithId[]>([]);
   const [driveSearchTerm, setDriveSearchTerm] = useState("");
@@ -83,7 +82,6 @@ export default function AddAssetModal({
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      cars: selectedCars,
       carIds: selectedCars.map((car) => car._id),
     }));
   }, [selectedCars]);
@@ -95,13 +93,18 @@ export default function AddAssetModal({
 
     try {
       await onAdd({
-        ...formData,
+        date: formData.date,
+        description: formData.description,
         hardDriveIds: selectedDrives.map((drive) => drive._id),
+        carIds: selectedCars.map((car) => car._id),
       });
+
       onClose();
     } catch (error) {
-      console.error("Error adding asset:", error);
-      setError("Failed to add asset");
+      console.error("Error adding raw asset:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to add raw asset"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -110,12 +113,28 @@ export default function AddAssetModal({
   const handleSelectDrive = (drive: HardDriveWithId) => {
     if (!selectedDrives.find((d) => d._id === drive._id)) {
       setSelectedDrives([...selectedDrives, drive]);
+      setFormData((prev) => ({
+        ...prev,
+        hardDriveIds: [...prev.hardDriveIds, drive._id],
+      }));
     }
     setDriveSearchTerm("");
   };
 
   const handleRemoveDrive = (driveId: string) => {
     setSelectedDrives(selectedDrives.filter((drive) => drive._id !== driveId));
+    setFormData((prev) => ({
+      ...prev,
+      hardDriveIds: prev.hardDriveIds.filter((id) => id !== driveId),
+    }));
+  };
+
+  const handleCarSelectionChange = (cars: Car[]) => {
+    setSelectedCars(cars);
+    setFormData((prev) => ({
+      ...prev,
+      carIds: cars.map((car) => car._id),
+    }));
   };
 
   if (!isOpen) return null;
@@ -232,7 +251,34 @@ export default function AddAssetModal({
           <label className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1">
             Associated Cars
           </label>
-          <CarSelector selectedCars={selectedCars} onSelect={setSelectedCars} />
+          <div className="flex flex-wrap gap-2 mb-2">
+            {selectedCars.map((car, index) => (
+              <div
+                key={`${car._id}-${index}`}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
+              >
+                <CarIcon className="w-3 h-3" />
+                {car.year} {car.make} {car.model}
+                {car.color && ` (${car.color})`}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newSelectedCars = selectedCars.filter(
+                      (_, i) => i !== index
+                    );
+                    handleCarSelectionChange(newSelectedCars);
+                  }}
+                  className="ml-1 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
+                >
+                  <XIcon className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <CarSelector
+            selectedCars={selectedCars}
+            onSelect={handleCarSelectionChange}
+          />
         </div>
 
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t">

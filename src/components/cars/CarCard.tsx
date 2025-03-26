@@ -4,37 +4,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Car } from "@/types/car";
+import { Car, CarImage, CategorizedImages } from "@/types/car";
 import { Trash2 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/ui/loading";
-
-interface CarImage {
-  _id: string;
-  cloudflareId: string;
-  url: string;
-  filename: string;
-  metadata?: {
-    angle?: string;
-    description?: string;
-    movement?: string;
-    tod?: string;
-    view?: string;
-    side?: string;
-    aiAnalysis?: {
-      angle?: string;
-      description?: string;
-      movement?: string;
-      tod?: string;
-      view?: string;
-      side?: string;
-    };
-  };
-  carId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
 
 interface CarCardProps {
   car: Car;
@@ -51,7 +25,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     images: car.images,
     primaryImageId: car.primaryImageId,
     hasImageIds: Boolean(car.imageIds?.length),
-    hasImages: Boolean(car.images?.length),
+    hasImages: Boolean(car.images),
   });
 
   const [primaryImage, setPrimaryImage] = useState<{
@@ -62,6 +36,30 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
 
   useEffect(() => {
     console.log("CarCard: useEffect triggered for car:", car._id);
+    console.log("CarCard: Image data structure:", {
+      imagesType: car.images
+        ? Array.isArray(car.images)
+          ? "array"
+          : "object"
+        : "undefined",
+      imageIds: car.imageIds,
+      images: car.images,
+      isEmpty:
+        car.images &&
+        !Array.isArray(car.images) &&
+        car.images.exterior &&
+        Array.isArray(car.images.exterior)
+          ? car.images.exterior.length === 0
+          : "N/A",
+      sampleImage:
+        car.images &&
+        !Array.isArray(car.images) &&
+        car.images.exterior &&
+        Array.isArray(car.images.exterior) &&
+        car.images.exterior.length > 0
+          ? car.images.exterior[0]
+          : "None",
+    });
 
     const fetchPrimaryImage = async () => {
       console.log("CarCard: Starting to fetch image for car:", car._id);
@@ -69,15 +67,19 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       setLoading(true);
 
       try {
-        // First check if we have direct images array with the new structure
-        if (car.images?.length) {
-          // If there's a primaryImageId, use that image
+        // Check for direct images from API - they should be in a simple array format now
+        if (car.images && Array.isArray(car.images) && car.images.length > 0) {
+          console.log(
+            `CarCard: Using direct image array (${car.images.length} images)`
+          );
+
+          // If there's a primaryImageId, try to use that image
           if (car.primaryImageId) {
             const primaryImg = car.images.find(
               (img) => img._id === car.primaryImageId
             );
             if (primaryImg) {
-              console.log("CarCard: Using primary image from primaryImageId");
+              console.log("CarCard: Found primary image");
               setPrimaryImage({
                 id: primaryImg._id,
                 url: primaryImg.url.endsWith("/public")
@@ -89,55 +91,104 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
             }
           }
 
-          // If no primaryImageId or it wasn't found, fall back to first image
-          console.log("CarCard: Using direct image URL from new structure");
+          // Use the first image as fallback
+          const firstImage = car.images[0];
+          console.log("CarCard: Using first image from array:", firstImage);
           setPrimaryImage({
-            id: car.images[0]._id,
-            url: car.images[0].url.endsWith("/public")
-              ? car.images[0].url
-              : `${car.images[0].url}/public`,
+            id: firstImage._id,
+            url: firstImage.url.endsWith("/public")
+              ? firstImage.url
+              : `${firstImage.url}/public`,
           });
           setLoading(false);
           return;
         }
 
-        // Fall back to imageIds if no direct images
+        // Check for categorized image structure as a fallback
+        if (car.images && !Array.isArray(car.images)) {
+          console.log("CarCard: Checking categorized image structure");
+          const categorizedImages = car.images as CategorizedImages;
+
+          // First try exterior images
+          if (categorizedImages.exterior?.length) {
+            console.log(
+              `CarCard: Found ${categorizedImages.exterior.length} exterior images`
+            );
+            setPrimaryImage({
+              id: categorizedImages.exterior[0]._id,
+              url: categorizedImages.exterior[0].url.endsWith("/public")
+                ? categorizedImages.exterior[0].url
+                : `${categorizedImages.exterior[0].url}/public`,
+            });
+            setLoading(false);
+            return;
+          }
+
+          // Try other categories in priority order
+          const categoryPriority = [
+            "interior",
+            "engine",
+            "damage",
+            "documents",
+            "other",
+          ];
+          for (const category of categoryPriority) {
+            const images =
+              categorizedImages[category as keyof CategorizedImages];
+            if (images?.length) {
+              console.log(
+                `CarCard: Found ${images.length} images in '${category}' category`
+              );
+              setPrimaryImage({
+                id: images[0]._id,
+                url: images[0].url.endsWith("/public")
+                  ? images[0].url
+                  : `${images[0].url}/public`,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        // Ultimate fallback: use imageIds to fetch images
         if (car.imageIds?.length) {
-          // If there's a primaryImageId, use that image
+          console.log(
+            `CarCard: Falling back to imageIds (${car.imageIds.length} ids)`
+          );
+
+          // Choose primary image ID or first available
           const idToFetch =
             car.primaryImageId && car.imageIds.includes(car.primaryImageId)
               ? car.primaryImageId
               : car.imageIds[0];
 
           console.log("CarCard: Fetching image with ID:", idToFetch);
-          const response = await fetch(`/api/images/metadata?ids=${idToFetch}`);
-          console.log("CarCard: Response received:", {
-            status: response.status,
-            ok: response.ok,
-            statusText: response.statusText,
-          });
+          const response = await fetch(`/api/images/${idToFetch}`);
 
           if (!response.ok) {
-            throw new Error("Failed to fetch image metadata");
+            throw new Error(
+              `Failed to fetch image: ${response.status} ${response.statusText}`
+            );
           }
 
-          const data = await response.json();
-          console.log("CarCard: Image metadata received:", data);
+          const imageData = await response.json();
+          console.log("CarCard: Image data received:", imageData);
 
-          if (data && data[0]) {
-            setPrimaryImage({
-              id: data[0].imageId,
-              url: `${data[0].url}/public`,
-            });
-          } else {
-            console.error("CarCard: No image data in response");
-          }
-        } else {
-          console.log("CarCard: No image IDs available");
+          setPrimaryImage({
+            id: imageData._id,
+            url: imageData.url.endsWith("/public")
+              ? imageData.url
+              : `${imageData.url}/public`,
+          });
+          setLoading(false);
+          return;
         }
+
+        console.log("CarCard: No image sources available");
+        setLoading(false);
       } catch (error) {
         console.error("CarCard: Error fetching image:", error);
-      } finally {
         setLoading(false);
       }
     };

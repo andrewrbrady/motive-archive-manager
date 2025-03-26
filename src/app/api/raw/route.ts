@@ -7,26 +7,18 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "10");
-  const search = searchParams.get("search") || "";
   const sort = searchParams.get("sort") || "date";
   const direction = searchParams.get("direction") === "asc" ? 1 : -1;
-  const client = searchParams.get("client") || "";
-  const hardDriveId = searchParams.get("hardDriveId") || "";
+  const searchTerm = searchParams.get("search") || "";
 
-  const skip = (page - 1) * limit;
-
-  // Enhanced debug info to help diagnose issues
-  const debugInfo = {
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "unknown",
-    vercel: process.env.VERCEL === "1",
-    database: process.env.MONGODB_DB || "motive_archive",
-    connectionPoolSize: 5,
-    hasCollection: false,
-    returnedCount: 0,
-    totalCount: 0,
-    retryCount: 0,
-    executedQuery: null as string | null,
+  // Debug info object
+  const debugInfo: any = {
+    query: {},
+    searchTerm,
+    page,
+    limit,
+    sort,
+    direction,
   };
 
   console.time("raw-assets-api-fetch");
@@ -36,74 +28,66 @@ export async function GET(request: Request) {
       const db = await getDatabase();
       const rawCollection = db.collection("raw_assets");
 
-      // Check if the collection exists
-      const collections = await db
-        .listCollections({ name: "raw_assets" })
-        .toArray();
-      debugInfo.hasCollection = collections.length > 0;
-
-      if (!debugInfo.hasCollection) {
-        console.warn("Collection 'raw_assets' not found in database");
-      }
-
-      // Build query
+      // Build the query
       const query: any = {};
-
-      if (search) {
+      if (searchTerm) {
         query.$or = [
-          { date: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
+          { date: { $regex: searchTerm, $options: "i" } },
+          { description: { $regex: searchTerm, $options: "i" } },
         ];
       }
 
-      if (client) {
-        query.client = { $regex: client, $options: "i" };
-      }
+      // Update debug info
+      debugInfo.query = query;
 
-      if (hardDriveId) {
-        try {
-          // Check if it's a valid ObjectId
-          query.hardDriveIds = new ObjectId(hardDriveId);
-        } catch (e) {
-          // If conversion to ObjectId fails, log the issue and try different approaches
-          console.log(
-            `Cannot convert hardDriveId ${hardDriveId} to ObjectId:`,
-            e
-          );
-
-          // Try both string and ObjectId matching for maximum compatibility
-          query.$or = query.$or || [];
-
-          // Add both conditions: match as string or as ObjectId string representation
-          query.$or.push(
-            { hardDriveIds: hardDriveId },
-            { hardDriveIds: { $regex: new RegExp(hardDriveId, "i") } }
-          );
-        }
-      }
-
-      // Store the executed query for debugging
-      debugInfo.executedQuery = JSON.stringify(query);
-      console.log("Executing MongoDB query:", debugInfo.executedQuery);
-
-      // Get count for pagination
+      // Get total count for pagination
       const totalCount = await rawCollection.countDocuments(query);
       const totalPages = Math.ceil(totalCount / limit);
+      const skip = (page - 1) * limit;
 
       // Update debug info
       debugInfo.totalCount = totalCount;
-      console.log(`Found ${totalCount} total raw assets matching query`);
+      debugInfo.totalPages = totalPages;
+      debugInfo.skip = skip;
 
-      // Get sorted and paginated results
+      // Get sorted and paginated results with populated car data
       const sortOptions: Record<string, 1 | -1> = {};
       sortOptions[sort] = direction;
 
-      const rawAssets = await rawCollection
-        .find(query)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limit)
-        .toArray();
+      const pipeline = [
+        { $match: query },
+        {
+          $lookup: {
+            from: "cars",
+            let: { carIds: "$carIds" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $in: ["$_id", "$$carIds"],
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  year: 1,
+                  make: 1,
+                  model: 1,
+                  color: 1,
+                  exteriorColor: 1,
+                },
+              },
+            ],
+            as: "cars",
+          },
+        },
+        { $sort: sortOptions },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+
+      const rawAssets = await rawCollection.aggregate(pipeline).toArray();
 
       // Update debug info
       debugInfo.returnedCount = rawAssets.length;
@@ -125,6 +109,14 @@ export async function GET(request: Request) {
           : [],
         carIds: Array.isArray(asset.carIds)
           ? asset.carIds.map((id) => id?.toString() || "")
+          : [],
+        // Format car data
+        cars: Array.isArray(asset.cars)
+          ? asset.cars.map((car) => ({
+              ...car,
+              _id: car._id.toString(),
+              color: car.exteriorColor || car.color || "",
+            }))
           : [],
       }));
 

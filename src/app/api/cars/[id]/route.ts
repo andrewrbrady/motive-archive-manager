@@ -81,6 +81,20 @@ interface UpdateBody {
   [key: string]: any;
 }
 
+// Add these types at the top of the file after the imports
+type PipelineStage = {
+  $match?: Record<string, any>;
+  $lookup?: {
+    from: string;
+    let?: Record<string, any>;
+    pipeline?: any[];
+    as: string;
+  };
+  $project?: Record<string, any>;
+  $addFields?: Record<string, any>;
+  $unwind?: string | { path: string; preserveNullAndEmptyArrays?: boolean };
+};
+
 // Helper function to get MongoDB client
 async function getMongoClient() {
   const client = new MongoClient(MONGODB_URI as string, {
@@ -107,38 +121,120 @@ export async function GET(
     }
     const objectId = new ObjectId(id);
 
+    // Parse query parameters for field selection
+    const url = new URL(request.url);
+    const fieldsParam = url.searchParams.get("fields");
+    const includeImages = url.searchParams.get("includeImages");
+    const imageCategory = url.searchParams.get("imageCategory");
+
     client = await getMongoClient();
     const db = client.db(DB_NAME);
 
     // Log the request for debugging
-    console.log("Fetching car with ID:", id);
+    console.log(
+      "Fetching car with ID:",
+      id,
+      "Fields:",
+      fieldsParam,
+      "Include Images:",
+      includeImages,
+      "Image Category:",
+      imageCategory
+    );
 
-    // Use aggregation to populate images
-    const car = await db
-      .collection("cars")
-      .aggregate([
-        { $match: { _id: objectId } },
-        {
+    // Create a projection object based on requested fields
+    let projection: Record<string, number> = {};
+
+    if (fieldsParam) {
+      const fields = fieldsParam.split(",");
+      fields.forEach((field) => {
+        projection[field.trim()] = 1;
+      });
+
+      // Always include _id unless explicitly excluded
+      if (!fields.includes("-_id")) {
+        projection["_id"] = 1;
+      }
+
+      // Always include imageIds for fallback
+      projection["imageIds"] = 1;
+    }
+
+    // Handle image fetching strategy
+    let matchStage = { $match: { _id: objectId } };
+
+    console.log(
+      `[Car ${id}] Preparing to fetch with includeImages=${includeImages}, imageCategory=${imageCategory}`
+    );
+
+    // Use aggregation to fetch car with selected fields and image strategy
+    const pipeline: PipelineStage[] = [
+      {
+        $match: { _id: objectId },
+      },
+    ];
+
+    // If showing images, handle them appropriately
+    if (includeImages === "true") {
+      console.log(`[Car ${id}] Including images in response`);
+
+      if (imageCategory) {
+        console.log(
+          `[Car ${id}] Looking for images in category: ${imageCategory}`
+        );
+
+        // Add a step to convert categorized images to regular array for consistent client handling
+        pipeline.push({
           $addFields: {
-            imageIds: {
-              $map: {
-                input: "$imageIds",
-                as: "id",
-                in: { $toObjectId: "$$id" },
-              },
-            },
+            tempImages: { $ifNull: [`$images.${imageCategory}`, []] },
           },
-        },
-        {
+        });
+
+        pipeline.push({
+          $project: {
+            ...Object.keys(projection).reduce((acc, key) => {
+              acc[key] = 1;
+              return acc;
+            }, {} as Record<string, number>),
+            images: "$tempImages",
+            imageIds: 1, // Always include imageIds for fallback
+          },
+        });
+      } else {
+        // Fetch all images
+        console.log(`[Car ${id}] Including all images`);
+
+        // If we have imageIds, use those to lookup images
+        pipeline.push({
           $lookup: {
             from: "images",
-            localField: "imageIds",
-            foreignField: "_id",
+            let: { imageIds: { $ifNull: ["$imageIds", []] } },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $in: [{ $toString: "$_id" }, "$$imageIds"],
+                  },
+                },
+              },
+            ],
             as: "images",
           },
-        },
-      ])
-      .next();
+        });
+      }
+    }
+
+    // Add projection if fields were specified
+    if (Object.keys(projection).length > 0 && includeImages !== "true") {
+      pipeline.push({ $project: projection });
+    }
+
+    // Execute the aggregation
+    console.log(
+      `[Car ${id}] Executing aggregation:`,
+      JSON.stringify(pipeline, null, 2)
+    );
+    const car = await db.collection("cars").aggregate(pipeline).next();
 
     // Log raw data for debugging
     console.log("Raw car data:", car);

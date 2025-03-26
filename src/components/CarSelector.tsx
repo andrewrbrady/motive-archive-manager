@@ -21,6 +21,42 @@ export default function CarSelector({
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
+  const [recentSearchCache, setRecentSearchCache] = useState<
+    Record<string, Car[]>
+  >({});
+
+  // Utility function for consistent car display formatting
+  const formatCarDisplay = (car: Car): string => {
+    // Helper to format a car ID nicely (first 8 chars with hyphen)
+    const formatCarId = (id: string): string => {
+      if (!id) return "Unknown";
+      const cleanId = id.toString().replace(/[^a-zA-Z0-9]/g, "");
+      return cleanId.substring(0, 8);
+    };
+
+    // If we have make and model, prioritize displaying that
+    if (car.make || car.model) {
+      const year = car.year ? `${car.year} ` : "";
+      const make = car.make ? car.make.trim() : "";
+      const model = car.model ? car.model.trim() : "";
+
+      let display = `${year}${make} ${model}`.trim();
+
+      // Add manufacturing details if available
+      if (car.manufacturing?.series) {
+        display += ` ${car.manufacturing.series}`;
+      }
+
+      if (car.manufacturing?.trim) {
+        display += ` (${car.manufacturing.trim})`;
+      }
+
+      return display;
+    }
+
+    // If we don't have make/model data, use a more user-friendly car ID format
+    return `Car ${formatCarId(car._id)}`;
+  };
 
   const searchCars = async (query: string) => {
     if (!query) {
@@ -28,13 +64,29 @@ export default function CarSelector({
       return;
     }
 
+    if (recentSearchCache[query]) {
+      const cachedResults = recentSearchCache[query].filter(
+        (car: Car) => !selectedCars.some((selected) => selected._id === car._id)
+      );
+      setSuggestions(cachedResults);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/cars?search=${encodeURIComponent(query)}&sort=createdAt_desc`
+        `/api/cars?search=${encodeURIComponent(
+          query
+        )}&sort=createdAt_desc&fields=_id,year,make,model,manufacturing,color`
       );
       if (!response.ok) throw new Error("Failed to fetch cars");
       const data = await response.json();
+
+      setRecentSearchCache((prev) => ({
+        ...prev,
+        [query]: data.cars,
+      }));
+
       setSuggestions(
         data.cars.filter(
           (car: Car) =>
@@ -75,13 +127,22 @@ export default function CarSelector({
   }, []);
 
   const handleSelect = (car: Car) => {
+    console.log("Selected car:", {
+      id: car._id,
+      make: car.make || "(empty make)",
+      model: car.model || "(empty model)",
+      year: car.year || "(empty year)",
+    });
     onSelect([...selectedCars, car]);
     setSearchTerm("");
     setShowSuggestions(false);
   };
 
   const handleRemove = (carId: string) => {
-    onSelect(selectedCars.filter((car) => car._id !== carId));
+    console.log("Removing car with ID:", carId);
+    const updatedCars = selectedCars.filter((car) => car._id !== carId);
+    console.log("Updated car list:", updatedCars);
+    onSelect(updatedCars);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -145,13 +206,7 @@ export default function CarSelector({
                   onMouseEnter={() => setSelectedIndex(index)}
                 >
                   <div className="flex items-center justify-between">
-                    <span>
-                      {car.year} {car.make} {car.model}
-                      {car.manufacturing?.series &&
-                        ` ${car.manufacturing.series}`}
-                      {car.manufacturing?.trim &&
-                        ` (${car.manufacturing.trim})`}
-                    </span>
+                    <span>{formatCarDisplay(car)}</span>
                     {car.color && (
                       <span className="text-[hsl(var(--foreground-muted))] text-sm">
                         {car.color}
@@ -173,12 +228,15 @@ export default function CarSelector({
         {selectedCars.map((car) => (
           <div
             key={car._id}
-            className="inline-flex items-center gap-2 px-3 py-1 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-full text-sm text-[hsl(var(--foreground))]"
+            className="inline-flex items-center gap-2 px-3 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-full text-sm"
           >
-            {car.year} {car.make} {car.model}
+            {formatCarDisplay(car)}
+            {car.color && (
+              <span className="opacity-70 text-xs">({car.color})</span>
+            )}
             <button
               onClick={() => handleRemove(car._id)}
-              className="text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--destructive))]"
+              className="text-[hsl(var(--secondary-foreground))] hover:text-[hsl(var(--destructive))] opacity-70 hover:opacity-100"
             >
               <X className="w-4 h-4" />
             </button>

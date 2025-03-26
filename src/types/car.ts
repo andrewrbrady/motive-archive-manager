@@ -106,6 +106,16 @@ export interface PriceHistory {
   }>;
 }
 
+// New type for categorized images
+export interface CategorizedImages {
+  exterior?: CarImage[];
+  interior?: CarImage[];
+  engine?: CarImage[];
+  damage?: CarImage[];
+  documents?: CarImage[];
+  other?: CarImage[];
+}
+
 export interface Car {
   _id: string;
   make: string;
@@ -204,9 +214,11 @@ export interface Car {
   has_reserve?: boolean;
   documents?: string[];
   research_entries?: any[];
+  // Original image array (backward compatibility)
   imageIds: string[];
   primaryImageId?: string;
-  images?: CarImage[];
+  // New image structure - can be either an array (old format) or categorized (new format)
+  images?: CarImage[] | CategorizedImages;
   captionIds?: string[];
   eventIds?: string[];
   deliverableIds?: string[];
