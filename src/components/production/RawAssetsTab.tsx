@@ -1,18 +1,10 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, memo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { RawAssetData } from "@/models/raw_assets";
-import {
-  PencilIcon,
-  FolderIcon,
-  CarIcon,
-  Trash2Icon,
-  HardDriveIcon,
-  Plus,
-  Search,
-} from "lucide-react";
+import { PencilIcon, FolderIcon, Trash2Icon, Plus, Search } from "lucide-react";
 import EditRawAssetModal from "./EditRawAssetModal";
 import RawAssetDetailsModal from "./RawAssetDetailsModal";
 import ImportRawAssetsModal from "./ImportRawAssetsModal";
@@ -23,14 +15,27 @@ import { useUrlParams } from "@/hooks/useUrlParams";
 import { PaginationWithUrl } from "@/components/ui/pagination-with-url";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import { useLabels } from "@/contexts/LabelsContext";
+import CarLabel from "./CarLabel";
+import DriveLabel from "./DriveLabel";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { debounce } from "lodash";
+import { CarIcon } from "lucide-react";
 
 const LIMIT_OPTIONS = [10, 25, 50, 100];
+
+interface Car {
+  _id: string;
+  year: number | string;
+  make: string;
+  model: string;
+  color?: string;
+}
 
 interface RawAsset {
   _id: string;
@@ -38,10 +43,12 @@ interface RawAsset {
   description: string;
   hardDriveIds: string[];
   carIds: string[];
+  cars?: Car[];
   createdAt?: Date;
   updatedAt?: Date;
 }
 
+// Utility function for timeout-aware fetching
 const fetchWithTimeout = async (url: string, options = {}, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
@@ -64,17 +71,143 @@ const fetchWithTimeout = async (url: string, options = {}, timeout = 30000) => {
         `Request timed out after ${timeout}ms. The server might be under heavy load.`
       );
     }
+
+    // Check specifically for resource constraint errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("ERR_INSUFFICIENT_RESOURCES")) {
+      console.error(`Resource constraint error: ${url}`);
+      throw new Error(
+        `The server or browser doesn't have enough resources to complete this request. Try again later.`
+      );
+    }
+
     throw error;
   }
 };
+
+// Memoized component for a single asset row to prevent unnecessary re-renders
+const AssetRow = memo(
+  ({
+    asset,
+    onEdit,
+    onDelete,
+    onClick,
+  }: {
+    asset: RawAsset;
+    onEdit: (asset: RawAsset) => void;
+    onDelete: (id: string) => void;
+    onClick: (id: string) => void;
+  }) => {
+    const handleClick = useCallback(() => {
+      onClick(asset._id);
+    }, [asset._id, onClick]);
+
+    const handleEditClick = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onEdit(asset);
+      },
+      [asset, onEdit]
+    );
+
+    const handleDeleteClick = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDelete(asset._id);
+      },
+      [asset._id, onDelete]
+    );
+
+    return (
+      <tr
+        className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
+        onClick={handleClick}
+      >
+        <td className="py-3 px-2">
+          <Link
+            href={`/raw/${asset._id}`}
+            className="text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))/90]"
+          >
+            {asset.date || "Unknown Date"}
+          </Link>
+        </td>
+        <td className="py-3 px-2 text-sm">
+          {asset.description || "No description"}
+        </td>
+        <td className="py-3 px-2">
+          <div className="flex flex-wrap gap-2">
+            {Array.isArray(asset.cars) && asset.cars.length > 0 ? (
+              asset.cars.map((car, index) => (
+                <div
+                  key={`${asset._id}-car-${index}`}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
+                >
+                  <CarIcon className="w-3 h-3" />
+                  {car.year} {car.make} {car.model}
+                  {car.color && ` (${car.color})`}
+                </div>
+              ))
+            ) : (
+              <span className="text-muted-foreground text-sm">No cars</span>
+            )}
+          </div>
+        </td>
+        <td className="py-3 px-2">
+          <div className="flex flex-wrap gap-2">
+            {Array.isArray(asset.hardDriveIds) &&
+            asset.hardDriveIds.length > 0 ? (
+              asset.hardDriveIds
+                .filter((id) => id !== null && id !== undefined && id !== "")
+                .map((driveId, index) => (
+                  <DriveLabel
+                    key={`${asset._id}-drive-${index}`}
+                    driveId={driveId}
+                  />
+                ))
+            ) : (
+              <span className="text-muted-foreground text-sm">
+                No storage locations
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="py-3 px-2 text-right">
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={handleEditClick}
+              className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+              title="Edit asset"
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+              title="Delete asset"
+            >
+              <Trash2Icon className="w-4 h-4" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+);
+
+// Add display name for debugging
+AssetRow.displayName = "AssetRow";
 
 export default function RawAssetsTab() {
   const pathname = usePathname();
   const router = useRouter();
   const { getParam, updateParams } = useUrlParams();
+  const { fetchCarLabels, fetchDriveLabels } = useLabels();
   const [assets, setAssets] = useState<RawAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<
+    "timeout" | "connection" | "resource" | "other" | null
+  >(null);
   const [searchTerm, setSearchTerm] = useState(() => {
     return getParam("search") || "";
   });
@@ -93,8 +226,6 @@ export default function RawAssetsTab() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
-  const [carLabels, setCarLabels] = useState<Record<string, string>>({});
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<
@@ -109,6 +240,292 @@ export default function RawAssetsTab() {
 
   // Add a state for tracking if a timeout occurred
   const [timeoutOccurred, setTimeoutOccurred] = useState(false);
+
+  // Simplified prefetch function - batches car and drive IDs with minimal logging
+  const prefetchLabels = useCallback(
+    (assets: RawAsset[]) => {
+      if (!assets?.length) return;
+
+      // Single-pass collection of unique IDs
+      const carIds = new Set<string>();
+      const driveIds = new Set<string>();
+
+      // Collect all unique IDs
+      assets.forEach((asset) => {
+        // Add car IDs to the set
+        if (asset.carIds?.length) {
+          asset.carIds.forEach((id) => {
+            if (id) carIds.add(id.toString());
+          });
+        }
+
+        // Add drive IDs to the set
+        if (asset.hardDriveIds?.length) {
+          asset.hardDriveIds.forEach((id) => {
+            if (id) driveIds.add(id.toString());
+          });
+        }
+      });
+
+      // Queue batch fetches without causing immediate API calls
+      if (carIds.size) {
+        fetchCarLabels(Array.from(carIds));
+      }
+
+      if (driveIds.size) {
+        fetchDriveLabels(Array.from(driveIds));
+      }
+    },
+    [fetchCarLabels, fetchDriveLabels]
+  );
+
+  // Modified fetch assets function with better error handling and retries
+  const fetchAssets = useCallback(
+    async (isRetry = false) => {
+      if (!isRetry) {
+        setLoading(true);
+        setError(null);
+        setErrorType(null);
+        setTimeoutOccurred(false);
+      }
+
+      // Use a unique timer name for each fetch attempt to avoid conflicts
+      const timerName = `fetch-raw-assets-${Date.now()}`;
+
+      try {
+        console.time(timerName);
+        console.log(
+          `Fetching raw assets (attempt ${
+            fetchAttempts + 1
+          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchTerm}`
+        );
+
+        // Use an increasing timeout based on retry attempts
+        const timeout = 30000 + fetchAttempts * 15000; // Increased timeouts: 30s, 45s, 60s
+        console.log(`Using timeout of ${timeout}ms for this request`);
+
+        // Get the current URL search parameters
+        const hardDriveId = getParam("hardDriveId") || "";
+
+        // Build the query URL with proper encoding
+        let queryUrl = `/api/raw?page=${currentPage}&limit=${itemsPerPage}`;
+
+        if (searchTerm) {
+          queryUrl += `&search=${encodeURIComponent(searchTerm)}`;
+        }
+
+        if (hardDriveId) {
+          queryUrl += `&hardDriveId=${encodeURIComponent(hardDriveId)}`;
+        }
+
+        console.log("Fetching from URL:", queryUrl);
+
+        // Use the fetchWithTimeout function
+        const response = await fetchWithTimeout(queryUrl, {}, timeout);
+
+        if (!response.ok) {
+          throw new Error(
+            `Server error: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+        console.timeEnd(timerName);
+
+        // Log the API response structure to help debug
+        console.log("Raw Assets API Response structure:", Object.keys(data));
+        console.log("Raw Assets meta:", data.meta);
+
+        // Log debug info if available
+        if (data.debug) {
+          console.log("Raw assets API debug info:", data.debug);
+        }
+
+        // Add better data validation before setting state
+        const assetsList = Array.isArray(data.data) ? data.data : [];
+        console.log(`Received ${assetsList.length} raw assets`);
+
+        // Add defensive check to ensure each asset has required properties
+        const sanitizedAssets = assetsList.map((asset: any) => ({
+          ...asset,
+          _id: asset._id || "",
+          date: asset.date || "Unknown Date",
+          description: asset.description || "",
+          hardDriveIds: Array.isArray(asset.hardDriveIds)
+            ? asset.hardDriveIds
+            : [],
+          carIds: Array.isArray(asset.carIds) ? asset.carIds : [],
+        }));
+
+        setAssets(sanitizedAssets);
+        setTotalPages(data.meta?.totalPages || 1);
+        setFetchAttempts(0); // Reset attempts on success
+        setTimeoutOccurred(false);
+        setLoading(false);
+
+        // Prefetch all labels after assets are loaded
+        if (sanitizedAssets.length > 0) {
+          console.log(
+            `Successfully loaded ${sanitizedAssets.length} assets, prefetching labels`
+          );
+          prefetchLabels(sanitizedAssets);
+        }
+      } catch (error: any) {
+        // Rest of error handling code remains unchanged...
+        // Make sure we end the timer even if there's an error
+        try {
+          console.timeEnd(timerName);
+        } catch (timerError) {
+          // Timer might not exist if this is a retry attempt, ignore the error
+        }
+
+        console.error("Error fetching raw assets:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        // Check if this was an abort error (timeout)
+        const isTimeout =
+          error instanceof Error &&
+          (error.name === "AbortError" || errorMessage.includes("timed out"));
+
+        // Check if the error is a connection issue
+        const isConnectionError =
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("network") ||
+          errorMessage.includes("MongoDB");
+
+        // Check if this is a resource constraint error
+        const isResourceError = errorMessage.includes(
+          "ERR_INSUFFICIENT_RESOURCES"
+        );
+
+        if (isTimeout) {
+          setTimeoutOccurred(true);
+          setErrorType("timeout");
+          console.warn("Request timed out while fetching raw assets");
+        } else if (isConnectionError) {
+          setErrorType("connection");
+          console.warn("Database connection error detected");
+        } else if (isResourceError) {
+          setErrorType("resource");
+          console.warn(
+            "Resource constraint error detected - server or browser may be overloaded"
+          );
+        } else {
+          setErrorType("other");
+        }
+
+        // Increment retry attempts and retry if we haven't exceeded the limit
+        if (fetchAttempts < maxRetries) {
+          setLoading(true);
+          const nextAttempt = fetchAttempts + 1;
+          setFetchAttempts(nextAttempt);
+          console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
+
+          // Exponential backoff for retries with jitter for resource errors
+          // Add extra backoff time for resource errors
+          const baseDelay = Math.pow(2, nextAttempt - 1) * 1000;
+          const jitter = Math.random() * 1000;
+          const resourceMultiplier = isResourceError ? 2 : 1;
+          const backoffDelay = baseDelay * resourceMultiplier + jitter;
+
+          console.log(
+            `Waiting ${backoffDelay}ms before retry (${
+              isResourceError ? "with resource error penalty" : "normal backoff"
+            })`
+          );
+
+          setTimeout(() => {
+            fetchAssets(true); // Pass true to indicate this is a retry
+          }, backoffDelay);
+        } else {
+          console.error(
+            `Max retry attempts (${maxRetries}) reached. Giving up.`
+          );
+
+          // Set appropriate error message based on error type
+          let userErrorMessage = `Failed to load assets after ${maxRetries} attempts. `;
+
+          if (isResourceError) {
+            userErrorMessage +=
+              "The server or browser doesn't have enough resources. Try reducing the page size or try again later.";
+          } else if (isTimeout) {
+            userErrorMessage +=
+              "Requests are timing out. The server may be under heavy load.";
+          } else if (isConnectionError) {
+            userErrorMessage +=
+              "Cannot connect to the server. Please check your network connection.";
+          } else {
+            userErrorMessage += errorMessage;
+          }
+
+          setError(userErrorMessage);
+          setLoading(false);
+        }
+      }
+    },
+    [
+      fetchAttempts,
+      itemsPerPage,
+      currentPage,
+      searchTerm,
+      getParam,
+      prefetchLabels,
+      maxRetries,
+    ]
+  );
+
+  // Function to fetch a specific asset by ID
+  const fetchAssetById = useCallback(
+    async (assetId: string) => {
+      try {
+        console.log(`Fetching specific asset by ID: ${assetId}`);
+        const response = await fetch(`/api/raw/${assetId}`);
+
+        if (!response.ok) {
+          throw new Error(
+            `Server error: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const asset = await response.json();
+
+        if (!asset || !asset._id) {
+          throw new Error(`Asset not found: ${assetId}`);
+        }
+
+        // Convert the asset to the format needed for the details modal
+        const rawAssetData: RawAssetData = {
+          _id: asset._id as unknown as ObjectId,
+          date: asset.date || "Unknown Date",
+          description: asset.description || "",
+          hardDriveIds: Array.isArray(asset.hardDriveIds)
+            ? asset.hardDriveIds.map((id: string) => id as unknown as ObjectId)
+            : [],
+          carIds: Array.isArray(asset.carIds) ? asset.carIds : [],
+          createdAt: asset.createdAt,
+          updatedAt: asset.updatedAt,
+        };
+
+        // If edit=true is in the URL, open the edit modal
+        const isEdit = getParam("edit") === "true";
+        if (isEdit) {
+          setSelectedAssetForDetails(rawAssetData);
+          setIsEditModalOpen(true);
+        } else {
+          setSelectedAssetForDetails(rawAssetData);
+          setIsDetailsModalOpen(true);
+        }
+
+        // Let the useEffect handle label fetching instead of doing it here
+      } catch (error) {
+        console.error(`Error fetching asset ${assetId}:`, error);
+        // No need to set global error state for a single asset fetch failure
+      }
+    },
+    [getParam] // Only depend on getParam
+  );
 
   // Handle Escape key press for both modals
   useEffect(() => {
@@ -132,7 +549,7 @@ export default function RawAssetsTab() {
     if (currentPage > totalPages && totalPages > 0) {
       handlePageChange(1);
     }
-  }, [totalPages]);
+  }, [totalPages, currentPage]);
 
   // Enhanced effect to handle asset parameter from URL, especially when coming from other tabs
   useEffect(() => {
@@ -206,7 +623,7 @@ export default function RawAssetsTab() {
       console.log("Assets not loaded yet, fetching specific asset");
       fetchAssetById(selectedAssetId);
     }
-  }, [assets, getParam, isEditModalOpen, isDetailsModalOpen]);
+  }, [assets, getParam, isEditModalOpen, isDetailsModalOpen]); // Removed fetchAssetById from dependencies
 
   // Handle addAsset parameter from URL
   useEffect(() => {
@@ -216,884 +633,294 @@ export default function RawAssetsTab() {
     }
   }, [getParam, isAddingAsset]);
 
-  const fetchDriveLabels = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(
-        `/api/hard-drives?id=${encodeURIComponent(id)}`
-      );
-      if (!response.ok) {
-        console.warn(
-          `Failed to fetch drive label for ${id}: ${response.statusText}`
-        );
-        return id; // Return the original ID if we can't fetch the label
-      }
-      const data = await response.json();
-      return data.drives?.[0]?.label || id;
-    } catch (error) {
-      console.warn(`Error fetching drive label for ${id}:`, error);
-      return id; // Return the original ID if there's an error
-    }
-  }, []);
+  // Load assets when the component mounts or when search/pagination changes
+  useEffect(() => {
+    // Don't call fetchAssets when component mounts if we're already loading or have assets
+    // Only fetch when currentPage or itemsPerPage changes
+    fetchAssets();
 
-  const fetchCarLabels = useCallback(async (carIds: string[]) => {
-    if (!carIds.length) return {};
+    // This dependency array should NOT include fetchAssets itself to prevent infinite loops
+  }, [currentPage, itemsPerPage]); // Removed fetchAssets from dependency array
 
-    try {
-      console.log("Fetching car labels for IDs:", carIds);
-      const response = await fetch(`/api/cars?ids=${carIds.join(",")}`);
-      if (!response.ok) {
-        console.warn(`Failed to fetch car labels: ${response.statusText}`);
-        return {};
-      }
-      const data = await response.json();
-      console.log("Received car data:", data);
-
-      const labels: Record<string, string> = {};
-      data.cars.forEach((car: any) => {
-        // Create human-readable label from car properties
-        const year = car.year || "";
-        const make = car.make || "";
-        const model = car.model || "";
-        const color = car.exteriorColor || car.color || "";
-
-        // Format: "2020 Tesla Model 3 (Red)"
-        let label = [year, make, model].filter(Boolean).join(" ");
-        if (color) label += ` (${color})`;
-
-        // Important: Ensure the key is a string to avoid type mismatches
-        const carIdStr = car._id.toString();
-
-        // If no car details available, use ID or placeholder
-        labels[carIdStr] = label || `Car ${carIdStr}`;
-        console.log(`Set label for car ${carIdStr}: ${labels[carIdStr]}`);
-      });
-
-      return labels;
-    } catch (error) {
-      console.warn(`Error fetching car labels:`, error);
-      return {};
-    }
-  }, []);
-
-  // Modified fetch assets function with better error handling and retries
-  const fetchAssets = useCallback(
-    async (isRetry = false) => {
-      if (!isRetry) {
-        setLoading(true);
-        setError(null);
-        setTimeoutOccurred(false);
-      }
-
-      try {
-        console.time("fetch-raw-assets");
-        console.log(
-          `Fetching raw assets (attempt ${
-            fetchAttempts + 1
-          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchTerm}`
-        );
-
-        // Use an increasing timeout based on retry attempts
-        const timeout = 30000 + fetchAttempts * 15000; // Increased timeouts: 30s, 45s, 60s
-        console.log(`Using timeout of ${timeout}ms for this request`);
-
-        // Get the current URL search parameters
-        const hardDriveId = getParam("hardDriveId") || "";
-
-        // Build the query URL with proper encoding
-        let queryUrl = `/api/raw?page=${currentPage}&limit=${itemsPerPage}`;
-
-        if (searchTerm) {
-          queryUrl += `&search=${encodeURIComponent(searchTerm)}`;
-        }
-
-        if (hardDriveId) {
-          queryUrl += `&hardDriveId=${encodeURIComponent(hardDriveId)}`;
-        }
-
-        console.log("Fetching from URL:", queryUrl);
-
-        // Use the fetchWithTimeout function
-        const response = await fetchWithTimeout(queryUrl, {}, timeout);
-
-        if (!response.ok) {
-          throw new Error(
-            `Server error: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-        console.timeEnd("fetch-raw-assets");
-
-        // Log the API response structure to help debug
-        console.log("Raw Assets API Response structure:", Object.keys(data));
-        console.log("Raw Assets meta:", data.meta);
-
-        // Log debug info if available
-        if (data.debug) {
-          console.log("Raw assets API debug info:", data.debug);
-        }
-
-        // Add better data validation before setting state
-        const assetsList = Array.isArray(data.data) ? data.data : [];
-        console.log(`Received ${assetsList.length} raw assets`);
-
-        // Add defensive check to ensure each asset has required properties
-        const sanitizedAssets = assetsList.map((asset: any) => ({
-          ...asset,
-          _id: asset._id || "",
-          date: asset.date || "Unknown Date",
-          description: asset.description || "",
-          hardDriveIds: Array.isArray(asset.hardDriveIds)
-            ? asset.hardDriveIds
-            : [],
-          carIds: Array.isArray(asset.carIds) ? asset.carIds : [],
-        }));
-
-        setAssets(sanitizedAssets);
-        setTotalPages(data.meta?.totalPages || 1);
-        setFetchAttempts(0); // Reset attempts on success
-        setTimeoutOccurred(false);
-        setLoading(false);
-
-        // Fetch labels for all cars and hard drives after assets are loaded
-        const allCarIds = new Set<string>();
-        const allDriveIds = new Set<string>();
-
-        // Collect all unique car and drive IDs
-        sanitizedAssets.forEach((asset: RawAsset) => {
-          if (asset.carIds && asset.carIds.length) {
-            asset.carIds.forEach((id: string) => allCarIds.add(id.toString()));
-          }
-          if (asset.hardDriveIds && asset.hardDriveIds.length) {
-            asset.hardDriveIds.forEach((id: string) =>
-              allDriveIds.add(id.toString())
-            );
-          }
-        });
-
-        console.log("Fetching labels for all assets");
-        // Fetch labels for all cars and drives in the list
-        if (allCarIds.size > 0) {
-          const carIds = Array.from(allCarIds);
-          console.log(`Fetching labels for ${carIds.length} cars`);
-          fetchCarLabels(carIds).then((newLabels) => {
-            setCarLabels((prevLabels) => ({ ...prevLabels, ...newLabels }));
-          });
-        }
-
-        if (allDriveIds.size > 0) {
-          const driveIds = Array.from(allDriveIds);
-          console.log(`Fetching labels for ${driveIds.length} drives`);
-          fetchDriveLabelsForAsset(driveIds);
-        }
-      } catch (error) {
-        // Make sure we end the timer even if there's an error
-        try {
-          console.timeEnd("fetch-raw-assets");
-        } catch (timerError) {
-          // Timer might not exist if this is a retry attempt, ignore the error
-        }
-
-        console.error("Error fetching raw assets:", error);
-
-        // Check if this was an abort error (timeout)
-        const isTimeout =
-          error instanceof Error &&
-          (error.name === "AbortError" || error.message.includes("timed out"));
-
-        // Check if the error is a connection issue
-        const isConnectionError =
-          error instanceof Error &&
-          (error.message.includes("connection") ||
-            error.message.includes("ECONNREFUSED") ||
-            error.message.includes("network") ||
-            error.message.includes("MongoDB"));
-
-        if (isTimeout) {
-          setTimeoutOccurred(true);
-          console.warn("Request timed out while fetching raw assets");
-        } else if (isConnectionError) {
-          console.warn("Database connection error detected");
-        }
-
-        // Try to extract any debug info from the response
-        let debugInfo = {};
-        try {
-          if (error instanceof Error && "response" in error) {
-            const responseData = await (error as any).response?.json();
-            if (responseData?.debug) {
-              debugInfo = responseData.debug;
-              console.log(
-                "Extracted debug info from error response:",
-                debugInfo
-              );
-            }
-          }
-        } catch (e) {
-          console.log("Could not extract debug info from error");
-        }
-
-        // If we haven't exceeded max retries, try again
-        if (fetchAttempts < maxRetries) {
-          const nextAttempt = fetchAttempts + 1;
-          console.log(
-            `Retrying fetch (attempt ${nextAttempt} of ${maxRetries})...`
-          );
-          setFetchAttempts(nextAttempt);
-
-          // Wait longer between retries with exponential backoff
-          const delay = Math.min(1000 * Math.pow(2, fetchAttempts), 10000);
-          console.log(`Waiting ${delay}ms before retry...`);
-
-          setTimeout(() => {
-            fetchAssets(true); // Pass true to indicate this is a retry
-          }, delay);
-
-          // Update error message to be more user-friendly
-          if (fetchAttempts === 0) {
-            setError(
-              isTimeout
-                ? "Loading is taking longer than expected. Retrying..."
-                : isConnectionError
-                ? `Database connection issue. Retrying... (${
-                    error instanceof Error ? error.message : "Unknown error"
-                  })`
-                : `Loading error: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                  }. Retrying...`
-            );
-          } else {
-            setError(
-              `Still trying to load (attempt ${nextAttempt} of ${maxRetries})...${
-                isTimeout
-                  ? " The server is taking longer than expected to respond."
-                  : isConnectionError
-                  ? " Database connection issues persist."
-                  : ""
-              }`
-            );
-          }
-        } else {
-          // Max retries exceeded, show final error
-          const errorMessage = isTimeout
-            ? "Request timed out. The server might be under heavy load or the database connection may be having issues."
-            : isConnectionError
-            ? `Database connection failed: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }. Please check your database settings or network connection.`
-            : `Failed to load raw assets: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }`;
-
-          console.error("All retries failed. Final error:", errorMessage);
-          setError(errorMessage);
-          setLoading(false);
-        }
-      }
-    },
-    [currentPage, itemsPerPage, searchTerm, fetchAttempts, maxRetries]
+  // Create a debounced search function
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      // Update URL parameter
+      updateParams({ search: value || null, page: "1" });
+      setCurrentPage(1);
+      fetchAssets(); // This calls fetchAssets with no arguments, matching the function signature
+    }, 500),
+    [] // Removed fetchAssets from dependency array to prevent loops
   );
 
-  // Replace the existing useEffect for fetching assets with this improved version
-  useEffect(() => {
-    setFetchAttempts(0); // Reset attempts when parameters change
-    fetchAssets();
-  }, [fetchAssets]);
+  // Handle search input change
+  const handleSearch = useCallback(
+    (value: string) => {
+      setSearchTerm(value);
+      debouncedSearch(value);
+    },
+    [debouncedSearch] // Only depend on debouncedSearch
+  );
 
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
-    updateParams({
-      search: value || null,
-      page: "1",
-    });
-  };
+  // Handle page change
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPage(page);
+      updateParams({ page: page.toString() });
+    },
+    [updateParams]
+  );
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    updateParams({
-      page: page.toString(),
-    });
-  };
+  // Handle items per page change
+  const handleLimitChange = useCallback(
+    (limit: number) => {
+      setItemsPerPage(limit);
+      setCurrentPage(1);
+      updateParams({ limit: limit.toString(), page: "1" });
+    },
+    [updateParams]
+  );
 
-  const handleLimitChange = (limit: number) => {
-    setItemsPerPage(limit);
-    setCurrentPage(1);
-    updateParams({
-      limit: limit.toString(),
-      page: "1",
-    });
-  };
+  // Handle asset click to open details
+  const handleAssetClick = useCallback(
+    (assetId: string) => {
+      updateParams({ asset: assetId, edit: null });
+    },
+    [updateParams]
+  );
 
-  const handleDeleteAll = async () => {
+  // Handle edit button click
+  const handleEdit = useCallback(
+    (asset: RawAsset) => {
+      updateParams({ asset: asset._id, edit: "true" });
+    },
+    [updateParams]
+  );
+
+  // Handle delete button click
+  const handleDeleteAsset = useCallback(async (assetId: string) => {
     if (
-      !confirm(
-        "Are you sure you want to delete all assets? This cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/raw", {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete assets");
-      fetchAssets();
-    } catch (err) {
-      console.error("Error deleting assets:", err);
-      setError("Failed to delete assets");
-    }
-  };
-
-  const handleViewDetails = (asset: RawAsset) => {
-    // Update URL parameters
-    updateParams({
-      asset: asset._id?.toString() || null,
-      edit: null,
-    });
-
-    // Then set the asset data and open the modal
-    setSelectedAssetForDetails({
-      _id: asset._id as unknown as ObjectId,
-      date: asset.date,
-      description: asset.description,
-      hardDriveIds: asset.hardDriveIds.map((id) => id as unknown as ObjectId),
-      carIds: asset.carIds,
-      createdAt: asset.createdAt,
-      updatedAt: asset.updatedAt,
-    });
-    setIsDetailsModalOpen(true);
-  };
-
-  const handleCloseDetails = () => {
-    console.log("Closing raw asset details modal");
-
-    // Close the modal first
-    setIsDetailsModalOpen(false);
-
-    // Reset the state
-    setSelectedAssetForDetails(undefined);
-
-    // Update URL params - preserve the tab parameter to stay on the raw-assets tab
-    updateParams(
-      {
-        asset: null,
-        edit: null,
-      },
-      {
-        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
-        clearOthers: false,
-      }
-    );
-  };
-
-  const handleEdit = (asset: RawAsset) => {
-    // First, reset the previous asset data
-    setSelectedAssetForDetails(undefined);
-
-    // Then set the new asset data after a small delay to ensure the reset takes effect
-    setTimeout(() => {
-      const rawAssetData: RawAssetData = {
-        _id: asset._id as unknown as ObjectId,
-        date: asset.date,
-        description: asset.description,
-        hardDriveIds: asset.hardDriveIds.map((id) => id as unknown as ObjectId),
-        carIds: asset.carIds,
-      };
-      setSelectedAssetId(asset._id);
-      setSelectedAssetForDetails(rawAssetData);
-      setIsEditModalOpen(true);
-      updateParams({ asset: asset._id?.toString() || null, edit: "true" });
-    }, 50);
-  };
-
-  const handleCloseModal = () => {
-    console.log("Closing edit modal");
-
-    // First close the modal in the state
-    setIsEditModalOpen(false);
-    setSelectedAssetId(null);
-    setSelectedAssetForDetails(undefined);
-
-    // Then clear both the asset and edit parameters from the URL
-    // This is crucial to prevent the modal from reopening due to URL parameters
-    updateParams(
-      {
-        asset: null,
-        edit: null,
-      },
-      {
-        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
-        clearOthers: false,
-      }
-    );
-  };
-
-  const handleSave = async (assetData: Partial<RawAssetData>) => {
-    try {
-      const method = selectedAssetId ? "PUT" : "POST";
-      const url = selectedAssetId ? `/api/raw/${selectedAssetId}` : "/api/raw";
-
-      // Create a clean data object without any extra fields
-      const cleanData = {
-        ...assetData,
-        carIds: assetData.carIds || [],
-      };
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cleanData),
-      });
-
-      if (!response.ok) throw new Error("Failed to save asset");
-
-      // Refresh the assets list
-      fetchAssets();
-      handleCloseModal();
-    } catch (error) {
-      console.error("Error saving asset:", error);
-      throw error; // Let the modal handle the error
-    }
-  };
-
-  const handleDeleteAsset = async (assetId: string) => {
-    if (
-      !confirm(
+      !window.confirm(
         "Are you sure you want to delete this asset? This cannot be undone."
       )
-    ) {
+    )
       return;
-    }
 
     try {
       const response = await fetch(`/api/raw/${assetId}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete asset");
-
-      // Update the state to remove the deleted asset
-      setAssets((prevAssets) =>
-        prevAssets.filter((asset) => asset._id?.toString() !== assetId)
-      );
-
-      // If this was the last item on the page and we're not on the first page,
-      // go to the previous page
-      if (assets.length === 1 && currentPage > 1) {
-        handlePageChange(currentPage - 1);
-      } else {
-        fetchAssets();
-      }
-    } catch (err) {
-      console.error("Error deleting asset:", err);
-      setError("Failed to delete asset");
-    }
-  };
-
-  const handleAssetClick = (assetId: string) => {
-    // Instead of showing a modal, navigate to the raw asset details page
-    router.push(`/raw/${assetId}`);
-  };
-
-  const handleAddAsset = async (assetData: {
-    date: string;
-    description: string;
-    hardDriveIds: string[];
-  }) => {
-    try {
-      const response = await fetch("/api/raw", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(assetData),
-      });
-
-      if (!response.ok) throw new Error("Failed to add asset");
-
-      // Refresh the assets list
-      fetchAssets();
-      setIsAddingAsset(false);
-    } catch (error) {
-      console.error("Error adding asset:", error);
-      throw error;
-    }
-  };
-
-  // Add a function to handle opening the add asset modal
-  const handleAddAssetClick = () => {
-    updateParams({
-      addAsset: "true",
-    });
-    setIsAddingAsset(true);
-  };
-
-  // Handle closing the add asset modal
-  const handleCloseAddAsset = () => {
-    setIsAddingAsset(false);
-    updateParams({
-      addAsset: null,
-    });
-  };
-
-  // Function to fetch a specific asset by ID
-  const fetchAssetById = async (assetId: string) => {
-    console.log("Fetching asset by ID:", assetId);
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/raw/${assetId}`);
 
       if (!response.ok) {
-        throw new Error("Failed to fetch asset");
+        throw new Error(
+          `Failed to delete asset: ${response.status} ${response.statusText}`
+        );
       }
 
-      const asset = await response.json();
-      console.log("Fetched asset data:", asset);
+      // Remove from local state
+      setAssets((prev) => prev.filter((a) => a._id !== assetId));
+      console.log(`Asset ${assetId} deleted successfully`);
+    } catch (error) {
+      console.error(`Error deleting asset ${assetId}:`, error);
+      alert(
+        `Failed to delete asset: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }, []);
 
-      // Transform the asset data to the expected format
-      const rawAssetData: RawAssetData = {
-        _id: asset._id as unknown as ObjectId,
-        date: asset.date,
-        description: asset.description,
-        hardDriveIds: asset.hardDriveIds.map(
-          (id: string) => id as unknown as ObjectId
-        ),
-        carIds: asset.carIds,
-        createdAt: asset.createdAt,
-        updatedAt: asset.updatedAt,
-      };
+  // Handle bulk delete function
+  const handleDeleteAll = useCallback(async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete ALL assets? This cannot be undone!"
+      )
+    )
+      return;
+    if (
+      !window.confirm(
+        "This is EXTREMELY destructive and will remove ALL raw assets. Please confirm again to proceed."
+      )
+    )
+      return;
 
-      // Check if edit mode or view mode
-      const isEdit = getParam("edit") === "true";
+    try {
+      setLoading(true);
+      const response = await fetch("/api/raw/delete-all", {
+        method: "DELETE",
+      });
 
-      if (isEdit && !isEditModalOpen) {
-        setSelectedAssetId(assetId);
-        setSelectedAssetForDetails(rawAssetData);
-        setIsEditModalOpen(true);
-        console.log("Opening edit modal for asset:", assetId);
-      } else if (!isEdit && !isDetailsModalOpen) {
-        setSelectedAssetForDetails(rawAssetData);
-        setIsDetailsModalOpen(true);
-        console.log("Opening details modal for asset:", assetId);
+      if (!response.ok) {
+        throw new Error("Failed to delete all assets");
       }
 
-      // If we had to fetch a single asset, also fetch drive labels for it
-      if (asset.hardDriveIds && asset.hardDriveIds.length > 0) {
-        fetchDriveLabelsForAsset(asset);
-      }
-
-      // Also fetch car labels for this asset
-      if (asset.carIds && asset.carIds.length > 0) {
-        const carLabelsResult = await fetchCarLabels(asset.carIds as string[]);
-        setCarLabels((prevLabels) => ({ ...prevLabels, ...carLabelsResult }));
-      }
-    } catch (err) {
-      console.error("Error fetching asset:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch asset");
+      // Clear local state
+      setAssets([]);
+      setTotalPages(1);
+      setCurrentPage(1);
+      alert("All assets have been deleted.");
+    } catch (error) {
+      console.error("Error deleting all assets:", error);
+      alert(
+        `Error deleting all assets: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  // Add individual drive fetching as a last resort - MOVED UP before it's used elsewhere
-  const fetchIndividualDrive = useCallback(async (driveId: string) => {
-    try {
-      console.log(`Fetching individual drive: ${driveId}`);
-      const response = await fetch(`/api/hard-drives/${driveId}`);
-
-      if (!response.ok) {
-        console.warn(
-          `Failed to fetch individual drive ${driveId}: ${response.statusText}`
-        );
-        return;
-      }
-
-      const data = await response.json();
-      console.log(`Received individual drive data:`, data);
-
-      let drive = data;
-
-      // Handle different response formats
-      if (data.data && typeof data.data === "object") {
-        drive = data.data;
-      } else if (data.drive && typeof data.drive === "object") {
-        drive = data.drive;
-      }
-
-      if (drive && drive._id) {
-        const driveIdStr = drive._id.toString();
-
-        // Try to extract a meaningful label using all possible fields
-        const label =
-          drive.label ||
-          drive.name ||
-          drive.systemName ||
-          `Drive ${driveIdStr.substring(0, 8)}`;
-
-        console.log(
-          `Individual fetch for drive ${driveIdStr} got label: ${label}`
-        );
-
-        // Update just this one drive label
-        setDriveLabels((prevLabels) => ({
-          ...prevLabels,
-          [driveIdStr]: label,
-        }));
-      } else {
-        console.warn(`No valid drive data found for ID ${driveId}`, drive);
-      }
-    } catch (error) {
-      console.error(`Error fetching individual drive ${driveId}:`, error);
-    }
   }, []);
 
-  // Utility function to get drive label, with fallback
-  const getDriveLabel = useCallback(
-    (driveId: string): string => {
-      if (!driveId) return "Unknown Drive";
+  // Handle closing the edit modal
+  const handleCloseModal = useCallback(() => {
+    setIsEditModalOpen(false);
+    updateParams({ asset: null, edit: null });
+  }, [updateParams]);
 
-      const label = driveLabels[driveId];
-      if (label) return label;
-
-      // If we don't have a label yet, trigger individual fetch and return fallback
-      fetchIndividualDrive(driveId).catch(console.error);
-      return `Drive ${driveId.substring(0, 8)}...`;
-    },
-    [driveLabels, fetchIndividualDrive]
-  );
-
-  // Function to fetch drive labels for a specific asset - IMPROVED ERROR HANDLING
-  const fetchDriveLabelsForAsset = useCallback(
-    async (asset: any) => {
-      if (!asset) return;
-
-      // Ensure hardDriveIds is an array, even if it's undefined or null
-      const hardDriveIds = Array.isArray(asset)
-        ? asset // If asset is already an array, use it directly (for batch fetching)
-        : Array.isArray(asset.hardDriveIds)
-        ? asset.hardDriveIds
-        : [];
-
-      if (!hardDriveIds || hardDriveIds.length === 0) {
-        console.log(
-          "Asset has no drive IDs or invalid hardDriveIds format",
-          asset
-        );
-        return;
-      }
-
-      console.log(`Fetching labels for ${hardDriveIds.length} drives`);
-
-      // Format IDs to strings with safety checks
-      const formattedDriveIds = hardDriveIds
-        .filter(
-          (id: string | null | undefined) => id !== null && id !== undefined
-        )
-        .map((id: string | { toString?: () => string }) =>
-          typeof id === "string" ? id : id?.toString ? id.toString() : ""
-        )
-        .filter((id: string) => id); // Remove empty strings
-
-      if (formattedDriveIds.length === 0) {
-        console.log("No valid drive IDs to fetch");
-        return;
-      }
-
+  // Handle save from edit modal
+  const handleSave = useCallback(
+    async (updatedAsset: Partial<RawAssetData>) => {
       try {
-        // First check if we already have the labels for all drives
-        const missingLabels = formattedDriveIds.filter(
-          (id: string) => !driveLabels[id]
-        );
-
-        if (missingLabels.length === 0) {
-          console.log("All drive labels already cached");
-          return;
+        if (!updatedAsset._id) {
+          throw new Error("Missing asset ID");
         }
 
-        console.log(`Fetching ${missingLabels.length} missing drive labels`);
-
-        // Try batch fetch first
-        const response = await fetch(
-          `/api/hard-drives?ids=${missingLabels.join(",")}`
-        );
-
-        if (!response.ok) {
-          console.warn(
-            `Batch fetch failed (${response.status}), falling back to individual fetches`
-          );
-          // Fall back to individual fetches
-          for (const driveId of missingLabels) {
-            await fetchIndividualDrive(driveId);
-          }
-          return;
-        }
-
-        const data = await response.json();
-        console.log("API Response data structure:", Object.keys(data));
-
-        if (data.debug) {
-          console.log("Hard drives API debug info:", data.debug);
-        }
-
-        // Process different response formats with better safety checks
-        let drivesList: any[] = [];
-
-        if (data?.data && Array.isArray(data.data)) {
-          console.log(`Using data.data array with ${data.data.length} items`);
-          drivesList = data.data;
-        } else if (data?.drives && Array.isArray(data.drives)) {
-          console.log(
-            `Using data.drives array with ${data.drives.length} items`
-          );
-          drivesList = data.drives;
-        } else if (Array.isArray(data)) {
-          console.log(`Using direct array response with ${data.length} items`);
-          drivesList = data;
-        } else {
-          console.warn("Unexpected API response format:", data);
-          // Fall back to individual fetches if the response format is unexpected
-          for (const driveId of missingLabels) {
-            await fetchIndividualDrive(driveId);
-          }
-          return;
-        }
-
-        console.log(
-          `Received ${drivesList.length} hard drives out of ${missingLabels.length} total`
-        );
-
-        if (!drivesList || drivesList.length === 0) {
-          console.warn("No drives found in response");
-          return;
-        }
-
-        // Update labels with better safety checks
-        const newLabels = { ...driveLabels };
-        drivesList.forEach((drive: any) => {
-          if (drive && drive._id) {
-            const driveIdStr =
-              typeof drive._id === "string"
-                ? drive._id
-                : drive._id.toString
-                ? drive._id.toString()
-                : "";
-
-            if (!driveIdStr) {
-              console.warn("Invalid drive ID format", drive);
-              return;
-            }
-
-            const label =
-              drive.label ||
-              drive.name ||
-              drive.systemName ||
-              `Drive ${driveIdStr.substring(0, 8)}`;
-
-            newLabels[driveIdStr] = label;
-            console.log(`Set label for drive ${driveIdStr}: ${label}`);
-          }
+        const response = await fetch(`/api/raw/${updatedAsset._id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedAsset),
         });
 
-        setDriveLabels(newLabels);
-      } catch (error) {
-        console.error("Error fetching drive labels:", error);
-        // For any error, still attempt individual fetches as a fallback
-        const idsToFetch = formattedDriveIds || [];
-        for (const driveId of idsToFetch) {
-          if (!driveLabels[driveId]) {
-            try {
-              await fetchIndividualDrive(driveId);
-            } catch (e) {
-              console.error(`Failed individual fetch for ${driveId}:`, e);
-            }
-          }
-        }
-      }
-    },
-    [driveLabels, fetchIndividualDrive]
-  );
-
-  // Add effect to prefetch all drive labels when component mounts
-  useEffect(() => {
-    const prefetchAllDrives = async () => {
-      try {
-        console.log("Prefetching all drive labels on component mount");
-        // Try to get all drives without pagination limits
-        const response = await fetch(`/api/hard-drives?limit=500`);
+        const result = await response.json();
+        console.log("Server response:", result); // Debug log
 
         if (!response.ok) {
-          console.warn("Failed to prefetch drive labels");
-          return;
+          // Get the error message from the server response if available
+          const errorMessage =
+            result.error ||
+            result.message ||
+            response.statusText ||
+            "Failed to update asset";
+          throw new Error(errorMessage);
         }
 
-        const data = await response.json();
-        console.log("Drive prefetch response structure:", Object.keys(data));
+        // Make sure we have a valid result before proceeding
+        if (!result || typeof result !== "object") {
+          console.error("Received invalid response format:", result);
+          throw new Error("Received invalid response from server");
+        }
 
-        // Find the drives data in the response
-        let drivesList = [];
-        if (data.data && Array.isArray(data.data)) {
-          console.log(`Found ${data.data.length} drives in data.data`);
-          drivesList = data.data;
-        } else if (data.drives && Array.isArray(data.drives)) {
-          console.log(`Found ${data.drives.length} drives in data.drives`);
-          drivesList = data.drives;
-        } else if (Array.isArray(data)) {
-          console.log(`Found ${data.length} drives in direct array`);
-          drivesList = data;
-        } else {
-          console.warn(
-            "Unexpected API response format, no drives found:",
-            data
+        // Get the updated data from the response
+        const updatedData = result;
+
+        // Update the local state with the returned data from the server
+        setAssets((prev) =>
+          prev.map((asset) =>
+            asset._id === updatedAsset._id?.toString()
+              ? {
+                  ...asset,
+                  date: updatedData.date || asset.date,
+                  description: updatedData.description || asset.description,
+                  hardDriveIds: Array.isArray(updatedData.hardDriveIds)
+                    ? updatedData.hardDriveIds.map((id: any) =>
+                        typeof id === "string" ? id : id.toString()
+                      )
+                    : asset.hardDriveIds,
+                  carIds: Array.isArray(updatedData.carIds)
+                    ? updatedData.carIds.map((id: any) =>
+                        typeof id === "string" ? id : id.toString()
+                      )
+                    : asset.carIds,
+                  cars: asset.cars, // Preserve existing cars data
+                }
+              : asset
+          )
+        );
+
+        // Refresh labels for any new IDs
+        if (
+          Array.isArray(updatedData.hardDriveIds) &&
+          updatedData.hardDriveIds.length > 0
+        ) {
+          fetchDriveLabels(
+            updatedData.hardDriveIds.map((id: any) =>
+              typeof id === "string" ? id : id.toString()
+            )
           );
-          return;
         }
 
-        // Safely transform the drivesList
-        const labels: Record<string, string> = {};
-
-        if (!Array.isArray(drivesList)) {
-          console.warn("drivesList is not an array:", drivesList);
-          setDriveLabels({});
-          return;
+        if (
+          Array.isArray(updatedData.carIds) &&
+          updatedData.carIds.length > 0
+        ) {
+          fetchCarLabels(
+            updatedData.carIds.map((id: any) =>
+              typeof id === "string" ? id : id.toString()
+            )
+          );
         }
 
-        drivesList.forEach((drive) => {
-          if (drive && drive._id) {
-            const driveIdStr =
-              typeof drive._id === "string" ? drive._id : drive._id.toString();
+        // Close the modal
+        handleCloseModal();
 
-            // Try multiple possible label fields
-            const driveLabel =
-              drive.label ||
-              drive.name ||
-              drive.systemName ||
-              `Drive ${driveIdStr.substring(0, 8)}`;
+        console.log("Asset updated successfully:", updatedData);
+      } catch (error) {
+        console.error("Error updating asset:", error);
+        // Show the actual error message from the server
+        alert(
+          error instanceof Error ? error.message : "Unknown error occurred"
+        );
+      }
+    },
+    [handleCloseModal, fetchCarLabels, fetchDriveLabels]
+  );
 
-            if (driveLabel) {
-              labels[driveIdStr] = driveLabel;
-              console.log(
-                `Set label for drive ${driveIdStr}: ${labels[driveIdStr]}`
-              );
-            }
-          }
+  // Handle adding a new asset
+  const handleAddAssetClick = useCallback(() => {
+    updateParams({ addAsset: "true" });
+  }, [updateParams]);
+
+  // Handle close add asset modal
+  const handleCloseAddAsset = useCallback(() => {
+    setIsAddingAsset(false);
+    updateParams({ addAsset: null });
+  }, [updateParams]);
+
+  // Handle add asset
+  const handleAddAsset = useCallback(
+    async (newAsset: RawAssetData) => {
+      try {
+        const response = await fetch("/api/raw", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(newAsset),
         });
 
-        console.log(`Prefetched ${Object.keys(labels).length} drive labels`);
-        setDriveLabels(labels);
+        if (!response.ok) {
+          throw new Error("Failed to add asset");
+        }
+
+        // Close the modal and refresh the list
+        handleCloseAddAsset();
+        fetchAssets();
+
+        console.log("Asset added successfully");
       } catch (error) {
-        console.error("Error prefetching drive labels:", error);
-        // Don't set an empty object here, keep any previous labels we might have
+        console.error("Error adding asset:", error);
+        alert(
+          `Failed to add asset: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
       }
-    };
-
-    prefetchAllDrives();
-  }, []);
-
-  // Modify the render function to handle the timeout state
-  // Add this JSX before the main content rendering (after the loading check)
+    },
+    [handleCloseAddAsset, fetchAssets]
+  );
 
   if (loading) {
     return (
@@ -1146,23 +973,74 @@ export default function RawAssetsTab() {
               <ul className="list-disc pl-5 text-sm text-muted-foreground mb-4">
                 <li>Try refreshing the page</li>
                 <li>Check your network connection</li>
-                <li>Try again in a few minutes</li>
+
+                {errorType === "resource" && (
+                  <>
+                    <li>Try reducing the page size (items per page)</li>
+                    <li>
+                      Close other browser tabs that might be using resources
+                    </li>
+                    <li>Wait a few minutes for the server load to decrease</li>
+                  </>
+                )}
+
+                {errorType === "timeout" && (
+                  <li>The server might be under heavy load, try again later</li>
+                )}
+
+                {errorType === "connection" && (
+                  <li>Check if your internet connection is stable</li>
+                )}
+
                 {timeoutOccurred && (
                   <li>Check if the database connection needs attention</li>
                 )}
               </ul>
+
+              {errorType === "resource" && (
+                <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-md mb-4">
+                  <h4 className="font-medium text-orange-600 dark:text-orange-400 mb-1">
+                    Resource Constraint Detected
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    The server or browser doesn't have enough resources to
+                    process this request. Try selecting a smaller page size from
+                    the dropdown above or try again later when the system is
+                    under less load.
+                  </p>
+                </div>
+              )}
             </>
           )}
-          <Button
-            variant="outline"
-            className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10"
-            onClick={() => {
-              setFetchAttempts(0);
-              fetchAssets();
-            }}
-          >
-            Try Again
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                setFetchAttempts(0);
+                fetchAssets();
+              }}
+            >
+              Try Again
+            </Button>
+
+            {errorType === "resource" && (
+              <Button
+                variant="outline"
+                className="mt-2"
+                onClick={() => {
+                  // Set a smaller page size and retry
+                  const smallerPageSize = Math.max(
+                    10,
+                    Math.floor(itemsPerPage / 2)
+                  );
+                  handleLimitChange(smallerPageSize);
+                }}
+              >
+                Try With Smaller Page Size
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1251,19 +1129,7 @@ export default function RawAssetsTab() {
             </tr>
           </thead>
           <tbody className="text-[hsl(var(--foreground))]">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="py-8">
-                  <LoadingContainer />
-                </td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={5} className="text-center py-4">
-                  {error}
-                </td>
-              </tr>
-            ) : assets.length === 0 ? (
+            {assets.length === 0 ? (
               <tr>
                 <td colSpan={5} className="text-center py-4">
                   No assets found
@@ -1271,123 +1137,13 @@ export default function RawAssetsTab() {
               </tr>
             ) : (
               assets.map((asset) => (
-                <tr
+                <AssetRow
                   key={asset._id?.toString() || Math.random().toString()}
-                  className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
-                  onClick={() => handleAssetClick(asset._id)}
-                >
-                  <td className="py-3 px-2">
-                    <Link
-                      href={`/raw/${asset._id}`}
-                      className="text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))/90]"
-                    >
-                      {asset.date || "Unknown Date"}
-                    </Link>
-                  </td>
-                  <td className="py-3 px-2 text-sm">
-                    {asset.description || "No description"}
-                  </td>
-                  <td className="py-3 px-2">
-                    <div className="flex flex-wrap gap-2">
-                      {Array.isArray(asset.carIds) &&
-                        asset.carIds.map((carId, index) => {
-                          const carIdStr = carId.toString();
-                          return (
-                            <span
-                              key={index}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
-                            >
-                              <CarIcon className="w-3 h-3" />
-                              {carLabels[carIdStr] || "Unknown Car"}
-                            </span>
-                          );
-                        })}
-                    </div>
-                  </td>
-                  <td className="py-3 px-2">
-                    <div className="flex flex-wrap gap-2">
-                      {Array.isArray(asset.hardDriveIds) &&
-                      asset.hardDriveIds.length > 0 ? (
-                        asset.hardDriveIds
-                          .filter(
-                            (id: any) =>
-                              id !== null && id !== undefined && id !== ""
-                          ) // Filter out null/undefined/empty IDs
-                          .map((hardDriveId: any, index) => {
-                            const hardDriveIdStr = hardDriveId
-                              ? typeof hardDriveId === "string"
-                                ? hardDriveId
-                                : hardDriveId.toString
-                                ? hardDriveId.toString()
-                                : ""
-                              : "";
-
-                            if (!hardDriveIdStr) return null; // Skip empty IDs
-
-                            // Get the actual drive label from our state
-                            let driveLabel = getDriveLabel(hardDriveIdStr);
-
-                            // Special handling for ARB_SHARED drives
-                            if (!driveLabel && hardDriveIdStr.includes("ARB")) {
-                              driveLabel = "ARB_SHARED";
-                            }
-
-                            // Format the full drive ID for display if needed
-                            let formattedId = "";
-                            if (hardDriveIdStr && hardDriveIdStr.length > 6) {
-                              formattedId =
-                                hardDriveIdStr.substring(0, 8) + "...";
-                            }
-
-                            // Show a descriptive label instead of just the ID
-                            const displayLabel =
-                              driveLabel ||
-                              (formattedId
-                                ? `${formattedId}`
-                                : "Unknown Drive");
-
-                            return (
-                              <span
-                                key={index}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
-                              >
-                                <HardDriveIcon className="w-3 h-3" />
-                                {displayLabel}
-                              </span>
-                            );
-                          })
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          No storage locations
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-right">
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(asset);
-                        }}
-                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
-                        title="Edit asset"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteAsset(asset._id);
-                        }}
-                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
-                        title="Delete asset"
-                      >
-                        <Trash2Icon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  asset={asset}
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteAsset}
+                  onClick={handleAssetClick}
+                />
               ))
             )}
           </tbody>
