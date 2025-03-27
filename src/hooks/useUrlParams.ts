@@ -37,6 +37,7 @@ export function useUrlParams() {
     // Log the initial state
     console.log("useUrlParams: Initial URL parameters:", params.toString());
     console.log("useUrlParams: Updates to apply:", JSON.stringify(updates));
+    console.log("useUrlParams: Options:", JSON.stringify(options));
 
     // Handle explicit parameter removal with extra care for 'template'
     Object.entries(updates).forEach(([key, value]) => {
@@ -44,6 +45,7 @@ export function useUrlParams() {
         console.log(`useUrlParams: Explicitly removing parameter: ${key}`);
         params.delete(key);
       } else {
+        console.log(`useUrlParams: Setting parameter: ${key}=${value}`);
         params.set(key, value);
       }
     });

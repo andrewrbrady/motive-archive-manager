@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HardDriveData } from "@/models/hard-drive";
-import { FolderIcon, ScanIcon, MapPin, InfoIcon } from "lucide-react";
+import { FolderIcon, ScanIcon, MapPin, InfoIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LocationResponse } from "@/models/location";
 import {
@@ -38,6 +38,21 @@ export default function HardDriveModal({
   drive,
 }: HardDriveModalProps) {
   console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
+  
+  // Add a local state to track if we should render directly without relying on URL params
+  const [forceRender, setForceRender] = useState(false);
+  
+  // If the parent says the modal should be open, but we don't see it, force render
+  useEffect(() => {
+    if (isOpen && !forceRender) {
+      console.log("Setting forceRender to true because isOpen is true");
+      setForceRender(true);
+    } else if (!isOpen && forceRender) {
+      console.log("Setting forceRender to false because isOpen is false");
+      setForceRender(false);
+    }
+  }, [isOpen, forceRender]);
+
   const [formData, setFormData] = useState<Partial<HardDriveData>>({
     label: "",
     systemName: "",
@@ -66,6 +81,12 @@ export default function HardDriveModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    console.log(
+      "HardDriveModal useEffect with drive:",
+      drive,
+      "isOpen:",
+      isOpen
+    );
     if (drive) {
       setFormData({
         ...drive,
@@ -403,18 +424,58 @@ export default function HardDriveModal({
     }
   };
 
-  if (!isOpen) {
-    console.log("HardDriveModal not showing because isOpen is false");
-    return null;
-  }
+  console.log("HardDriveModal will render with drive:", drive, "isOpen:", isOpen, "forceRender:", forceRender);
 
-  console.log("HardDriveModal will render with drive:", drive);
+  // If we're using forced rendering, render directly without the UrlModal wrapper
+  if (forceRender) {
+    console.log("HardDriveModal using direct rendering due to forceRender");
+    return (
+      <div className="fixed inset-0 bg-[hsl(var(--background))]/95 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
+        <div className="bg-[hsl(var(--background))] p-6 rounded-lg shadow-xl max-w-4xl w-full mx-4 border border-[hsl(var(--border))] relative">
+          <div className="flex justify-between items-start mb-6">
+            <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
+              {drive ? "Edit Hard Drive" : "Add New Hard Drive"}
+            </h2>
+            <button
+              onClick={() => {
+                console.log("Direct modal close button clicked");
+                onClose();
+              }}
+              className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] ml-auto"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-[hsl(var(--destructive))/10] border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] rounded">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Label*</label>
+              <input
+                type="text"
+                value={formData.label}
+                onChange={(e) =>
+  console.log(
+    "HardDriveModal will render with drive:",
+    drive,
+    "isOpen:",
+    isOpen
+  );
 
   return (
     <UrlModal
       paramName={drive ? "editDrive" : "createDrive"}
       paramValue={drive ? drive._id?.toString() : "true"}
-      onClose={onClose}
+      onClose={() => {
+        console.log("UrlModal onClose triggered");
+        onClose();
+      }}
       title={drive ? "Edit Hard Drive" : "Add New Hard Drive"}
       preserveParams={["tab", "page", "limit", "search", "location", "view"]}
     >

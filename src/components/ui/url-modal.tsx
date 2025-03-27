@@ -75,7 +75,9 @@ export function UrlModal({
         "UrlModal - Changing isOpen from",
         isOpen,
         "to",
-        shouldBeOpen
+        shouldBeOpen,
+        "- URL:",
+        window.location.href
       );
       setIsOpen(shouldBeOpen);
     }

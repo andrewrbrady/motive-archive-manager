@@ -549,25 +549,28 @@ export default function HardDrivesTab() {
   };
 
   const handleCloseModal = () => {
-    // Get the current template parameter
-    const template = getParam("template");
+    console.log("Closing modal - clearing URL parameters");
 
-    setIsModalOpen(false);
-    setSelectedDrive(undefined);
-    setIsAddingDrive(false);
-
-    // Update URL parameters, preserving the template parameter if it exists
+    // Need to clear both parameters regardless of which one was set
     updateParams(
       {
         createDrive: null,
         editDrive: null,
-        template: template || null,
       },
       {
         preserveParams: ["tab", "page", "limit", "search", "location", "view"],
         context: "tab:hard-drives",
       }
     );
+
+    setIsModalOpen(false);
+    setSelectedDrive(undefined);
+    setIsAddingDrive(false);
+
+    // Check URL after closing
+    setTimeout(() => {
+      console.log("URL after closing modal:", window.location.href);
+    }, 100);
   };
 
   const handleAddDrive = () => {
@@ -660,10 +663,13 @@ export default function HardDrivesTab() {
 
   const handleEdit = (drive: HardDriveWithDetails) => {
     console.log("Edit button clicked for drive:", drive);
+    console.log("Drive ID to be edited:", drive._id?.toString());
+
     setSelectedDrive(drive);
     setIsModalOpen(true);
 
     // Add URL parameter to make the edit mode shareable and bookmarkable
+    console.log("Setting editDrive URL parameter to:", drive._id?.toString());
     updateParams(
       {
         editDrive: drive._id?.toString() || "",
@@ -673,6 +679,12 @@ export default function HardDrivesTab() {
         context: "modal:edit-drive",
       }
     );
+
+    // Check URL after a short delay
+    setTimeout(() => {
+      console.log("URL after update:", window.location.href);
+      console.log("URL parameters after update:", window.location.search);
+    }, 100);
 
     // Force a delay to ensure state updates before checking
     setTimeout(() => {
@@ -699,6 +711,10 @@ export default function HardDrivesTab() {
   useEffect(() => {
     const editDriveId = getParam("editDrive");
     console.log("Checking editDrive URL parameter:", editDriveId);
+    console.log("Current URL:", window.location.href);
+    console.log("All URL params:", window.location.search);
+    console.log("Current drives array length:", drives.length);
+    console.log("isModalOpen state:", isModalOpen);
 
     if (editDriveId && !isModalOpen) {
       console.log("Found editDrive parameter, looking for matching drive");
