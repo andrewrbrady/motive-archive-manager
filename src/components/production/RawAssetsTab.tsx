@@ -208,7 +208,16 @@ export default function RawAssetsTab() {
   const [errorType, setErrorType] = useState<
     "timeout" | "connection" | "resource" | "other" | null
   >(null);
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
+
+  // State for the search term used in API queries (only updates after debounce)
   const [searchTerm, setSearchTerm] = useState(() => {
+    return getParam("search") || "";
+  });
+
+  // State for the search field display value (updates immediately on typing)
+  // This separation prevents UI refreshes on every keystroke
+  const [displaySearchTerm, setDisplaySearchTerm] = useState(() => {
     return getParam("search") || "";
   });
 
@@ -237,9 +246,6 @@ export default function RawAssetsTab() {
   // Add a state for tracking retry attempts
   const [fetchAttempts, setFetchAttempts] = useState(0);
   const maxRetries = 3;
-
-  // Add a state for tracking if a timeout occurred
-  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
 
   // Simplified prefetch function - batches car and drive IDs with minimal logging
   const prefetchLabels = useCallback(
@@ -645,18 +651,22 @@ export default function RawAssetsTab() {
   // Create a debounced search function
   const debouncedSearch = useCallback(
     debounce((value: string) => {
+      // Update the actual search term that will be used for the API call
+      setSearchTerm(value);
       // Update URL parameter
       updateParams({ search: value || null, page: "1" });
       setCurrentPage(1);
       fetchAssets(); // This calls fetchAssets with no arguments, matching the function signature
-    }, 500),
+    }, 750), // Increased debounce time for better typing experience
     [] // Removed fetchAssets from dependency array to prevent loops
   );
 
   // Handle search input change
   const handleSearch = useCallback(
     (value: string) => {
-      setSearchTerm(value);
+      // Update displayed search term immediately for responsive UI
+      setDisplaySearchTerm(value);
+      // Debounce the actual search
       debouncedSearch(value);
     },
     [debouncedSearch] // Only depend on debouncedSearch
@@ -922,6 +932,23 @@ export default function RawAssetsTab() {
     [handleCloseAddAsset, fetchAssets]
   );
 
+  // Also initialize displaySearchTerm when loading from URL param
+  useEffect(() => {
+    const urlSearchParam = getParam("search");
+    if (urlSearchParam) {
+      setDisplaySearchTerm(urlSearchParam);
+    }
+  }, [getParam]);
+
+  // Make sure both searchTerm and displaySearchTerm are updated when params change
+  useEffect(() => {
+    const searchParam = getParam("search") || "";
+    if (searchParam !== searchTerm) {
+      setSearchTerm(searchParam);
+      setDisplaySearchTerm(searchParam);
+    }
+  }, [getParam, searchTerm]);
+
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
@@ -1052,7 +1079,7 @@ export default function RawAssetsTab() {
         <div className="flex-1 relative">
           <input
             type="text"
-            value={searchTerm}
+            value={displaySearchTerm}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search by date, description, storage location, car year, make, model, or color..."
             className="w-full px-4 py-2 pl-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
