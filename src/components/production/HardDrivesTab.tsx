@@ -560,6 +560,7 @@ export default function HardDrivesTab() {
     updateParams(
       {
         createDrive: null,
+        editDrive: null,
         template: template || null,
       },
       {
@@ -658,8 +659,30 @@ export default function HardDrivesTab() {
   };
 
   const handleEdit = (drive: HardDriveWithDetails) => {
+    console.log("Edit button clicked for drive:", drive);
     setSelectedDrive(drive);
     setIsModalOpen(true);
+
+    // Add URL parameter to make the edit mode shareable and bookmarkable
+    updateParams(
+      {
+        editDrive: drive._id?.toString() || "",
+      },
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        context: "modal:edit-drive",
+      }
+    );
+
+    // Force a delay to ensure state updates before checking
+    setTimeout(() => {
+      console.log(
+        "After state update - isModalOpen:",
+        isModalOpen,
+        "selectedDrive:",
+        selectedDrive
+      );
+    }, 100);
   };
 
   // Handle createDrive parameter from URL
@@ -671,6 +694,32 @@ export default function HardDrivesTab() {
       setIsAddingDrive(true);
     }
   }, [getParam, isModalOpen]);
+
+  // Handle editDrive parameter from URL
+  useEffect(() => {
+    const editDriveId = getParam("editDrive");
+    console.log("Checking editDrive URL parameter:", editDriveId);
+
+    if (editDriveId && !isModalOpen) {
+      console.log("Found editDrive parameter, looking for matching drive");
+
+      // Find the drive by ID
+      const driveToEdit = drives.find(
+        (drive) => drive._id?.toString() === editDriveId
+      );
+
+      if (driveToEdit) {
+        console.log("Found drive to edit:", driveToEdit);
+        setSelectedDrive(driveToEdit);
+        setIsModalOpen(true);
+        setIsAddingDrive(false);
+      } else {
+        console.warn("Could not find drive with ID:", editDriveId);
+        // Clear the parameter if we can't find the drive
+        updateParams({ editDrive: null });
+      }
+    }
+  }, [getParam, isModalOpen, drives]);
 
   // Ensure tab parameter is set when component mounts and no template param exists
   useEffect(() => {

@@ -37,6 +37,7 @@ export default function HardDriveModal({
   onSave,
   drive,
 }: HardDriveModalProps) {
+  console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
   const [formData, setFormData] = useState<Partial<HardDriveData>>({
     label: "",
     systemName: "",
@@ -402,12 +403,17 @@ export default function HardDriveModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log("HardDriveModal not showing because isOpen is false");
+    return null;
+  }
+
+  console.log("HardDriveModal will render with drive:", drive);
 
   return (
     <UrlModal
-      paramName="createDrive"
-      paramValue="true"
+      paramName={drive ? "editDrive" : "createDrive"}
+      paramValue={drive ? drive._id?.toString() : "true"}
       onClose={onClose}
       title={drive ? "Edit Hard Drive" : "Add New Hard Drive"}
       preserveParams={["tab", "page", "limit", "search", "location", "view"]}
