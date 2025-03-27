@@ -32,11 +32,11 @@ interface PaginationWithUrlProps {
 export function PaginationWithUrl({
   totalPages,
   defaultPage = 1,
-  defaultPageSize = 10,
+  defaultPageSize = 100,
   onPageChange,
   context,
   preserveParams = [],
-  pageSizeOptions = [10, 25, 50, 100],
+  pageSizeOptions = [100, 10, 25, 50],
   showPageSizeSelector = true,
 }: PaginationWithUrlProps) {
   const { getParam, updateParams } = useUrlParams();

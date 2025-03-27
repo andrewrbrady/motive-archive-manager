@@ -27,7 +27,7 @@ import {
 import { debounce } from "lodash";
 import { CarIcon } from "lucide-react";
 
-const LIMIT_OPTIONS = [10, 25, 50, 100];
+const LIMIT_OPTIONS = [100, 10, 25, 50];
 
 interface Car {
   _id: string;
@@ -227,7 +227,7 @@ export default function RawAssetsTab() {
 
   const [itemsPerPage, setItemsPerPage] = useState(() => {
     const limit = getParam("limit");
-    return limit ? parseInt(limit) : 10;
+    return limit ? parseInt(limit) : 100;
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -313,6 +313,7 @@ export default function RawAssetsTab() {
         // Build the query URL with proper encoding
         let queryUrl = `/api/raw?page=${currentPage}&limit=${itemsPerPage}`;
 
+        // Always include search parameter if it exists
         if (searchInput) {
           queryUrl += `&search=${encodeURIComponent(searchInput)}`;
         }
@@ -636,23 +637,10 @@ export default function RawAssetsTab() {
     }
   }, [getParam, isAddingAsset]);
 
-  // Load assets when the component mounts or when search/pagination changes
+  // Load assets when the component mounts or when search/pagination/itemsPerPage changes
   useEffect(() => {
-    // Don't call fetchAssets when component mounts if we're already loading or have assets
-    // Only fetch when currentPage or itemsPerPage changes
     fetchAssets();
-
-    // This dependency array should NOT include fetchAssets itself to prevent infinite loops
-  }, [currentPage, itemsPerPage]); // Removed fetchAssets from dependency array
-
-  // Create a debounced function just for URL updates
-  const debouncedUpdateUrl = useCallback(
-    debounce((value: string) => {
-      updateParams({ search: value || null, page: "1" });
-      setCurrentPage(1);
-    }, 500), // Longer delay for URL updates
-    [updateParams]
-  );
+  }, [currentPage, itemsPerPage, searchInput]); // Add searchInput to the dependency array
 
   // Function to filter assets with a search term
   const filterAssetsByTerm = useCallback(
@@ -682,24 +670,28 @@ export default function RawAssetsTab() {
     []
   );
 
-  // Simple search handler - does immediate filtering but debounced URL updates
+  // Simple search handler - update URL and trigger server-side search
   const handleSearch = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchInput(value);
 
-      // Immediate filtering
-      setFilteredAssets(filterAssetsByTerm(assets, value));
-
-      // Debounced URL update
-      debouncedUpdateUrl(value);
+      // Reset to page 1 when searching and update URL params
+      updateParams({ search: value || null, page: "1" });
+      setCurrentPage(1);
     },
-    [assets, debouncedUpdateUrl, filterAssetsByTerm]
+    [updateParams]
   );
 
-  // Update filtered assets when assets or search input changes
+  // Update filtered assets when assets change
   useEffect(() => {
-    setFilteredAssets(filterAssetsByTerm(assets, searchInput));
+    // When no search input is present, just use the server-fetched assets
+    if (!searchInput.trim()) {
+      setFilteredAssets(assets);
+    } else {
+      // Only use client-side filtering as a fallback for immediate feedback
+      setFilteredAssets(filterAssetsByTerm(assets, searchInput));
+    }
   }, [assets, searchInput, filterAssetsByTerm]);
 
   // Initialize search from URL only once on first load
@@ -1206,7 +1198,7 @@ export default function RawAssetsTab() {
           defaultPageSize={itemsPerPage}
           onPageChange={handlePageChange}
           context="tab:raw-assets"
-          preserveParams={["tab", "search"]}
+          preserveParams={["tab", "search", "hardDriveId"]}
           pageSizeOptions={LIMIT_OPTIONS}
         />
       )}
