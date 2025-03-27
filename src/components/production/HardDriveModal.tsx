@@ -125,13 +125,18 @@ export default function HardDriveModal({
         status: formData.status || "Available",
         locationId: formData.locationId === "none" ? "" : formData.locationId,
         rawAssets: formData.rawAssets || [],
+        // Add description field that API expects
+        description:
+          formData.notes || `${formData.type} ${formData.interface} Drive`,
       };
 
       await onSave(cleanedFormData);
       onClose();
     } catch (error) {
       console.error("Error saving hard drive:", error);
-      setError("Failed to save hard drive");
+      setError(
+        error instanceof Error ? error.message : "Failed to save hard drive"
+      );
     } finally {
       setIsSubmitting(false);
     }

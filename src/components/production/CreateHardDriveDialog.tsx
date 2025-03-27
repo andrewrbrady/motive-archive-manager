@@ -76,7 +76,18 @@ export default function CreateHardDriveDialog({
     setError(null);
 
     try {
-      await onSave(formData);
+      // Format the data for the API
+      const apiFormattedData = {
+        ...formData,
+        // Add description field that API expects
+        description: `${formData.type} ${formData.interface} Drive`,
+        // Ensure name field is set from label for API compatibility
+        name: formData.label,
+        // Ensure rawAssetIds is initialized even if empty
+        rawAssetIds: [],
+      };
+
+      await onSave(apiFormattedData);
       onClose();
     } catch (err) {
       setError(

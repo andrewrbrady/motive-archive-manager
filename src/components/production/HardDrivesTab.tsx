@@ -614,22 +614,46 @@ export default function HardDrivesTab() {
         ? `/api/hard-drives/${selectedDrive._id}`
         : "/api/hard-drives";
 
+      // Map the form data fields to what the API expects for both POST and PUT
+      const apiData = {
+        name: driveData.label,
+        description:
+          driveData.notes || `${driveData.type} ${driveData.interface} Drive`,
+        capacity: driveData.capacity,
+        rawAssetIds: driveData.rawAssets || [],
+
+        // Include additional fields that might be needed for the database model
+        // but won't affect the API validation
+        type: driveData.type,
+        interface: driveData.interface,
+        status: driveData.status,
+        locationId: driveData.locationId,
+        systemName: driveData.systemName,
+        label: driveData.label,
+      };
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(driveData),
+        body: JSON.stringify(apiData),
       });
 
-      if (!response.ok) throw new Error("Failed to save hard drive");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.error || "Failed to save hard drive");
+      }
 
       fetchDrives();
       setIsModalOpen(false);
       setSelectedDrive(undefined);
     } catch (err) {
       console.error("Error saving hard drive:", err);
-      setError("Failed to save hard drive");
+      setError(
+        err instanceof Error ? err.message : "Failed to save hard drive"
+      );
     }
   };
 
