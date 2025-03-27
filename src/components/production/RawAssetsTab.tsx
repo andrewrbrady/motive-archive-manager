@@ -25,7 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { debounce } from "lodash";
-import { CarIcon } from "lucide-react";
+import { CarIcon, HardDriveIcon } from "lucide-react";
 
 const LIMIT_OPTIONS = [100, 10, 25, 50];
 
@@ -44,6 +44,7 @@ interface RawAsset {
   hardDriveIds: string[];
   carIds: string[];
   cars?: Car[];
+  hardDrives?: Array<{ _id: string; label: string; name: string }>;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -158,12 +159,30 @@ const AssetRow = memo(
             asset.hardDriveIds.length > 0 ? (
               asset.hardDriveIds
                 .filter((id) => id !== null && id !== undefined && id !== "")
-                .map((driveId, index) => (
-                  <DriveLabel
-                    key={`${asset._id}-drive-${index}`}
-                    driveId={driveId}
-                  />
-                ))
+                .map((driveId, index) => {
+                  // Check if we have the hardDrive data in the asset
+                  const hardDrive = asset.hardDrives?.find(
+                    (drive) => drive._id === driveId
+                  );
+                  if (hardDrive && (hardDrive.label || hardDrive.name)) {
+                    return (
+                      <div
+                        key={`${asset._id}-drive-${index}`}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] rounded-md text-xs border border-[hsl(var(--border))] shadow-sm"
+                      >
+                        <HardDriveIcon className="w-3 h-3" />
+                        {hardDrive.label || hardDrive.name}
+                      </div>
+                    );
+                  }
+                  // Fall back to the DriveLabel component if we don't have the data
+                  return (
+                    <DriveLabel
+                      key={`${asset._id}-drive-${index}`}
+                      driveId={driveId}
+                    />
+                  );
+                })
             ) : (
               <span className="text-muted-foreground text-sm">
                 No storage locations
@@ -203,20 +222,20 @@ export default function RawAssetsTab() {
   const { getParam, updateParams } = useUrlParams();
   const { fetchCarLabels, fetchDriveLabels } = useLabels();
   const [assets, setAssets] = useState<RawAsset[]>([]);
+  const [filteredAssets, setFilteredAssets] = useState<RawAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<
     "timeout" | "connection" | "resource" | "other" | null
   >(null);
-  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
-
-  // State for search input
-  const [searchInput, setSearchInput] = useState(() => {
+  const [searchTerm, setSearchTerm] = useState(() => {
     return getParam("search") || "";
   });
 
-  // State for filtered assets (for client-side filtering)
-  const [filteredAssets, setFilteredAssets] = useState<RawAsset[]>([]);
+  // Separate state for the input field to prevent excessive API calls
+  const [searchInput, setSearchInput] = useState(() => {
+    return getParam("search") || "";
+  });
 
   const [currentPage, setCurrentPage] = useState(() => {
     const page = getParam("page");
@@ -243,6 +262,9 @@ export default function RawAssetsTab() {
   // Add a state for tracking retry attempts
   const [fetchAttempts, setFetchAttempts] = useState(0);
   const maxRetries = 3;
+
+  // Add a state for tracking if a timeout occurred
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
 
   // Simplified prefetch function - batches car and drive IDs with minimal logging
   const prefetchLabels = useCallback(
@@ -272,10 +294,12 @@ export default function RawAssetsTab() {
 
       // Queue batch fetches without causing immediate API calls
       if (carIds.size) {
+        console.log(`Prefetching ${carIds.size} car labels`);
         fetchCarLabels(Array.from(carIds));
       }
 
       if (driveIds.size) {
+        console.log(`Prefetching ${driveIds.size} hard drive labels`);
         fetchDriveLabels(Array.from(driveIds));
       }
     },
@@ -300,7 +324,7 @@ export default function RawAssetsTab() {
         console.log(
           `Fetching raw assets (attempt ${
             fetchAttempts + 1
-          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchInput}`
+          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchTerm}`
         );
 
         // Use an increasing timeout based on retry attempts
@@ -313,9 +337,8 @@ export default function RawAssetsTab() {
         // Build the query URL with proper encoding
         let queryUrl = `/api/raw?page=${currentPage}&limit=${itemsPerPage}`;
 
-        // Always include search parameter if it exists
-        if (searchInput) {
-          queryUrl += `&search=${encodeURIComponent(searchInput)}`;
+        if (searchTerm) {
+          queryUrl += `&search=${encodeURIComponent(searchTerm)}`;
         }
 
         if (hardDriveId) {
@@ -359,6 +382,7 @@ export default function RawAssetsTab() {
             ? asset.hardDriveIds
             : [],
           carIds: Array.isArray(asset.carIds) ? asset.carIds : [],
+          hardDrives: Array.isArray(asset.hardDrives) ? asset.hardDrives : [],
         }));
 
         setAssets(sanitizedAssets);
@@ -473,7 +497,7 @@ export default function RawAssetsTab() {
       fetchAttempts,
       itemsPerPage,
       currentPage,
-      searchInput,
+      searchTerm,
       getParam,
       prefetchLabels,
       maxRetries,
@@ -637,70 +661,79 @@ export default function RawAssetsTab() {
     }
   }, [getParam, isAddingAsset]);
 
-  // Load assets when the component mounts or when search/pagination/itemsPerPage changes
+  // Load assets when the component mounts or when search/pagination changes
   useEffect(() => {
+    // Don't call fetchAssets when component mounts if we're already loading or have assets
+    // Only fetch when currentPage or itemsPerPage changes
     fetchAssets();
-  }, [currentPage, itemsPerPage, searchInput]); // Add searchInput to the dependency array
 
-  // Function to filter assets with a search term
-  const filterAssetsByTerm = useCallback(
-    (assets: RawAsset[], searchTerm: string) => {
-      if (!searchTerm.trim()) {
-        return assets;
+    // This dependency array should NOT include fetchAssets itself to prevent infinite loops
+  }, [currentPage, itemsPerPage]); // Removed fetchAssets from dependency array
+
+  // Filter assets locally based on search term
+  const filterAssets = useCallback((assets: RawAsset[], term: string) => {
+    if (!term.trim()) {
+      return assets;
+    }
+
+    const searchLower = term.toLowerCase();
+    return assets.filter((asset) => {
+      // Check date
+      if (asset.date && asset.date.toLowerCase().includes(searchLower)) {
+        return true;
       }
 
-      const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/);
-      return assets.filter((asset) => {
-        const searchableContent = [
-          asset.date || "",
-          asset.description || "",
-          ...(asset.cars || []).map(
-            (car) =>
-              `${car.year || ""} ${car.make || ""} ${car.model || ""} ${
-                car.color || ""
-              }`
-          ),
-        ]
-          .join(" ")
-          .toLowerCase();
+      // Check description
+      if (
+        asset.description &&
+        asset.description.toLowerCase().includes(searchLower)
+      ) {
+        return true;
+      }
 
-        return searchTerms.every((term) => searchableContent.includes(term));
-      });
-    },
-    []
+      // Check cars
+      if (Array.isArray(asset.cars) && asset.cars.length > 0) {
+        for (const car of asset.cars) {
+          const carString = `${car.year} ${car.make} ${car.model} ${
+            car.color || ""
+          }`.toLowerCase();
+          if (carString.includes(searchLower)) {
+            return true;
+          }
+        }
+      }
+
+      // We don't check hard drive IDs here as they need to be fetched and resolved first
+
+      return false;
+    });
+  }, []);
+
+  // Update filtered assets whenever assets or search term changes
+  useEffect(() => {
+    setFilteredAssets(filterAssets(assets, searchTerm));
+  }, [assets, searchTerm, filterAssets]);
+
+  // Create a properly debounced search function
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      // Update URL parameter and trigger search
+      updateParams({ search: value || null, page: "1" });
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 500),
+    [updateParams]
   );
 
-  // Simple search handler - update URL and trigger server-side search
+  // Handle search input change
   const handleSearch = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchInput(value);
-
-      // Reset to page 1 when searching and update URL params
-      updateParams({ search: value || null, page: "1" });
-      setCurrentPage(1);
+      debouncedSearch(value);
     },
-    [updateParams]
+    [debouncedSearch]
   );
-
-  // Update filtered assets when assets change
-  useEffect(() => {
-    // When no search input is present, just use the server-fetched assets
-    if (!searchInput.trim()) {
-      setFilteredAssets(assets);
-    } else {
-      // Only use client-side filtering as a fallback for immediate feedback
-      setFilteredAssets(filterAssetsByTerm(assets, searchInput));
-    }
-  }, [assets, searchInput, filterAssetsByTerm]);
-
-  // Initialize search from URL only once on first load
-  useEffect(() => {
-    const searchParam = getParam("search");
-    if (searchParam) {
-      setSearchInput(searchParam);
-    }
-  }, []); // Empty dependency array means this only runs once
 
   // Handle page change
   const handlePageChange = useCallback(
@@ -1099,6 +1132,7 @@ export default function RawAssetsTab() {
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
         </div>
+
         <select
           value={itemsPerPage}
           onChange={(e) => handleLimitChange(Number(e.target.value))}
@@ -1171,9 +1205,7 @@ export default function RawAssetsTab() {
             {filteredAssets.length === 0 ? (
               <tr>
                 <td colSpan={5} className="text-center py-4">
-                  {searchInput && assets.length > 0
-                    ? "No matching assets found"
-                    : "No assets found"}
+                  No assets found
                 </td>
               </tr>
             ) : (
@@ -1191,14 +1223,14 @@ export default function RawAssetsTab() {
         </table>
       </div>
 
-      {!loading && assets.length > 0 && (
+      {!loading && filteredAssets.length > 0 && (
         <PaginationWithUrl
           totalPages={totalPages}
           defaultPage={currentPage}
           defaultPageSize={itemsPerPage}
           onPageChange={handlePageChange}
           context="tab:raw-assets"
-          preserveParams={["tab", "search", "hardDriveId"]}
+          preserveParams={["tab", "search"]}
           pageSizeOptions={LIMIT_OPTIONS}
         />
       )}

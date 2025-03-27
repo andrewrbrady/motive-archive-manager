@@ -10,6 +10,20 @@ export interface RawAssetData {
   description: string;
   hardDriveIds: TypeObjectId[];
   carIds: string[]; // Array of car IDs - required field
+  cars?: Array<{
+    _id: string;
+    year?: number | string;
+    make?: string;
+    model?: string;
+    color?: string;
+    exteriorColor?: string;
+  }>;
+  hardDrives?: Array<{
+    _id: string;
+    name?: string;
+    label?: string;
+    type?: string;
+  }>;
   createdAt?: Date;
   updatedAt?: Date;
 }

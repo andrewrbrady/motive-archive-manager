@@ -306,8 +306,12 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
           if (!drive || !drive._id) return;
 
           const driveIdStr = drive._id.toString();
+          // Use a more meaningful fallback instead of showing the Object ID
           const label =
-            drive.label || drive.name || `Drive ${driveIdStr.substring(0, 8)}`;
+            drive.label ||
+            drive.name ||
+            drive.type ||
+            `Hard Drive ${driveIdStr.substring(0, 6)}`;
 
           newLabels[driveIdStr] = label;
         });
@@ -315,7 +319,8 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
         // Add fallbacks for any IDs that weren't returned
         uncachedIds.forEach((id) => {
           if (!newLabels[id]) {
-            newLabels[id] = `Drive ${id.substring(0, 8)}`;
+            // Use a more user-friendly fallback
+            newLabels[id] = `Hard Drive ${id.substring(0, 6)}`;
 
             // Mark in sessionStorage that we've tried this ID multiple times
             sessionStorage.setItem(`drive-retry-${id}`, "3");
@@ -330,7 +335,8 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
         // Create fallbacks for all requested IDs
         const fallbackLabels: Record<string, string> = {};
         uncachedIds.forEach((id) => {
-          fallbackLabels[id] = `Drive ${id.substring(0, 8)}`;
+          // Use a more user-friendly fallback
+          fallbackLabels[id] = `Hard Drive ${id.substring(0, 6)}`;
 
           // Mark as max retries to prevent further attempts
           sessionStorage.setItem(`drive-retry-${id}`, "3");
@@ -482,7 +488,7 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
       // Return loading/fallback state
       return fetchingDriveIds.has(id)
         ? "Loading..."
-        : `Drive ${id.substring(0, 8)}`;
+        : `Hard Drive ${id.substring(0, 6)}`;
     },
     [driveLabels, fetchingDriveIds]
   );

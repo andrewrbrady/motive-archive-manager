@@ -6,10 +6,11 @@ import { RawAsset } from "@/models/raw_assets";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "10");
+  const limit = parseInt(searchParams.get("limit") || "100");
   const sort = searchParams.get("sort") || "date";
   const direction = searchParams.get("direction") === "asc" ? 1 : -1;
   const searchTerm = searchParams.get("search") || "";
+  const hardDriveId = searchParams.get("hardDriveId") || "";
 
   // Debug info object
   const debugInfo: any = {
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
     limit,
     sort,
     direction,
+    hardDriveId,
   };
 
   console.time("raw-assets-api-fetch");
@@ -35,6 +37,19 @@ export async function GET(request: Request) {
           { date: { $regex: searchTerm, $options: "i" } },
           { description: { $regex: searchTerm, $options: "i" } },
         ];
+      }
+
+      // Add hardDriveId filter if present
+      if (hardDriveId) {
+        try {
+          const hardDriveObjectId = new ObjectId(hardDriveId);
+          query.hardDriveIds = hardDriveObjectId;
+        } catch (err) {
+          console.error(
+            `Invalid ObjectId format for hardDriveId: ${hardDriveId}`
+          );
+          query.hardDriveIds = hardDriveId;
+        }
       }
 
       // Update debug info
@@ -54,17 +69,55 @@ export async function GET(request: Request) {
       const sortOptions: Record<string, 1 | -1> = {};
       sortOptions[sort] = direction;
 
+      // Modified pipeline to include both car and hard drive data
       const pipeline = [
         { $match: query },
+        // First add a stage to ensure carIds is a valid array
+        {
+          $addFields: {
+            safeCarIds: {
+              $cond: {
+                if: { $isArray: "$carIds" },
+                then: {
+                  $filter: {
+                    input: "$carIds",
+                    as: "id",
+                    cond: { $ne: ["$$id", null] },
+                  },
+                },
+                else: [],
+              },
+            },
+            // Add a similar field for hard drive IDs
+            safeHardDriveIds: {
+              $cond: {
+                if: { $isArray: "$hardDriveIds" },
+                then: {
+                  $filter: {
+                    input: "$hardDriveIds",
+                    as: "id",
+                    cond: { $ne: ["$$id", null] },
+                  },
+                },
+                else: [],
+              },
+            },
+          },
+        },
+        // Then use safeCarIds in the lookup
         {
           $lookup: {
             from: "cars",
-            let: { carIds: "$carIds" },
+            let: { carIds: "$safeCarIds" },
             pipeline: [
               {
                 $match: {
                   $expr: {
-                    $in: ["$_id", "$$carIds"],
+                    $cond: {
+                      if: { $eq: [{ $size: "$$carIds" }, 0] },
+                      then: false, // Skip this match if carIds is empty
+                      else: { $in: ["$_id", "$$carIds"] },
+                    },
                   },
                 },
               },
@@ -80,6 +133,35 @@ export async function GET(request: Request) {
               },
             ],
             as: "cars",
+          },
+        },
+        // Add lookup for hard drives
+        {
+          $lookup: {
+            from: "hard_drives",
+            let: { hardDriveIds: "$safeHardDriveIds" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $cond: {
+                      if: { $eq: [{ $size: "$$hardDriveIds" }, 0] },
+                      then: false, // Skip this match if hardDriveIds is empty
+                      else: { $in: ["$_id", "$$hardDriveIds"] },
+                    },
+                  },
+                },
+              },
+              {
+                $project: {
+                  _id: 1,
+                  name: 1,
+                  label: 1,
+                  type: 1,
+                },
+              },
+            ],
+            as: "hardDrives",
           },
         },
         { $sort: sortOptions },
@@ -116,6 +198,13 @@ export async function GET(request: Request) {
               ...car,
               _id: car._id.toString(),
               color: car.exteriorColor || car.color || "",
+            }))
+          : [],
+        // Format hard drive data
+        hardDrives: Array.isArray(asset.hardDrives)
+          ? asset.hardDrives.map((drive) => ({
+              ...drive,
+              _id: drive._id.toString(),
             }))
           : [],
       }));
