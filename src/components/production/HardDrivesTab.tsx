@@ -865,10 +865,13 @@ export default function HardDrivesTab() {
           {drives.map((drive) => (
             <div
               key={drive._id?.toString() || Math.random().toString()}
-              className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 cursor-pointer hover:bg-[hsl(var(--accent))/10] shadow-sm transition-colors"
+              className="bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-lg p-4 cursor-pointer hover:bg-[hsl(var(--accent))/10] shadow-sm transition-colors relative"
               onClick={(e) => {
-                console.log("Grid item clicked for drive:", drive);
-                handleViewDetails(drive);
+                // Only handle click if not on a button
+                if (!(e.target as HTMLElement).closest("button")) {
+                  console.log("Grid item clicked for drive:", drive);
+                  handleViewDetails(drive);
+                }
               }}
             >
               <div className="flex items-center gap-2 mb-3">
@@ -880,6 +883,30 @@ export default function HardDrivesTab() {
                       {drive.systemName}
                     </div>
                   )}
+                </div>
+                <div className="flex ml-auto gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(drive);
+                    }}
+                    className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))] transition-colors"
+                    title="Edit drive"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (drive._id) {
+                        setDriveToDelete(drive);
+                      }
+                    }}
+                    className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+                    title="Delete drive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
               <div className="space-y-2 text-sm">
@@ -991,8 +1018,15 @@ export default function HardDrivesTab() {
                   key={drive._id?.toString() || Math.random().toString()}
                   className="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] transition-colors cursor-pointer"
                   onClick={(e) => {
-                    console.log("Table row clicked for drive:", drive);
-                    handleViewDetails(drive);
+                    // Only handle click if it's directly on the row or a cell, not on buttons
+                    if (
+                      e.target === e.currentTarget ||
+                      (e.target as HTMLElement).tagName === "TD" ||
+                      (e.target as HTMLElement).closest("td:not(:last-child)")
+                    ) {
+                      console.log("Table row clicked for drive:", drive);
+                      handleViewDetails(drive);
+                    }
                   }}
                 >
                   <td className="py-3 px-2">
@@ -1125,6 +1159,19 @@ export default function HardDrivesTab() {
         onClose={handleCloseModal}
         onSave={handleSave}
         drive={selectedDrive}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={!!driveToDelete}
+        onClose={() => setDriveToDelete(null)}
+        onConfirm={() => {
+          if (driveToDelete?._id) {
+            handleDelete(driveToDelete._id.toString());
+            setDriveToDelete(null);
+          }
+        }}
+        title="Delete Hard Drive"
+        message={`Are you sure you want to delete the hard drive "${driveToDelete?.label}"? This action cannot be undone.`}
       />
     </div>
   );
