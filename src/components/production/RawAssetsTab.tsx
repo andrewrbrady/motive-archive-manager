@@ -210,16 +210,13 @@ export default function RawAssetsTab() {
   >(null);
   const [timeoutOccurred, setTimeoutOccurred] = useState(false);
 
-  // State for the search term used in API queries (only updates after debounce)
-  const [searchTerm, setSearchTerm] = useState(() => {
+  // State for search input
+  const [searchInput, setSearchInput] = useState(() => {
     return getParam("search") || "";
   });
 
-  // State for the search field display value (updates immediately on typing)
-  // This separation prevents UI refreshes on every keystroke
-  const [displaySearchTerm, setDisplaySearchTerm] = useState(() => {
-    return getParam("search") || "";
-  });
+  // State for filtered assets (for client-side filtering)
+  const [filteredAssets, setFilteredAssets] = useState<RawAsset[]>([]);
 
   const [currentPage, setCurrentPage] = useState(() => {
     const page = getParam("page");
@@ -303,7 +300,7 @@ export default function RawAssetsTab() {
         console.log(
           `Fetching raw assets (attempt ${
             fetchAttempts + 1
-          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchTerm}`
+          }): page=${currentPage}, limit=${itemsPerPage}, search=${searchInput}`
         );
 
         // Use an increasing timeout based on retry attempts
@@ -316,8 +313,8 @@ export default function RawAssetsTab() {
         // Build the query URL with proper encoding
         let queryUrl = `/api/raw?page=${currentPage}&limit=${itemsPerPage}`;
 
-        if (searchTerm) {
-          queryUrl += `&search=${encodeURIComponent(searchTerm)}`;
+        if (searchInput) {
+          queryUrl += `&search=${encodeURIComponent(searchInput)}`;
         }
 
         if (hardDriveId) {
@@ -475,7 +472,7 @@ export default function RawAssetsTab() {
       fetchAttempts,
       itemsPerPage,
       currentPage,
-      searchTerm,
+      searchInput,
       getParam,
       prefetchLabels,
       maxRetries,
@@ -648,15 +645,65 @@ export default function RawAssetsTab() {
     // This dependency array should NOT include fetchAssets itself to prevent infinite loops
   }, [currentPage, itemsPerPage]); // Removed fetchAssets from dependency array
 
+  // Function to filter assets based on search input
+  const filterAssets = useCallback(
+    (assetsToFilter: RawAsset[], searchValue: string) => {
+      if (!searchValue.trim()) {
+        // If no search, show all assets
+        setFilteredAssets(assetsToFilter);
+        return;
+      }
+
+      const normalizedSearch = searchValue.toLowerCase().trim();
+
+      const filtered = assetsToFilter.filter((asset) => {
+        // Check date
+        if (asset.date?.toLowerCase().includes(normalizedSearch)) return true;
+
+        // Check description
+        if (asset.description?.toLowerCase().includes(normalizedSearch))
+          return true;
+
+        // Check car information
+        if (asset.cars && asset.cars.length > 0) {
+          for (const car of asset.cars) {
+            const carYear = car.year?.toString().toLowerCase() || "";
+            const carMake = car.make?.toLowerCase() || "";
+            const carModel = car.model?.toLowerCase() || "";
+            const carColor = car.color?.toLowerCase() || "";
+
+            // Check each car field
+            if (carYear.includes(normalizedSearch)) return true;
+            if (carMake.includes(normalizedSearch)) return true;
+            if (carModel.includes(normalizedSearch)) return true;
+            if (carColor.includes(normalizedSearch)) return true;
+
+            // Check combined string
+            const combinedCar =
+              `${carYear} ${carMake} ${carModel} ${carColor}`.toLowerCase();
+            if (combinedCar.includes(normalizedSearch)) return true;
+          }
+        }
+
+        return false;
+      });
+
+      setFilteredAssets(filtered);
+    },
+    []
+  );
+
+  // Effect to filter assets whenever search input or assets change
+  useEffect(() => {
+    filterAssets(assets, searchInput);
+  }, [assets, searchInput, filterAssets]);
+
   // Create a debounced search function
   const debouncedSearch = useCallback(
     debounce((value: string) => {
-      // Update the actual search term that will be used for the API call
-      setSearchTerm(value);
-      // Update URL parameter
+      // Only update URL parameter, no need to trigger API fetch
       updateParams({ search: value || null, page: "1" });
       setCurrentPage(1);
-      fetchAssets(); // This calls fetchAssets with no arguments, matching the function signature
     }, 750), // Increased debounce time for better typing experience
     [] // Removed fetchAssets from dependency array to prevent loops
   );
@@ -664,9 +711,7 @@ export default function RawAssetsTab() {
   // Handle search input change
   const handleSearch = useCallback(
     (value: string) => {
-      // Update displayed search term immediately for responsive UI
-      setDisplaySearchTerm(value);
-      // Debounce the actual search
+      setSearchInput(value);
       debouncedSearch(value);
     },
     [debouncedSearch] // Only depend on debouncedSearch
@@ -932,22 +977,21 @@ export default function RawAssetsTab() {
     [handleCloseAddAsset, fetchAssets]
   );
 
-  // Also initialize displaySearchTerm when loading from URL param
+  // Also initialize searchInput when loading from URL param
   useEffect(() => {
     const urlSearchParam = getParam("search");
     if (urlSearchParam) {
-      setDisplaySearchTerm(urlSearchParam);
+      setSearchInput(urlSearchParam);
     }
   }, [getParam]);
 
-  // Make sure both searchTerm and displaySearchTerm are updated when params change
+  // Make sure searchInput is updated when params change
   useEffect(() => {
     const searchParam = getParam("search") || "";
-    if (searchParam !== searchTerm) {
-      setSearchTerm(searchParam);
-      setDisplaySearchTerm(searchParam);
+    if (searchParam !== searchInput) {
+      setSearchInput(searchParam);
     }
-  }, [getParam, searchTerm]);
+  }, [getParam, searchInput]);
 
   if (loading) {
     return (
@@ -1079,7 +1123,7 @@ export default function RawAssetsTab() {
         <div className="flex-1 relative">
           <input
             type="text"
-            value={displaySearchTerm}
+            value={searchInput}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search by date, description, storage location, car year, make, model, or color..."
             className="w-full px-4 py-2 pl-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
@@ -1156,14 +1200,16 @@ export default function RawAssetsTab() {
             </tr>
           </thead>
           <tbody className="text-[hsl(var(--foreground))]">
-            {assets.length === 0 ? (
+            {filteredAssets.length === 0 ? (
               <tr>
                 <td colSpan={5} className="text-center py-4">
-                  No assets found
+                  {searchInput && assets.length > 0
+                    ? "No matching assets found"
+                    : "No assets found"}
                 </td>
               </tr>
             ) : (
-              assets.map((asset) => (
+              filteredAssets.map((asset) => (
                 <AssetRow
                   key={asset._id?.toString() || Math.random().toString()}
                   asset={asset}
