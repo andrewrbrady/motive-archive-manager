@@ -38,10 +38,10 @@ export default function HardDriveModal({
   drive,
 }: HardDriveModalProps) {
   console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
-  
+
   // Add a local state to track if we should render directly without relying on URL params
   const [forceRender, setForceRender] = useState(false);
-  
+
   // If the parent says the modal should be open, but we don't see it, force render
   useEffect(() => {
     if (isOpen && !forceRender) {
@@ -424,7 +424,14 @@ export default function HardDriveModal({
     }
   };
 
-  console.log("HardDriveModal will render with drive:", drive, "isOpen:", isOpen, "forceRender:", forceRender);
+  console.log(
+    "HardDriveModal will render with drive:",
+    drive,
+    "isOpen:",
+    isOpen,
+    "forceRender:",
+    forceRender
+  );
 
   // If we're using forced rendering, render directly without the UrlModal wrapper
   if (forceRender) {
@@ -461,13 +468,283 @@ export default function HardDriveModal({
                 type="text"
                 value={formData.label}
                 onChange={(e) =>
-  console.log(
-    "HardDriveModal will render with drive:",
-    drive,
-    "isOpen:",
-    isOpen
-  );
+                  setFormData({ ...formData, label: e.target.value })
+                }
+                required
+                className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+              />
+            </div>
 
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                System Name
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.systemName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, systemName: e.target.value })
+                  }
+                  className="flex-1 px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleFolderSelect}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <FolderIcon className="w-4 h-4" />
+                  {isLoading ? "Loading..." : "Select Drive"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSystemDriveInfo}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  {isLoading ? "Loading..." : "Get System Drive"}
+                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleScan}
+                        disabled={isScanning || !formData.systemName}
+                        className="flex items-center gap-2"
+                      >
+                        <ScanIcon className="w-4 h-4" />
+                        {isScanning ? "Scanning..." : "Scan YYMMDD Dirs"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-xs">
+                        Scans for directories in YYMMDD format and associates
+                        matching raw assets with this drive.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Type*</label>
+                <select
+                  value={formData.type}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      type: e.target.value as "HDD" | "SSD" | "NVMe",
+                    })
+                  }
+                  required
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                >
+                  <option value="HDD">HDD</option>
+                  <option value="SSD">SSD</option>
+                  <option value="NVMe">NVMe</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Interface*
+                </label>
+                <select
+                  value={formData.interface}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      interface: e.target.value as
+                        | "USB"
+                        | "Thunderbolt"
+                        | "USB-C"
+                        | "Internal",
+                    })
+                  }
+                  required
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                >
+                  <option value="USB">USB</option>
+                  <option value="USB-C">USB-C</option>
+                  <option value="Thunderbolt">Thunderbolt</option>
+                  <option value="Internal">Internal</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Status*
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      status: e.target.value as
+                        | "Available"
+                        | "In Use"
+                        | "Archived"
+                        | "Offline",
+                    })
+                  }
+                  required
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                >
+                  <option value="Available">Available</option>
+                  <option value="In Use">In Use</option>
+                  <option value="Archived">Archived</option>
+                  <option value="Offline">Offline</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Location
+                </label>
+                <div className="flex gap-2 items-center">
+                  <Select
+                    value={formData.locationId || "none"}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        locationId: value === "none" ? "" : value,
+                      })
+                    }
+                    disabled={isLoadingLocations}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Total Capacity (GB)*
+                </label>
+                <input
+                  type="number"
+                  value={formData.capacity?.total || 0}
+                  onChange={(e) =>
+                    updateCapacity("total", Number(e.target.value))
+                  }
+                  required
+                  min="0"
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Used Space (GB)
+                </label>
+                <input
+                  type="number"
+                  value={formData.capacity?.used || 0}
+                  onChange={(e) =>
+                    updateCapacity("used", Number(e.target.value))
+                  }
+                  min="0"
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Available Space (GB)
+                </label>
+                <input
+                  type="number"
+                  value={formData.capacity?.available || 0}
+                  onChange={(e) =>
+                    updateCapacity("available", Number(e.target.value))
+                  }
+                  min="0"
+                  className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Notes</label>
+              <textarea
+                value={formData.notes || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
+                rows={4}
+                className="w-full px-3 py-2 bg-[hsl(var(--background))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))]"
+              ></textarea>
+            </div>
+
+            {scanResult && (
+              <div className="p-3 bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))] rounded">
+                <h3 className="font-medium mb-1">Scan Results</h3>
+                <p className="text-sm mb-2">
+                  Scanned {scanResult.scannedFolders} folders and found{" "}
+                  {scanResult.matchedAssets} matching raw assets.
+                </p>
+                {scanResult.matchedAssets > 0 ? (
+                  <div className="text-sm text-[hsl(var(--success))]">
+                    Successfully matched and associated raw assets with this
+                    drive.
+                  </div>
+                ) : scanResult.scannedFolders > 0 ? (
+                  <div className="text-sm text-[hsl(var(--muted-foreground))]">
+                    Found directories but no matching assets in the database.
+                  </div>
+                ) : (
+                  <div className="text-sm text-[hsl(var(--muted-foreground))]">
+                    No date-formatted directories (YYMMDD) found.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? drive
+                    ? "Saving..."
+                    : "Adding..."
+                  : drive
+                  ? "Save Changes"
+                  : "Add Hard Drive"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Default to using UrlModal
   return (
     <UrlModal
       paramName={drive ? "editDrive" : "createDrive"}
