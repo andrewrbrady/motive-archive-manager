@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HardDriveData } from "@/models/hard-drive";
-import { FolderIcon, ScanIcon, MapPin } from "lucide-react";
+import { FolderIcon, ScanIcon, MapPin, InfoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LocationResponse } from "@/models/location";
 import {
@@ -11,6 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UrlModal } from "@/components/ui/url-modal";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface HardDriveModalProps {
   isOpen: boolean;
@@ -298,30 +304,99 @@ export default function HardDriveModal({
 
   const handleScan = async () => {
     try {
+      if (!formData.systemName) {
+        setError("Please select or enter a system path first");
+        return;
+      }
+
       setIsScanning(true);
       setError(null);
+      setScanResult(null);
 
-      // Simulate scanning for demo purposes
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Fetch directory listing from the drive
+      const response = await fetch(
+        `/api/system/directory?path=${encodeURIComponent(formData.systemName)}`
+      );
 
-      // Update form data with scan results
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to scan drive directories");
+      }
+
+      const { directories } = await response.json();
+
+      // Filter for directories that match YYMMDD format
+      const dateRegex = /^(\d{6})$/; // Match YYMMDD format
+      const dateDirectories = directories.filter((dir: { name: string }) =>
+        dateRegex.test(dir.name)
+      );
+
+      if (dateDirectories.length === 0) {
+        setScanResult({
+          matchedAssets: 0,
+          scannedFolders: directories.length,
+        });
+        setFormData((prev) => ({
+          ...prev,
+          notes:
+            prev.notes ||
+            `Scan completed on ${new Date().toLocaleString()}. No date-formatted directories found.`,
+        }));
+        return;
+      }
+
+      // Extract dates from directory names to search for matching raw assets
+      const datesToSearch = dateDirectories.map(
+        (dir: { name: string }) => dir.name
+      );
+
+      // Search for raw assets with matching dates
+      const assetResponse = await fetch("/api/raw/search-by-dates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ dates: datesToSearch, driveId: formData._id }),
+      });
+
+      if (!assetResponse.ok) {
+        throw new Error("Failed to search for matching assets");
+      }
+
+      const { matchedAssets, associatedAssets, newlyAssociated } =
+        await assetResponse.json();
+
+      // Update the form with scan results
       setFormData((prev) => ({
         ...prev,
-        type: "SSD",
-        interface: "Internal",
-        locationId: prev.locationId, // Keep existing locationId
         notes:
           prev.notes ||
-          `Scan completed on ${new Date().toLocaleString()}. Found 3 matching assets.`,
+          `Scan completed on ${new Date().toLocaleString()}.\n` +
+            `Found ${dateDirectories.length} date directories (YYMMDD format).\n` +
+            `Matched with ${matchedAssets.length} raw assets.\n` +
+            `${associatedAssets.length} assets were already associated with this drive.\n` +
+            `${newlyAssociated} assets were newly associated with this drive.`,
       }));
 
+      // Set scan result for display
       setScanResult({
-        matchedAssets: 3,
-        scannedFolders: 12,
+        matchedAssets: matchedAssets.length,
+        scannedFolders: directories.length,
       });
+
+      // If we found any matches, show a success message
+      if (matchedAssets.length > 0) {
+        setError(null);
+      } else if (dateDirectories.length > 0) {
+        setError(
+          "Found date directories but no matching assets in the database."
+        );
+      } else {
+        setError("No date-formatted directories (YYMMDD) found on this drive.");
+      }
     } catch (error) {
       console.error("Error scanning drive:", error);
-      setError("Failed to scan drive");
+      setError(error instanceof Error ? error.message : "Failed to scan drive");
     } finally {
       setIsScanning(false);
     }
@@ -389,17 +464,29 @@ export default function HardDriveModal({
             >
               {isLoading ? "Loading..." : "Get System Drive"}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleScan}
-              disabled={isScanning || !formData.systemName}
-              className="flex items-center gap-2"
-            >
-              <ScanIcon className="w-4 h-4" />
-              {isScanning ? "Scanning..." : "Scan"}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleScan}
+                    disabled={isScanning || !formData.systemName}
+                    className="flex items-center gap-2"
+                  >
+                    <ScanIcon className="w-4 h-4" />
+                    {isScanning ? "Scanning..." : "Scan YYMMDD Dirs"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-xs">
+                    Scans for directories in YYMMDD format and associates
+                    matching raw assets with this drive.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -561,10 +648,23 @@ export default function HardDriveModal({
         {scanResult && (
           <div className="p-3 bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))] rounded">
             <h3 className="font-medium mb-1">Scan Results</h3>
-            <p className="text-sm">
+            <p className="text-sm mb-2">
               Scanned {scanResult.scannedFolders} folders and found{" "}
-              {scanResult.matchedAssets} potential raw assets.
+              {scanResult.matchedAssets} matching raw assets.
             </p>
+            {scanResult.matchedAssets > 0 ? (
+              <div className="text-sm text-[hsl(var(--success))]">
+                Successfully matched and associated raw assets with this drive.
+              </div>
+            ) : scanResult.scannedFolders > 0 ? (
+              <div className="text-sm text-[hsl(var(--muted-foreground))]">
+                Found directories but no matching assets in the database.
+              </div>
+            ) : (
+              <div className="text-sm text-[hsl(var(--muted-foreground))]">
+                No date-formatted directories (YYMMDD) found.
+              </div>
+            )}
           </div>
         )}
 
