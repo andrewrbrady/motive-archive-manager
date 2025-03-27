@@ -645,77 +645,70 @@ export default function RawAssetsTab() {
     // This dependency array should NOT include fetchAssets itself to prevent infinite loops
   }, [currentPage, itemsPerPage]); // Removed fetchAssets from dependency array
 
-  // Function to filter assets based on search input
-  const filterAssets = useCallback(
-    (assetsToFilter: RawAsset[], searchValue: string) => {
-      if (!searchValue.trim()) {
-        // If no search, show all assets
-        setFilteredAssets(assetsToFilter);
-        return;
+  // Create a debounced function just for URL updates
+  const debouncedUpdateUrl = useCallback(
+    debounce((value: string) => {
+      updateParams({ search: value || null, page: "1" });
+      setCurrentPage(1);
+    }, 500), // Longer delay for URL updates
+    [updateParams]
+  );
+
+  // Function to filter assets with a search term
+  const filterAssetsByTerm = useCallback(
+    (assets: RawAsset[], searchTerm: string) => {
+      if (!searchTerm.trim()) {
+        return assets;
       }
 
-      const normalizedSearch = searchValue.toLowerCase().trim();
+      const searchTerms = searchTerm.toLowerCase().trim().split(/\s+/);
+      return assets.filter((asset) => {
+        const searchableContent = [
+          asset.date || "",
+          asset.description || "",
+          ...(asset.cars || []).map(
+            (car) =>
+              `${car.year || ""} ${car.make || ""} ${car.model || ""} ${
+                car.color || ""
+              }`
+          ),
+        ]
+          .join(" ")
+          .toLowerCase();
 
-      const filtered = assetsToFilter.filter((asset) => {
-        // Check date
-        if (asset.date?.toLowerCase().includes(normalizedSearch)) return true;
-
-        // Check description
-        if (asset.description?.toLowerCase().includes(normalizedSearch))
-          return true;
-
-        // Check car information
-        if (asset.cars && asset.cars.length > 0) {
-          for (const car of asset.cars) {
-            const carYear = car.year?.toString().toLowerCase() || "";
-            const carMake = car.make?.toLowerCase() || "";
-            const carModel = car.model?.toLowerCase() || "";
-            const carColor = car.color?.toLowerCase() || "";
-
-            // Check each car field
-            if (carYear.includes(normalizedSearch)) return true;
-            if (carMake.includes(normalizedSearch)) return true;
-            if (carModel.includes(normalizedSearch)) return true;
-            if (carColor.includes(normalizedSearch)) return true;
-
-            // Check combined string
-            const combinedCar =
-              `${carYear} ${carMake} ${carModel} ${carColor}`.toLowerCase();
-            if (combinedCar.includes(normalizedSearch)) return true;
-          }
-        }
-
-        return false;
+        return searchTerms.every((term) => searchableContent.includes(term));
       });
-
-      setFilteredAssets(filtered);
     },
     []
   );
 
-  // Effect to filter assets whenever search input or assets change
-  useEffect(() => {
-    filterAssets(assets, searchInput);
-  }, [assets, searchInput, filterAssets]);
-
-  // Create a debounced search function
-  const debouncedSearch = useCallback(
-    debounce((value: string) => {
-      // Only update URL parameter, no need to trigger API fetch
-      updateParams({ search: value || null, page: "1" });
-      setCurrentPage(1);
-    }, 750), // Increased debounce time for better typing experience
-    [] // Removed fetchAssets from dependency array to prevent loops
-  );
-
-  // Handle search input change
+  // Simple search handler - does immediate filtering but debounced URL updates
   const handleSearch = useCallback(
-    (value: string) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
       setSearchInput(value);
-      debouncedSearch(value);
+
+      // Immediate filtering
+      setFilteredAssets(filterAssetsByTerm(assets, value));
+
+      // Debounced URL update
+      debouncedUpdateUrl(value);
     },
-    [debouncedSearch] // Only depend on debouncedSearch
+    [assets, debouncedUpdateUrl, filterAssetsByTerm]
   );
+
+  // Update filtered assets when assets or search input changes
+  useEffect(() => {
+    setFilteredAssets(filterAssetsByTerm(assets, searchInput));
+  }, [assets, searchInput, filterAssetsByTerm]);
+
+  // Initialize search from URL only once on first load
+  useEffect(() => {
+    const searchParam = getParam("search");
+    if (searchParam) {
+      setSearchInput(searchParam);
+    }
+  }, []); // Empty dependency array means this only runs once
 
   // Handle page change
   const handlePageChange = useCallback(
@@ -977,22 +970,6 @@ export default function RawAssetsTab() {
     [handleCloseAddAsset, fetchAssets]
   );
 
-  // Also initialize searchInput when loading from URL param
-  useEffect(() => {
-    const urlSearchParam = getParam("search");
-    if (urlSearchParam) {
-      setSearchInput(urlSearchParam);
-    }
-  }, [getParam]);
-
-  // Make sure searchInput is updated when params change
-  useEffect(() => {
-    const searchParam = getParam("search") || "";
-    if (searchParam !== searchInput) {
-      setSearchInput(searchParam);
-    }
-  }, [getParam, searchInput]);
-
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
@@ -1124,13 +1101,12 @@ export default function RawAssetsTab() {
           <input
             type="text"
             value={searchInput}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={handleSearch}
             placeholder="Search by date, description, storage location, car year, make, model, or color..."
             className="w-full px-4 py-2 pl-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] rounded border border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--ring))] placeholder:text-[hsl(var(--muted-foreground))]"
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
         </div>
-
         <select
           value={itemsPerPage}
           onChange={(e) => handleLimitChange(Number(e.target.value))}
