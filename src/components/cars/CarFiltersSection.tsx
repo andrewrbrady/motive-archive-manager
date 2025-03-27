@@ -20,8 +20,6 @@ interface CarFiltersSectionProps {
     minYear: string;
     maxYear: string;
     clientId: string;
-    minPrice: string;
-    maxPrice: string;
     search?: string;
   };
   makes: string[];
@@ -50,16 +48,10 @@ export default function CarFiltersSection({
     // Update the URL parameters
     Object.entries(newFilters).forEach(([key, val]) => {
       if (key.includes("Year")) {
-        // For year fields, only update when it's a 4-digit number
-        if (val && /^\d{4}$/.test(val)) {
+        // For year fields, update if there's a value or remove if empty
+        if (val) {
           params.set(key, val);
-        } else if (!val) {
-          params.delete(key);
-        }
-      } else if (key.includes("Price")) {
-        // For price fields, update even if empty to preserve partial values
-        params.set(key, val);
-        if (!val) {
+        } else {
           params.delete(key);
         }
       } else {
@@ -75,8 +67,11 @@ export default function CarFiltersSection({
     // Preserve view mode and page size
     const view = searchParams?.get("view");
     const pageSize = searchParams?.get("pageSize");
+    const isEditMode = searchParams?.get("edit");
+
     if (view) params.set("view", view);
     if (pageSize) params.set("pageSize", pageSize);
+    if (isEditMode) params.set("edit", isEditMode);
     params.set("page", "1"); // Reset to first page
 
     router.push(`/cars?${params.toString()}`);
@@ -87,8 +82,6 @@ export default function CarFiltersSection({
       make: "",
       minYear: "",
       maxYear: "",
-      minPrice: "",
-      maxPrice: "",
       clientId: "",
       search: "",
     };
@@ -97,8 +90,11 @@ export default function CarFiltersSection({
     const params = new URLSearchParams();
     const view = searchParams?.get("view");
     const pageSize = searchParams?.get("pageSize");
+    const isEditMode = searchParams?.get("edit");
+
     if (view) params.set("view", view);
     if (pageSize) params.set("pageSize", pageSize);
+    if (isEditMode) params.set("edit", isEditMode);
     params.set("page", "1");
 
     router.push(`/cars?${params.toString()}`);
@@ -178,26 +174,6 @@ export default function CarFiltersSection({
                 placeholder="Max"
                 value={filters.maxYear}
                 onChange={(e) => handleFilterChange("maxYear", e.target.value)}
-              />
-            </div>
-          </FilterItem>
-
-          <FilterItem className="w-80">
-            <FilterLabel>Price Range</FilterLabel>
-            <div className="grid grid-cols-2 gap-4">
-              <FilterInput
-                type="number"
-                name="minPrice"
-                placeholder="Min"
-                value={filters.minPrice}
-                onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-              />
-              <FilterInput
-                type="number"
-                name="maxPrice"
-                placeholder="Max"
-                value={filters.maxPrice}
-                onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
               />
             </div>
           </FilterItem>

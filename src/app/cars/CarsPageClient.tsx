@@ -70,8 +70,6 @@ interface CarsPageClientProps {
     minYear?: string;
     maxYear?: string;
     clientId?: string;
-    minPrice?: string;
-    maxPrice?: string;
     sort?: string;
     search?: string;
   };
@@ -137,8 +135,6 @@ export default function CarsPageClient({
               minYear: filters.minYear || "",
               maxYear: filters.maxYear || "",
               clientId: filters.clientId || "",
-              minPrice: filters.minPrice || "",
-              maxPrice: filters.maxPrice || "",
               search: filters.search || "",
             }}
             makes={makes.map((make) => make.name)}

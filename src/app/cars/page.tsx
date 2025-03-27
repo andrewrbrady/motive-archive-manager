@@ -21,8 +21,6 @@ interface FilterParams {
   minYear?: string;
   maxYear?: string;
   clientId?: string;
-  minPrice?: string;
-  maxPrice?: string;
   sort?: string;
   search?: string;
 }
@@ -144,23 +142,25 @@ export default async function CarsPage({
     const view = (resolvedParams.view?.toString() || "grid") as "grid" | "list";
     const isEditMode = resolvedParams.edit === "true";
 
-    const filters = {
+    // Extract all filter parameters
+    const filters: FilterParams = {
       make: resolvedParams.make?.toString(),
       minYear: resolvedParams.minYear?.toString(),
       maxYear: resolvedParams.maxYear?.toString(),
       clientId: resolvedParams.clientId?.toString(),
-      minPrice: resolvedParams.minPrice?.toString(),
-      maxPrice: resolvedParams.maxPrice?.toString(),
       sort: resolvedParams.sort?.toString(),
       search: resolvedParams.search?.toString(),
     };
 
-    // Clean up undefined values
+    // Clean up undefined or empty values
     Object.keys(filters).forEach((key) => {
-      if (filters[key as keyof FilterParams] === undefined) {
+      const value = filters[key as keyof FilterParams];
+      if (value === undefined || value === "") {
         delete filters[key as keyof FilterParams];
       }
     });
+
+    console.log("Applying filters:", filters);
 
     const [{ cars, totalPages, currentPage, totalCount }, makes, clients] =
       await Promise.all([
