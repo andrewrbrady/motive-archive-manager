@@ -19,26 +19,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-// Add a CSS style to remove all focus outlines
-const noFocusOutlineStyle = { outline: "none" };
-
-// Add global style to apply to the gallery container
-const galleryContainerStyle = {
-  ...noFocusOutlineStyle,
-  // Add any other styles needed for the container
+// Replace focus removal styles with accessible focus styles
+const accessibleFocusStyle = {
+  outline: "2px solid hsl(var(--primary))",
+  outlineOffset: "2px",
 };
 
-// Add a style tag to remove focus outlines globally
-if (typeof document !== "undefined") {
-  const styleEl = document.createElement("style");
-  styleEl.textContent = `
-    .focus-outline-none *:focus {
-      outline: none !important;
-      box-shadow: none !important;
-    }
-  `;
-  document.head.appendChild(styleEl);
-}
+// Completely remove this style tag that removes focus outlines
+// if (typeof document !== "undefined") {
+//   const styleEl = document.createElement("style");
+//   styleEl.textContent = `
+//     .focus-outline-none *:focus {
+//       outline: none !important;
+//       box-shadow: none !important;
+//     }
+//   `;
+//   document.head.appendChild(styleEl);
+// }
 
 interface ImageGalleryProps {
   images: {
@@ -207,6 +204,9 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   // Find the index of the primary image - ONLY ON INITIAL LOAD
   const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
 
+  // Add this state variable to track user interactions
+  const [userHasSelectedImage, setUserHasSelectedImage] = useState(false);
+
   // When mainIndex changes, update currentImageId
   useEffect(() => {
     // Skip this effect if the change was triggered by the image ID effect
@@ -248,10 +248,12 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
       primaryImageId,
       imagesCount: sortedImages.length,
       hasSetInitialImage,
+      userHasSelectedImage,
     });
 
     // Only set the primary image on initial load or when primaryImageId explicitly changes
-    if (primaryImageId && !hasSetInitialImage) {
+    // AND only if the user hasn't manually selected an image
+    if (primaryImageId && !hasSetInitialImage && !userHasSelectedImage) {
       const primaryIndex = sortedImages.findIndex(
         (img) => img.id === primaryImageId
       );
@@ -265,7 +267,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
         setHasSetInitialImage(true);
       }
     }
-  }, [primaryImageId, sortedImages, hasSetInitialImage]);
+  }, [primaryImageId, sortedImages, hasSetInitialImage, userHasSelectedImage]);
 
   // Reset image loaded state when images change
   useEffect(() => {
@@ -538,21 +540,32 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
       });
       setModalIndex(newModalIndex);
     } else {
+      // Mark that the user has manually navigated
+      setUserHasSelectedImage(true);
+
       // Force image reload when advancing to next image
       setMainImageLoaded(false);
-      setMainIndex((prev) => {
-        const newIndex = (prev + 1) % optimizedImages.length;
-        console.log(
-          `ImageGallery: handleNext - changing from ${prev} to ${newIndex}`,
-          {
-            totalImages: optimizedImages.length,
-            newImageId: optimizedImages[newIndex]?.id,
-          }
-        );
-        return newIndex;
-      });
+      const newIndex = (mainIndex + 1) % optimizedImages.length;
+      console.log(
+        `ImageGallery: handleNext - changing from ${mainIndex} to ${newIndex}`,
+        {
+          totalImages: optimizedImages.length,
+          newImageId: optimizedImages[newIndex]?.id,
+        }
+      );
+      setMainIndex(newIndex);
+      // Update currentImageId to match the new index
+      if (optimizedImages[newIndex]) {
+        setCurrentImageId(optimizedImages[newIndex].id);
+      }
     }
-  }, [isModalOpen, optimizedImages.length, modalIndex, optimizedImages]);
+  }, [
+    isModalOpen,
+    optimizedImages.length,
+    modalIndex,
+    mainIndex,
+    optimizedImages,
+  ]);
 
   const handlePrev = useCallback(() => {
     if (isModalOpen) {
@@ -565,22 +578,33 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
       });
       setModalIndex(newModalIndex);
     } else {
+      // Mark that the user has manually navigated
+      setUserHasSelectedImage(true);
+
       // Force image reload when going to previous image
       setMainImageLoaded(false);
-      setMainIndex((prev) => {
-        const newIndex =
-          (prev - 1 + optimizedImages.length) % optimizedImages.length;
-        console.log(
-          `ImageGallery: handlePrev - changing from ${prev} to ${newIndex}`,
-          {
-            totalImages: optimizedImages.length,
-            newImageId: optimizedImages[newIndex]?.id,
-          }
-        );
-        return newIndex;
-      });
+      const newIndex =
+        (mainIndex - 1 + optimizedImages.length) % optimizedImages.length;
+      console.log(
+        `ImageGallery: handlePrev - changing from ${mainIndex} to ${newIndex}`,
+        {
+          totalImages: optimizedImages.length,
+          newImageId: optimizedImages[newIndex]?.id,
+        }
+      );
+      setMainIndex(newIndex);
+      // Update currentImageId to match the new index
+      if (optimizedImages[newIndex]) {
+        setCurrentImageId(optimizedImages[newIndex].id);
+      }
     }
-  }, [isModalOpen, optimizedImages.length, modalIndex, optimizedImages]);
+  }, [
+    isModalOpen,
+    optimizedImages.length,
+    modalIndex,
+    mainIndex,
+    optimizedImages,
+  ]);
 
   const handlePageChange = useCallback(
     (newPage: number) => {
@@ -592,6 +616,10 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
           itemsPerPage,
         });
         setCurrentPage(newPage);
+
+        // Mark that user has manually changed page when using pagination controls
+        setUserHasSelectedImage(true);
+
         // Set mainIndex to first image of the new page
         const newMainIndex = (newPage - 1) * itemsPerPage;
         if (newMainIndex < optimizedImages.length) {
@@ -625,123 +653,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  // Add keyboard navigation effect
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if input elements have focus
-      const activeElement = document.activeElement;
-      const isInput =
-        activeElement?.tagName === "INPUT" ||
-        activeElement?.tagName === "TEXTAREA" ||
-        activeElement?.getAttribute("contenteditable") === "true";
-
-      // Check if gallery elements have focus
-      const galleryHasFocus =
-        interactiveImageRef.current?.contains(activeElement as Node) ||
-        mainImageRef.current?.contains(activeElement as Node) ||
-        isModalOpen;
-
-      // Debug information
-      console.log("Gallery key event:", {
-        key: e.key,
-        isInput,
-        isModalOpen,
-        galleryHasFocus,
-        activeElement: activeElement?.tagName,
-        mainIndex,
-        modalIndex,
-        imagesCount: optimizedImages.length,
-      });
-
-      // Exit early if we're typing in an input and modal is not open
-      if (isInput && !isModalOpen) {
-        return;
-      }
-
-      // Handle escape to close modal
-      if (e.key === "Escape" && isModalOpen) {
-        e.preventDefault();
-        console.log("ImageGallery: Closing modal with Escape key");
-        setIsModalOpen(false);
-        return;
-      }
-
-      // Only handle navigation if modal is open or gallery has focus
-      if (!isModalOpen && !galleryHasFocus) {
-        console.log(
-          "ImageGallery: Skipping key handling - gallery not focused"
-        );
-        return;
-      }
-
-      // Pagination with Shift+Arrow keys
-      if (e.shiftKey) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          console.log("ImageGallery: Shift+Left - Changing to previous page");
-          handlePageChange(Math.max(1, currentPage - 1));
-          return;
-        }
-
-        if (e.key === "ArrowRight") {
-          e.preventDefault();
-          console.log("ImageGallery: Shift+Right - Changing to next page");
-          handlePageChange(Math.min(totalPages, currentPage + 1));
-          return;
-        }
-      }
-
-      // Image navigation with arrow keys
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        console.log("ImageGallery: Left arrow - Previous image");
-        handlePrev();
-        return;
-      }
-
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        console.log("ImageGallery: Right arrow - Next image");
-        handleNext();
-        return;
-      }
-
-      // Open modal with Enter/Space when main image has focus
-      if (document.activeElement === interactiveImageRef.current) {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          console.log("ImageGallery: Opening modal with keyboard");
-          setModalIndex(mainIndex);
-          setIsModalOpen(true);
-        }
-      }
-    };
-
-    console.log("ImageGallery: Setting up keyboard event listeners", {
-      imagesCount: optimizedImages.length,
-      currentPage,
-      totalPages,
-      isModalOpen,
-    });
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      console.log("ImageGallery: Removing keyboard event listeners");
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [
-    handleNext,
-    handlePrev,
-    isModalOpen,
-    currentPage,
-    totalPages,
-    handlePageChange,
-    optimizedImages.length,
-    mainIndex,
-    modalIndex,
-  ]);
-
   // Add focus trap and management for the modal
   useEffect(() => {
     if (!isModalOpen) return;
@@ -751,7 +662,53 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     // Store the element that had focus before opening modal
     const previouslyFocused = document.activeElement as HTMLElement;
 
-    // After modal closed, restore focus
+    // Find focusable elements in modal
+    const modal = document.querySelector(".image-modal");
+    if (modal) {
+      const focusableElements = modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstFocusable = focusableElements[0] as HTMLElement;
+      const lastFocusable = focusableElements[
+        focusableElements.length - 1
+      ] as HTMLElement;
+
+      // Focus the first element in the modal
+      if (firstFocusable) {
+        setTimeout(() => firstFocusable.focus(), 100);
+      }
+
+      // Handle tab to trap focus
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key === "Tab") {
+          // If shift+tab on first element, go to last element
+          if (e.shiftKey && document.activeElement === firstFocusable) {
+            e.preventDefault();
+            lastFocusable.focus();
+          }
+          // If tab on last element, go to first element
+          else if (!e.shiftKey && document.activeElement === lastFocusable) {
+            e.preventDefault();
+            firstFocusable.focus();
+          }
+        }
+      };
+
+      document.addEventListener("keydown", handleTabKey);
+
+      // Clean up
+      return () => {
+        document.removeEventListener("keydown", handleTabKey);
+
+        // Restore focus when modal closes
+        if (previouslyFocused) {
+          console.log("ImageGallery: Modal closed, restoring focus");
+          previouslyFocused.focus();
+        }
+      };
+    }
+
+    // Fallback return if no modal
     return () => {
       if (previouslyFocused) {
         console.log("ImageGallery: Modal closed, restoring focus");
@@ -826,7 +783,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     }
   };
 
-  // Add this below the handlePageChange function
+  // Completely rewrite the handleThumbnailClick function to avoid the back-and-forth issue
   const handleThumbnailClick = useCallback(
     (actualIndex: number) => {
       console.log("ImageGallery: Thumbnail click handler called", {
@@ -836,12 +793,14 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
         totalImages: optimizedImages.length,
       });
 
-      // Only proceed if this isn't already the selected image
+      // Mark that the user has manually selected an image
+      setUserHasSelectedImage(true);
+
+      // If this is already the selected image, open the modal
       if (actualIndex === mainIndex) {
         console.log(
           `ImageGallery: Thumbnail already selected, opening modal for index ${actualIndex}`
         );
-        // If already selected, open the modal instead
         setModalIndex(actualIndex);
         setIsModalOpen(true);
         return;
@@ -854,15 +813,23 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
       // First reset the image loaded state
       setMainImageLoaded(false);
 
-      // Update the currentImageId to maintain selection across mode switches
+      // Update the mainIndex immediately
+      setMainIndex(actualIndex);
+
+      // Also update the currentImageId
       if (optimizedImages[actualIndex]) {
         setCurrentImageId(optimizedImages[actualIndex].id);
       }
-
-      // Then update the index immediately
-      setMainIndex(actualIndex);
     },
-    [mainIndex, optimizedImages]
+    [
+      mainIndex,
+      optimizedImages,
+      setModalIndex,
+      setIsModalOpen,
+      setMainIndex,
+      setCurrentImageId,
+      setMainImageLoaded,
+    ]
   );
 
   // Add preloading after the optimizedImages calculation
@@ -919,8 +886,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
           shouldUpdateIndex = true;
         }
       }
-      // If current image not found, try using primary image
-      else if (primaryImageId && !hasSetInitialImage) {
+      // If current image not found, try using primary image but only if user hasn't manually selected an image
+      else if (primaryImageId && !hasSetInitialImage && !userHasSelectedImage) {
         const primaryIndex = images.findIndex(
           (img) => img.id === primaryImageId
         );
@@ -952,13 +919,31 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
         setHasSetInitialImage(true);
       }, 50);
     }
-  }, [images, primaryImageId, currentImageId, itemsPerPage, mainIndex]);
+  }, [
+    images,
+    primaryImageId,
+    currentImageId,
+    itemsPerPage,
+    mainIndex,
+    userHasSelectedImage,
+    hasSetInitialImage,
+  ]);
 
   // Add fade-in transition to the main image container to smooth transitions
   const mainImageContainerStyle = {
-    ...noFocusOutlineStyle,
+    ...accessibleFocusStyle,
     transition: "opacity 0.2s ease-in-out",
   };
+
+  // Add a cleanup effect for any keyboard handlers
+  useEffect(() => {
+    return () => {
+      // Any cleanup needed
+    };
+  }, []);
+
+  // Add this at the top of the component, with other state and refs
+  const mainImageContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div
@@ -967,135 +952,133 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     >
       {/* Main gallery content */}
       <div
-        className="flex gap-6 p-1 focus:outline-none focus-visible:outline-none"
-        tabIndex={0}
-        onFocus={() => console.log("Main gallery container focused")}
-        ref={(el) => {
-          // Disable auto-focus on mount to prevent focus border on page load
-          /*
-          if (el && typeof window !== "undefined") {
-            setTimeout(() => {
-              el.focus();
-              console.log("Auto focusing gallery container");
-            }, 100);
-          }
-          */
-        }}
+        className="flex gap-6 p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 image-gallery-wrapper"
         role="application"
         aria-label="Image gallery with keyboard navigation"
-        style={galleryContainerStyle}
+        tabIndex={0}
+        onFocus={() => console.log("Gallery container focused")}
         onKeyDown={(e) => {
-          console.log("Direct keydown on gallery container:", e.key);
+          // Don't handle keyboard events if we're in an input element
+          if (
+            document.activeElement?.tagName === "INPUT" ||
+            document.activeElement?.tagName === "TEXTAREA" ||
+            document.activeElement?.getAttribute("contenteditable") === "true"
+          ) {
+            return;
+          }
 
-          // Handle navigation with arrow keys
-          if (e.key === "ArrowLeft") {
+          console.log("Gallery keydown:", e.key);
+
+          // Handle escape to close modal first
+          if (e.key === "Escape" && isModalOpen) {
             e.preventDefault();
-            console.log(
-              "Gallery container: Left arrow pressed - Previous image"
-            );
-            handlePrev();
-          } else if (e.key === "ArrowRight") {
-            e.preventDefault();
-            console.log("Gallery container: Right arrow pressed - Next image");
-            handleNext();
-          } else if (e.shiftKey && e.key === "ArrowLeft") {
-            e.preventDefault();
-            console.log("Gallery container: Shift+Left - Previous page");
-            handlePageChange(Math.max(1, currentPage - 1));
-          } else if (e.shiftKey && e.key === "ArrowRight") {
-            e.preventDefault();
-            console.log("Gallery container: Shift+Right - Next page");
-            handlePageChange(Math.min(totalPages, currentPage + 1));
-          } else if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            console.log("Gallery container: Enter/Space - Opening modal");
-            setModalIndex(mainIndex);
-            setIsModalOpen(true);
+            setIsModalOpen(false);
+            return;
+          }
+
+          // Handle all navigation with switch for cleaner code
+          switch (e.key) {
+            case "ArrowLeft":
+              e.preventDefault();
+              e.stopPropagation();
+              handlePrev();
+              break;
+
+            case "ArrowRight":
+              e.preventDefault();
+              e.stopPropagation();
+              handleNext();
+              break;
+
+            case "Enter":
+            case " ":
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isModalOpen) {
+                setModalIndex(mainIndex);
+                setIsModalOpen(true);
+              }
+              break;
+
+            case "Home":
+            case "PageUp":
+              e.preventDefault();
+              e.stopPropagation();
+              handlePageChange(1);
+              setMainIndex(0);
+              if (optimizedImages[0]) {
+                setCurrentImageId(optimizedImages[0].id);
+              }
+              break;
+
+            case "End":
+            case "PageDown":
+              e.preventDefault();
+              e.stopPropagation();
+              const lastPage = Math.ceil(optimizedImages.length / itemsPerPage);
+              handlePageChange(lastPage);
+              const lastIndex = optimizedImages.length - 1;
+              setMainIndex(lastIndex);
+              if (optimizedImages[lastIndex]) {
+                setCurrentImageId(optimizedImages[lastIndex].id);
+              }
+              break;
           }
         }}
       >
         <div className="w-2/3">
           <div
             ref={mainImageRef}
-            className={`sticky top-4 ${
+            className={`flex-1 flex flex-col ${
               isMainVisible ? "opacity-100" : "opacity-0"
             }`}
-            style={mainImageContainerStyle}
           >
-            {isLoading ? (
-              <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm">
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--foreground-muted))]" />
-                  <p className="text-sm text-[hsl(var(--foreground-muted))]">
-                    Loading images...
-                  </p>
-                </div>
-              </div>
-            ) : filteredImages.length > 0 ? (
+            {filteredImages.length > 0 ? (
               <>
                 <button
                   ref={interactiveImageRef}
-                  className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm transition-shadow hover:shadow-md cursor-pointer"
-                  onTouchStart={handleTouchStart}
-                  onTouchEnd={handleTouchEnd}
                   onClick={() => {
                     console.log(
-                      "ImageGallery: Main image button clicked - opening modal"
+                      "ImageGallery: Main image clicked - opening modal"
                     );
                     setModalIndex(mainIndex);
                     setIsModalOpen(true);
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      console.log(
-                        "Main image Enter/Space pressed - opening modal"
-                      );
-                      setModalIndex(mainIndex);
-                      setIsModalOpen(true);
-                    }
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  className="relative w-full bg-[hsl(var(--background-muted))] rounded-md overflow-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 flex justify-center items-center"
+                  style={{
+                    minHeight: "400px",
+                    maxHeight: "calc(100vh - 300px)",
                   }}
-                  tabIndex={0}
-                  aria-label={`View image ${mainIndex + 1} of ${
-                    filteredImages.length
+                  aria-label={`View image of ${
+                    filteredImages[mainIndex]?.metadata?.description || "car"
                   } in fullscreen mode. Use arrow keys to navigate.`}
                   role="button"
-                  style={noFocusOutlineStyle}
+                  tabIndex={0}
                 >
                   {!mainImageLoaded && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-[hsl(var(--background-primary))]">
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--foreground-muted))]" />
                     </div>
                   )}
                   <Image
-                    src={optimizedImages[mainIndex]?.mainUrl}
-                    alt={`Vehicle view ${mainIndex + 1} of ${
-                      optimizedImages.length
-                    }`}
-                    className={`object-cover transition-opacity duration-300 ${
-                      mainImageLoaded ? "opacity-100" : "opacity-0"
-                    }`}
-                    fill
-                    sizes="100vw"
-                    priority
+                    src={filteredImages[mainIndex]?.url}
+                    alt={
+                      filteredImages[mainIndex]?.metadata?.description ||
+                      `Car image ${mainIndex + 1}`
+                    }
+                    className="max-w-full max-h-full"
+                    width={1200}
+                    height={800}
+                    priority={true}
                     onLoadingComplete={() => {
-                      console.log(
-                        `ImageGallery: Main image loaded for index ${mainIndex}`,
-                        {
-                          src: optimizedImages[mainIndex]?.mainUrl,
-                        }
-                      );
+                      console.log("Main image loaded successfully:");
                       setMainImageLoaded(true);
                     }}
                     onError={() => {
-                      console.error(
-                        `ImageGallery: Error loading main image for index ${mainIndex}`,
-                        {
-                          src: optimizedImages[mainIndex]?.mainUrl,
-                        }
-                      );
-                      // Still set as loaded to remove the loading spinner
-                      setMainImageLoaded(true);
+                      console.error("Main image failed to load");
+                      setMainImageLoaded(true); // Still set to true to hide the loader
                     }}
                   />
                   <button
@@ -1107,21 +1090,21 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       setModalIndex(mainIndex);
                       setIsModalOpen(true);
                     }}
-                    className="absolute top-4 right-4 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none"
+                    className="absolute top-4 right-4 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label="Open fullscreen view"
                   >
                     <ZoomIn className="w-5 h-5" />
                   </button>
-                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[hsl(var(--background-primary))]/50 to-transparent" />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       console.log(
                         "ImageGallery: Main view prev button clicked"
                       );
                       handlePrev();
                     }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="w-5 h-5" />
@@ -1129,12 +1112,13 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       console.log(
                         "ImageGallery: Main view next button clicked"
                       );
                       handleNext();
                     }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     aria-label="Next image"
                   >
                     <ChevronRight className="w-5 h-5" />
@@ -1176,7 +1160,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 {Object.keys(activeFilters).length > 0 && (
                   <button
                     onClick={handleResetFilters}
-                    className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
+                    className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     Reset Filters
                   </button>
@@ -1229,19 +1213,20 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                   return (
                     <div key={image.id} className="relative aspect-square">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleThumbnailClick(actualIndex);
                         }}
-                        className={`w-full h-full relative transition-all duration-150 ease-in-out ${
+                        className={`thumbnail-button w-full h-full relative transition-all duration-150 ease-in-out ${
                           actualIndex === mainIndex
                             ? "ring-2 ring-[hsl(var(--border-muted))]"
                             : "opacity-75 hover:opacity-100"
-                        } focus:outline-none`}
+                        } focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
                         aria-label={`View image ${actualIndex + 1}`}
                         aria-current={
                           actualIndex === mainIndex ? "true" : "false"
                         }
-                        style={noFocusOutlineStyle}
+                        tabIndex={0}
                       >
                         <div
                           id={`loader-${actualIndex}`}
@@ -1301,7 +1286,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                         {/* Set as thumbnail button - positioned outside the button but inside the wrapper div */}
                         {primaryImageId !== undefined && (
                           <button
-                            className={`absolute bottom-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-black/90 transition-colors z-10 ${
+                            className={`absolute bottom-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-black/90 transition-colors z-10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                               primaryImageId === image.id
                                 ? "ring-2 ring-yellow-500"
                                 : ""
@@ -1312,7 +1297,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                             }}
                             disabled={updatingThumbnail === image.id}
                             title="Set as thumbnail"
-                            style={noFocusOutlineStyle}
                           >
                             {updatingThumbnail === image.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1337,16 +1321,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none"
+                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   aria-label="Previous page"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (currentPage > 1) {
-                        handlePageChange(currentPage - 1);
-                      }
-                    }
-                  }}
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -1356,16 +1332,8 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none"
+                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   aria-label="Next page"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (currentPage < totalPages) {
-                        handlePageChange(currentPage + 1);
-                      }
-                    }
-                  }}
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -1376,7 +1344,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
 
         {isModalOpen && (
           <div
-            className="fixed inset-0 bg-[hsl(var(--background-primary))]/90 dark:bg-[hsl(var(--background-primary))]/95 z-[9999] flex items-center justify-center"
+            className="image-modal fixed inset-0 bg-[hsl(var(--background-primary))]/90 dark:bg-[hsl(var(--background-primary))]/95 z-[9999] flex items-center justify-center"
             role="dialog"
             aria-modal="true"
             aria-label="Image gallery fullscreen view"
@@ -1389,23 +1357,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 setIsModalOpen(false);
               }
             }}
-            onKeyDown={(e) => {
-              console.log("Modal keydown:", e.key);
-              if (e.key === "Escape") {
-                e.preventDefault();
-                console.log("Modal Escape key pressed - closing");
-                setIsModalOpen(false);
-              } else if (e.key === "ArrowLeft") {
-                e.preventDefault();
-                console.log("Modal Left arrow pressed - previous image");
-                handlePrev();
-              } else if (e.key === "ArrowRight") {
-                e.preventDefault();
-                console.log("Modal Right arrow pressed - next image");
-                handleNext();
-              }
-            }}
-            style={{ top: 0, left: 0, right: 0, bottom: 0, position: "fixed" }}
             tabIndex={-1} // Makes the container focusable but not in the tab order
           >
             <button
@@ -1413,32 +1364,28 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 console.log("ImageGallery: Modal close button clicked");
                 setIsModalOpen(false);
               }}
-              className="absolute top-4 right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none"
+              className="absolute top-4 right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label="Close fullscreen view"
-              ref={(el) => {
-                // Auto focus the close button when modal opens
-                if (el && typeof window !== "undefined") {
-                  setTimeout(() => el.focus(), 50);
-                }
-              }}
             >
               <X className="w-6 h-6" />
             </button>
-            <div className="relative w-full h-full max-w-7xl max-h-[90vh] flex items-center justify-center">
+            <div className="relative flex items-center justify-center p-4">
               <Image
-                src={optimizedImages[modalIndex]?.mainUrl}
+                src={
+                  optimizedImages[modalIndex]?.url ||
+                  filteredImages[modalIndex]?.url
+                }
                 alt={`Full size view ${modalIndex + 1} of ${
                   optimizedImages.length
                 }`}
-                className="max-w-full max-h-[90vh] object-contain"
-                width={1200}
-                height={800}
-                sizes="100vw"
+                className="max-w-[90vw] max-h-[90vh]"
+                width={1600}
+                height={1200}
                 priority
                 onError={(e) => {
                   console.error(
                     "ImageGallery: Modal image failed to load:",
-                    optimizedImages[modalIndex]?.mainUrl
+                    optimizedImages[modalIndex]?.url
                   );
                 }}
                 onLoadingComplete={() => {
@@ -1451,7 +1398,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 console.log("ImageGallery: Modal previous button clicked");
                 handlePrev();
               }}
-              className="absolute left-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none"
+              className="absolute left-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label="Previous image"
             >
               <ChevronLeft className="w-8 h-8" />
@@ -1461,11 +1408,18 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 console.log("ImageGallery: Modal next button clicked");
                 handleNext();
               }}
-              className="absolute right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none"
+              className="absolute right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               aria-label="Next image"
             >
               <ChevronRight className="w-8 h-8" />
             </button>
+
+            {/* Caption or metadata display in modal */}
+            {filteredImages[modalIndex]?.metadata?.description && (
+              <div className="absolute bottom-4 left-0 right-0 text-center bg-[hsl(var(--background-primary))]/75 p-2 text-[hsl(var(--foreground))]">
+                {filteredImages[modalIndex].metadata.description}
+              </div>
+            )}
           </div>
         )}
       </div>
