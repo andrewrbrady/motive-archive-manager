@@ -8,10 +8,37 @@ import {
   ZoomIn,
   Loader2,
   Image as ImageIcon,
+  Filter,
 } from "lucide-react";
 import { transformImageUrl, imagePresets } from "@/lib/imageTransform";
 import Image from "next/image";
 import { toast } from "react-hot-toast";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+// Add a CSS style to remove all focus outlines
+const noFocusOutlineStyle = { outline: "none" };
+
+// Add global style to apply to the gallery container
+const galleryContainerStyle = {
+  ...noFocusOutlineStyle,
+  // Add any other styles needed for the container
+};
+
+// Add a style tag to remove focus outlines globally
+if (typeof document !== "undefined") {
+  const styleEl = document.createElement("style");
+  styleEl.textContent = `
+    .focus-outline-none *:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+  `;
+  document.head.appendChild(styleEl);
+}
 
 interface ImageGalleryProps {
   images: {
@@ -24,6 +51,7 @@ interface ImageGalleryProps {
       movement?: string;
       tod?: string;
       view?: string;
+      side?: string;
     };
     variants?: {
       [key: string]: string;
@@ -35,6 +63,22 @@ interface ImageGalleryProps {
   carId?: string;
   primaryImageId?: string;
   onPrimaryImageChange?: (imageId: string) => void;
+  activeFilters?: {
+    angle?: string;
+    view?: string;
+    movement?: string;
+    tod?: string;
+    side?: string;
+  };
+  onFilterChange?: (filterType: string, value: string) => void;
+  onFilterOptionsChange?: (options: {
+    angles: string[];
+    views: string[];
+    movements: string[];
+    tods: string[];
+    sides: string[];
+  }) => void;
+  onResetFilters?: () => void;
 }
 
 export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
@@ -43,7 +87,49 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   carId,
   primaryImageId,
   onPrimaryImageChange,
+  activeFilters: externalActiveFilters,
+  onFilterChange,
+  onFilterOptionsChange,
+  onResetFilters,
 }) => {
+  // Use internal filter state if no external state is provided
+  const [internalActiveFilters, setInternalActiveFilters] = useState<{
+    angle?: string;
+    view?: string;
+    movement?: string;
+    tod?: string;
+    side?: string;
+  }>({});
+
+  // Use either external filters or internal filters
+  const activeFilters = externalActiveFilters || internalActiveFilters;
+
+  // Function to handle filter changes - either call external handler or update internal state
+  const handleFilterChange = (filterType: string, value: string) => {
+    if (onFilterChange) {
+      // Use external handler
+      onFilterChange(filterType, value);
+    } else {
+      // Use internal state
+      setInternalActiveFilters((prev) => ({
+        ...prev,
+        [filterType]:
+          value === prev[filterType as keyof typeof prev] ? undefined : value,
+      }));
+    }
+  };
+
+  // Function to reset filters - either call external handler or update internal state
+  const handleResetFilters = () => {
+    if (onResetFilters) {
+      // Use external handler
+      onResetFilters();
+    } else {
+      // Use internal state
+      setInternalActiveFilters({});
+    }
+  };
+
   // Debug input images for duplicates
   useEffect(() => {
     const imageIds = images.map((img) => img.id);
@@ -71,30 +157,31 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     }
   }, [images]);
 
-  // Deduplicate images by ID and sort by filename
+  // Deduplicate images by ID while maintaining original order
   const sortedImages = React.useMemo(() => {
-    // Create a Map to deduplicate by ID
-    const uniqueImagesMap = new Map();
+    console.log("Recomputing sortedImages with", images.length, "input images");
 
-    // Keep only one instance of each image ID
-    images.forEach((img) => {
-      if (!uniqueImagesMap.has(img.id)) {
-        uniqueImagesMap.set(img.id, img);
+    // Create a Set to track seen IDs
+    const seenIds = new Set<string>();
+
+    // Filter out duplicates while maintaining order
+    const dedupedImages = images.filter((img) => {
+      if (seenIds.has(img.id)) {
+        return false;
       }
+      seenIds.add(img.id);
+      return true;
     });
 
-    // Convert back to array and sort
-    return Array.from(uniqueImagesMap.values()).sort((a, b) =>
-      a.filename.localeCompare(b.filename)
+    console.log(
+      "Deduped image IDs (first 3):",
+      dedupedImages.slice(0, 3).map((img) => img.id)
     );
-  }, [images]);
 
-  console.log(
-    "ImageGalleryEnhanced: Rendering with",
-    sortedImages.length,
-    "images after deduplication"
-  );
+    return dedupedImages;
+  }, [images]); // Only depend on images array
 
+  // State declarations
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
@@ -103,23 +190,58 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   const [isMainVisible, setIsMainVisible] = useState(true);
   const [imagesLoaded, setImagesLoaded] = useState(false);
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<{
-    angle?: string;
-    view?: string;
-    movement?: string;
-    tod?: string;
-  }>({});
   const [updatingThumbnail, setUpdatingThumbnail] = useState<string | null>(
     null
   );
+  // Track the currently viewed image by ID, not just index - moved this to the top with other state declarations
+  const [currentImageId, setCurrentImageId] = useState<string | null>(null);
+  // Add a flag to prevent loops when programmatically changing index
+  const isChangingFromImageIdRef = useRef(false);
   const mainImageRef = useRef<HTMLDivElement>(null);
   const interactiveImageRef = useRef<HTMLButtonElement>(null);
   const imagesPerRow = 3;
   const rowsPerPage = 5;
+  const itemsPerPage = imagesPerRow * rowsPerPage;
   const loadedThumbnailsRef = useRef<Set<string>>(new Set());
 
   // Find the index of the primary image - ONLY ON INITIAL LOAD
   const [hasSetInitialImage, setHasSetInitialImage] = useState(false);
+
+  // When mainIndex changes, update currentImageId
+  useEffect(() => {
+    // Skip this effect if the change was triggered by the image ID effect
+    if (isChangingFromImageIdRef.current) {
+      isChangingFromImageIdRef.current = false;
+      return;
+    }
+
+    if (sortedImages.length > 0 && mainIndex < sortedImages.length) {
+      const newImageId = sortedImages[mainIndex].id;
+      // Only update if different to prevent loops
+      if (newImageId !== currentImageId) {
+        setCurrentImageId(newImageId);
+      }
+    }
+  }, [mainIndex, sortedImages, currentImageId]);
+
+  // Force reset the component state when images array changes
+  useEffect(() => {
+    console.log("Images array changed, preserving selection where possible");
+
+    // Don't reset the main index or current page - maintain the current view
+    // Only reset loaded state to prevent stale thumbnails
+    setMainImageLoaded(false);
+    setImagesLoaded(false);
+    loadedThumbnailsRef.current = new Set();
+
+    // Don't reset hasSetInitialImage - keep the selected image
+  }, [images]);
+
+  console.log(
+    "ImageGalleryEnhanced: Rendering with",
+    sortedImages.length,
+    "images after deduplication"
+  );
 
   useEffect(() => {
     console.log("ImageGalleryEnhanced: primaryImageId effect triggered", {
@@ -152,88 +274,179 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   }, [images]);
 
   // Get unique filter values
-  const filterOptions = sortedImages.reduce(
-    (acc, img) => {
-      if (
-        img.metadata.angle &&
-        !acc.angles.includes(img.metadata.angle) &&
-        ![
-          "not applicable",
-          "n/a",
-          "N/A",
-          "na",
-          "none",
-          "Not Applicable",
-          "unknown",
-          "Unknown",
-        ].includes(img.metadata.angle.toLowerCase())
-      ) {
-        acc.angles.push(img.metadata.angle);
-      }
-      if (
-        img.metadata.view &&
-        !acc.views.includes(img.metadata.view) &&
-        ![
-          "not applicable",
-          "n/a",
-          "N/A",
-          "na",
-          "none",
-          "Not Applicable",
-          "unknown",
-          "Unknown",
-        ].includes(img.metadata.view.toLowerCase())
-      ) {
-        acc.views.push(img.metadata.view);
-      }
-      if (
-        img.metadata.movement &&
-        !acc.movements.includes(img.metadata.movement) &&
-        ![
-          "not applicable",
-          "n/a",
-          "N/A",
-          "na",
-          "none",
-          "Not Applicable",
-          "unknown",
-          "Unknown",
-        ].includes(img.metadata.movement.toLowerCase())
-      ) {
-        acc.movements.push(img.metadata.movement);
-      }
-      if (
-        img.metadata.tod &&
-        !acc.tods.includes(img.metadata.tod) &&
-        ![
-          "not applicable",
-          "n/a",
-          "N/A",
-          "na",
-          "none",
-          "Not Applicable",
-          "unknown",
-          "Unknown",
-        ].includes(img.metadata.tod.toLowerCase())
-      ) {
-        acc.tods.push(img.metadata.tod);
-      }
-      return acc;
-    },
-    { angles: [], views: [], movements: [], tods: [] } as {
-      angles: string[];
-      views: string[];
-      movements: string[];
-      tods: string[];
+  const filterOptions = React.useMemo(() => {
+    console.log("Computing filter options from", sortedImages.length, "images");
+
+    // Debug log the first few images' metadata
+    if (sortedImages.length > 0) {
+      console.log(
+        "Sample image metadata:",
+        sortedImages.slice(0, 3).map((img) => img.metadata)
+      );
     }
-  );
+
+    // Invalid values to skip (case-insensitive)
+    const invalidValues = [
+      "not applicable",
+      "n/a",
+      "na",
+      "none",
+      "not specified",
+      "unknown",
+      "undefined",
+      "null",
+      "",
+    ];
+
+    // Helper function to normalize metadata values
+    const normalizeValue = (value: string | undefined): string | null => {
+      if (!value) return null;
+
+      const trimmedValue = value.trim();
+      if (trimmedValue === "") return null;
+
+      // Check against invalid values (case-insensitive)
+      if (
+        invalidValues.some(
+          (invalid) => trimmedValue.toLowerCase() === invalid.toLowerCase()
+        )
+      ) {
+        return null;
+      }
+
+      // Return the original casing, but trimmed
+      return trimmedValue;
+    };
+
+    // Process each image
+    const result = sortedImages.reduce(
+      (acc, img) => {
+        // Process angle
+        const normalizedAngle = normalizeValue(img.metadata.angle);
+        if (normalizedAngle && !acc.angles.includes(normalizedAngle)) {
+          acc.angles.push(normalizedAngle);
+        }
+
+        // Process view
+        const normalizedView = normalizeValue(img.metadata.view);
+        if (normalizedView && !acc.views.includes(normalizedView)) {
+          acc.views.push(normalizedView);
+        }
+
+        // Process movement
+        const normalizedMovement = normalizeValue(img.metadata.movement);
+        if (normalizedMovement && !acc.movements.includes(normalizedMovement)) {
+          acc.movements.push(normalizedMovement);
+        }
+
+        // Process time of day
+        const normalizedTod = normalizeValue(img.metadata.tod);
+        if (normalizedTod && !acc.tods.includes(normalizedTod)) {
+          acc.tods.push(normalizedTod);
+        }
+
+        // Process side
+        const normalizedSide = normalizeValue(img.metadata.side);
+        if (normalizedSide && !acc.sides.includes(normalizedSide)) {
+          acc.sides.push(normalizedSide);
+        }
+
+        return acc;
+      },
+      { angles: [], views: [], movements: [], tods: [], sides: [] } as {
+        angles: string[];
+        views: string[];
+        movements: string[];
+        tods: string[];
+        sides: string[];
+      }
+    );
+
+    // Sort all arrays alphabetically
+    result.angles.sort();
+    result.views.sort();
+    result.movements.sort();
+    result.tods.sort();
+    result.sides.sort();
+
+    console.log("Extracted filter options:", result);
+    return result;
+  }, [sortedImages]);
+
+  // Track previous image count to only notify parent when it changes
+  const prevImagesCountRef = useRef(sortedImages.length);
+
+  // Track previous filter options to avoid infinite loops
+  const prevFilterOptionsRef = useRef<typeof filterOptions | null>(null);
+
+  // Notify parent of filter options only when filter options actually change
+  React.useEffect(() => {
+    console.log("Filter options effect triggered");
+
+    // Skip if filterOptions haven't changed from the previous value
+    const optionsJSON = JSON.stringify(filterOptions);
+    const prevOptionsJSON = prevFilterOptionsRef.current
+      ? JSON.stringify(prevFilterOptionsRef.current)
+      : null;
+
+    // Only notify parent when options actually change
+    if (onFilterOptionsChange && optionsJSON !== prevOptionsJSON) {
+      console.log("Notifying parent of filter options:", filterOptions);
+      onFilterOptionsChange(filterOptions);
+
+      // Update the previous value reference
+      prevFilterOptionsRef.current = filterOptions;
+    }
+  }, [filterOptions, onFilterOptionsChange]);
 
   // Filter images based on active filters
-  const filteredImages = sortedImages.filter((img) => {
-    return Object.entries(activeFilters).every(([key, value]) => {
-      if (!value) return true;
-      return img.metadata[key as keyof typeof img.metadata] === value;
+  const filteredImages = React.useMemo(() => {
+    console.log(
+      "Recalculating filteredImages with",
+      sortedImages.length,
+      "sorted images"
+    );
+
+    // If we don't have any active filters, return all images
+    if (
+      Object.keys(activeFilters).every(
+        (key) => !activeFilters[key as keyof typeof activeFilters]
+      )
+    ) {
+      console.log(
+        "No active filters, returning all",
+        sortedImages.length,
+        "images"
+      );
+      return sortedImages;
+    }
+
+    // Apply filters
+    const results = sortedImages.filter((img) => {
+      return Object.entries(activeFilters).every(([key, value]) => {
+        if (!value) return true;
+        return img.metadata[key as keyof typeof img.metadata] === value;
+      });
     });
+
+    console.log("After applying filters, have", results.length, "images");
+
+    // If filtering resulted in no images, return all images instead of an empty array
+    if (results.length === 0 && sortedImages.length > 0) {
+      console.log(
+        "WARNING: Filtering resulted in 0 images - returning all images instead"
+      );
+      return sortedImages;
+    }
+
+    return results;
+  }, [sortedImages, activeFilters]);
+
+  // Add debug log for filtered images
+  console.log("Filtering results:", {
+    beforeFiltering: sortedImages.length,
+    afterFiltering: filteredImages.length,
+    activeFilters,
   });
 
   // Pre-calculate optimized image URLs using the transformImageUrl utility
@@ -265,7 +478,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     }
   }, [optimizedImages]);
 
-  const itemsPerPage = imagesPerRow * rowsPerPage;
   const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
 
   // Reset to first page when filters change
@@ -548,17 +760,6 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     };
   }, [isModalOpen]);
 
-  const handleFilterChange = (
-    filterType: string,
-    value: string | undefined
-  ) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      [filterType]:
-        value === prev[filterType as keyof typeof prev] ? undefined : value,
-    }));
-  };
-
   const paginatedImages = optimizedImages.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -653,6 +854,11 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
       // First reset the image loaded state
       setMainImageLoaded(false);
 
+      // Update the currentImageId to maintain selection across mode switches
+      if (optimizedImages[actualIndex]) {
+        setCurrentImageId(optimizedImages[actualIndex].id);
+      }
+
       // Then update the index immediately
       setMainIndex(actualIndex);
     },
@@ -690,119 +896,94 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
     return () => clearTimeout(timerId);
   }, [mainIndex, optimizedImages, mainImageLoaded]);
 
+  // Enhanced version of the useEffect for image array changes
+  useEffect(() => {
+    // This is a separate effect to handle image array changes
+    const imageCount = images.length;
+    console.log(
+      `ImageGalleryEnhanced: Images array changed - new count: ${imageCount}`
+    );
+
+    if (imageCount > 0) {
+      let newMainIndex = mainIndex; // Default to current image index
+      let shouldUpdateIndex = false;
+
+      // Try to maintain the same image by ID when switching modes
+      if (currentImageId) {
+        const currentImageIndex = images.findIndex(
+          (img) => img.id === currentImageId
+        );
+        if (currentImageIndex >= 0) {
+          console.log(`Maintaining view of current image ID ${currentImageId}`);
+          newMainIndex = currentImageIndex;
+          shouldUpdateIndex = true;
+        }
+      }
+      // If current image not found, try using primary image
+      else if (primaryImageId && !hasSetInitialImage) {
+        const primaryIndex = images.findIndex(
+          (img) => img.id === primaryImageId
+        );
+        if (primaryIndex >= 0) {
+          console.log(
+            `Setting main index to primary image at index ${primaryIndex}`
+          );
+          newMainIndex = primaryIndex;
+          shouldUpdateIndex = true;
+        }
+      }
+
+      // Only update mainIndex if we actually found a matching image
+      if (shouldUpdateIndex) {
+        // Set flag to prevent circular updates
+        isChangingFromImageIdRef.current = true;
+
+        // Set the main index to maintain image selection across mode switches
+        setMainIndex(newMainIndex);
+
+        // Calculate correct page for selected image
+        const newPage = Math.floor(newMainIndex / itemsPerPage) + 1;
+        setCurrentPage(newPage);
+      }
+
+      // Add small delay before marking image as loaded to prevent flickering
+      setMainImageLoaded(false);
+      setTimeout(() => {
+        setHasSetInitialImage(true);
+      }, 50);
+    }
+  }, [images, primaryImageId, currentImageId, itemsPerPage, mainIndex]);
+
+  // Add fade-in transition to the main image container to smooth transitions
+  const mainImageContainerStyle = {
+    ...noFocusOutlineStyle,
+    transition: "opacity 0.2s ease-in-out",
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 pb-4 border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))]">
-        {filterOptions.angles.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
-              Angle
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {filterOptions.angles.map((angle: string) => (
-                <button
-                  key={angle}
-                  onClick={() => handleFilterChange("angle", angle)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
-                    activeFilters.angle === angle
-                      ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
-                      : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
-                  }`}
-                >
-                  {angle}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {filterOptions.views.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
-              View
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {filterOptions.views.map((view: string) => (
-                <button
-                  key={view}
-                  onClick={() => handleFilterChange("view", view)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
-                    activeFilters.view === view
-                      ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
-                      : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
-                  }`}
-                >
-                  {view}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {filterOptions.movements.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
-              Movement
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {filterOptions.movements.map((movement: string) => (
-                <button
-                  key={movement}
-                  onClick={() => handleFilterChange("movement", movement)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
-                    activeFilters.movement === movement
-                      ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
-                      : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
-                  }`}
-                >
-                  {movement}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {filterOptions.tods.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
-              Time of Day
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {filterOptions.tods.map((tod: string) => (
-                <button
-                  key={tod}
-                  onClick={() => handleFilterChange("tod", tod)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
-                    activeFilters.tod === tod
-                      ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
-                      : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
-                  }`}
-                >
-                  {tod}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
+    <div
+      className="space-y-6 focus-outline-none focus-visible:outline-none"
+      key="image-gallery-enhanced-stable"
+    >
       {/* Main gallery content */}
       <div
-        className="flex gap-6 focus:outline-2 focus:outline-[hsl(var(--border-muted))] focus:outline focus:rounded-md p-1"
+        className="flex gap-6 p-1 focus:outline-none focus-visible:outline-none"
         tabIndex={0}
         onFocus={() => console.log("Main gallery container focused")}
         ref={(el) => {
-          // Auto focus the gallery container when it mounts
+          // Disable auto-focus on mount to prevent focus border on page load
+          /*
           if (el && typeof window !== "undefined") {
             setTimeout(() => {
               el.focus();
               console.log("Auto focusing gallery container");
             }, 100);
           }
+          */
         }}
         role="application"
         aria-label="Image gallery with keyboard navigation"
+        style={galleryContainerStyle}
         onKeyDown={(e) => {
           console.log("Direct keydown on gallery container:", e.key);
 
@@ -836,9 +1017,10 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
         <div className="w-2/3">
           <div
             ref={mainImageRef}
-            className={`sticky top-4 transition-all duration-150 ease-in-out ${
+            className={`sticky top-4 ${
               isMainVisible ? "opacity-100" : "opacity-0"
             }`}
+            style={mainImageContainerStyle}
           >
             {isLoading ? (
               <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm">
@@ -853,7 +1035,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
               <>
                 <button
                   ref={interactiveImageRef}
-                  className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm transition-shadow hover:shadow-md cursor-pointer focus:outline focus:outline-2 focus:outline-[hsl(var(--border-muted))]"
+                  className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-[hsl(var(--background-primary))] dark:bg-[hsl(var(--background-primary))] border border-[hsl(var(--border-muted))] dark:border-[hsl(var(--border-muted))] shadow-sm transition-shadow hover:shadow-md cursor-pointer"
                   onTouchStart={handleTouchStart}
                   onTouchEnd={handleTouchEnd}
                   onClick={() => {
@@ -878,6 +1060,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                     filteredImages.length
                   } in fullscreen mode. Use arrow keys to navigate.`}
                   role="button"
+                  style={noFocusOutlineStyle}
                 >
                   {!mainImageLoaded && (
                     <div className="absolute inset-0 flex items-center justify-center bg-[hsl(var(--background-primary))]">
@@ -924,7 +1107,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       setModalIndex(mainIndex);
                       setIsModalOpen(true);
                     }}
-                    className="absolute top-4 right-4 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2 z-10"
+                    className="absolute top-4 right-4 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none"
                     aria-label="Open fullscreen view"
                   >
                     <ZoomIn className="w-5 h-5" />
@@ -938,7 +1121,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       );
                       handlePrev();
                     }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2 z-10"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="w-5 h-5" />
@@ -951,7 +1134,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                       );
                       handleNext();
                     }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2 z-10"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out focus:outline-none"
                     aria-label="Next image"
                   >
                     <ChevronRight className="w-5 h-5" />
@@ -988,14 +1171,47 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 </div>
               </>
             ) : (
-              <div className="aspect-[4/3] w-full flex items-center justify-center rounded-lg bg-[hsl(var(--background-muted))] dark:bg-[hsl(var(--background-primary))] text-muted-foreground">
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-4">
                 <p>No images match the selected filters</p>
+                {Object.keys(activeFilters).length > 0 && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
+                  >
+                    Reset Filters
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
 
         <div className="w-1/3">
+          {/* Active filters display - moved near the thumbnails */}
+          {Object.keys(activeFilters).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mb-2 p-2 bg-[hsl(var(--background-subtle))] rounded-md">
+              <span className="text-xs text-[hsl(var(--foreground-muted))]">
+                Filters:
+              </span>
+              {Object.entries(activeFilters).map(([key, value]) => (
+                <button
+                  key={key}
+                  onClick={() => handleFilterChange(key, value)}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  {key}: {value}
+                  <X className="w-3 h-3" />
+                </button>
+              ))}
+              <button
+                onClick={handleResetFilters}
+                className="ml-auto px-2 py-1 text-xs rounded-full bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))] transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col h-[calc(100vh-24rem)]">
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
@@ -1020,11 +1236,12 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                           actualIndex === mainIndex
                             ? "ring-2 ring-[hsl(var(--border-muted))]"
                             : "opacity-75 hover:opacity-100"
-                        } focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2`}
+                        } focus:outline-none`}
                         aria-label={`View image ${actualIndex + 1}`}
                         aria-current={
                           actualIndex === mainIndex ? "true" : "false"
                         }
+                        style={noFocusOutlineStyle}
                       >
                         <div
                           id={`loader-${actualIndex}`}
@@ -1095,6 +1312,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                             }}
                             disabled={updatingThumbnail === image.id}
                             title="Set as thumbnail"
+                            style={noFocusOutlineStyle}
                           >
                             {updatingThumbnail === image.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1119,7 +1337,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2"
+                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none"
                   aria-label="Previous page"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -1138,7 +1356,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2"
+                  className="p-2 bg-[hsl(var(--background-primary))]/50 rounded-full text-[hsl(var(--foreground))] hover:bg-[hsl(var(--background-primary))]/70 transition-colors duration-150 ease-in-out disabled:opacity-50 focus:outline-none"
                   aria-label="Next page"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -1195,7 +1413,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 console.log("ImageGallery: Modal close button clicked");
                 setIsModalOpen(false);
               }}
-              className="absolute top-4 right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2"
+              className="absolute top-4 right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none"
               aria-label="Close fullscreen view"
               ref={(el) => {
                 // Auto focus the close button when modal opens
@@ -1233,7 +1451,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 console.log("ImageGallery: Modal previous button clicked");
                 handlePrev();
               }}
-              className="absolute left-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2"
+              className="absolute left-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none"
               aria-label="Previous image"
             >
               <ChevronLeft className="w-8 h-8" />
@@ -1243,7 +1461,7 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
                 console.log("ImageGallery: Modal next button clicked");
                 handleNext();
               }}
-              className="absolute right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-[hsl(var(--border-muted))] focus:ring-offset-2"
+              className="absolute right-4 p-2 text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-muted))] transition-colors duration-150 ease-in-out focus:outline-none"
               aria-label="Next image"
             >
               <ChevronRight className="w-8 h-8" />
@@ -1274,4 +1492,205 @@ export const ImageGalleryEnhanced: React.FC<ImageGalleryProps> = ({
   );
 };
 
-export default ImageGalleryEnhanced;
+// Export the filter button separately to be used in the parent component
+export const ImageFilterButton = React.memo(function ImageFilterButton({
+  activeFilters,
+  filterOptions,
+  onFilterChange,
+  onResetFilters,
+}: {
+  activeFilters: any;
+  filterOptions: any;
+  onFilterChange: (type: string, value: string) => void;
+  onResetFilters: () => void;
+}) {
+  console.log("ImageFilterButton render with options:", filterOptions);
+
+  // Control the open state of the popover manually
+  const [open, setOpen] = React.useState(false);
+
+  // Handle filter change without causing multiple renders
+  const handleFilterChange = React.useCallback(
+    (type: string, value: string) => {
+      console.log(`Filter change: ${type} = ${value}`);
+      onFilterChange(type, value);
+    },
+    [onFilterChange]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))]">
+          <Filter className="w-4 h-4" />
+          Filter
+          {Object.keys(activeFilters).length > 0 && (
+            <span className="flex items-center justify-center w-5 h-5 text-xs rounded-full bg-primary text-primary-foreground">
+              {Object.keys(activeFilters).length}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-4 max-h-96 overflow-y-auto bg-[hsl(var(--background))] border border-[hsl(var(--border))] shadow-md">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-medium">Filter Images</h3>
+            {Object.keys(activeFilters).length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onResetFilters();
+                }}
+                className="text-xs text-primary hover:text-primary/90 transition-colors"
+              >
+                Reset All Filters
+              </button>
+            )}
+          </div>
+
+          {filterOptions.angles && filterOptions.angles.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Angle
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.angles.map((angle: string) => (
+                  <button
+                    key={angle}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("angle", angle);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.angle === angle
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {angle}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.views && filterOptions.views.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                View
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.views.map((view: string) => (
+                  <button
+                    key={view}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("view", view);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.view === view
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {view}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.movements && filterOptions.movements.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Movement
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.movements.map((movement: string) => (
+                  <button
+                    key={movement}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("movement", movement);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.movement === movement
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {movement}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.tods && filterOptions.tods.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Time of Day
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.tods.map((tod: string) => (
+                  <button
+                    key={tod}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("tod", tod);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.tod === tod
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {tod}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.sides && filterOptions.sides.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Side
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.sides.map((side: string) => (
+                  <button
+                    key={side}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("side", side);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.side === side
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {side}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Debug info */}
+          <div className="mt-4 pt-4 border-t border-[hsl(var(--border-subtle))]">
+            <details>
+              <summary className="text-xs text-[hsl(var(--foreground-muted))] cursor-pointer">
+                Debug filter options
+              </summary>
+              <pre className="mt-2 p-2 bg-[hsl(var(--background-subtle))] rounded text-xs overflow-auto max-h-40">
+                {JSON.stringify(filterOptions, null, 2)}
+              </pre>
+            </details>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});

@@ -7,10 +7,10 @@ import {
   DeleteStatus,
   UploadProgress,
 } from "@/components/StatusNotification";
-import { Button } from "@/components/ui/button";
-import { X, Plus, Trash2 } from "lucide-react";
-import { useDropzone } from "react-dropzone";
+import { Trash2, Plus } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { Button } from "@/components/ui/button";
+import { toast } from "react-hot-toast";
 
 interface ImageMetadata {
   angle?: string;
@@ -62,6 +62,8 @@ interface ImageUploadWithContextProps {
   carId: string;
   refreshImages: () => void;
   context: CarsClientContext;
+  primaryImageId?: string;
+  onPrimaryImageChange?: (imageId: string) => void;
 }
 
 export default function ImageUploadWithContext({
@@ -79,6 +81,8 @@ export default function ImageUploadWithContext({
   carId,
   refreshImages,
   context,
+  primaryImageId,
+  onPrimaryImageChange,
 }: ImageUploadWithContextProps) {
   const [imagesToDelete, setImagesToDelete] = useState<
     Array<{ index: number; image: Image }>
@@ -186,27 +190,7 @@ export default function ImageUploadWithContext({
     setDeleteStatus([]);
   };
 
-  const [showDropzone, setShowDropzone] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      handleImageUpload(acceptedFiles);
-      setShowDropzone(false);
-    },
-    [carId]
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/jpeg": [],
-      "image/png": [],
-      "image/webp": [],
-      "image/heic": [],
-      "image/heif": [],
-    },
-  });
 
   const handleImageUpload = async (files: File[]) => {
     if (!files.length) return;
@@ -313,43 +297,184 @@ export default function ImageUploadWithContext({
     }
   }, [context]);
 
+  // Helper function to extract image ID from Cloudflare image URL
+  const extractImageIdFromUrl = (url: string): string | null => {
+    // Format: https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/594b1728-88a5-4368-a2f1-91f352872c00/public
+    try {
+      // Extract the ID segment from the URL (assuming it's the second-to-last path segment)
+      const urlParts = url.split("/");
+      if (urlParts.length >= 2) {
+        // The ID is usually the second-to-last segment
+        const potentialId = urlParts[urlParts.length - 2];
+        // Check if it looks like a valid ID (contains hyphens or is long enough)
+        if (
+          potentialId &&
+          (potentialId.includes("-") || potentialId.length >= 24)
+        ) {
+          console.log(
+            `[ImageUploadWithContext] Extracted ID ${potentialId} from URL ${url}`
+          );
+          return potentialId;
+        }
+      }
+    } catch (error) {
+      console.error(
+        `[ImageUploadWithContext] Failed to extract ID from URL ${url}:`,
+        error
+      );
+    }
+    return null;
+  };
+
+  // Ensure that images passed from props have valid IDs by extracting from URL if needed
+  const processedImages = React.useMemo(() => {
+    return images.map((image) => {
+      // We still want to keep this logic to ensure all images have IDs for display purposes,
+      // but we won't use these extracted IDs for the primary image setting API call
+      if (!image.id || image.id.trim() === "") {
+        if (image.url) {
+          const extractedId = extractImageIdFromUrl(image.url);
+          if (extractedId) {
+            console.log(
+              `[ImageUploadWithContext] Generated ID for image from URL: ${extractedId}`
+            );
+            return {
+              ...image,
+              id: extractedId,
+            };
+          }
+        }
+      }
+      return image;
+    });
+  }, [images]);
+
+  // Add a function to handle setting the primary image
+  const handleSetPrimaryImage = async (imageId: string) => {
+    console.log(`[ImageUploadWithContext] Setting primary image to ${imageId}`);
+
+    // Validate the imageId
+    if (!imageId || typeof imageId !== "string" || imageId.trim() === "") {
+      const errorMsg = `Cannot set primary image: Invalid image ID: ${imageId} (type: ${typeof imageId})`;
+      console.error(errorMsg);
+      toast.error("Failed to update featured image: Invalid image ID");
+      return;
+    }
+
+    if (!carId) {
+      console.error("Cannot set primary image: Car ID is not available");
+      toast.error("Cannot set primary image: Car ID is not available");
+      return;
+    }
+
+    console.log(
+      `[ImageUploadWithContext] Making API request to /api/cars/${carId}/thumbnail with primaryImageId: "${imageId}"`
+    );
+
+    try {
+      // Make the API request to update the primary image
+      const requestBody = JSON.stringify({ primaryImageId: imageId });
+      console.log(`Request body: ${requestBody}`);
+
+      const response = await fetch(`/api/cars/${carId}/thumbnail`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: requestBody,
+      });
+
+      console.log(
+        `[ImageUploadWithContext] API response status:`,
+        response.status
+      );
+
+      if (!response.ok) {
+        let errorMessage = "Failed to update featured image";
+
+        try {
+          // Try to parse the error as JSON
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error("Error response from API (JSON):", errorData);
+        } catch (parseError) {
+          // If not JSON, get the text
+          const errorText = await response.text();
+          console.error("Error response from API (text):", errorText);
+          errorMessage = errorText || errorMessage;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      // Parse the response data
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log("API response data:", responseData);
+      } catch (parseError) {
+        console.warn(
+          "Could not parse response as JSON, but request was successful"
+        );
+      }
+
+      toast.success("Featured image updated successfully");
+      console.log(
+        `[ImageUploadWithContext] Featured image updated successfully to ${imageId}`
+      );
+
+      // Call the callback if provided
+      if (onPrimaryImageChange) {
+        console.log(
+          `[ImageUploadWithContext] Calling onPrimaryImageChange callback with ${imageId}`
+        );
+        onPrimaryImageChange(imageId);
+      } else {
+        console.warn(
+          `[ImageUploadWithContext] onPrimaryImageChange callback not provided`
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[ImageUploadWithContext] Error updating featured image:",
+        error
+      );
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update featured image"
+      );
+    }
+  };
+
+  // Add logging for primaryImageId
+  React.useEffect(() => {
+    console.log(
+      `[ImageUploadWithContext] primaryImageId: ${primaryImageId || "None"}`
+    );
+  }, [primaryImageId]);
+
+  // Add logging for the first few processed images
+  React.useEffect(() => {
+    if (processedImages.length > 0) {
+      console.log(
+        "[ImageUploadWithContext] First few processed images:",
+        processedImages
+          .slice(0, Math.min(3, processedImages.length))
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            isPrimary: primaryImageId === img.id,
+          }))
+      );
+    }
+  }, [processedImages, primaryImageId]);
+
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" key="image-upload-context-stable">
       <div className="mt-4 w-full flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium">Images</h3>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowDropzone(!showDropzone)}
-            >
-              {showDropzone ? <X className="w-4 h-4 mr-2" /> : null}
-              {showDropzone ? "Cancel" : "Add Images"}
-            </Button>
-          </div>
-        </div>
-
-        {showDropzone && (
-          <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-md p-8 text-center cursor-pointer transition-colors ${
-              isDragActive
-                ? "border-primary bg-primary/10"
-                : "border-border hover:bg-muted/50"
-            }`}
-          >
-            <input {...getInputProps()} />
-            {isDragActive ? (
-              <p>Drop the files here...</p>
-            ) : (
-              <p>Drag and drop images here, or click to select files</p>
-            )}
-          </div>
-        )}
-
         <ImageGallery
-          images={images}
+          images={processedImages}
           isEditMode={isEditMode}
           onRemoveImage={(indices, deleteFromStorage) => {
             console.log(
@@ -404,13 +529,26 @@ export default function ImageUploadWithContext({
           uploading={uploading}
           uploadProgress={uploadProgress}
           showMetadata={showMetadata}
-          showFilters={showFilters}
+          showFilters={false}
           title={title}
           aspectRatio="4/3"
           thumbnailsPerRow={3}
           rowsPerPage={5}
           carId={carId}
           onDeleteSingleImage={handleDeleteSingleImage}
+          externalFileInputRef={fileInputRef}
+          onExternalFileSelect={(files) => {
+            handleImageUpload(files);
+            if (files.length) {
+              const fileList = Object.assign([], files, {
+                item: (i: number) => files[i],
+                length: files.length,
+              }) as unknown as FileList;
+              onImagesChange(fileList);
+            }
+          }}
+          primaryImageId={primaryImageId}
+          onPrimaryImageChange={handleSetPrimaryImage}
           contextInput={
             isEditMode && (
               <div className="w-full">

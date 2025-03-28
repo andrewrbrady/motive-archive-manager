@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useTransition as useReactTransition,
+} from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import DocumentsClient from "@/app/documents/DocumentsClient";
@@ -21,7 +26,10 @@ import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
-import { ImageGalleryEnhanced } from "@/components/cars/ImageGalleryEnhanced";
+import {
+  ImageGalleryEnhanced,
+  ImageFilterButton,
+} from "@/components/cars/ImageGalleryEnhanced";
 import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
@@ -543,6 +551,50 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const [additionalContext, setAdditionalContext] = useState("");
   const [imagesLoading, setImagesLoading] = useState(true);
 
+  // Filtering state
+  const [activeFilters, setActiveFilters] = useState<{
+    angle?: string;
+    view?: string;
+    movement?: string;
+    tod?: string;
+    side?: string;
+  }>({});
+  const [filterOptions, setFilterOptions] = useState<{
+    angles: string[];
+    views: string[];
+    movements: string[];
+    tods: string[];
+    sides: string[];
+  }>({ angles: [], views: [], movements: [], tods: [], sides: [] });
+
+  // Add transition state for smooth mode switching
+  const [isPending, startTransition] = useReactTransition();
+
+  // Memoized filter option update function to avoid unnecessary rerenders
+  const handleFilterOptionsChange = useCallback(
+    (options: typeof filterOptions) => {
+      setFilterOptions(options);
+    },
+    []
+  );
+
+  // Handle filter changes
+  const handleFilterChange = useCallback(
+    (filterType: string, value: string) => {
+      setActiveFilters((prev) => ({
+        ...prev,
+        [filterType]:
+          value === prev[filterType as keyof typeof prev] ? undefined : value,
+      }));
+    },
+    []
+  );
+
+  // Reset all filters
+  const handleResetFilters = useCallback(() => {
+    setActiveFilters({});
+  }, []);
+
   // Create a CarsClientContext object for the ImageUploadWithContext component
   const carsClientContext = {
     uploadImages: async (
@@ -814,7 +866,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
         setError(null);
 
         // Fetch car data
-        const carResponse = await fetch(`/api/cars/${id}`);
+        const carResponse = await fetch(`/api/cars/${id}?includeImages=true`);
         if (!carResponse.ok) {
           throw new Error(`Failed to fetch car: ${carResponse.statusText}`);
         }
@@ -822,6 +874,12 @@ export default function CarPage({ params }: { params: { id: string } }) {
         if (!carData) {
           throw new Error("No car data received");
         }
+
+        // Debug car data to understand image structure
+        console.log("=== Car API Response ===");
+        console.log("Car data:", carData);
+        console.log("Car images:", carData.images);
+        console.log("Car imageIds:", carData.imageIds);
 
         // Fetch documents
         const docsResponse = await fetch(`/api/cars/${id}/documents`);
@@ -1505,16 +1563,19 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
       // Add a timestamp to ensure we bypass any cache
       const timestamp = new Date().getTime();
-      const response = await fetch(`/api/cars/${params.id}?t=${timestamp}`, {
-        // Add cache-busting headers
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-        // Force cache bypass
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/cars/${params.id}?includeImages=true&t=${timestamp}`,
+        {
+          // Add cache-busting headers
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+          // Force cache bypass
+          cache: "no-store",
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -1563,6 +1624,56 @@ export default function CarPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("[DEBUG] Error refreshing car data:", error);
     }
+  };
+
+  // Add debug log for image data
+  console.log("Debug car data in render:", {
+    id: car?._id,
+    hasImages: Boolean(car?.images?.length),
+    imageCount: car?.images?.length || 0,
+    imageIds: car?.imageIds?.length || 0,
+  });
+
+  // Add debug logging for primaryImageId
+  React.useEffect(() => {
+    if (car) {
+      console.log(
+        `[Car Page] Current car primaryImageId: ${car.primaryImageId || "None"}`
+      );
+    }
+  }, [car]);
+
+  const handlePrimaryImageChange = async (imageId: string) => {
+    console.log(`[Car Page] Setting primary image ID to: ${imageId}`);
+
+    // Extract ID from URL if it's embedded in the URL but not passed as a proper ID
+    if (!imageId || imageId.trim() === "") {
+      console.error(
+        "[Car Page] Error: Received empty imageId in handlePrimaryImageChange"
+      );
+      return;
+    }
+
+    // Update car state with the new primary image ID
+    setCar((prevCar) => {
+      if (!prevCar) return prevCar;
+      console.log(
+        `[Car Page] Updating car state with primaryImageId: ${imageId}`
+      );
+      console.log(
+        `[Car Page] Previous primaryImageId: ${
+          prevCar.primaryImageId || "None"
+        }`
+      );
+      return {
+        ...prevCar,
+        primaryImageId: imageId,
+      };
+    });
+
+    // Refresh car data to ensure UI updates
+    console.log("[Car Page] Refreshing car data after primary image change");
+    await refreshCarData();
   };
 
   if (isLoading) {
@@ -1619,95 +1730,194 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 label: "Image Gallery",
                 content: (
                   <div className="space-y-4">
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => setIsEditMode(!isEditMode)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
+                    <div className="flex justify-between items-center">
+                      <div>
+                        {!isEditMode && (
+                          <ImageFilterButton
+                            activeFilters={activeFilters}
+                            filterOptions={filterOptions}
+                            onFilterChange={handleFilterChange}
+                            onResetFilters={handleResetFilters}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => {
+                            // Use React's useTransition to make the mode switch smoother
+                            startTransition(() => {
+                              if (isEditMode) {
+                                // Clear filters but don't reset the main image index
+                                setActiveFilters({});
+
+                                // Exit edit mode
+                                setIsEditMode(false);
+
+                                // Only fetch data without visual indicators
+                                fetch(
+                                  `/api/cars/${id}?includeImages=true&t=${Date.now()}`,
+                                  {
+                                    // Add cache-busting headers
+                                    headers: {
+                                      "Cache-Control":
+                                        "no-cache, no-store, must-revalidate",
+                                      Pragma: "no-cache",
+                                      Expires: "0",
+                                    },
+                                    cache: "no-store",
+                                  }
+                                )
+                                  .then((res) => res.json())
+                                  .then((data) => {
+                                    console.log(
+                                      "Retrieved car data silently, images:",
+                                      data.images?.length || 0
+                                    );
+
+                                    // Update car data without triggering a visual refresh
+                                    setCar((prevCar) => {
+                                      if (!prevCar) return data;
+
+                                      // Create a new object that preserves structure
+                                      return {
+                                        ...prevCar,
+                                        ...data,
+                                        images: data.images,
+                                      };
+                                    });
+                                  })
+                                  .catch((error) => {
+                                    console.error(
+                                      "Error retrieving car data:",
+                                      error
+                                    );
+                                  });
+                              } else {
+                                // Enter edit mode without resetting state
+                                setIsEditMode(true);
+                              }
+                            });
+                          }}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
+                        >
+                          {isEditMode ? (
+                            <>
+                              <Check className="w-4 h-4" />
+                              Done
+                            </>
+                          ) : (
+                            <>
+                              <Pencil className="w-4 h-4" />
+                              Edit Gallery
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Use a consistent wrapper for both modes to prevent layout shifts */}
+                    <div className="image-gallery-wrapper mt-4 relative">
+                      {/* Add opacity transition for smoother mode switching */}
+                      <div
+                        className={`transition-opacity duration-300 ${
+                          isPending ? "opacity-60" : "opacity-100"
+                        }`}
                       >
                         {isEditMode ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Done
-                          </>
+                          <ImageUploadWithContext
+                            carId={params.id}
+                            images={
+                              car?.images?.map((img) => ({
+                                id: img._id,
+                                url: img.url,
+                                filename: img.filename,
+                                metadata: {
+                                  angle: img.metadata?.angle || "",
+                                  view: img.metadata?.view || "",
+                                  movement: img.metadata?.movement || "",
+                                  tod: img.metadata?.tod || "",
+                                  side: img.metadata?.side || "",
+                                  description: img.metadata?.description || "",
+                                  ...(img.metadata || {}),
+                                },
+                                variants: {},
+                                createdAt:
+                                  img.createdAt || new Date().toISOString(),
+                                updatedAt:
+                                  img.updatedAt || new Date().toISOString(),
+                              })) || []
+                            }
+                            primaryImageId={car?.primaryImageId}
+                            onPrimaryImageChange={handlePrimaryImageChange}
+                            isEditMode={isEditMode}
+                            onRemoveImage={handleRemoveImage}
+                            onImagesChange={handleImageUpload}
+                            uploading={uploadingImages}
+                            uploadProgress={uploadProgress}
+                            setUploadProgress={setUploadProgress}
+                            showMetadata={true}
+                            showFilters={true}
+                            title={
+                              car ? `${car.year} ${car.make} ${car.model}` : ""
+                            }
+                            onContextChange={setAdditionalContext}
+                            context={carsClientContext}
+                            refreshImages={refreshCarData}
+                          />
                         ) : (
-                          <>
-                            <Pencil className="w-4 h-4" />
-                            Edit Gallery
-                          </>
+                          <ImageGalleryEnhanced
+                            images={
+                              car?.images?.map((img) => ({
+                                id: img._id,
+                                url: img.url.endsWith("/public")
+                                  ? img.url
+                                  : `${img.url}/public`,
+                                filename: img.filename,
+                                metadata: {
+                                  angle: img.metadata?.angle || "",
+                                  view: img.metadata?.view || "",
+                                  movement: img.metadata?.movement || "",
+                                  tod: img.metadata?.tod || "",
+                                  side: img.metadata?.side || "",
+                                  description: img.metadata?.description || "",
+                                  ...(img.metadata || {}),
+                                },
+                                variants: {},
+                                createdAt:
+                                  img.createdAt || new Date().toISOString(),
+                                updatedAt:
+                                  img.updatedAt || new Date().toISOString(),
+                              })) || []
+                            }
+                            isLoading={imagesLoading}
+                            carId={id}
+                            primaryImageId={car.primaryImageId}
+                            activeFilters={activeFilters}
+                            onFilterChange={handleFilterChange}
+                            onResetFilters={handleResetFilters}
+                            onFilterOptionsChange={handleFilterOptionsChange}
+                            onPrimaryImageChange={(imageId: string) => {
+                              console.log(
+                                "Setting image as primary in ImageGalleryEnhanced:",
+                                imageId
+                              );
+                              // Update the local state to reflect the change
+                              setCar((prevCar) => {
+                                if (!prevCar) return prevCar;
+                                return {
+                                  ...prevCar,
+                                  primaryImageId: imageId,
+                                };
+                              });
+                              // Show a success message
+                              toast.success(
+                                "Featured image updated successfully"
+                              );
+                            }}
+                          />
                         )}
-                      </button>
+                      </div>
                     </div>
-                    {isEditMode ? (
-                      <ImageUploadWithContext
-                        images={
-                          car.images?.map((img) => ({
-                            id: img._id,
-                            url: img.url.endsWith("/public")
-                              ? img.url
-                              : `${img.url}/public`,
-                            filename: img.filename,
-                            metadata: img.metadata || {},
-                            variants: {},
-                            createdAt:
-                              img.createdAt || new Date().toISOString(),
-                            updatedAt:
-                              img.updatedAt || new Date().toISOString(),
-                          })) || []
-                        }
-                        isEditMode={isEditMode}
-                        onRemoveImage={handleRemoveImage}
-                        onImagesChange={handleImageUpload}
-                        uploading={uploadingImages}
-                        uploadProgress={uploadProgress}
-                        showMetadata={true}
-                        showFilters={true}
-                        title={`${car.year} ${car.make} ${car.model}`}
-                        onContextChange={setAdditionalContext}
-                        carId={id}
-                        refreshImages={() => {
-                          fetch(`/api/cars/${id}`)
-                            .then((res) => res.json())
-                            .then((data) => setCar(data))
-                            .catch((error) =>
-                              console.error("Error refreshing images:", error)
-                            );
-                        }}
-                        context={carsClientContext}
-                      />
-                    ) : (
-                      <ImageGalleryEnhanced
-                        images={
-                          car.images?.map((img) => ({
-                            id: img._id,
-                            url: img.url.endsWith("/public")
-                              ? img.url
-                              : `${img.url}/public`,
-                            filename: img.filename,
-                            metadata: img.metadata || {},
-                            variants: {},
-                            createdAt:
-                              img.createdAt || new Date().toISOString(),
-                            updatedAt:
-                              img.updatedAt || new Date().toISOString(),
-                          })) || []
-                        }
-                        isLoading={imagesLoading}
-                        carId={id}
-                        primaryImageId={car.primaryImageId}
-                        onPrimaryImageChange={(imageId: string) => {
-                          // Update the local state to reflect the change
-                          setCar((prevCar) => {
-                            if (!prevCar) return prevCar;
-                            return {
-                              ...prevCar,
-                              primaryImageId: imageId,
-                            };
-                          });
-                          // Show a success message
-                          toast.success("Thumbnail updated successfully");
-                        }}
-                      />
-                    )}
                   </div>
                 ),
               },

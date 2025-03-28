@@ -29,6 +29,7 @@ import { toast } from "react-hot-toast";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
 import BatchDeliverableForm from "./BatchDeliverableForm";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface DeliverablesTabProps {
   carId: string | string[];
@@ -241,8 +242,10 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const getPillColor = (field: string, value: string) => {
     const colors = {
       status: {
-        not_started: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
-        in_progress: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
+        not_started:
+          "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
+        in_progress:
+          "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
         done: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
       },
       platform: "bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))]",
@@ -397,6 +400,17 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
   };
 
+  // Helper to safely handle date conversions
+  const safeDateValue = (dateString: string): Date | undefined => {
+    try {
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? undefined : date;
+    } catch (error) {
+      console.error("Error parsing date:", error);
+      return undefined;
+    }
+  };
+
   const renderCell = (deliverable: Deliverable, field: keyof Deliverable) => {
     const isEditing =
       editingCell?.id === deliverable._id?.toString() &&
@@ -505,10 +519,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       if (field === "edit_deadline" || field === "release_date") {
         return (
           <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={new Date(editValue).toISOString().split("T")[0]}
-              onChange={(e) => setEditValue(e.target.value)}
+            <DatePicker
+              date={safeDateValue(editValue)}
+              setDate={(date) => setEditValue(date ? date.toISOString() : "")}
               className="w-[180px]"
             />
             <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
@@ -576,7 +589,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           onClick={() => handleCellClick(deliverable, field)}
           className="cursor-pointer"
         >
-          {safeFormat(deliverable[field], "MMM d, yyyy")}
+          {safeFormat(deliverable[field], "MM/dd/yyyy")}
         </div>
       );
     }

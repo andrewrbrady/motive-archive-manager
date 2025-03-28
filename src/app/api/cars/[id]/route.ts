@@ -208,12 +208,18 @@ export async function GET(
         pipeline.push({
           $lookup: {
             from: "images",
-            let: { imageIds: { $ifNull: ["$imageIds", []] } },
+            let: {
+              carId: { $toString: "$_id" },
+              imageIds: { $ifNull: ["$imageIds", []] },
+            },
             pipeline: [
               {
                 $match: {
                   $expr: {
-                    $in: [{ $toString: "$_id" }, "$$imageIds"],
+                    $or: [
+                      { $in: [{ $toString: "$_id" }, "$$imageIds"] },
+                      { $eq: [{ $toString: "$carId" }, "$$carId"] },
+                    ],
                   },
                 },
               },
@@ -292,13 +298,23 @@ export async function GET(
 
       if (Array.isArray(car.images)) {
         standardizedCar.images = car.images
-          .filter((img) => img != null)
+          .filter((img) => img != null && img.url)
           .map((img) => ({
             ...img,
             _id: img._id?.toString() || "",
             car_id: img.car_id?.toString() || "",
             url: img.url.endsWith("/public") ? img.url : `${img.url}/public`,
           }));
+
+        console.log(
+          `[Car ${id}] Found ${standardizedCar.images.length} images after standardization`
+        );
+        if (standardizedCar.images.length > 0) {
+          console.log(`[Car ${id}] First image sample:`, {
+            id: standardizedCar.images[0]._id,
+            url: standardizedCar.images[0].url,
+          });
+        }
       }
 
       // Handle client info with defensive checks

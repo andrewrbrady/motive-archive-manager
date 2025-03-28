@@ -6,6 +6,7 @@ import {
   ChevronRight,
   X,
   ZoomIn,
+  Filter,
   Loader2,
   Check,
   Compass,
@@ -14,6 +15,8 @@ import {
   Move,
   Plus,
   Trash2,
+  Star,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
@@ -78,6 +81,10 @@ interface ImageGalleryProps {
   carId: string;
   onImageProgress?: (progress: UploadProgress) => void;
   onDeleteSingleImage?: (imageId: string, filename: string) => Promise<void>;
+  externalFileInputRef?: React.RefObject<HTMLInputElement>;
+  onExternalFileSelect?: (files: File[]) => void;
+  primaryImageId?: string;
+  onPrimaryImageChange?: (imageId: string) => void;
 }
 
 interface Filters {
@@ -117,6 +124,10 @@ export function ImageGallery({
   carId,
   onImageProgress,
   onDeleteSingleImage,
+  externalFileInputRef,
+  onExternalFileSelect,
+  primaryImageId,
+  onPrimaryImageChange,
 }: ImageGalleryProps) {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -173,14 +184,19 @@ export function ImageGallery({
     }
   }, [images.length]);
 
-  // Only force reload when entering/exiting edit mode
   useEffect(() => {
     if (isEditMode) {
-      setCurrentPage(1);
+      // When entering edit mode, only reset selections and maintain the current view
       setSelectedImages([]);
-      setFilters({});
+      // Keep currentPage and mainIndex consistent across mode transitions
     } else {
+      // When exiting edit mode
       setSelectedImages([]); // Clear selections when exiting edit mode
+      setImageErrors({}); // Reset image errors when exiting edit mode
+      // Don't reset mainIndex or currentPage to keep the same image in view
+
+      // Ensure main image loaded state is true to prevent jarring transitions
+      setMainImageLoaded(true);
     }
   }, [isEditMode]);
 
@@ -226,17 +242,31 @@ export function ImageGallery({
 
   const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
 
-  // Reset mainIndex and currentPage when filtered results change
+  // Add the new effect here after filteredImages and totalPages are declared
+  // Add a new effect to ensure state consistency during mode transitions
   useEffect(() => {
-    if (filteredImages.length === 0) {
-      setMainIndex(0);
-      setCurrentPage(1);
-    } else if (mainIndex >= filteredImages.length) {
+    // Ensure mainIndex is valid for the current filtered images
+    if (filteredImages.length > 0 && mainIndex >= filteredImages.length) {
       setMainIndex(filteredImages.length - 1);
-      const newPage = Math.ceil(filteredImages.length / itemsPerPage);
-      setCurrentPage(Math.min(currentPage, newPage));
     }
-  }, [filteredImages.length, mainIndex, currentPage, itemsPerPage]);
+
+    // Ensure we're maintaining the correct page
+    const correctPage = Math.ceil((mainIndex + 1) / itemsPerPage);
+    if (
+      currentPage !== correctPage &&
+      correctPage <= totalPages &&
+      correctPage > 0
+    ) {
+      setCurrentPage(correctPage);
+    }
+  }, [
+    isEditMode,
+    filteredImages,
+    mainIndex,
+    currentPage,
+    itemsPerPage,
+    totalPages,
+  ]);
 
   const handleFilterChange = (
     key: keyof Filters,
@@ -484,8 +514,13 @@ export function ImageGallery({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && onImagesChange) {
-      onImagesChange(e.target.files);
+    if (e.target.files) {
+      if (onExternalFileSelect) {
+        onExternalFileSelect(Array.from(e.target.files));
+      }
+      if (onImagesChange) {
+        onImagesChange(e.target.files);
+      }
     }
   };
 
@@ -501,9 +536,14 @@ export function ImageGallery({
     });
   };
 
-  // Remove the mainImageLoaded state changes from thumbnail clicks
+  // Modify the handleThumbnailClick function to improve transition
   const handleThumbnailClick = (index: number) => {
-    if (!isEditMode) {
+    // Allow thumbnail clicking in both modes, but handle selection differently
+    if (isEditMode) {
+      handleImageSelect(index);
+    } else {
+      // Apply a smoother transition by setting main image loaded first
+      setMainImageLoaded(true);
       setMainIndex(index);
     }
   };
@@ -535,6 +575,66 @@ export function ImageGallery({
     }
     return `${baseUrl}/public`;
   };
+
+  // Add a function to handle setting a thumbnail image
+  const handleSetAsPrimary = (image: Image, event: React.MouseEvent) => {
+    event.stopPropagation();
+
+    // Use the image's database ID (stored in the id property) rather than extracting from URL
+    let imageId = image.id;
+
+    // If image ID is empty, log an error and don't proceed
+    if (!imageId || imageId.trim() === "") {
+      console.error(
+        `[SET PRIMARY IMAGE] Cannot set primary image: No valid database ID found for image`,
+        image
+      );
+      return;
+    }
+
+    console.log(
+      `[SET PRIMARY IMAGE] Setting image ${imageId} as primary image`
+    );
+    console.log(
+      `[SET PRIMARY IMAGE] onPrimaryImageChange available:`,
+      !!onPrimaryImageChange
+    );
+
+    if (onPrimaryImageChange) {
+      console.log(
+        `[SET PRIMARY IMAGE] Calling onPrimaryImageChange with imageId:`,
+        imageId
+      );
+      onPrimaryImageChange(imageId);
+    } else {
+      console.error(
+        "[SET PRIMARY IMAGE] Error: onPrimaryImageChange callback is not available"
+      );
+    }
+  };
+
+  React.useEffect(() => {
+    // Log the primary image ID value when it changes
+    if (primaryImageId) {
+      console.log("[ImageGallery] Current primaryImageId:", primaryImageId);
+    } else {
+      console.log("[ImageGallery] No primaryImageId set");
+    }
+  }, [primaryImageId]);
+
+  // Log all image IDs on initial load
+  React.useEffect(() => {
+    if (images && images.length > 0) {
+      console.log(
+        "[ImageGallery] First few image IDs:",
+        images.slice(0, Math.min(3, images.length)).map((img) => ({
+          id: img.id,
+          filename: img.filename,
+          url: img.url,
+        }))
+      );
+    }
+  }, [images]);
 
   if (!images || images.length === 0 || filteredImages.length === 0) {
     const placeholderCount = 15; // 3x5 grid
@@ -592,35 +692,7 @@ export function ImageGallery({
                     )}
                   </button>
                 </div>
-                <div className="flex flex-col gap-4">
-                  {contextInput}
-                  <div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      multiple
-                      accept="image/*"
-                    />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
-                    >
-                      {uploading ? (
-                        <>
-                          <LoadingSpinner size="sm" />
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-3.5 h-3.5" />
-                          Add Images
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <div className="flex flex-col gap-4">{contextInput}</div>
               </div>
             )}
 
@@ -659,20 +731,20 @@ export function ImageGallery({
         <div className="w-2/3 space-y-3">
           <div ref={mainImageRef} className="sticky top-4 mb-4">
             <div
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-background-secondary dark:bg-background-secondary"
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-background-secondary dark:bg-background-secondary transition-opacity duration-300"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             >
               {displayImages[mainIndex] && (
                 <Image
-                  key={`${displayImages[mainIndex].id}-${isEditMode}`}
+                  key={`${displayImages[mainIndex].id}`}
                   src={getImageUrl(displayImages[mainIndex].url)}
                   alt={
                     title
                       ? `${title} - View ${mainIndex + 1}`
                       : `View ${mainIndex + 1} of ${displayImages.length}`
                   }
-                  className="object-cover"
+                  className="object-cover transition-all duration-300"
                   fill
                   sizes="100vw"
                   priority
@@ -807,11 +879,7 @@ export function ImageGallery({
                 <button
                   onClick={handleDeleteSelected}
                   disabled={selectedImages.length === 0}
-                  className={`px-3 py-1.5 border rounded-md flex items-center gap-2 text-sm ${
-                    selectedImages.length > 0
-                      ? "border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 hover:text-destructive-600 dark:hover:text-destructive-400"
-                      : "border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-subtle))]"
-                  }`}
+                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 text-sm"
                 >
                   <X className="w-3.5 h-3.5" />
                   {selectedImages.length > 0 ? (
@@ -827,10 +895,21 @@ export function ImageGallery({
                 </button>
                 <button
                   onClick={() => setShowDeleteAllConfirm(true)}
-                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2 text-sm group ml-auto"
+                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2 text-sm group"
                 >
                   <Trash2 className="w-3.5 h-3.5 group-hover:text-destructive-500 dark:group-hover:text-destructive-400" />
                   Delete All
+                </button>
+                <button
+                  onClick={() => {
+                    const inputRef = externalFileInputRef || fileInputRef;
+                    inputRef.current?.click();
+                  }}
+                  disabled={uploading}
+                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 text-sm ml-auto"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Images
                 </button>
               </div>
               <div className="flex flex-col gap-4">
@@ -843,22 +922,6 @@ export function ImageGallery({
                   multiple
                   accept="image/*"
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
-                >
-                  {uploading ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-3.5 h-3.5" />
-                      Add Images
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           )}
@@ -875,9 +938,9 @@ export function ImageGallery({
 
                 return (
                   <div
-                    key={index}
+                    key={image.id}
                     className={cn(
-                      "relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200",
+                      "relative rounded-lg overflow-hidden cursor-pointer transition-all duration-300",
                       isEditMode && "hover:opacity-90"
                     )}
                     style={{ aspectRatio }}
@@ -889,7 +952,7 @@ export function ImageGallery({
                       className={cn(
                         "object-cover transition-all duration-300",
                         isMainVisible && actualIndex === mainIndex
-                          ? ""
+                          ? "ring-2 ring-accent-primary dark:ring-accent-primary"
                           : "opacity-75 dark:opacity-60",
                         isSelected
                           ? "ring-2 ring-destructive-500 dark:ring-destructive-500"
@@ -905,7 +968,7 @@ export function ImageGallery({
                           : handleThumbnailClick(actualIndex)
                       }
                       className={cn(
-                        "absolute inset-0 rounded-lg transition-colors duration-200",
+                        "absolute inset-0 rounded-lg transition-colors duration-300",
                         isSelected
                           ? "bg-destructive-500 bg-opacity-10"
                           : "hover:bg-[hsl(var(--background))] bg-opacity-5 dark:hover:bg-[var(--background-primary)]/5"
@@ -954,6 +1017,63 @@ export function ImageGallery({
                         aria-label="Delete image"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-white" />
+                      </button>
+                    )}
+
+                    {!isEditMode && (
+                      <button
+                        onClick={(e) => {
+                          // Prevent the default event and stop propagation
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          console.log(
+                            `[SET FEATURED IMAGE] Clicked for image:`,
+                            image
+                          );
+                          console.log(
+                            `[SET FEATURED IMAGE] Current primaryImageId:`,
+                            primaryImageId
+                          );
+                          console.log(
+                            `[SET FEATURED IMAGE] Is primary image? Direct match:`,
+                            primaryImageId === image.id,
+                            `URL match:`,
+                            image.url.includes(primaryImageId || "")
+                          );
+
+                          // Call the handler with the entire image object
+                          handleSetAsPrimary(image, e);
+                        }}
+                        className={`absolute top-1 right-9 p-1 ${
+                          primaryImageId === image.id ||
+                          (primaryImageId && image.url.includes(primaryImageId))
+                            ? "bg-yellow-500/90 text-black hover:bg-yellow-400/90 ring-2 ring-yellow-500"
+                            : "bg-black/70 dark:bg-[var(--background-primary)]/70 text-white hover:bg-black/90 dark:hover:bg-[var(--background-primary)]/90"
+                        } rounded-full z-10`}
+                        aria-label={
+                          primaryImageId === image.id ||
+                          (primaryImageId && image.url.includes(primaryImageId))
+                            ? "Current featured image"
+                            : "Set as featured image"
+                        }
+                        title={
+                          primaryImageId === image.id ||
+                          (primaryImageId && image.url.includes(primaryImageId))
+                            ? "Current featured image"
+                            : "Set as featured image"
+                        }
+                        type="button"
+                      >
+                        <ImageIcon
+                          className={`w-3.5 h-3.5 ${
+                            primaryImageId === image.id ||
+                            (primaryImageId &&
+                              image.url.includes(primaryImageId))
+                              ? "text-black"
+                              : "text-white"
+                          }`}
+                        />
                       </button>
                     )}
                   </div>
