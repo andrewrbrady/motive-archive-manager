@@ -17,6 +17,11 @@ export interface NormalizedImage {
   url: string;
   filename: string;
   metadata: ImageMetadata;
+  variants?: {
+    [key: string]: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface FilterOptions {
@@ -79,6 +84,9 @@ export const useGalleryState = (carId: string) => {
         view: image.metadata?.view,
         side: image.metadata?.side,
       },
+      variants: image.variants || {},
+      createdAt: image.createdAt || new Date().toISOString(),
+      updatedAt: image.updatedAt || new Date().toISOString(),
     };
   }, []);
 
