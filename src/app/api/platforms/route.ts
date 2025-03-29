@@ -4,6 +4,12 @@ import clientPromise from "@/lib/mongodb";
 export async function GET() {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const collection = client.db("motive_archive").collection("platforms");
 
     const platforms = await collection.find({}).toArray();

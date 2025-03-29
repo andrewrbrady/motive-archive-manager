@@ -25,6 +25,12 @@ export async function GET(request: Request) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const DB_NAME = process.env.MONGODB_DB || "motive_archive";
     const db = client.db(DB_NAME);
     const carsCollection = db.collection("cars");

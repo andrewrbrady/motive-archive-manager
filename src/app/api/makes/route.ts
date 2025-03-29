@@ -7,6 +7,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     console.log("Fetching makes from MongoDB...");
@@ -46,6 +52,12 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const body = await request.json();
 
@@ -82,6 +94,12 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const body = await request.json();
 
@@ -116,6 +134,12 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

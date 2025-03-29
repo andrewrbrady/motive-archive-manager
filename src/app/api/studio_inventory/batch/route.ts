@@ -25,6 +25,12 @@ export async function PUT(request: NextRequest) {
     // First, update standard fields
     if (Object.keys(standardUpdates).length > 0) {
       const client = await clientPromise;
+      if (!client) {
+        return NextResponse.json(
+          { error: "Failed to connect to database" },
+          { status: 500 }
+        );
+      }
       const db = client.db("motive_archive");
 
       for (const id of itemIds) {
@@ -43,6 +49,12 @@ export async function PUT(request: NextRequest) {
       (tagsToRemove && tagsToRemove.length > 0)
     ) {
       const client = await clientPromise;
+      if (!client) {
+        return NextResponse.json(
+          { error: "Failed to connect to database" },
+          { status: 500 }
+        );
+      }
       const db = client.db("motive_archive");
 
       // Process each item individually for tag updates
@@ -151,6 +163,12 @@ export async function POST(request: NextRequest) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     switch (action) {

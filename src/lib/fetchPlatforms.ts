@@ -10,6 +10,11 @@ export interface Platform {
 export async function fetchPlatforms() {
   try {
     const client = await clientPromise;
+
+    if (!client) {
+      throw new Error("Failed to connect to MongoDB");
+    }
+
     const db = client.db("motive_archive");
 
     console.log("Fetching platforms from MongoDB...");

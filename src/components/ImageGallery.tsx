@@ -17,6 +17,8 @@ import {
   Trash2,
   Star,
   ImageIcon,
+  ChevronRightSquare,
+  ChevronLeftSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
@@ -24,6 +26,16 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import Image from "next/image";
 import ImageManager from "./ImageManager";
 import { LoadingSpinner } from "@/components/ui/loading";
+import LazyImage from "@/components/LazyImage";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Pagination from "@/components/ui/pagination";
 
 interface ImageMetadata {
   angle?: string;
@@ -40,6 +52,9 @@ interface ImageMetadata {
     view?: string;
     side?: string;
   };
+  category?: string;
+  isPrimary?: boolean;
+  [key: string]: any;
 }
 
 interface UploadProgress {
@@ -85,6 +100,14 @@ interface ImageGalleryProps {
   onExternalFileSelect?: (files: File[]) => void;
   primaryImageId?: string;
   onPrimaryImageChange?: (imageId: string) => void;
+  pagination?: PaginationData;
+  onPageChange?: (page: number) => void;
+  className?: string;
+  thumbnailSize?: { width: number; height: number };
+  fullSize?: { width: number; height: number };
+  showCategoryTabs?: boolean;
+  onImageClick?: (image: Image) => void;
+  isLoading?: boolean;
 }
 
 interface Filters {
@@ -94,6 +117,13 @@ interface Filters {
   tod?: string;
   view?: string;
   side?: string;
+}
+
+interface PaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
 }
 
 // Common classes for consistent styling
@@ -128,6 +158,14 @@ export function ImageGallery({
   onExternalFileSelect,
   primaryImageId,
   onPrimaryImageChange,
+  pagination,
+  onPageChange,
+  className = "",
+  thumbnailSize = { width: 150, height: 100 },
+  fullSize = { width: 800, height: 600 },
+  showCategoryTabs = true,
+  onImageClick,
+  isLoading = false,
 }: ImageGalleryProps) {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -151,6 +189,10 @@ export function ImageGallery({
     {}
   );
   const [isImageManagerOpen, setIsImageManagerOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+  const [currentTab, setCurrentTab] = useState("all");
+  const [galleryImages, setGalleryImages] = useState<Image[]>(images);
+  const [showImageDialog, setShowImageDialog] = useState(false);
 
   useEffect(() => {
     if (uploading && uploadProgress.length > 0) {
@@ -230,7 +272,7 @@ export function ImageGallery({
   }, [images]);
 
   // Filter images based on selected filters
-  const filteredImages = images.filter((image) => {
+  const displayFilteredImages = galleryImages.filter((image) => {
     return Object.entries(filters).every(([key, value]) => {
       if (!value) return true;
       const imageValue = image.metadata[key as keyof typeof image.metadata];
@@ -240,14 +282,17 @@ export function ImageGallery({
     });
   });
 
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
+  const totalPages = Math.ceil(displayFilteredImages.length / itemsPerPage);
 
   // Add the new effect here after filteredImages and totalPages are declared
   // Add a new effect to ensure state consistency during mode transitions
   useEffect(() => {
     // Ensure mainIndex is valid for the current filtered images
-    if (filteredImages.length > 0 && mainIndex >= filteredImages.length) {
-      setMainIndex(filteredImages.length - 1);
+    if (
+      displayFilteredImages.length > 0 &&
+      mainIndex >= displayFilteredImages.length
+    ) {
+      setMainIndex(displayFilteredImages.length - 1);
     }
 
     // Ensure we're maintaining the correct page
@@ -261,7 +306,7 @@ export function ImageGallery({
     }
   }, [
     isEditMode,
-    filteredImages,
+    displayFilteredImages,
     mainIndex,
     currentPage,
     itemsPerPage,
@@ -278,19 +323,16 @@ export function ImageGallery({
     }));
   };
 
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      if (newPage >= 1 && newPage <= totalPages) {
-        setCurrentPage(newPage);
-        const firstImageIndexOfNewPage = (newPage - 1) * itemsPerPage;
-        setMainIndex(
-          Math.min(firstImageIndexOfNewPage, filteredImages.length - 1)
-        );
-        setMainImageLoaded(true);
-      }
-    },
-    [totalPages, itemsPerPage, filteredImages.length]
-  );
+  const handleExternalPageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      const firstImageIndexOfNewPage = (newPage - 1) * itemsPerPage;
+      setMainIndex(
+        Math.min(firstImageIndexOfNewPage, displayFilteredImages.length - 1)
+      );
+      setMainImageLoaded(true);
+    }
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -316,23 +358,27 @@ export function ImageGallery({
 
   const handleNext = useCallback(() => {
     if (isModalOpen) {
-      setModalIndex((prev) => (prev + 1) % filteredImages.length);
+      setModalIndex((prev) => (prev + 1) % displayFilteredImages.length);
     } else {
-      setMainIndex((prev) => (prev + 1) % filteredImages.length);
+      setMainIndex((prev) => (prev + 1) % displayFilteredImages.length);
     }
-  }, [isModalOpen, filteredImages.length]);
+  }, [isModalOpen, displayFilteredImages.length]);
 
   const handlePrev = useCallback(() => {
     if (isModalOpen) {
       setModalIndex(
-        (prev) => (prev - 1 + filteredImages.length) % filteredImages.length
+        (prev) =>
+          (prev - 1 + displayFilteredImages.length) %
+          displayFilteredImages.length
       );
     } else {
       setMainIndex(
-        (prev) => (prev - 1 + filteredImages.length) % filteredImages.length
+        (prev) =>
+          (prev - 1 + displayFilteredImages.length) %
+          displayFilteredImages.length
       );
     }
-  }, [isModalOpen, filteredImages.length]);
+  }, [isModalOpen, displayFilteredImages.length]);
 
   const handleDeleteSelected = useCallback(() => {
     console.log(
@@ -451,10 +497,10 @@ export function ImageGallery({
       if (e.shiftKey) {
         if (e.key === "ArrowLeft") {
           e.preventDefault();
-          handlePageChange(Math.max(1, currentPage - 1));
+          handleExternalPageChange(Math.max(1, currentPage - 1));
         } else if (e.key === "ArrowRight") {
           e.preventDefault();
-          handlePageChange(Math.min(totalPages, currentPage + 1));
+          handleExternalPageChange(Math.min(totalPages, currentPage + 1));
         } else if (
           e.key === "Delete" &&
           isEditMode &&
@@ -492,7 +538,7 @@ export function ImageGallery({
     isModalOpen,
     currentPage,
     totalPages,
-    handlePageChange,
+    handleExternalPageChange,
     isEditMode,
     selectedImages.length,
     handleDeleteSelected,
@@ -563,7 +609,7 @@ export function ImageGallery({
   };
 
   // Filter out images that have errored
-  const displayImages = filteredImages.filter(
+  const displayImages = displayFilteredImages.filter(
     (image) => !imageErrors[image.url]
   );
 
@@ -636,558 +682,211 @@ export function ImageGallery({
     }
   }, [images]);
 
-  if (!images || images.length === 0 || filteredImages.length === 0) {
-    const placeholderCount = 15; // 3x5 grid
+  useEffect(() => {
+    if (currentTab === "all") {
+      setGalleryImages(images);
+    } else {
+      setGalleryImages(
+        images.filter((img) => img.metadata?.category === currentTab)
+      );
+    }
+  }, [images, currentTab]);
 
+  const handleImageClick = (image: Image) => {
+    setSelectedImage(image);
+    setShowImageDialog(true);
+    if (onImageClick) {
+      onImageClick(image);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setShowImageDialog(false);
+  };
+
+  const navigateImages = (direction: "next" | "prev") => {
+    if (!selectedImage) return;
+
+    const currentIndex = galleryImages.findIndex(
+      (img) => img.id === selectedImage.id
+    );
+    if (currentIndex === -1) return;
+
+    let newIndex;
+    if (direction === "next") {
+      newIndex = (currentIndex + 1) % galleryImages.length;
+    } else {
+      newIndex =
+        (currentIndex - 1 + galleryImages.length) % galleryImages.length;
+    }
+
+    setSelectedImage(galleryImages[newIndex]);
+  };
+
+  // Extract unique categories from images
+  const categories = [
+    "all",
+    ...Array.from(
+      new Set(
+        images.map((img) => img.metadata?.category).filter(Boolean) as string[]
+      )
+    ),
+  ];
+
+  if (isLoading) {
     return (
-      <div>
-        <div className="flex gap-6">
-          <div className="w-2/3">
-            <div
-              className={`relative aspect-[4/3] w-full overflow-hidden rounded-lg ${skeletonClasses}`}
-            >
-              {uploading ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <LoadingSpinner size="sm" />
-                </div>
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <MotiveLogo className="w-16 h-16 opacity-50" />
-                  <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase tracking-wide text-sm font-medium">
-                    {!images || images.length === 0
-                      ? "No Images Available"
-                      : "No Images Match The Selected Filters"}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="w-1/3 space-y-4">
-            {isEditMode && (
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    multiple
-                    accept="image/*"
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 w-full justify-center text-sm"
-                  >
-                    {uploading ? (
-                      <>
-                        <LoadingSpinner size="sm" />
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        Add Images
-                      </>
-                    )}
-                  </button>
-                </div>
-                <div className="flex flex-col gap-4">{contextInput}</div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: placeholderCount }).map((_, index) => (
-                <div
-                  key={index}
-                  className="aspect-[4/3] rounded-lg bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] relative group"
-                >
-                  {isEditMode && index === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] text-sm">
-                        Click &quot;Add Images&quot; to begin
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      <div
+        className={cn(
+          "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4",
+          className
+        )}
+      >
+        {Array.from({ length: 8 }).map((_, index) => (
+          <LazyImage
+            key={`skeleton-${index}`}
+            src=""
+            alt="Loading"
+            width={thumbnailSize.width}
+            height={thumbnailSize.height}
+            loadingVariant="skeleton"
+          />
+        ))}
       </div>
     );
   }
 
+  if (images.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">No images available</div>
+    );
+  }
+
   return (
-    <div className="space-y-4 relative">
-      {showFilters && (
-        <ImageFilterControls
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          availableFilters={allAvailableFilters}
-        />
+    <div className={className}>
+      {showCategoryTabs && categories.length > 1 && (
+        <Tabs
+          defaultValue="all"
+          value={currentTab}
+          onValueChange={setCurrentTab}
+          className="mb-4"
+        >
+          <TabsList>
+            {categories.map((category) => (
+              <TabsTrigger
+                key={category}
+                value={category}
+                className="capitalize"
+              >
+                {category}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
-      <div className="flex gap-6">
-        <div className="w-2/3 space-y-3">
-          <div ref={mainImageRef} className="sticky top-4 mb-4">
-            <div
-              className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-background-secondary dark:bg-background-secondary transition-opacity duration-300"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-            >
-              {displayImages[mainIndex] && (
-                <Image
-                  key={`${displayImages[mainIndex].id}`}
-                  src={getImageUrl(displayImages[mainIndex].url)}
-                  alt={
-                    title
-                      ? `${title} - View ${mainIndex + 1}`
-                      : `View ${mainIndex + 1} of ${displayImages.length}`
-                  }
-                  className="object-cover transition-all duration-300"
-                  fill
-                  sizes="100vw"
-                  priority
-                  onLoadingComplete={() => {
-                    setMainImageLoaded(true);
-                  }}
-                  onError={() => handleImageError(displayImages[mainIndex].url)}
-                />
-              )}
-              <button
-                onClick={() => {
-                  setModalIndex(mainIndex);
-                  setIsModalOpen(true);
-                }}
-                className="absolute top-4 right-4 p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20"
-                aria-label="Open fullscreen view"
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {galleryImages.map((image) => (
+          <div key={image.id} className="relative group cursor-pointer">
+            <LazyImage
+              src={image.url}
+              alt={image.metadata?.description || image.filename || "Car image"}
+              width={thumbnailSize.width}
+              height={thumbnailSize.height}
+              className="rounded-md"
+              onClick={() => handleImageClick(image)}
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="bg-white bg-opacity-70 hover:bg-opacity-100"
+                onClick={() => handleImageClick(image)}
               >
                 <ZoomIn className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handlePrev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20"
-                aria-label="Previous image"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20"
-                aria-label="Next image"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
+            {image.metadata?.isPrimary && (
+              <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                Primary
+              </div>
+            )}
           </div>
-
-          {showMetadata && mainImageLoaded && (
-            <div className={`${cardClasses} shadow-sm p-3`}>
-              <div className="grid grid-cols-4 divide-x divide-zinc-200 dark:divide-zinc-800">
-                <div className="flex items-center px-4 first:pl-0 last:pr-0">
-                  <div className="flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
-                      Angle
-                    </span>
-                  </div>
-                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
-                    {displayImages[
-                      mainIndex
-                    ]?.metadata?.angle?.toLowerCase() === "not applicable"
-                      ? ""
-                      : displayImages[mainIndex]?.metadata?.angle || ""}
-                  </span>
-                </div>
-                <div className="flex items-center px-4 first:pl-0 last:pr-0">
-                  <div className="flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
-                      View
-                    </span>
-                  </div>
-                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
-                    {displayImages[mainIndex]?.metadata?.view || "N/A"}
-                  </span>
-                </div>
-                <div className="flex items-center px-4 first:pl-0 last:pr-0">
-                  <div className="flex items-center gap-1.5">
-                    <Sun className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
-                      Time of Day
-                    </span>
-                  </div>
-                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
-                    {displayImages[mainIndex]?.metadata?.tod || "N/A"}
-                  </span>
-                </div>
-                <div className="flex items-center px-4 first:pl-0 last:pr-0">
-                  <div className="flex items-center gap-1.5">
-                    <Move className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-                    <span className="text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase text-xs font-medium">
-                      Movement
-                    </span>
-                  </div>
-                  <span className="uppercase text-xs ml-auto text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))]">
-                    {displayImages[mainIndex]?.metadata?.movement || "N/A"}
-                  </span>
-                </div>
-              </div>
-              {displayImages[mainIndex]?.metadata?.description && (
-                <div className="mt-2 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-subtle))] border-t border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] pt-2">
-                  {displayImages[mainIndex].metadata.description}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="w-1/3 space-y-4">
-          {isEditMode && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const currentPageImages = displayImages
-                      .slice(
-                        (currentPage - 1) * itemsPerPage,
-                        currentPage * itemsPerPage
-                      )
-                      .map(
-                        (_, index) => (currentPage - 1) * itemsPerPage + index
-                      );
-
-                    const allSelected = currentPageImages.every((index) =>
-                      selectedImages.includes(index)
-                    );
-
-                    if (allSelected) {
-                      setSelectedImages((prev) =>
-                        prev.filter((i) => !currentPageImages.includes(i))
-                      );
-                    } else {
-                      setSelectedImages((prev) => [
-                        ...new Set([...prev, ...currentPageImages]),
-                      ]);
-                    }
-                  }}
-                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2 text-sm"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  Select All
-                </button>
-                <button
-                  onClick={handleDeleteSelected}
-                  disabled={selectedImages.length === 0}
-                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 text-sm"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  {selectedImages.length > 0 ? (
-                    <>
-                      Delete ({selectedImages.length})
-                      <span className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] ml-2">
-                        ⇧⌫
-                      </span>
-                    </>
-                  ) : (
-                    "Delete"
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowDeleteAllConfirm(true)}
-                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2 text-sm group"
-                >
-                  <Trash2 className="w-3.5 h-3.5 group-hover:text-destructive-500 dark:group-hover:text-destructive-400" />
-                  Delete All
-                </button>
-                <button
-                  onClick={() => {
-                    const inputRef = externalFileInputRef || fileInputRef;
-                    inputRef.current?.click();
-                  }}
-                  disabled={uploading}
-                  className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] disabled:opacity-50 flex items-center gap-2 text-sm ml-auto"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Images
-                </button>
-              </div>
-              <div className="flex flex-col gap-4">
-                {contextInput}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  multiple
-                  accept="image/*"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-2">
-            {displayImages
-              .slice(
-                (currentPage - 1) * itemsPerPage,
-                currentPage * itemsPerPage
-              )
-              .map((image, index) => {
-                const actualIndex = (currentPage - 1) * itemsPerPage + index;
-                const isSelected = selectedImages.includes(actualIndex);
-
-                return (
-                  <div
-                    key={image.id}
-                    className={cn(
-                      "relative rounded-lg overflow-hidden cursor-pointer transition-all duration-300",
-                      isEditMode && "hover:opacity-90"
-                    )}
-                    style={{ aspectRatio }}
-                  >
-                    <Image
-                      src={getImageUrl(image.url, "width=200")}
-                      alt={image.metadata.description || ""}
-                      fill
-                      className={cn(
-                        "object-cover transition-all duration-300",
-                        isMainVisible && actualIndex === mainIndex
-                          ? "ring-2 ring-accent-primary dark:ring-accent-primary"
-                          : "opacity-75 dark:opacity-60",
-                        isSelected
-                          ? "ring-2 ring-destructive-500 dark:ring-destructive-500"
-                          : ""
-                      )}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      onError={() => handleImageError(image.url)}
-                    />
-                    <div
-                      onClick={() =>
-                        isEditMode
-                          ? handleImageSelect(actualIndex)
-                          : handleThumbnailClick(actualIndex)
-                      }
-                      className={cn(
-                        "absolute inset-0 rounded-lg transition-colors duration-300",
-                        isSelected
-                          ? "bg-destructive-500 bg-opacity-10"
-                          : "hover:bg-[hsl(var(--background))] bg-opacity-5 dark:hover:bg-[var(--background-primary)]/5"
-                      )}
-                    />
-
-                    {isEditMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent triggering the parent div's onClick
-                          console.log(
-                            `============ INDIVIDUAL IMAGE DELETE CLICKED ============`
-                          );
-                          console.log(
-                            `Image: ${image.id}, filename: ${image.filename}`
-                          );
-                          console.log(
-                            `DeleteFromStorage is being FORCED to TRUE`
-                          );
-                          if (onDeleteSingleImage && image.id) {
-                            console.log(
-                              `Using onDeleteSingleImage for image ${image.id}`
-                            );
-                            onDeleteSingleImage(image.id, image.filename)
-                              .then(() =>
-                                console.log(
-                                  `Delete operation completed for image ${image.id}`
-                                )
-                              )
-                              .catch((err) =>
-                                console.error(
-                                  `Error deleting image ${image.id}:`,
-                                  err
-                                )
-                              );
-                          } else {
-                            // Fallback to the original method
-                            console.log(
-                              `Using onRemoveImage for image at index ${actualIndex} with deleteFromStorage=true`
-                            );
-                            // Force deleteFromStorage to be a boolean true, not just truthy
-                            onRemoveImage([actualIndex], true);
-                          }
-                        }}
-                        className="absolute top-1 right-1 p-1 bg-black/70 dark:bg-[var(--background-primary)]/70 rounded-full text-white hover:bg-black/90 dark:hover:bg-[var(--background-primary)]/90 z-10"
-                        aria-label="Delete image"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-white" />
-                      </button>
-                    )}
-
-                    {!isEditMode && (
-                      <button
-                        onClick={(e) => {
-                          // Prevent the default event and stop propagation
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          console.log(
-                            `[SET FEATURED IMAGE] Clicked for image:`,
-                            image
-                          );
-                          console.log(
-                            `[SET FEATURED IMAGE] Current primaryImageId:`,
-                            primaryImageId
-                          );
-                          console.log(
-                            `[SET FEATURED IMAGE] Is primary image? Direct match:`,
-                            primaryImageId === image.id,
-                            `URL match:`,
-                            image.url.includes(primaryImageId || "")
-                          );
-
-                          // Call the handler with the entire image object
-                          handleSetAsPrimary(image, e);
-                        }}
-                        className={`absolute top-1 right-9 p-1 ${
-                          primaryImageId === image.id ||
-                          (primaryImageId && image.url.includes(primaryImageId))
-                            ? "bg-yellow-500/90 text-black hover:bg-yellow-400/90 ring-2 ring-yellow-500"
-                            : "bg-black/70 dark:bg-[var(--background-primary)]/70 text-white hover:bg-black/90 dark:hover:bg-[var(--background-primary)]/90"
-                        } rounded-full z-10`}
-                        aria-label={
-                          primaryImageId === image.id ||
-                          (primaryImageId && image.url.includes(primaryImageId))
-                            ? "Current featured image"
-                            : "Set as featured image"
-                        }
-                        title={
-                          primaryImageId === image.id ||
-                          (primaryImageId && image.url.includes(primaryImageId))
-                            ? "Current featured image"
-                            : "Set as featured image"
-                        }
-                        type="button"
-                      >
-                        <ImageIcon
-                          className={`w-3.5 h-3.5 ${
-                            primaryImageId === image.id ||
-                            (primaryImageId &&
-                              image.url.includes(primaryImageId))
-                              ? "text-black"
-                              : "text-white"
-                          }`}
-                        />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20 disabled:opacity-50"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="text-sm text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 bg-black/50 dark:bg-[var(--background-primary)]/10 rounded-full text-white hover:bg-black/70 dark:hover:bg-[var(--background-primary)]/20 disabled:opacity-50"
-                aria-label="Next page"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-        </div>
+        ))}
       </div>
 
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/90 dark:bg-black/95 z-50 flex items-center justify-center"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Image gallery"
-        >
-          <button
-            onClick={() => setIsModalOpen(false)}
-            className="absolute top-4 right-4 p-2 text-white hover:text-[hsl(var(--foreground-subtle))] dark:hover:text-[hsl(var(--foreground-muted))]"
-            aria-label="Close fullscreen view"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <Image
-            src={getImageUrl(displayImages[modalIndex].url)}
-            alt={`Full size view ${modalIndex + 1} of ${displayImages.length}`}
-            className="max-w-full max-h-[90vh] object-contain"
-            fill
-            sizes="100vw"
-            priority
-          />
-          <button
-            onClick={handlePrev}
-            className="absolute left-4 p-2 text-white hover:text-[hsl(var(--foreground-subtle))] dark:hover:text-[hsl(var(--foreground-muted))]"
-            aria-label="Previous image"
-          >
-            <ChevronLeft className="w-8 h-8" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="absolute right-4 p-2 text-white hover:text-[hsl(var(--foreground-subtle))] dark:hover:text-[hsl(var(--foreground-muted))]"
-            aria-label="Next image"
-          >
-            <ChevronRight className="w-8 h-8" />
-          </button>
-        </div>
+      {pagination && pagination.pages > 1 && (
+        <Pagination
+          className="mt-4 flex justify-center"
+          currentPage={pagination.page}
+          totalPages={pagination.pages}
+          onPageChange={handleExternalPageChange}
+        />
       )}
 
-      {showDeleteAllConfirm && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center">
-          <div className={`${cardClasses} p-6 max-w-md w-full mx-4 space-y-4`}>
-            <h3 className="text-lg font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-              Delete All Images?
-            </h3>
-            <p className="text-sm text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]">
-              Are you sure you want to delete all {images.length} images? This
-              action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setShowDeleteAllConfirm(false)}
-                className="px-3 py-1.5 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAll}
-                className="px-3 py-1.5 border border-destructive-200 dark:border-destructive-800 rounded-md hover:bg-destructive-50 dark:hover:bg-destructive-950 bg-opacity-30 text-destructive-600 dark:text-destructive-400 text-sm flex items-center gap-2"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete All
-              </button>
-            </div>
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent className="max-w-4xl w-full p-1 sm:p-6">
+          <DialogTitle className="flex justify-between items-center">
+            <span>
+              {selectedImage?.metadata?.description ||
+                selectedImage?.filename ||
+                "Image"}
+            </span>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" onClick={handleCloseDialog}>
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </DialogTitle>
+
+          <div className="relative flex justify-center items-center">
+            {selectedImage && (
+              <LazyImage
+                src={selectedImage.url}
+                alt={
+                  selectedImage.metadata?.description ||
+                  selectedImage.filename ||
+                  "Car image"
+                }
+                width={fullSize.width}
+                height={fullSize.height}
+                objectFit="contain"
+                className="rounded-md"
+              />
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute left-2 p-1 bg-white/70 hover:bg-white/90 rounded-full"
+              onClick={() => navigateImages("prev")}
+            >
+              <ChevronLeftSquare className="w-6 h-6" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 p-1 bg-white/70 hover:bg-white/90 rounded-full"
+              onClick={() => navigateImages("next")}
+            >
+              <ChevronRightSquare className="w-6 h-6" />
+            </Button>
           </div>
-        </div>
-      )}
 
-      <ImageManager
-        selectedImages={selectedImages.map((index) => images[index].url)}
-        onSelect={(imageUrl) => {
-          const index = images.findIndex((img) => img.url === imageUrl);
-          if (index !== -1) {
-            handleImageSelect(index);
-          }
-        }}
-        maxSelection={maxSelection}
-        showUploader={isEditMode}
-        onImageProgress={handleImageProgress}
-        carId={carId}
-      />
+          {selectedImage?.metadata && (
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              {Object.entries(selectedImage.metadata)
+                .filter(([key]) => key !== "isPrimary")
+                .map(([key, value]) => (
+                  <div key={key} className="flex">
+                    <span className="font-medium capitalize mr-2">{key}:</span>
+                    <span>{String(value)}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -6,6 +6,12 @@ import { ObjectId } from "mongodb";
 export async function GET() {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Fetch all items from the database
@@ -54,6 +60,12 @@ export async function POST(request: Request) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Set timestamps

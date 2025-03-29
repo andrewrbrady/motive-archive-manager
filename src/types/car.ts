@@ -75,12 +75,20 @@ export interface CarImage {
   url: string;
   filename: string;
   metadata?: {
+    category?:
+      | "exterior"
+      | "interior"
+      | "engine"
+      | "damage"
+      | "documents"
+      | "other";
     angle?: string;
     description?: string;
     movement?: string;
     tod?: string;
     view?: string;
     side?: string;
+    isPrimary?: boolean;
     aiAnalysis?: {
       angle?: string;
       description?: string;
@@ -106,7 +114,10 @@ export interface PriceHistory {
   }>;
 }
 
-// New type for categorized images
+/**
+ * @deprecated Use array of CarImage objects with category metadata instead
+ * This interface is kept for backward compatibility and will be removed in a future version
+ */
 export interface CategorizedImages {
   exterior?: CarImage[];
   interior?: CarImage[];
@@ -217,8 +228,13 @@ export interface Car {
   // Original image array (backward compatibility)
   imageIds: string[];
   primaryImageId?: string;
-  // New image structure - can be either an array (old format) or categorized (new format)
-  images?: CarImage[] | CategorizedImages;
+
+  // New standardized image field - only array format
+  images?: CarImage[];
+
+  // @deprecated - will be removed in future version
+  categorizedImages?: CategorizedImages;
+
   captionIds?: string[];
   eventIds?: string[];
   deliverableIds?: string[];

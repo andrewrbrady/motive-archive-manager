@@ -29,6 +29,11 @@ export const fetchAuctions = cache(async function fetchAuctions(
 ): Promise<AuctionsResponse> {
   try {
     const client = await clientPromise;
+
+    if (!client) {
+      throw new Error("Failed to connect to MongoDB");
+    }
+
     const db = client.db("motive_archive");
     const skip = (page - 1) * pageSize;
 

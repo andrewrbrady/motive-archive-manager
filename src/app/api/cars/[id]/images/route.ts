@@ -1,7 +1,9 @@
 // Location: app/api/cars/[id]/images/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
-import { getDatabase } from "@/lib/mongodb";
+import { getDatabase, getMongoClient } from "@/lib/mongodb";
+import { DB_NAME } from "@/constants";
+import { getFormattedImageUrl } from "@/lib/cloudflare";
 
 interface ImageData {
   imageUrl: string;
@@ -27,6 +29,209 @@ interface CarDocument {
   images?: Image[];
 }
 
+async function getCloudflareAuth() {
+  const apiToken = process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN;
+  const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+
+  if (!apiToken || !accountId) {
+    throw new Error("Cloudflare API token or account ID is missing");
+  }
+
+  return { apiToken, accountId };
+}
+
+// GET images for a car
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  try {
+    const { id } = context.params;
+    console.log(`GET images for car with ID: ${id}`);
+
+    // Parse query parameters
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "20");
+    const skip = (page - 1) * limit;
+    const category = url.searchParams.get("category");
+
+    if (!ObjectId.isValid(id)) {
+      console.log(`Invalid car ID format: ${id}`);
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
+
+    console.log("Getting MongoDB database directly using getDatabase...");
+    // Use getDatabase instead of getMongoClient for more reliable connection
+    const db = await getDatabase();
+    console.log("Successfully connected to database");
+
+    const carObjectId = new ObjectId(id);
+
+    // Build query for category filtering
+    const query: any = { carId: carObjectId };
+    if (category) {
+      query["metadata.category"] = category;
+    }
+
+    // First, check if the car exists and if it has imageIds
+    console.log(`Checking if car exists with ID: ${id}`);
+    const car = await db.collection("cars").findOne({ _id: carObjectId });
+
+    if (!car) {
+      console.log(`Car not found with ID: ${id}`);
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
+    console.log(`Found car with ${car.imageIds?.length || 0} imageIds`);
+
+    // Count total existing images for pagination metadata
+    const totalImages = await db.collection("images").countDocuments(query);
+    console.log(
+      `Found ${totalImages} existing image documents in the database`
+    );
+
+    // Check if we need to create image documents from imageIds
+    if (
+      totalImages === 0 &&
+      car.imageIds &&
+      Array.isArray(car.imageIds) &&
+      car.imageIds.length > 0
+    ) {
+      console.log(
+        `Car ${id} has ${car.imageIds.length} imageIds but no image documents. Creating them now.`
+      );
+
+      // Create image documents from imageIds
+      const now = new Date().toISOString();
+      const imageDocuments = car.imageIds
+        .map((imgId: string) => {
+          try {
+            if (!imgId) {
+              console.log("Found empty imageId, skipping");
+              return null;
+            }
+
+            console.log(`Processing imageId: ${imgId}`);
+            let imgObjectId;
+
+            if (ObjectId.isValid(imgId)) {
+              imgObjectId = new ObjectId(imgId);
+            } else {
+              console.log(
+                `Invalid ObjectId format for ${imgId}, using as string ID`
+              );
+              // If it's not a valid ObjectId, we can still use it as the cloudflareId
+              // Just create a new ObjectId for the document ID
+              imgObjectId = new ObjectId();
+            }
+
+            return {
+              _id: imgObjectId,
+              carId: carObjectId,
+              cloudflareId: imgId,
+              url: `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imgId}/public`,
+              filename: `Image ${imgId.substring(0, 8)}`,
+              metadata: {
+                category: category || "exterior",
+                isPrimary: car.primaryImageId === imgId,
+              },
+              createdAt: now,
+              updatedAt: now,
+            };
+          } catch (error) {
+            console.error(
+              `Error creating image document for ID ${imgId}:`,
+              error
+            );
+            return null;
+          }
+        })
+        .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
+
+      console.log(
+        `Prepared ${imageDocuments.length} image documents for insertion`
+      );
+
+      if (imageDocuments.length > 0) {
+        try {
+          // Use insertMany with ordered: false to continue even if some inserts fail
+          const insertResult = await db
+            .collection("images")
+            .insertMany(imageDocuments, { ordered: false });
+          console.log(
+            `Created ${insertResult.insertedCount} image documents from imageIds`
+          );
+        } catch (error: any) {
+          // Some inserts might fail due to duplicate keys, which is fine
+          if (error.code === 11000) {
+            console.log("Some documents already exist (duplicate key error)");
+          } else {
+            console.error("Error creating image documents:", error);
+          }
+        }
+      }
+    }
+
+    // Get paginated images
+    console.log(
+      `Fetching paginated images: page=${page}, limit=${limit}, skip=${skip}`
+    );
+    const images = await db
+      .collection("images")
+      .find(query)
+      .sort({ updatedAt: -1, createdAt: -1 }) // Show most recently updated/created first
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    console.log(`Found ${images.length} images to return`);
+
+    // Process images with our utility function
+    const processedImages = images.map((img) => ({
+      ...img,
+      _id: img._id.toString(),
+      id: img._id.toString(), // Add id for consistency
+      carId: img.carId.toString(),
+      url: getFormattedImageUrl(img.url),
+    }));
+
+    // In development, log useful debugging info
+    if (process.env.NODE_ENV === "development") {
+      console.log(`Found ${processedImages.length} images for car ${id}`);
+      console.log(
+        `Pagination info: page=${page}, limit=${limit}, total=${totalImages}, pages=${Math.ceil(
+          Math.max(totalImages, images.length) / limit
+        )}`
+      );
+    }
+
+    return NextResponse.json({
+      images: processedImages,
+      pagination: {
+        total: Math.max(totalImages, images.length), // Use the greater of count or actual results
+        page,
+        limit,
+        pages: Math.ceil(Math.max(totalImages, images.length) / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching car images:", error);
+    return NextResponse.json(
+      {
+        error: `Failed to fetch car images: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// POST handler for adding images to a car
 export async function POST(
   request: NextRequest,
   context: { params: { id: Promise<string> } }
@@ -57,9 +262,26 @@ export async function POST(
     const carsCollection = db.collection<CarDocument>("cars");
     const imagesCollection = db.collection<Image>("images");
 
-    // Create new image document
+    // Create new image document with a proper MongoDB ObjectId
+    const imageObjectId = new ObjectId();
+
+    // Check if imageId is a Cloudflare ID (GUID format) or some other format
+    const isCloudflareIdFormat =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+        imageId
+      );
+
+    console.log(
+      `imageId ${imageId} is ${
+        isCloudflareIdFormat
+          ? "in Cloudflare format"
+          : "not in Cloudflare format"
+      }`
+    );
+
     const imageDoc = {
-      _id: new ObjectId(),
+      _id: imageObjectId,
+      // Store the Cloudflare ID separately from the MongoDB _id
       cloudflareId: imageId,
       url: imageUrl,
       filename: imageUrl.split("/").pop() || "",
@@ -71,11 +293,16 @@ export async function POST(
 
     // Insert the image document
     await imagesCollection.insertOne(imageDoc);
-    console.log("Created new image document:", imageDoc._id);
+    console.log(
+      "Created new image document:",
+      imageDoc._id,
+      "with cloudflareId:",
+      imageDoc.cloudflareId
+    );
 
-    // Update the car document with the new image ID
+    // Update the car document with the new image ID (use our MongoDB ObjectId)
     const updateDoc: UpdateFilter<CarDocument> = {
-      $push: { imageIds: imageDoc._id.toString() },
+      $push: { imageIds: imageObjectId.toString() },
       $set: { updatedAt: new Date().toISOString() },
     };
 
@@ -130,490 +357,273 @@ export async function DELETE(
   request: NextRequest,
   context: { params: { id: Promise<string> } }
 ) {
-  console.log("========== IMAGE DELETION API CALLED ==========");
+  console.log("======== DELETE IMAGE API CALLED ========");
+
+  // Log the request URL and headers for debugging
+  const url = new URL(request.url);
+  console.log("Request URL:", url.toString());
+  console.log("Request method:", request.method);
+  console.log(
+    "Request headers:",
+    Object.fromEntries([...request.headers.entries()])
+  );
+
   try {
     const id = await context.params.id;
-    const requestData = await request.json();
-
-    console.log(
-      "DELETE images API called with data:",
-      JSON.stringify(requestData, null, 2)
-    );
-    console.log("Request URL:", request.url);
     console.log("Car ID:", id);
 
-    // Handle both single imageUrl and batch indices
-    const {
-      imageUrl,
-      deleteFromStorage,
-      indices,
-      imageId,
-      cloudflareId,
-      filename,
-    } = requestData;
-
-    console.log("deleteFromStorage value:", deleteFromStorage);
-    console.log("typeof deleteFromStorage:", typeof deleteFromStorage);
-    if (imageId) console.log("imageId provided:", imageId);
-    if (cloudflareId) console.log("cloudflareId provided:", cloudflareId);
-    if (filename) console.log("filename provided:", filename);
-
-    // Use the getDatabase helper
-    const db = await getDatabase();
-    const imagesCollection = db.collection<Image>("images");
-    const carsCollection = db.collection<CarDocument>("cars");
-
-    // If indices are provided, forward to the batch endpoint
-    if (indices && Array.isArray(indices) && indices.length > 0) {
-      console.log("BATCH DELETE MODE detected with", indices.length, "indices");
-      console.log("Indices:", indices);
-
-      // Get the car with its images
-      const car = (await carsCollection
-        .aggregate([
-          { $match: { _id: new ObjectId(id) } },
-          {
-            $lookup: {
-              from: "images",
-              localField: "imageIds",
-              foreignField: "_id",
-              as: "images",
-            },
-          },
-        ])
-        .next()) as CarDocument;
-
-      if (!car) {
-        console.error(`Car not found with ID: ${id}`);
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
-      }
-
-      if (!car.images || car.images.length === 0) {
-        console.error(`No images found for car ID: ${id}`);
-        return NextResponse.json({ error: "No images found" }, { status: 404 });
-      }
-
-      console.log(`Car has ${car.images.length} images`);
-      console.log(`Car imageIds length: ${car.imageIds?.length}`);
-
-      // Process all valid indices
-      const validIndices = indices.filter(
-        (index) =>
-          typeof index === "number" && index >= 0 && index < car.images!.length
-      );
-
-      console.log(
-        `Valid indices after filtering: ${validIndices.length}`,
-        validIndices
-      );
-
-      if (validIndices.length === 0) {
-        console.error("No valid images to delete after filtering indices");
-        return NextResponse.json(
-          { error: "No valid images to delete" },
-          { status: 400 }
-        );
-      }
-
-      const imagesToDelete = validIndices.map((index) => car.images![index]);
-
-      console.log(
-        `Found ${imagesToDelete.length} images to delete:`,
-        imagesToDelete.map((img) => ({
-          id: img._id.toString(),
-          url: img.url.substring(0, 30) + "...", // truncate for readability
-        }))
-      );
-
-      // Track successful deletions
-      const deletedImages = [];
-      const failedImages = [];
-
-      // Delete each image
-      for (const image of imagesToDelete) {
-        try {
-          console.log(`Deleting image: ${image._id.toString()}`);
-
-          // Convert image._id to string if it's an ObjectId
-          const imageIdString =
-            typeof image._id === "object" && image._id !== null
-              ? image._id.toString()
-              : image._id;
-
-          // Remove image ID from car
-          const updateResult = await carsCollection.updateOne(
-            { _id: new ObjectId(id) },
-            {
-              $pull: { imageIds: imageIdString },
-              $set: { updatedAt: new Date().toISOString() },
-            }
-          );
-
-          console.log(`Update result: ${JSON.stringify(updateResult)}`);
-
-          // Delete image document
-          const deleteResult = await imagesCollection.deleteOne({
-            _id: image._id,
-          });
-          console.log(`Delete result: ${JSON.stringify(deleteResult)}`);
-
-          // Delete from Cloudflare if requested
-          if (deleteFromStorage && image.cloudflareId) {
-            console.log(
-              `CLOUDFLARE DELETE: Starting deletion for image ${image._id} with cloudflareId ${image.cloudflareId}`
-            );
-            console.log(
-              `deleteFromStorage value: ${deleteFromStorage} (${typeof deleteFromStorage})`
-            );
-            console.log(
-              `CLOUDFLARE_ACCOUNT_ID: ${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID?.substring(
-                0,
-                5
-              )}...`
-            );
-            console.log(
-              `CLOUDFLARE_API_TOKEN available: ${!!process.env
-                .NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`
-            );
-
-            try {
-              const cloudflareUrl = `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`;
-              console.log(`Cloudflare API URL: ${cloudflareUrl}`);
-
-              const cloudflareResponse = await fetch(cloudflareUrl, {
-                method: "DELETE",
-                headers: {
-                  Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
-                },
-              });
-
-              const cloudflareResult = await cloudflareResponse.json();
-              console.log(
-                `Cloudflare response status: ${cloudflareResponse.status}`
-              );
-              console.log(
-                `Cloudflare response body: ${JSON.stringify(
-                  cloudflareResult,
-                  null,
-                  2
-                )}`
-              );
-
-              if (!cloudflareResponse.ok) {
-                console.error(
-                  `❌ ERROR deleting from Cloudflare: ${
-                    cloudflareResult.errors?.[0]?.message || "Unknown error"
-                  }`,
-                  cloudflareResult
-                );
-              } else {
-                console.log(
-                  `✅ Successfully deleted image from Cloudflare: ${image.cloudflareId}`
-                );
-              }
-            } catch (cloudflareError) {
-              console.error(
-                `❌ EXCEPTION during Cloudflare deletion: ${image.cloudflareId}`,
-                cloudflareError
-              );
-            }
-          } else {
-            console.log(
-              `⚠️ SKIPPING Cloudflare deletion for image ${
-                image._id
-              } - deleteFromStorage=${deleteFromStorage}, cloudflareId=${
-                image.cloudflareId || "none"
-              }`
-            );
-          }
-
-          deletedImages.push({
-            id: image._id.toString(),
-            url: image.url.substring(0, 30) + "...", // truncate for readability
-          });
-        } catch (error) {
-          console.error(`Error deleting image ${image._id.toString()}:`, error);
-          failedImages.push({
-            id: image._id.toString(),
-            url: image.url.substring(0, 30) + "...", // truncate for readability
-            error: String(error),
-          });
-        }
-      }
-
-      // After all deletions, refresh the car document to ensure it's up to date
-      // Use a more aggressive approach to ensure the car document is updated
-      try {
-        // First, get the current car document to see what imageIds are left
-        const currentCar = await carsCollection.findOne({
-          _id: new ObjectId(id),
-        });
-        console.log(
-          `Current car imageIds: ${currentCar?.imageIds?.length || 0}`
-        );
-
-        // If we deleted all images, explicitly set imageIds to an empty array
-        if (
-          deletedImages.length === imagesToDelete.length &&
-          imagesToDelete.length > 0
-        ) {
-          console.log(`All images deleted, setting imageIds to empty array`);
-          await carsCollection.updateOne(
-            { _id: new ObjectId(id) },
-            {
-              $set: {
-                imageIds: [],
-                updatedAt: new Date().toISOString(),
-              },
-            }
-          );
-        } else {
-          // Otherwise, just update the timestamp
-          await carsCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { updatedAt: new Date().toISOString() } }
-          );
-        }
-      } catch (refreshError) {
-        console.error(`Error refreshing car document: ${refreshError}`);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Deleted ${deletedImages.length} images${
-          failedImages.length > 0
-            ? `, failed to delete ${failedImages.length} images`
-            : ""
-        }`,
-        deletedImages,
-        failedImages: failedImages.length > 0 ? failedImages : undefined,
-      });
-    }
-
-    // Handle single image deletion (original implementation)
-    if (!imageUrl) {
-      console.error("❌ No image URL provided in request");
-      return NextResponse.json(
-        { error: "No image URL provided" },
-        { status: 400 }
-      );
-    }
-
-    console.log(`Looking for image with URL: ${imageUrl.substring(0, 30)}...`);
-
-    // Remove "/public" suffix from the URL if it exists
-    const normalizedUrl = imageUrl.replace(/\/public$/, "");
-    console.log(
-      `Normalized URL for lookup: ${normalizedUrl.substring(0, 30)}...`
-    );
-
-    // Try to find the image with different URL formats
-    let image = await imagesCollection.findOne({ url: imageUrl });
-
-    // If image ID is provided directly, try to look up by that
-    if (!image && imageId) {
-      console.log(`Trying to find image by provided imageId: ${imageId}`);
-      const objectId =
-        typeof imageId === "string" ? new ObjectId(imageId) : imageId;
-      image = await imagesCollection.findOne({ _id: objectId });
-    }
-
-    // If cloudflareId is provided, try that next
-    if (!image && cloudflareId) {
-      console.log(
-        `Trying to find image by provided cloudflareId: ${cloudflareId}`
-      );
-      image = await imagesCollection.findOne({ cloudflareId });
-    }
-
-    // If not found with exact URL, try with normalized URL
-    if (!image) {
-      console.log(
-        `Image not found with exact URL or direct IDs, trying normalized URL...`
-      );
-      image = await imagesCollection.findOne({ url: normalizedUrl });
-    }
-
-    // If still not found, try to find by partial URL (without the domain)
-    if (!image) {
-      console.log(
-        `Image not found with normalized URL, trying partial URL match...`
-      );
-      const urlParts = normalizedUrl.split("/");
-      const extractedImageId =
-        urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
-      console.log(`Extracted image ID from URL: ${extractedImageId}`);
-
-      // Try to find by cloudflareId
-      image = await imagesCollection.findOne({
-        cloudflareId: extractedImageId,
-      });
-
-      // If not found by cloudflareId, try a more flexible query with regex
-      if (!image && extractedImageId && extractedImageId.length > 5) {
-        console.log(`Image not found by cloudflareId, trying regex match...`);
-        image = await imagesCollection.findOne({
-          url: { $regex: extractedImageId, $options: "i" },
-        });
-      }
-    }
-
-    if (!image) {
-      console.error(
-        `❌ Image not found with URL after all attempts: ${imageUrl.substring(
-          0,
-          30
-        )}...`
-      );
-
-      // Get a sample of images in the DB for debugging
-      const sampleImages = await imagesCollection
-        .find({ carId: new ObjectId(id) })
-        .limit(3)
-        .toArray();
-      console.log(
-        `Sample image URLs in DB:`,
-        sampleImages.map((img) => img.url.substring(0, 30) + "...")
-      );
-
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
-    }
-
-    console.log(
-      `✅ Found image: ${image._id}, cloudflareId: ${
-        image.cloudflareId || "none"
-      }, url: ${image.url.substring(0, 30)}...`
-    );
-
-    // Convert image._id to string if it's an ObjectId
-    const imageIdString =
-      typeof image._id === "object" && image._id !== null
-        ? image._id.toString()
-        : image._id;
-
-    // Remove the image ID from the car document
-    const pullDoc: UpdateFilter<CarDocument> = {
-      $pull: { imageIds: imageIdString },
-      $set: { updatedAt: new Date().toISOString() },
-    };
-
-    const result = await carsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      pullDoc
-    );
-
-    if (result.matchedCount === 0) {
-      console.error(`Car not found with ID: ${id}`);
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
-    }
-
-    console.log(`Updated car document, removed image ID: ${image._id}`);
-
-    // Delete the image document from MongoDB
-    await imagesCollection.deleteOne({ _id: image._id });
-    console.log(`Deleted image document with ID: ${image._id}`);
-
-    // Check if this was the last image and update the car document accordingly
-    const updatedCar = await carsCollection.findOne({ _id: new ObjectId(id) });
-    if (
-      updatedCar &&
-      (!updatedCar.imageIds || updatedCar.imageIds.length === 0)
-    ) {
-      console.log(
-        `This was the last image, ensuring imageIds is an empty array`
-      );
-      await carsCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { imageIds: [], updatedAt: new Date().toISOString() } }
-      );
-    }
-
-    // Double-check that the car document was updated correctly
-    const finalCar = await carsCollection.findOne({ _id: new ObjectId(id) });
-    console.log(`Final car imageIds count: ${finalCar?.imageIds?.length || 0}`);
-
-    // Return success early to update UI state
-    const response = NextResponse.json({
-      success: true,
-      message: "Image deleted successfully",
-      deletedImage: {
-        id: image._id.toString(),
-        url: image.url.substring(0, 30) + "...", // truncate for readability
-      },
+    // Parse the request data
+    const requestData = await request.json().catch((e) => {
+      console.error("Failed to parse request body:", e);
+      return null;
     });
 
-    // If deleteFromStorage is true, delete from Cloudflare after response is sent
-    if (deleteFromStorage && image.cloudflareId) {
-      console.log(
-        `CLOUDFLARE DELETE: Starting single deletion for cloudflareId=${image.cloudflareId}`
-      );
-      console.log(
-        `deleteFromStorage value: ${deleteFromStorage} (${typeof deleteFromStorage})`
-      );
-      console.log(
-        `CLOUDFLARE_ACCOUNT_ID: ${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID?.substring(
-          0,
-          5
-        )}...`
-      );
-      console.log(
-        `CLOUDFLARE_API_TOKEN available: ${!!process.env
-          .NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`
-      );
+    // Get the image IDs from the request body
+    const {
+      imageIds = [],
+      cloudflareIds = [],
+      deleteFromStorage = false,
+      isUserInitiated: bodyUserInitiated,
+    } = requestData || {};
+
+    console.log("MongoDB ObjectIds to delete:", imageIds);
+    console.log("Cloudflare IDs to delete:", cloudflareIds);
+    console.log("Delete from storage:", deleteFromStorage);
+    console.log("User initiated (from body):", bodyUserInitiated);
+
+    // Get MongoDB client and start session
+    const client = await getMongoClient();
+    const db = await getDatabase();
+    let session = null;
+
+    try {
+      session = client.startSession();
+      console.log("MongoDB session started");
+
+      // Start a transaction
+      let result = null;
 
       try {
-        const cloudflareUrl = `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${image.cloudflareId}`;
-        console.log(`Cloudflare API URL: ${cloudflareUrl}`);
+        session.startTransaction();
+        console.log("Transaction started");
 
-        const cloudflareResponse = await fetch(cloudflareUrl, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
-          },
+        // Convert carId to ObjectId
+        const carObjectId = new ObjectId(id);
+
+        // Fetch the car to get its images - using a safer approach
+        const car = await db.collection("cars").findOne({
+          _id: carObjectId,
         });
 
-        const cloudflareResult = await cloudflareResponse.json();
-        console.log(`Cloudflare response status: ${cloudflareResponse.status}`);
-        console.log(
-          `Cloudflare response body: ${JSON.stringify(
-            cloudflareResult,
-            null,
-            2
-          )}`
-        );
+        // First step: Find images by their MongoDB ObjectIds (if provided)
+        let imageObjectIds: ObjectId[] = [];
+        if (Array.isArray(imageIds) && imageIds.length > 0) {
+          // Attempt to convert input IDs to ObjectIds when possible
+          imageObjectIds = imageIds
+            .map((id) => {
+              try {
+                // Check if it's already a valid ObjectId string
+                if (ObjectId.isValid(id)) {
+                  return new ObjectId(id);
+                } else {
+                  console.log(
+                    `ID ${id} is not a valid MongoDB ObjectId format`
+                  );
+                  return null;
+                }
+              } catch (e) {
+                console.error(`Invalid ObjectId: ${id}`);
+                return null;
+              }
+            })
+            .filter((id): id is ObjectId => id !== null);
 
-        if (!cloudflareResponse.ok) {
-          console.error(
-            `❌ ERROR deleting from Cloudflare: ${
-              cloudflareResult.errors?.[0]?.message || "Unknown error"
-            }`,
-            cloudflareResult
-          );
-        } else {
           console.log(
-            `✅ Successfully deleted image from Cloudflare: ${image.cloudflareId}`
+            "Valid MongoDB ObjectIds:",
+            imageObjectIds.map((id) => id.toString())
           );
         }
-      } catch (cloudflareError) {
-        console.error(
-          `❌ EXCEPTION during Cloudflare deletion:`,
-          cloudflareError
-        );
-      }
-    } else {
-      console.log(
-        `⚠️ SKIPPING Cloudflare deletion - deleteFromStorage=${deleteFromStorage}, cloudflareId=${
-          image.cloudflareId || "none"
-        }`
-      );
-    }
 
-    return response;
-  } catch (error) {
-    console.error("❌ CRITICAL ERROR in DELETE API route:", error);
+        // Second step: If we have Cloudflare IDs, find the corresponding image documents
+        let imageDocs: any[] = [];
+
+        // Build a query that can handle both ObjectIds and Cloudflare IDs
+        const query: any = { carId: carObjectId };
+
+        if (imageObjectIds.length > 0 && cloudflareIds.length > 0) {
+          // If we have both types, use $or to find matches for either
+          query.$or = [
+            { _id: { $in: imageObjectIds } },
+            { cloudflareId: { $in: cloudflareIds } },
+          ];
+        } else if (imageObjectIds.length > 0) {
+          // Only MongoDB ObjectIds provided
+          query._id = { $in: imageObjectIds };
+        } else if (cloudflareIds.length > 0) {
+          // Only Cloudflare IDs provided
+          query.cloudflareId = { $in: cloudflareIds };
+        }
+
+        console.log("Image lookup query:", JSON.stringify(query));
+
+        // Find all matching image documents
+        imageDocs = await db.collection("images").find(query).toArray();
+
+        console.log(`Found ${imageDocs.length} image documents to delete`);
+
+        // Extract the ObjectIds from the found documents
+        const foundImageObjectIds = imageDocs.map((doc) => doc._id);
+        console.log(
+          "ObjectIds of images to delete:",
+          foundImageObjectIds.map((id) => id.toString())
+        );
+
+        // Extract cloudflare IDs from the found documents
+        // IMPORTANT FIX: Always use the cloudflareId field from the document, not the MongoDB ID
+        const foundCloudflareIds = deleteFromStorage
+          ? imageDocs.map((img) => img.cloudflareId).filter(Boolean)
+          : [];
+
+        console.log(
+          "CloudflareIds to delete from storage:",
+          foundCloudflareIds
+        );
+
+        // Update the car document to remove the image IDs - using $pullAll with type assertion
+        const updateResult = await db.collection("cars").updateOne(
+          { _id: carObjectId },
+          {
+            $pullAll: { imageIds: foundImageObjectIds } as any,
+            $set: { updatedAt: new Date().toISOString() },
+          },
+          { session }
+        );
+
+        console.log("Car update result:", updateResult);
+
+        // Delete the image documents
+        const deleteImagesResult = await db
+          .collection("images")
+          .deleteMany({ _id: { $in: foundImageObjectIds } }, { session });
+
+        console.log("Delete images result:", deleteImagesResult);
+
+        // Commit the transaction
+        await session.commitTransaction();
+        console.log("Transaction committed successfully");
+
+        // Delete from Cloudflare if requested
+        const cloudflareResults: any[] = [];
+        if (deleteFromStorage && foundCloudflareIds.length > 0) {
+          try {
+            const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+            const apiToken = process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN;
+
+            if (!accountId || !apiToken) {
+              throw new Error("Missing Cloudflare credentials");
+            }
+
+            console.log(
+              `Deleting ${foundCloudflareIds.length} images from Cloudflare`
+            );
+
+            for (const cloudflareId of foundCloudflareIds) {
+              try {
+                console.log(
+                  `Deleting image with Cloudflare ID: ${cloudflareId}`
+                );
+                const cloudflareResponse = await fetch(
+                  `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/${cloudflareId}`,
+                  {
+                    method: "DELETE",
+                    headers: {
+                      Authorization: `Bearer ${apiToken}`,
+                    },
+                  }
+                );
+
+                const cloudflareResult = await cloudflareResponse.json();
+                cloudflareResults.push({
+                  id: cloudflareId,
+                  success: cloudflareResult.success,
+                  errors: cloudflareResult.errors,
+                });
+
+                console.log(
+                  `Cloudflare deletion for ${cloudflareId}:`,
+                  cloudflareResult.success ? "Success" : "Failed"
+                );
+              } catch (cfError: unknown) {
+                console.error(
+                  `Error deleting image ${cloudflareId} from Cloudflare:`,
+                  cfError
+                );
+                cloudflareResults.push({
+                  id: cloudflareId,
+                  success: false,
+                  error:
+                    cfError instanceof Error
+                      ? cfError.message
+                      : String(cfError),
+                });
+              }
+            }
+          } catch (cfAuthError) {
+            console.error("Error getting Cloudflare auth:", cfAuthError);
+            cloudflareResults.push({
+              error: "Failed to get Cloudflare auth",
+              success: false,
+            });
+          }
+        }
+
+        // Fetch the updated car to return
+        const updatedCar = await db
+          .collection("cars")
+          .findOne({ _id: carObjectId });
+
+        console.log("Updated car:", {
+          _id: updatedCar?._id,
+          imageIds: updatedCar?.imageIds?.length || 0,
+        });
+
+        // Return success response
+        return NextResponse.json({
+          success: true,
+          message: `Deleted ${foundImageObjectIds.length} images successfully`,
+          deletedCount: foundImageObjectIds.length,
+          imagesDeletedCount: deleteImagesResult.deletedCount,
+          cloudflareResults,
+          car: updatedCar,
+        });
+      } catch (txError) {
+        console.error("Transaction error:", txError);
+        // Abort transaction on error
+        if (session.inTransaction()) {
+          await session.abortTransaction();
+          console.log("Transaction aborted due to error");
+        }
+        throw txError;
+      }
+    } finally {
+      // End session if it exists
+      if (session) {
+        await session.endSession();
+        console.log("MongoDB session ended");
+      }
+    }
+  } catch (error: unknown) {
+    console.error("Error in DELETE image endpoint:", error);
+
+    // Ensure we return a proper error response
     return NextResponse.json(
-      { error: "Internal Server Error", details: String(error) },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
+  } finally {
+    console.log("======== DELETE IMAGE API COMPLETED ========");
   }
 }

@@ -38,6 +38,12 @@ export async function GET(
 ) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Validate ObjectId
@@ -117,6 +123,12 @@ export async function PUT(
 ) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const data = await request.json();
 
@@ -249,6 +261,12 @@ export async function DELETE(
 ) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Validate ObjectId

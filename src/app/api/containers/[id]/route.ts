@@ -10,6 +10,12 @@ export async function GET(
 ) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     const container = await db.collection("containers").findOne({
@@ -50,6 +56,12 @@ export async function PUT(
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Prepare update data
@@ -95,6 +107,12 @@ export async function DELETE(
 ) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Check if this container is used by any inventory items

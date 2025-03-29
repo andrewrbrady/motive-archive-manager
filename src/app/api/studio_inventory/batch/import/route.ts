@@ -14,6 +14,12 @@ export async function POST(request: NextRequest) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const collection = db.collection("studio_inventory");
 

@@ -1,5 +1,7 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
+import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { createStaticResponse } from "@/lib/cache-utils";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -51,20 +53,22 @@ export async function GET(
     }
 
     // Process URL to ensure it works with Cloudflare
-    if (image.url && !image.url.endsWith("/public")) {
-      image.url = `${image.url}/public`;
-    }
-
-    console.log(`Found image: ${id}, URL: ${image.url}`);
-
-    // Convert ObjectId to string
     const processedImage = {
       ...image,
       _id: image._id.toString(),
       carId: image.carId ? image.carId.toString() : null,
+      url: getFormattedImageUrl(image.url),
+      // Add metadata.category if not present but can be derived from old structure
+      metadata: {
+        ...image.metadata,
+        category: image.metadata?.category || determineImageCategory(image),
+      },
     };
 
-    return NextResponse.json(processedImage);
+    console.log(`Found image: ${id}, URL: ${processedImage.url}`);
+
+    // Return with appropriate cache headers - images are static and can be cached longer
+    return createStaticResponse(processedImage);
   } catch (error) {
     console.error("Error fetching image:", error);
     return NextResponse.json(
@@ -76,4 +80,53 @@ export async function GET(
       await client.close();
     }
   }
+}
+
+/**
+ * Helper function to determine image category from metadata
+ * Used for backward compatibility with older image data
+ */
+function determineImageCategory(image: any): string | undefined {
+  const metadata = image.metadata || {};
+
+  // Check for explicit view fields
+  if (metadata.view === "exterior" || metadata.angle) {
+    return "exterior";
+  }
+
+  if (metadata.view === "interior") {
+    return "interior";
+  }
+
+  if (metadata.view === "engine" || metadata.angle === "engine bay") {
+    return "engine";
+  }
+
+  if (
+    metadata.view === "damage" ||
+    metadata.description?.toLowerCase().includes("damage")
+  ) {
+    return "damage";
+  }
+
+  if (
+    metadata.view === "documents" ||
+    metadata.description?.toLowerCase().includes("document") ||
+    image.filename?.toLowerCase().includes("document")
+  ) {
+    return "documents";
+  }
+
+  // Check filename patterns as last resort
+  const filename = image.filename?.toLowerCase() || "";
+
+  if (filename.includes("interior")) return "interior";
+  if (filename.includes("engine")) return "engine";
+  if (filename.includes("damage")) return "damage";
+  if (filename.includes("doc")) return "documents";
+  if (filename.includes("ext") || filename.match(/front|rear|side|profile/))
+    return "exterior";
+
+  // Default to 'other' if we can't determine
+  return "other";
 }

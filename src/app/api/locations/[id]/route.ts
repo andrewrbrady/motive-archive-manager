@@ -13,6 +13,12 @@ interface RouteParams {
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const { id } = params;
 
@@ -48,6 +54,12 @@ export async function GET(request: Request, { params }: RouteParams) {
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const { id } = params;
     const data = await request.json();
@@ -101,6 +113,12 @@ export async function PUT(request: Request, { params }: RouteParams) {
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const { id } = params;
 

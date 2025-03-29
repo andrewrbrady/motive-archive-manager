@@ -23,6 +23,12 @@ export async function GET(request: NextRequest) {
 
     // Connect to MongoDB
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db(process.env.MONGODB_DB || "motive_archive");
 
     // Build query with filters

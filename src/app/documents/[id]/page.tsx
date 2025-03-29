@@ -13,6 +13,9 @@ interface ReceiptItem {
 
 async function getReceipt(id: string) {
   const client = await clientPromise;
+  if (!client) {
+    throw new Error("Failed to connect to database");
+  }
   const db = client.db("motive_archive");
 
   const receipt = await db

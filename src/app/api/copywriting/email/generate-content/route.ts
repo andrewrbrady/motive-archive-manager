@@ -46,31 +46,36 @@ export async function POST(request: NextRequest) {
     if (carId) {
       try {
         const client = await clientPromise;
-        const db = client.db();
-        const carsCollection = db.collection("cars");
+        if (!client) {
+          console.error("Failed to connect to MongoDB");
+          // Continue without car info
+        } else {
+          const db = client.db();
+          const carsCollection = db.collection("cars");
 
-        const car = await carsCollection.findOne({
-          _id: new ObjectId(carId),
-        });
+          const car = await carsCollection.findOne({
+            _id: new ObjectId(carId),
+          });
 
-        if (car) {
-          // Extract important car details
-          carInfo = {
-            year: car.year,
-            make: car.make,
-            model: car.model,
-            color: car.color,
-            price: car.price?.listPrice || null,
-            mileage: car.mileage?.value
-              ? `${car.mileage.value} ${car.mileage.unit || "miles"}`
-              : null,
-            description: car.description,
-            engine: car.engine?.type,
-            transmission: car.transmission?.type,
-            status: car.status,
-            vin: car.vin,
-            features: car.features || [],
-          };
+          if (car) {
+            // Extract important car details
+            carInfo = {
+              year: car.year,
+              make: car.make,
+              model: car.model,
+              color: car.color,
+              price: car.price?.listPrice || null,
+              mileage: car.mileage?.value
+                ? `${car.mileage.value} ${car.mileage.unit || "miles"}`
+                : null,
+              description: car.description,
+              engine: car.engine?.type,
+              transmission: car.transmission?.type,
+              status: car.status,
+              vin: car.vin,
+              features: car.features || [],
+            };
+          }
         }
       } catch (error) {
         console.error("Error fetching car details:", error);

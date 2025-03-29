@@ -32,6 +32,12 @@ export async function POST(request: NextRequest) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const captions = db.collection("captions");
     const cars = db.collection("cars");
@@ -93,6 +99,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const captions = db.collection("captions");
 
@@ -137,6 +149,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const captions = db.collection("captions");
     const cars = db.collection("cars");
@@ -189,6 +207,12 @@ export async function GET(request: NextRequest) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
     const captions = db.collection("captions");
 

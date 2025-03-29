@@ -27,6 +27,12 @@ export async function GET(request: Request) {
     const skip = (page - 1) * pageSize;
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Build base query

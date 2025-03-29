@@ -29,6 +29,11 @@ export async function fetchInventory(
 ) {
   try {
     const client = await clientPromise;
+
+    if (!client) {
+      throw new Error("Failed to connect to MongoDB");
+    }
+
     const db = client.db(process.env.MONGODB_DB || "motive_archive");
     const collection = db.collection<InventoryItemRaw>("inventory");
 

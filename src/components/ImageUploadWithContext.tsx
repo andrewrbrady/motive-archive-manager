@@ -5,12 +5,13 @@ import { ImageGallery } from "@/components/ImageGallery";
 import {
   StatusNotification,
   DeleteStatus,
-  UploadProgress,
+  UploadProgress as StatusUploadProgress,
 } from "@/components/StatusNotification";
 import { Trash2, Plus } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+import { ProgressItem } from "@/components/ui/UploadProgressTracking";
 
 interface ImageMetadata {
   angle?: string;
@@ -38,7 +39,7 @@ interface CarsClientContext {
   uploadImages: (
     carId: string,
     files: File[],
-    setProgress: (progress: UploadProgress[]) => void
+    setProgress: (progress: StatusUploadProgress[]) => void
   ) => Promise<void>;
   deleteImage: (
     carId: string,
@@ -47,14 +48,47 @@ interface CarsClientContext {
   ) => Promise<void>;
 }
 
+// Use our common ProgressItem interface for better type compatibility
+interface CustomUploadProgress extends ProgressItem {
+  fileName: string;
+  progress: number;
+  status:
+    | "pending"
+    | "uploading"
+    | "processing"
+    | "analyzing"
+    | "complete"
+    | "error";
+  imageUrl?: string;
+  metadata?: ImageMetadata;
+  error?: string;
+  currentStep?: string;
+  stepProgress?: {
+    cloudflare: {
+      status: "pending" | "uploading" | "complete" | "error";
+      progress: number;
+      message?: string;
+    };
+    openai: {
+      status: "pending" | "analyzing" | "complete" | "error";
+      progress: number;
+      message?: string;
+    };
+  };
+}
+
 interface ImageUploadWithContextProps {
   images: Image[];
   isEditMode: boolean;
   onRemoveImage: (indices: number[], deleteFromStorage: boolean) => void;
   onImagesChange: (files: FileList) => void;
   uploading: boolean;
-  uploadProgress: UploadProgress[];
-  setUploadProgress?: (progress: UploadProgress[]) => void;
+  uploadProgress: StatusUploadProgress[];
+  setUploadProgress?: (
+    progress:
+      | StatusUploadProgress[]
+      | ((prev: StatusUploadProgress[]) => StatusUploadProgress[])
+  ) => void;
   showMetadata?: boolean;
   showFilters?: boolean;
   title: string;
@@ -195,25 +229,55 @@ export default function ImageUploadWithContext({
   const handleImageUpload = async (files: File[]) => {
     if (!files.length) return;
     if (_setUploadProgress) {
-      // Initialize progress for each file
-      const initialProgress = files.map((file) => ({
-        fileName: file.name,
-        progress: 0,
-        status: "pending" as const,
-        currentStep: "Starting upload...",
-      }));
+      // Initialize progress for each file with our enhanced step tracking
+      const initialProgress = files.map(
+        (file): StatusUploadProgress => ({
+          fileName: file.name,
+          progress: 0,
+          status: "uploading",
+          currentStep: "Preparing to upload...",
+          stepProgress: {
+            cloudflare: {
+              status: "uploading",
+              progress: 0,
+              message: "Starting upload to Cloudflare...",
+            },
+            openai: {
+              status: "pending",
+              progress: 0,
+              message: "Waiting for upload to complete...",
+            },
+          },
+        })
+      );
 
       _setUploadProgress(initialProgress);
+    }
 
-      // Context.uploadImages handles the upload and returns updated progress
-      try {
-        await context.uploadImages(carId, files, _setUploadProgress);
-        // Keep notification visible for a moment after completion
-        setTimeout(() => {
-          refreshImages();
-        }, 1000);
-      } catch (error) {
-        console.error("Upload failed:", error);
+    try {
+      await context.uploadImages(
+        carId,
+        files,
+        (progress: StatusUploadProgress[]) => {
+          if (_setUploadProgress) {
+            _setUploadProgress(progress);
+          }
+        }
+      );
+      console.log("Upload complete!");
+      refreshImages();
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      if (_setUploadProgress) {
+        _setUploadProgress((current: StatusUploadProgress[]) =>
+          current.map(
+            (item: StatusUploadProgress): StatusUploadProgress => ({
+              ...item,
+              status: "error",
+              error: error instanceof Error ? error.message : "Upload failed",
+            })
+          )
+        );
       }
     }
   };
@@ -573,13 +637,15 @@ export default function ImageUploadWithContext({
       </div>
 
       {/* StatusNotification is now rendered with a portal and doesn't need to be positioned here */}
-      {(uploading || isDeleting || showNotification) && (
+      {showNotification && (
         <StatusNotification
-          uploadProgress={uploadProgress}
+          show={showNotification}
+          uploadProgress={uploadProgress as any}
           deleteStatus={deleteStatus}
-          isUploading={uploading}
+          uploading={uploading}
           isDeleting={isDeleting}
-          onClose={clearNotifications}
+          onClose={closeNotification}
+          clearNotifications={clearNotifications}
         />
       )}
     </div>

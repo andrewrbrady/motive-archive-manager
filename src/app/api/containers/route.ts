@@ -7,6 +7,12 @@ import { Container, formatContainer } from "@/models/container";
 export async function GET() {
   try {
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Fetch all containers from the database
@@ -41,6 +47,12 @@ export async function POST(request: Request) {
     }
 
     const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
     const db = client.db("motive_archive");
 
     // Get the next container number by finding the max containerNumber and adding 1

@@ -7,15 +7,19 @@ interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  className?: string;
 }
 
 export default function Pagination({
   currentPage,
   totalPages,
   onPageChange,
+  className,
 }: PaginationProps) {
   return (
-    <div className="flex justify-center items-center gap-2">
+    <div
+      className={`flex justify-center items-center gap-2 ${className || ""}`}
+    >
       <Button
         variant="outline"
         size="icon"

@@ -127,34 +127,98 @@ export function ImageGalleryRewrite({
     (img) => img.id === currentImageId
   )?.id;
 
-  // Local UI state only
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Core state - simplified
+  const [images, setImages] = useState<ImageType[]>(initialImages);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(
     urlPage ? parseInt(urlPage) - 1 : 0
   );
   const [filters, setFilters] = useState<FilterState>({});
-  const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const itemsPerPage = 15; // 3 columns x 5 rows
-  const [images, setImages] = useState<ImageType[]>(initialImages);
-  const [copiedField, setCopiedField] = useState<"filename" | "url" | null>(
-    null
-  );
   const [filterOptions, setFilterOptions] = useState<Record<string, string[]>>(
     {}
   );
+  const [copiedField, setCopiedField] = useState<"filename" | "url" | null>(
+    null
+  );
 
-  // Update images when initialImages changes
+  // UI state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const itemsPerPage = 15; // 3 columns x 5 rows
+
+  // Safety mechanism
+  const [isMounted, setIsMounted] = useState(false);
+  const safeToDeleteRef = useRef(false);
+
+  // Initialize component and prevent auto-deletions
   useEffect(() => {
-    console.log("initialImages changed, updating state", initialImages?.length);
-    if (initialImages) {
-      setImages(initialImages);
-      setSelectedImages(new Set<string>());
+    setIsMounted(true);
+    console.log("ImageGallery: Initial mounting phase - deletions blocked");
 
-      // Create filter options object from images
+    // Only enable deletions after component is fully mounted and stable
+    const safetyTimer = setTimeout(() => {
+      safeToDeleteRef.current = true;
+      console.log("ImageGallery: Component mounted and ready for user actions");
+    }, 2000);
+
+    return () => {
+      clearTimeout(safetyTimer);
+      setIsMounted(false);
+    };
+  }, []);
+
+  // Update the initialization effect to properly handle changes to initialImages
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const initialImagesLength = initialImages?.length || 0;
+    const currentImagesLength = images.length;
+
+    console.log(
+      `ImageGallery: Initializing with ${initialImagesLength} images (current: ${currentImagesLength})`
+    );
+
+    // Compare initial and current images by ID to detect real changes
+    const initialImageIds = new Set(initialImages?.map((img) => img.id) || []);
+    const currentImageIds = new Set(images.map((img) => img.id));
+
+    // Check for changes in the actual image data, not just IDs
+    const hasDifferentImages =
+      initialImagesLength !== currentImagesLength ||
+      initialImages?.some((img) => !currentImageIds.has(img.id)) ||
+      images.some((img) => !initialImageIds.has(img.id));
+
+    // Check deeply for changes in metadata or other properties
+    const hasUpdatedImageData = initialImages?.some((initialImg) => {
+      const currentImg = images.find((img) => img.id === initialImg.id);
+      if (!currentImg) return false;
+
+      // Check for metadata changes that would require updates
+      if (
+        JSON.stringify(initialImg.metadata) !==
+        JSON.stringify(currentImg.metadata)
+      ) {
+        console.log(`Metadata changed for image ${initialImg.id}`);
+        return true;
+      }
+
+      return false;
+    });
+
+    if (hasDifferentImages || hasUpdatedImageData) {
+      console.log("Images have changed, updating gallery state");
+      setImages(initialImages);
+    } else {
+      console.log(
+        "No meaningful image changes detected, preserving current state"
+      );
+    }
+
+    // Extract filter options from images regardless of image changes
+    if (initialImages?.length > 0) {
       const options = {
         angles: new Set<string>(),
         views: new Set<string>(),
@@ -165,12 +229,12 @@ export function ImageGalleryRewrite({
 
       initialImages.forEach((image) => {
         const { metadata } = image;
-        if (metadata.angle?.trim()) options.angles.add(metadata.angle.trim());
-        if (metadata.view?.trim()) options.views.add(metadata.view.trim());
-        if (metadata.movement?.trim())
+        if (metadata?.angle?.trim()) options.angles.add(metadata.angle.trim());
+        if (metadata?.view?.trim()) options.views.add(metadata.view.trim());
+        if (metadata?.movement?.trim())
           options.movements.add(metadata.movement.trim());
-        if (metadata.tod?.trim()) options.tods.add(metadata.tod.trim());
-        if (metadata.side?.trim()) options.sides.add(metadata.side.trim());
+        if (metadata?.tod?.trim()) options.tods.add(metadata.tod.trim());
+        if (metadata?.side?.trim()) options.sides.add(metadata.side.trim());
       });
 
       const newFilterOptions = {
@@ -186,7 +250,47 @@ export function ImageGalleryRewrite({
         onFilterOptionsChange(newFilterOptions);
       }
     }
-  }, [initialImages, onFilterOptionsChange]);
+  }, [initialImages, isMounted, onFilterOptionsChange, images]);
+
+  // Safe image removal function
+  const safeRemoveImage = useCallback(
+    (indices: number[], deleteFromStorage: boolean) => {
+      // Safety check 1: Component must be mounted
+      if (!isMounted) {
+        console.error("❌ Cannot delete images - component not fully mounted");
+        return;
+      }
+
+      // Safety check 2: After initialization period
+      if (!safeToDeleteRef.current) {
+        console.error("❌ Cannot delete images during initialization period");
+        return;
+      }
+
+      // Safety check 3: Must have valid indices
+      if (!indices.length) {
+        console.error("❌ Cannot delete images - no indices provided");
+        return;
+      }
+
+      // Safety check 4: Must have actual user selections for explicit deletions
+      if (deleteFromStorage && selectedImages.size === 0) {
+        console.error(
+          "❌ Cannot permanently delete images without user selection"
+        );
+        return;
+      }
+
+      console.log(`✅ Safe deletion of ${indices.length} images`, {
+        deleteFromStorage,
+        selectedImageCount: selectedImages.size,
+      });
+
+      // Call the original handler
+      onRemoveImage(indices, deleteFromStorage);
+    },
+    [isMounted, onRemoveImage, selectedImages.size]
+  );
 
   // Filter images based on selected filters
   const filteredImages = useMemo(() => {
@@ -214,27 +318,6 @@ export function ImageGalleryRewrite({
     },
     [router, searchParams]
   );
-
-  // Remove the effect that updates page on mainIndex change
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams?.toString() || "");
-    const hasIrrelevantParams = ["pageSize", "view", "edit", "search"].some(
-      (param) => params.has(param)
-    );
-
-    if (hasIrrelevantParams) {
-      // Keep only relevant parameters (mode, image, and page)
-      const relevantParams = new URLSearchParams();
-      if (params.has("mode")) relevantParams.set("mode", params.get("mode")!);
-      if (params.has("image"))
-        relevantParams.set("image", params.get("image")!);
-      if (params.has("page")) relevantParams.set("page", params.get("page")!);
-
-      const queryString = relevantParams.toString();
-      const newUrl = queryString ? `?${queryString}` : window.location.pathname;
-      router.replace(newUrl, { scroll: false });
-    }
-  }, [router, searchParams]);
 
   // Navigation handlers - Update to handle page changes correctly
   const handlePrev = useCallback(() => {
@@ -266,7 +349,7 @@ export function ImageGalleryRewrite({
     setCurrentPage(targetPage);
   }, [mainIndex, filteredImages, itemsPerPage, router, searchParams]);
 
-  // Update setMainImage to handle page changes
+  // Set main image
   const setMainImage = useCallback(
     (imageId: string) => {
       const imageIndex = filteredImages.findIndex((img) => img.id === imageId);
@@ -286,6 +369,7 @@ export function ImageGalleryRewrite({
     [filteredImages, itemsPerPage, router, searchParams]
   );
 
+  // Handle filter changes
   const handleFilterChange = (type: string, value: string) => {
     // Reset to first page when changing filters
     handlePageChange(0);
@@ -306,96 +390,6 @@ export function ImageGalleryRewrite({
     handlePageChange(0);
     setFilters({});
   };
-
-  // Add the buttons at the top of the gallery
-  const renderTopButtons = () => {
-    return (
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          {!isEditMode && (
-            <ImageFilterButton
-              activeFilters={filters}
-              filterOptions={filterOptions}
-              onFilterChange={handleFilterChange}
-              onResetFilters={handleResetFilters}
-            />
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={toggleEditMode}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            {isEditMode ? (
-              <>
-                <Eye className="w-4 h-4" />
-                View Mode
-              </>
-            ) : (
-              <>
-                <Pencil className="w-4 h-4" />
-                Edit Mode
-              </>
-            )}
-          </Button>
-          {isEditMode && (
-            <>
-              <Button
-                onClick={() => {
-                  console.log("Upload button clicked");
-                  // Clear the input first
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                    // Open the file picker dialog
-                    fileInputRef.current.click();
-                  }
-                }}
-                disabled={uploading}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <UploadIcon className="w-4 h-4" />
-                Upload
-              </Button>
-              <Button
-                onClick={() => {
-                  // Refresh the images from server
-                  console.log("Requesting image refresh");
-                  if (onImagesChange) {
-                    onImagesChange(images);
-                  }
-                }}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <RefreshCcw className="w-4 h-4" />
-                Refresh
-              </Button>
-              <Button
-                onClick={handleDeleteSelected}
-                disabled={selectedImages.size === 0}
-                variant="destructive"
-                className="flex items-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Selected ({selectedImages.size})
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Pagination
-  const paginatedImages = useMemo(() => {
-    const startIndex = currentPage * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredImages.slice(startIndex, endIndex);
-  }, [filteredImages, currentPage]);
-
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
 
   // URL update helpers
   const updateUrl = useCallback(
@@ -425,23 +419,145 @@ export function ImageGalleryRewrite({
   );
 
   const toggleEditMode = useCallback(() => {
+    console.log(
+      `Toggling mode from ${isEditMode ? "edit" : "view"} to ${
+        isEditMode ? "view" : "edit"
+      }`
+    );
+
+    // Set a flag in localStorage to prevent automatic refreshes
+    // for a short period during mode change
+    localStorage.setItem("preventAutoRefresh", "true");
+
+    // First update the URL to change the mode
     updateUrl({ mode: isEditMode ? null : "edit" });
-  }, [isEditMode, updateUrl]);
+
+    // Instead of forcing a server refresh immediately,
+    // let the URL update take effect first
+    setTimeout(() => {
+      if (onImagesChange) {
+        console.log("Mode toggle: selective refresh");
+        // Clear the prevention flag
+        localStorage.removeItem("preventAutoRefresh");
+      }
+    }, 500);
+  }, [isEditMode, updateUrl, onImagesChange]);
+
+  // Handle delete selection with stronger server synchronization
+  const handleDeleteSelected = useCallback(async () => {
+    console.log("Delete selected:", selectedImages.size, "images");
+
+    if (selectedImages.size === 0) {
+      console.log("No images selected");
+      return;
+    }
+
+    // Map the selected image IDs back to their indices
+    const selectedIndices: number[] = [];
+    const selectedIds: string[] = Array.from(selectedImages);
+
+    selectedIds.forEach((id) => {
+      const index = images.findIndex((img) => img.id === id);
+      if (index !== -1) {
+        selectedIndices.push(index);
+      }
+    });
+
+    console.log(`Selected indices for deletion: ${selectedIndices.join(", ")}`);
+
+    if (selectedIndices.length === 0) {
+      console.log("No valid indices found for deletion");
+      return;
+    }
+
+    // Confirm deletion with the user
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedIndices.length} image(s)?`
+      )
+    ) {
+      console.log("Deletion canceled by user");
+      return;
+    }
+
+    // First, update the UI optimistically
+    const updatedImages = images.filter((img) => !selectedIds.includes(img.id));
+    setImages(updatedImages);
+
+    try {
+      // Call the safe delete function - this will trigger server-side deletion
+      console.log(`Deleting ${selectedIndices.length} images from server...`);
+      await safeRemoveImage(selectedIndices, true);
+
+      // Clear selection
+      setSelectedImages(new Set());
+
+      // Switch to another image if the current one was deleted
+      if (selectedIds.includes(currentImageId) && updatedImages.length > 0) {
+        // Safely select the first available image
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.set("image", updatedImages[0].id);
+        params.set("page", "1"); // Reset to first page
+        router.replace(`?${params.toString()}`, { scroll: false });
+      }
+
+      // Force a refresh of data from server to ensure consistency
+      if (onImagesChange) {
+        console.log("Requesting server refresh after deletion");
+        // Wait a moment to ensure server processing completes
+        setTimeout(() => {
+          // Pass updatedImages to maintain state consistency until server refresh completes
+          onImagesChange(updatedImages);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Error during image deletion:", error);
+      // Revert optimistic update if deletion failed
+      if (onImagesChange) {
+        console.log("Error occurred - forcing refresh from server");
+        onImagesChange(images); // Pass original images to trigger full refresh
+      }
+    }
+  }, [
+    selectedImages,
+    images,
+    safeRemoveImage,
+    currentImageId,
+    router,
+    searchParams,
+    onImagesChange,
+  ]);
+
+  // Image selection handler
+  const handleImageSelect = useCallback((imageId: string) => {
+    setSelectedImages((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(imageId)) {
+        newSet.delete(imageId);
+      } else {
+        newSet.add(imageId);
+      }
+      return newSet;
+    });
+  }, []);
 
   // Image loading handler
   const handleImageLoad = useCallback((imageId: string) => {
     setLoadedImages((prev) => new Set([...prev, imageId]));
   }, []);
 
+  // Handle copy to clipboard
+  const handleCopy = useCallback((text: string, field: "filename" | "url") => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000); // Reset after 2 seconds
+  }, []);
+
   // Image upload handler
   const handleImageUpload = async (files: FileList) => {
     if (!files.length) return;
 
-    console.log(
-      `Starting upload of ${files.length} files to /api/cloudflare/images`
-    );
-    console.log(`Using carId: ${carId}`);
-
+    console.log(`Starting upload of ${files.length} files`);
     setUploading(true);
 
     // Simple progress tracking
@@ -460,13 +576,7 @@ export function ImageGalleryRewrite({
       const file = files[i];
 
       try {
-        console.log(
-          `Uploading file ${i + 1}/${files.length}: ${file.name} (${
-            file.size
-          } bytes)`
-        );
-
-        // Create a basic FormData without extra complexity
+        // Create a basic FormData
         const formData = new FormData();
 
         // First, verify the file is valid
@@ -474,30 +584,16 @@ export function ImageGalleryRewrite({
           throw new Error("File is empty");
         }
 
-        // Add the file with the exact field name expected by the server
+        // Add the file
         formData.append("file", file);
-
-        // Add the carId to the FormData, which is required by the API
         formData.append("carId", carId);
 
         // Add vehicleInfo if available
         if (vehicleInfo) {
           formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
-          console.log("Added vehicleInfo to FormData", {
-            vehicleInfoType: typeof vehicleInfo,
-          });
-        } else {
-          console.log("No vehicleInfo available to add to FormData");
         }
 
-        console.log(
-          `FormData created with fields: file, carId=${carId}${
-            vehicleInfo ? ", vehicleInfo" : " (no vehicleInfo)"
-          }`
-        );
-        console.log(`File type: ${file.type}, size: ${file.size} bytes`);
-
-        // Update progress to show uploading
+        // Update progress
         setUploadProgress((prev) => {
           const updated = [...prev];
           if (updated[i]) {
@@ -516,23 +612,14 @@ export function ImageGalleryRewrite({
           body: formData,
         });
 
-        console.log(
-          `API response status: ${response.status} ${response.statusText}`
-        );
-
         if (!response.ok) {
-          // Get error information
           const errorText = await response.text();
-          console.error(
-            `Upload failed with status ${response.status}: ${errorText}`
-          );
           throw new Error(
             `Upload failed: ${response.status} - ${errorText.substring(0, 200)}`
           );
         }
 
         const result = await response.json();
-        console.log("Upload successful, response:", result);
 
         // Update progress
         setUploadProgress((prev) => {
@@ -582,7 +669,6 @@ export function ImageGalleryRewrite({
 
     // If we have new images, update the gallery
     if (newImages.length > 0) {
-      console.log(`Adding ${newImages.length} new images to gallery`);
       const updatedImages = [...images, ...newImages];
       setImages(updatedImages);
 
@@ -592,60 +678,86 @@ export function ImageGalleryRewrite({
     }
   };
 
-  // Selection handlers
-  const handleImageSelect = useCallback((imageId: string) => {
-    setSelectedImages((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(imageId)) {
-        newSet.delete(imageId);
-      } else {
-        newSet.add(imageId);
-      }
-      return newSet;
-    });
-  }, []);
+  // Pagination
+  const paginatedImages = useMemo(() => {
+    const startIndex = currentPage * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredImages.slice(startIndex, endIndex);
+  }, [filteredImages, currentPage]);
 
-  const handleDeleteSelected = useCallback(() => {
-    console.log("Delete button clicked");
-    console.log("Selected images:", Array.from(selectedImages));
+  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
 
-    if (selectedImages.size === 0) {
-      console.log("No images selected");
-      return;
-    }
-
-    // Get all indices and IDs for selected images
-    const selectedIndices: number[] = [];
-    const selectedIds: string[] = [];
-
-    Array.from(selectedImages).forEach((id) => {
-      const index = images.findIndex((img) => img.id === id);
-      if (index !== -1) {
-        selectedIndices.push(index);
-        selectedIds.push(id);
-      }
-    });
-
-    console.log("Selected indices:", selectedIndices);
-    console.log("Selected IDs:", selectedIds);
-
-    if (selectedIndices.length > 0) {
-      // Call the parent component's onRemoveImage function with the indices
-      // This is the main method for deletion
-      onRemoveImage(selectedIndices, true);
-
-      // Clear selection after deletion
-      setSelectedImages(new Set());
-    } else {
-      console.log("No valid indices found for deletion");
-    }
-  }, [selectedImages, images, onRemoveImage]);
-
-  // Add debug logging to component mount
-  useEffect(() => {
-    console.log("ImageGalleryRewrite component mounted");
-    console.log("Initial images count:", initialImages.length);
-  }, [initialImages.length]);
+  // Add the buttons at the top of the gallery
+  const renderTopButtons = () => {
+    return (
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          {!isEditMode && (
+            <ImageFilterButton
+              activeFilters={filters}
+              filterOptions={filterOptions}
+              onFilterChange={handleFilterChange}
+              onResetFilters={handleResetFilters}
+            />
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={toggleEditMode}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {isEditMode ? (
+              <>
+                <Eye className="w-4 h-4" />
+                View Mode
+              </>
+            ) : (
+              <>
+                <Pencil className="w-4 h-4" />
+                Edit Mode
+              </>
+            )}
+          </Button>
+          {isEditMode && (
+            <>
+              <Button
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                    fileInputRef.current.click();
+                  }
+                }}
+                disabled={uploading}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <UploadIcon className="w-4 h-4" />
+                Upload
+              </Button>
+              <Button
+                onClick={handleManualRefresh}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Button
+                onClick={handleDeleteSelected}
+                disabled={selectedImages.size === 0}
+                variant="destructive"
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedImages.size})
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -663,12 +775,64 @@ export function ImageGalleryRewrite({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handlePrev, handleNext, isModalOpen]);
 
-  // Add copy handler
-  const handleCopy = useCallback((text: string, field: "filename" | "url") => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000); // Reset after 2 seconds
-  }, []);
+  // Add this effect to force synchronization when edit mode changes
+  useEffect(() => {
+    // Only run this effect if the component is fully mounted
+    if (!isMounted) return;
+
+    // Check if we should prevent refresh
+    if (localStorage.getItem("preventAutoRefresh") === "true") {
+      console.log("Skipping automatic refresh due to prevention flag");
+      return;
+    }
+
+    console.log(
+      `Mode changed to: ${isEditMode ? "edit" : "view"} mode - syncing state`
+    );
+
+    // Debounce the refresh operation to prevent rapid consecutive calls
+    const refreshTimer = setTimeout(() => {
+      // When switching modes, only refresh if we have images and no prevention flag
+      if (onImagesChange && images.length > 0) {
+        console.log(
+          "Mode changed: requesting selective image refresh from server"
+        );
+        // Use the current images to keep state consistent
+        onImagesChange(images);
+      }
+    }, 300);
+
+    return () => clearTimeout(refreshTimer);
+  }, [isEditMode, isMounted, onImagesChange, images]);
+
+  // Function to force a manual refresh - add timestamp parameter
+  const handleManualRefresh = useCallback(() => {
+    // Force server synchronization
+    console.log("🔄 Manual refresh requested");
+    if (onImagesChange) {
+      // Generate a unique timestamp so the server recognizes this as a new request
+      const timestamp = new Date().getTime();
+      console.log(
+        `🔄 Forcing complete server refresh with timestamp: ${timestamp}`
+      );
+
+      // Clear local state to ensure we don't have any old references
+      setImages([]);
+      setSelectedImages(new Set());
+      setLoadedImages(new Set());
+
+      // Pass empty array to force a complete refresh from parent
+      onImagesChange([]);
+
+      // Also reset pagination to first page
+      if (currentPage !== 0) {
+        handlePageChange(0);
+      }
+
+      // Set a timestamp in localStorage to ensure the server query is fresh
+      localStorage.setItem("lastRefreshTimestamp", timestamp.toString());
+    }
+  }, [onImagesChange, currentPage, handlePageChange]);
 
   return (
     <div className="space-y-4">
@@ -831,8 +995,10 @@ export function ImageGalleryRewrite({
                           "ring-2 ring-destructive"
                       )}
                       sizes="(max-width: 768px) 25vw, 200px"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent event bubbling
                         if (isEditMode) {
+                          // In edit mode, we toggle selection of this specific image only
                           handleImageSelect(image.id);
                         } else {
                           setMainImage(image.id);
@@ -865,24 +1031,16 @@ export function ImageGalleryRewrite({
             )}
           </div>
 
-          {/* File input for uploads (keep this but remove the redundant upload button) */}
+          {/* File input for uploads */}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             multiple
             onChange={(e) => {
-              console.log("File input change event triggered");
               const fileList = e.target.files;
               if (fileList && fileList.length > 0) {
-                console.log(
-                  `Selected ${fileList.length} files:`,
-                  Array.from(fileList).map((f) => f.name)
-                );
-                // Process the selected files
                 handleImageUpload(fileList);
-              } else {
-                console.log("No files selected");
               }
             }}
             className="hidden"
@@ -913,7 +1071,7 @@ export function ImageGalleryRewrite({
             </div>
           )}
 
-          {/* Upload progress state - keep this visible for user feedback */}
+          {/* Upload progress indicator */}
           {uploading && (
             <div className="mt-4 p-3 bg-background border border-border rounded-md">
               <div className="flex items-center gap-2 text-sm">

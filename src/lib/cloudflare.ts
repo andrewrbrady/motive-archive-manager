@@ -170,3 +170,40 @@ export async function uploadToCloudflare(
     ),
   };
 }
+
+/**
+ * Format a Cloudflare Images URL to ensure it has the correct variant suffix
+ * @param url The base Cloudflare image URL
+ * @param variant The variant to use (defaults to 'public')
+ * @returns Properly formatted Cloudflare image URL
+ */
+export function getFormattedImageUrl(
+  url: string | null | undefined,
+  variant: string = "public"
+): string {
+  if (!url) {
+    return ""; // Return empty string for null/undefined URLs
+  }
+
+  // Clean any existing variants
+  const baseUrl = url.replace(/\/(public|thumbnail|avatar)$/, "");
+
+  // Ensure the URL is properly formed for Cloudflare Images
+  if (!baseUrl.includes("imagedelivery.net")) {
+    console.warn("Non-Cloudflare image URL detected:", url);
+    return url; // Return as-is if not a Cloudflare URL
+  }
+
+  // Return URL with specified variant
+  return `${baseUrl}/${variant}`;
+}
+
+/**
+ * Generate a placeholder image URL for missing images
+ * This can be used when we have imageIds but no actual image data
+ */
+export function getPlaceholderImageUrl(imageId: string): string {
+  // Return a placeholder image URL that shows the image is loading
+  // The format is deliberately compatible with getFormattedImageUrl
+  return `https://placehold.co/800x600/d1d5db/6b7280?text=Loading...`;
+}

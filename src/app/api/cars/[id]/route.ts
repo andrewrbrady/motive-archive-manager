@@ -1,6 +1,6 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
-import { ImageMetadata } from "@/lib/cloudflare";
+import { ImageMetadata, getFormattedImageUrl } from "@/lib/cloudflare";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -130,18 +130,6 @@ export async function GET(
     client = await getMongoClient();
     const db = client.db(DB_NAME);
 
-    // Log the request for debugging
-    console.log(
-      "Fetching car with ID:",
-      id,
-      "Fields:",
-      fieldsParam,
-      "Include Images:",
-      includeImages,
-      "Image Category:",
-      imageCategory
-    );
-
     // Create a projection object based on requested fields
     let projection: Record<string, number> = {};
 
@@ -160,13 +148,6 @@ export async function GET(
       projection["imageIds"] = 1;
     }
 
-    // Handle image fetching strategy
-    let matchStage = { $match: { _id: objectId } };
-
-    console.log(
-      `[Car ${id}] Preparing to fetch with includeImages=${includeImages}, imageCategory=${imageCategory}`
-    );
-
     // Use aggregation to fetch car with selected fields and image strategy
     const pipeline: PipelineStage[] = [
       {
@@ -176,58 +157,67 @@ export async function GET(
 
     // If showing images, handle them appropriately
     if (includeImages === "true") {
-      console.log(`[Car ${id}] Including images in response`);
-
-      if (imageCategory) {
-        console.log(
-          `[Car ${id}] Looking for images in category: ${imageCategory}`
-        );
-
-        // Add a step to convert categorized images to regular array for consistent client handling
-        pipeline.push({
-          $addFields: {
-            tempImages: { $ifNull: [`$images.${imageCategory}`, []] },
-          },
-        });
-
-        pipeline.push({
-          $project: {
-            ...Object.keys(projection).reduce((acc, key) => {
-              acc[key] = 1;
-              return acc;
-            }, {} as Record<string, number>),
-            images: "$tempImages",
-            imageIds: 1, // Always include imageIds for fallback
-          },
-        });
-      } else {
-        // Fetch all images
-        console.log(`[Car ${id}] Including all images`);
-
-        // If we have imageIds, use those to lookup images
-        pipeline.push({
-          $lookup: {
-            from: "images",
-            let: {
-              carId: { $toString: "$_id" },
-              imageIds: { $ifNull: ["$imageIds", []] },
+      // Convert string imageIds to ObjectIds for proper lookup
+      pipeline.push({
+        $addFields: {
+          imageObjectIds: {
+            $map: {
+              input: { $ifNull: ["$imageIds", []] },
+              as: "id",
+              in: { $toObjectId: "$$id" },
             },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $or: [
-                      { $in: [{ $toString: "$_id" }, "$$imageIds"] },
-                      { $eq: [{ $toString: "$carId" }, "$$carId"] },
-                    ],
-                  },
+          },
+        },
+      });
+
+      // Lookup images using the converted ObjectIds
+      pipeline.push({
+        $lookup: {
+          from: "images",
+          let: { imageIds: "$imageObjectIds" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $in: ["$_id", "$$imageIds"],
                 },
               },
-            ],
-            as: "images",
-          },
-        });
-      }
+            },
+            // Filter by category if specified
+            ...(imageCategory
+              ? [
+                  {
+                    $match: {
+                      $or: [
+                        { "metadata.category": imageCategory },
+                        {
+                          $and: [
+                            { "metadata.category": { $exists: false } },
+                            {
+                              [`metadata.${imageCategory}`]: { $exists: true },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ]
+              : []),
+          ],
+          as: "images",
+        },
+      });
+
+      // Clean up temporary field
+      pipeline.push({
+        $project: {
+          imageObjectIds: 0,
+          ...Object.keys(projection).reduce((acc, key) => {
+            acc[key] = 1;
+            return acc;
+          }, {} as Record<string, number>),
+        },
+      });
     }
 
     // Add projection if fields were specified
@@ -236,117 +226,105 @@ export async function GET(
     }
 
     // Execute the aggregation
-    console.log(
-      `[Car ${id}] Executing aggregation:`,
-      JSON.stringify(pipeline, null, 2)
-    );
     const car = await db.collection("cars").aggregate(pipeline).next();
-
-    // Log raw data for debugging
-    console.log("Raw car data:", car);
 
     if (!car) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    try {
-      // Basic car data with defensive checks
-      const standardizedCar: StandardizedCar = {
-        ...car,
-        _id: car._id?.toString() || "unknown",
-        price: {
-          listPrice:
-            typeof car.price === "object"
-              ? car.price.listPrice
-              : typeof car.price === "string"
-              ? parseFloat(car.price)
-              : typeof car.price === "number"
-              ? car.price
-              : null,
-          soldPrice: typeof car.price === "object" ? car.price.soldPrice : null,
-          priceHistory:
-            typeof car.price === "object" ? car.price.priceHistory : [],
-        },
-        year:
-          typeof car.year === "string"
-            ? parseInt(car.year, 10)
-            : car.year || new Date().getFullYear(),
-        mileage: car.mileage
-          ? {
-              value:
-                typeof car.mileage.value === "string"
-                  ? parseFloat(car.mileage.value)
-                  : car.mileage.value || 0,
-              unit: car.mileage.unit || "mi",
-            }
-          : { value: 0, unit: "mi" },
-        status: car.status || "available",
-        imageIds: [],
-        images: [],
-        client: null,
-        clientInfo: null,
-        createdAt: "",
-        updatedAt: "",
-      };
-
-      // Handle arrays with defensive checks
-      if (Array.isArray(car.imageIds)) {
-        standardizedCar.imageIds = car.imageIds
-          .filter((id) => id != null)
-          .map((id) => id?.toString() || "");
-      }
-
-      if (Array.isArray(car.images)) {
-        standardizedCar.images = car.images
-          .filter((img) => img != null && img.url)
-          .map((img) => ({
-            ...img,
-            _id: img._id?.toString() || "",
-            car_id: img.car_id?.toString() || "",
-            url: img.url.endsWith("/public") ? img.url : `${img.url}/public`,
-          }));
-
-        console.log(
-          `[Car ${id}] Found ${standardizedCar.images.length} images after standardization`
-        );
-        if (standardizedCar.images.length > 0) {
-          console.log(`[Car ${id}] First image sample:`, {
-            id: standardizedCar.images[0]._id,
-            url: standardizedCar.images[0].url,
-          });
-        }
-      }
-
-      // Handle client info with defensive checks
-      standardizedCar.client = car.client?.toString() || null;
-      standardizedCar.clientInfo = car.clientInfo
+    // Basic car data with defensive checks
+    const standardizedCar: StandardizedCar = {
+      ...car,
+      _id: car._id?.toString() || "unknown",
+      price: {
+        listPrice:
+          typeof car.price === "object"
+            ? car.price.listPrice
+            : typeof car.price === "string"
+            ? parseFloat(car.price)
+            : typeof car.price === "number"
+            ? car.price
+            : null,
+        soldPrice: typeof car.price === "object" ? car.price.soldPrice : null,
+        priceHistory:
+          typeof car.price === "object" ? car.price.priceHistory : [],
+      },
+      year:
+        typeof car.year === "string"
+          ? parseInt(car.year, 10)
+          : car.year || new Date().getFullYear(),
+      mileage: car.mileage
         ? {
-            ...car.clientInfo,
-            _id: car.clientInfo._id?.toString() || "",
+            value:
+              typeof car.mileage.value === "string"
+                ? parseFloat(car.mileage.value)
+                : car.mileage.value || 0,
+            unit: car.mileage.unit || "mi",
           }
-        : null;
+        : { value: 0, unit: "mi" },
+      status: car.status || "available",
+      imageIds: [],
+      images: [],
+      client: null,
+      clientInfo: null,
+      createdAt: "",
+      updatedAt: "",
+    };
 
-      // Handle dates with defensive checks
-      standardizedCar.createdAt =
-        car.createdAt instanceof Date
-          ? car.createdAt.toISOString()
-          : car.createdAt || new Date().toISOString();
-      standardizedCar.updatedAt =
-        car.updatedAt instanceof Date
-          ? car.updatedAt.toISOString()
-          : car.updatedAt || new Date().toISOString();
-
-      // Log standardized data for debugging
-      console.log("Standardized car data:", standardizedCar);
-
-      return NextResponse.json(standardizedCar);
-    } catch (error) {
-      console.error("Error standardizing car data:", error);
-      return NextResponse.json(
-        { error: "Failed to process car data" },
-        { status: 500 }
-      );
+    // Handle arrays with defensive checks
+    if (Array.isArray(car.imageIds)) {
+      standardizedCar.imageIds = car.imageIds
+        .filter((id) => id != null)
+        .map((id) => id?.toString() || "");
     }
+
+    if (Array.isArray(car.images)) {
+      standardizedCar.images = car.images
+        .filter((img) => img != null && img.url)
+        .map((img) => ({
+          ...img,
+          _id: img._id?.toString() || "",
+          car_id: img.carId?.toString() || img.car_id?.toString() || "",
+          url: getFormattedImageUrl(img.url), // Use our new utility function
+          metadata: {
+            ...img.metadata,
+            // Set isPrimary flag based on primaryImageId
+            isPrimary:
+              car.primaryImageId &&
+              img._id.toString() === car.primaryImageId.toString(),
+          },
+        }));
+    }
+
+    // Handle client info with defensive checks
+    standardizedCar.client = car.client?.toString() || null;
+    standardizedCar.clientInfo = car.clientInfo
+      ? {
+          ...car.clientInfo,
+          _id: car.clientInfo._id?.toString() || "",
+        }
+      : null;
+
+    // Handle dates with defensive checks
+    standardizedCar.createdAt =
+      car.createdAt instanceof Date
+        ? car.createdAt.toISOString()
+        : car.createdAt || new Date().toISOString();
+    standardizedCar.updatedAt =
+      car.updatedAt instanceof Date
+        ? car.updatedAt.toISOString()
+        : car.updatedAt || new Date().toISOString();
+
+    // Generate a unique ETag based on updatedAt timestamp
+    const etag = `"${standardizedCar.updatedAt || new Date().toISOString()}"`;
+
+    return new NextResponse(JSON.stringify(standardizedCar), {
+      headers: {
+        "Content-Type": "application/json",
+        ETag: etag,
+        "Cache-Control": "private, max-age=10",
+      },
+    });
   } catch (error) {
     console.error("Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });

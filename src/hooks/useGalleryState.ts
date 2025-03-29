@@ -6,8 +6,29 @@ export type GalleryMode = "editing" | "viewing";
 export interface UploadProgress {
   fileName: string;
   progress: number;
-  status: "uploading" | "complete" | "error";
+  status:
+    | "pending"
+    | "uploading"
+    | "processing"
+    | "analyzing"
+    | "complete"
+    | "error";
+  imageUrl?: string;
+  metadata?: ImageMetadata;
   error?: string;
+  currentStep?: string;
+  stepProgress?: {
+    cloudflare: {
+      status: "pending" | "uploading" | "complete" | "error";
+      progress: number;
+      message?: string;
+    };
+    openai: {
+      status: "pending" | "analyzing" | "complete" | "error";
+      progress: number;
+      message?: string;
+    };
+  };
 }
 
 export interface ImageMetadata {
