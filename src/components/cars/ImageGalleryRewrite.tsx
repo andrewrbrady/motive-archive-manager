@@ -20,6 +20,8 @@ import {
   Filter,
   Copy,
   Check,
+  UploadIcon,
+  RefreshCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { transformImageUrl } from "@/lib/imageTransform";
@@ -29,6 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ImageFilterButton } from "@/components/cars/ImageGalleryEnhanced";
+import { Button } from "@/components/ui/button";
 
 interface ImageMetadata {
   angle?: string;
@@ -86,12 +89,13 @@ interface ImageType {
 
 interface ImageGalleryRewriteProps {
   images: ImageType[];
-  onRemoveImage: (indices: number[], isMultiple?: boolean) => void;
+  onRemoveImage: (indices: number[], deleteFromStorage: boolean) => void;
   onImagesChange?: (images: ImageType[]) => void;
   onPrimaryImageChange?: (imageId: string) => void;
   showFilters?: boolean;
   vehicleInfo?: any;
   carId: string;
+  onFilterOptionsChange?: (options: Record<string, string[]>) => void;
 }
 
 interface FilterState {
@@ -110,6 +114,7 @@ export function ImageGalleryRewrite({
   showFilters,
   vehicleInfo,
   carId,
+  onFilterOptionsChange,
 }: ImageGalleryRewriteProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -138,40 +143,50 @@ export function ImageGalleryRewrite({
   const [copiedField, setCopiedField] = useState<"filename" | "url" | null>(
     null
   );
+  const [filterOptions, setFilterOptions] = useState<Record<string, string[]>>(
+    {}
+  );
 
   // Update images when initialImages changes
   useEffect(() => {
-    setImages(initialImages);
-  }, [initialImages]);
+    console.log("initialImages changed, updating state", initialImages?.length);
+    if (initialImages) {
+      setImages(initialImages);
+      setSelectedImages(new Set<string>());
 
-  // Extract available filter values from all images
-  const filterOptions = useMemo(() => {
-    const options = {
-      angles: new Set<string>(),
-      views: new Set<string>(),
-      movements: new Set<string>(),
-      tods: new Set<string>(),
-      sides: new Set<string>(),
-    };
+      // Create filter options object from images
+      const options = {
+        angles: new Set<string>(),
+        views: new Set<string>(),
+        movements: new Set<string>(),
+        tods: new Set<string>(),
+        sides: new Set<string>(),
+      };
 
-    images.forEach((image) => {
-      const { metadata } = image;
-      if (metadata.angle?.trim()) options.angles.add(metadata.angle.trim());
-      if (metadata.view?.trim()) options.views.add(metadata.view.trim());
-      if (metadata.movement?.trim())
-        options.movements.add(metadata.movement.trim());
-      if (metadata.tod?.trim()) options.tods.add(metadata.tod.trim());
-      if (metadata.side?.trim()) options.sides.add(metadata.side.trim());
-    });
+      initialImages.forEach((image) => {
+        const { metadata } = image;
+        if (metadata.angle?.trim()) options.angles.add(metadata.angle.trim());
+        if (metadata.view?.trim()) options.views.add(metadata.view.trim());
+        if (metadata.movement?.trim())
+          options.movements.add(metadata.movement.trim());
+        if (metadata.tod?.trim()) options.tods.add(metadata.tod.trim());
+        if (metadata.side?.trim()) options.sides.add(metadata.side.trim());
+      });
 
-    return {
-      angles: Array.from(options.angles).sort(),
-      views: Array.from(options.views).sort(),
-      movements: Array.from(options.movements).sort(),
-      tods: Array.from(options.tods).sort(),
-      sides: Array.from(options.sides).sort(),
-    };
-  }, [images]);
+      const newFilterOptions = {
+        angles: Array.from(options.angles).sort(),
+        views: Array.from(options.views).sort(),
+        movements: Array.from(options.movements).sort(),
+        tods: Array.from(options.tods).sort(),
+        sides: Array.from(options.sides).sort(),
+      };
+
+      setFilterOptions(newFilterOptions);
+      if (onFilterOptionsChange) {
+        onFilterOptionsChange(newFilterOptions);
+      }
+    }
+  }, [initialImages, onFilterOptionsChange]);
 
   // Filter images based on selected filters
   const filteredImages = useMemo(() => {
@@ -306,21 +321,11 @@ export function ImageGalleryRewrite({
             />
           )}
         </div>
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => {
-              const newMode = isEditMode ? undefined : "edit";
-              const params = new URLSearchParams(
-                searchParams?.toString() || ""
-              );
-              if (newMode) {
-                params.set("mode", newMode);
-              } else {
-                params.delete("mode");
-              }
-              router.push(`?${params.toString()}`);
-            }}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
+        <div className="flex gap-2">
+          <Button
+            onClick={toggleEditMode}
+            variant="outline"
+            className="flex items-center gap-2"
           >
             {isEditMode ? (
               <>
@@ -333,7 +338,51 @@ export function ImageGalleryRewrite({
                 Edit Mode
               </>
             )}
-          </button>
+          </Button>
+          {isEditMode && (
+            <>
+              <Button
+                onClick={() => {
+                  console.log("Upload button clicked");
+                  // Clear the input first
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                    // Open the file picker dialog
+                    fileInputRef.current.click();
+                  }
+                }}
+                disabled={uploading}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <UploadIcon className="w-4 h-4" />
+                Upload
+              </Button>
+              <Button
+                onClick={() => {
+                  // Refresh the images from server
+                  console.log("Requesting image refresh");
+                  if (onImagesChange) {
+                    onImagesChange(images);
+                  }
+                }}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Button
+                onClick={handleDeleteSelected}
+                disabled={selectedImages.size === 0}
+                variant="destructive"
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Selected ({selectedImages.size})
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -385,96 +434,163 @@ export function ImageGalleryRewrite({
   }, []);
 
   // Image upload handler
-  const handleImageUpload = useCallback(
-    async (files: FileList) => {
-      setUploading(true);
-      const newProgress: ImageProgress[] = Array.from(files).map((file) => ({
-        fileName: file.name,
-        progress: 0,
-        status: "pending",
-        currentStep: "Preparing upload...",
-      }));
-      setUploadProgress(newProgress);
+  const handleImageUpload = async (files: FileList) => {
+    if (!files.length) return;
+
+    console.log(
+      `Starting upload of ${files.length} files to /api/cloudflare/images`
+    );
+    console.log(`Using carId: ${carId}`);
+
+    setUploading(true);
+
+    // Simple progress tracking
+    const newProgress: ImageProgress[] = Array.from(files).map((file) => ({
+      fileName: file.name,
+      progress: 0,
+      status: "uploading",
+      currentStep: "Starting upload...",
+    }));
+    setUploadProgress(newProgress);
+
+    // Process each file sequentially
+    const newImages: ImageType[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
 
       try {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("carId", carId);
-          if (vehicleInfo) {
-            formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
-          }
-
-          // Update progress for this file
-          setUploadProgress((prev) => {
-            const updated = [...prev];
-            updated[i] = {
-              ...updated[i],
-              status: "uploading",
-              progress: 0,
-              currentStep: "Uploading...",
-            };
-            return updated;
-          });
-
-          // Upload the file
-          const response = await fetch("/api/cloudflare/images", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            throw new Error(`Upload failed: ${response.statusText}`);
-          }
-
-          const result = await response.json();
-
-          // Update progress for successful upload
-          setUploadProgress((prev) => {
-            const updated = [...prev];
-            updated[i] = {
-              ...updated[i],
-              status: "complete",
-              progress: 100,
-              imageUrl: result.url,
-              currentStep: "Upload complete",
-            };
-            return updated;
-          });
-
-          // Add the new image to the gallery
-          if (onImagesChange) {
-            setImages((prev) => [...prev, result]);
-            onImagesChange([...images, result]);
-          }
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        // Update progress to show error
-        setUploadProgress((prev) =>
-          prev.map((p) =>
-            p.status !== "complete"
-              ? {
-                  ...p,
-                  status: "error",
-                  progress: 0,
-                  error: "Upload failed",
-                  currentStep: "Error",
-                }
-              : p
-          )
+        console.log(
+          `Uploading file ${i + 1}/${files.length}: ${file.name} (${
+            file.size
+          } bytes)`
         );
-      } finally {
-        setUploading(false);
-        // Clear progress after a delay
-        setTimeout(() => {
-          setUploadProgress([]);
-        }, 3000);
+
+        // Create a basic FormData without extra complexity
+        const formData = new FormData();
+
+        // First, verify the file is valid
+        if (!file.size) {
+          throw new Error("File is empty");
+        }
+
+        // Add the file with the exact field name expected by the server
+        formData.append("file", file);
+
+        // Add the carId to the FormData, which is required by the API
+        formData.append("carId", carId);
+
+        // Add vehicleInfo if available
+        if (vehicleInfo) {
+          formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
+          console.log("Added vehicleInfo to FormData", {
+            vehicleInfoType: typeof vehicleInfo,
+          });
+        } else {
+          console.log("No vehicleInfo available to add to FormData");
+        }
+
+        console.log(
+          `FormData created with fields: file, carId=${carId}${
+            vehicleInfo ? ", vehicleInfo" : " (no vehicleInfo)"
+          }`
+        );
+        console.log(`File type: ${file.type}, size: ${file.size} bytes`);
+
+        // Update progress to show uploading
+        setUploadProgress((prev) => {
+          const updated = [...prev];
+          if (updated[i]) {
+            updated[i] = {
+              ...updated[i],
+              progress: 10,
+              currentStep: "Uploading to server...",
+            };
+          }
+          return updated;
+        });
+
+        // Use the Cloudflare image upload endpoint
+        const response = await fetch(`/api/cloudflare/images`, {
+          method: "POST",
+          body: formData,
+        });
+
+        console.log(
+          `API response status: ${response.status} ${response.statusText}`
+        );
+
+        if (!response.ok) {
+          // Get error information
+          const errorText = await response.text();
+          console.error(
+            `Upload failed with status ${response.status}: ${errorText}`
+          );
+          throw new Error(
+            `Upload failed: ${response.status} - ${errorText.substring(0, 200)}`
+          );
+        }
+
+        const result = await response.json();
+        console.log("Upload successful, response:", result);
+
+        // Update progress
+        setUploadProgress((prev) => {
+          const updated = [...prev];
+          if (updated[i]) {
+            updated[i] = {
+              ...updated[i],
+              progress: 100,
+              status: "complete",
+              imageUrl: result.imageUrl,
+              currentStep: "Complete",
+            };
+          }
+          return updated;
+        });
+
+        // Add to new images
+        newImages.push({
+          id: result.imageId,
+          url: result.imageUrl,
+          filename: file.name,
+          metadata: result.metadata || {},
+          variants: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        console.error(`Error uploading ${file.name}:`, error);
+
+        // Show error in progress
+        setUploadProgress((prev) => {
+          const updated = [...prev];
+          if (updated[i]) {
+            updated[i] = {
+              ...updated[i],
+              status: "error",
+              error: error.message || "Upload failed",
+              currentStep: "Failed",
+            };
+          }
+          return updated;
+        });
       }
-    },
-    [carId, vehicleInfo, images, onImagesChange]
-  );
+    }
+
+    setUploading(false);
+
+    // If we have new images, update the gallery
+    if (newImages.length > 0) {
+      console.log(`Adding ${newImages.length} new images to gallery`);
+      const updatedImages = [...images, ...newImages];
+      setImages(updatedImages);
+
+      if (onImagesChange) {
+        onImagesChange(updatedImages);
+      }
+    }
+  };
 
   // Selection handlers
   const handleImageSelect = useCallback((imageId: string) => {
@@ -490,13 +606,46 @@ export function ImageGalleryRewrite({
   }, []);
 
   const handleDeleteSelected = useCallback(() => {
-    const selectedIndices = Array.from(selectedImages)
-      .map((id) => images.findIndex((img) => img.id === id))
-      .filter((index) => index !== -1);
+    console.log("Delete button clicked");
+    console.log("Selected images:", Array.from(selectedImages));
 
-    onRemoveImage(selectedIndices, true);
-    setSelectedImages(new Set());
+    if (selectedImages.size === 0) {
+      console.log("No images selected");
+      return;
+    }
+
+    // Get all indices and IDs for selected images
+    const selectedIndices: number[] = [];
+    const selectedIds: string[] = [];
+
+    Array.from(selectedImages).forEach((id) => {
+      const index = images.findIndex((img) => img.id === id);
+      if (index !== -1) {
+        selectedIndices.push(index);
+        selectedIds.push(id);
+      }
+    });
+
+    console.log("Selected indices:", selectedIndices);
+    console.log("Selected IDs:", selectedIds);
+
+    if (selectedIndices.length > 0) {
+      // Call the parent component's onRemoveImage function with the indices
+      // This is the main method for deletion
+      onRemoveImage(selectedIndices, true);
+
+      // Clear selection after deletion
+      setSelectedImages(new Set());
+    } else {
+      console.log("No valid indices found for deletion");
+    }
   }, [selectedImages, images, onRemoveImage]);
+
+  // Add debug logging to component mount
+  useEffect(() => {
+    console.log("ImageGalleryRewrite component mounted");
+    console.log("Initial images count:", initialImages.length);
+  }, [initialImages.length]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -658,21 +807,6 @@ export function ImageGalleryRewrite({
 
         {/* Thumbnails Grid - Right Column */}
         <div className="w-1/3">
-          {isEditMode && selectedImages.size > 0 && (
-            <div className="mb-4 flex items-center gap-2 justify-end">
-              <span className="text-sm text-muted-foreground">
-                {selectedImages.size} selected
-              </span>
-              <button
-                onClick={handleDeleteSelected}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Selected
-              </button>
-            </div>
-          )}
-
           <div className="grid grid-cols-3 gap-2">
             {paginatedImages.map(
               (image, index) =>
@@ -731,35 +865,28 @@ export function ImageGalleryRewrite({
             )}
           </div>
 
-          {/* Upload Button */}
-          {isEditMode && (
-            <div className="mt-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) =>
-                  e.target.files && handleImageUpload(e.target.files)
-                }
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full px-4 py-2 text-sm border rounded-md hover:bg-accent transition-colors disabled:opacity-50"
-              >
-                {uploading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Uploading...</span>
-                  </div>
-                ) : (
-                  "Upload Images"
-                )}
-              </button>
-            </div>
-          )}
+          {/* File input for uploads (keep this but remove the redundant upload button) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => {
+              console.log("File input change event triggered");
+              const fileList = e.target.files;
+              if (fileList && fileList.length > 0) {
+                console.log(
+                  `Selected ${fileList.length} files:`,
+                  Array.from(fileList).map((f) => f.name)
+                );
+                // Process the selected files
+                handleImageUpload(fileList);
+              } else {
+                console.log("No files selected");
+              }
+            }}
+            className="hidden"
+          />
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -783,6 +910,16 @@ export function ImageGalleryRewrite({
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
+            </div>
+          )}
+
+          {/* Upload progress state - keep this visible for user feedback */}
+          {uploading && (
+            <div className="mt-4 p-3 bg-background border border-border rounded-md">
+              <div className="flex items-center gap-2 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Uploading images...</span>
+              </div>
             </div>
           )}
         </div>
