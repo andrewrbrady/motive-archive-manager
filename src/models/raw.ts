@@ -20,6 +20,9 @@ export class RawAsset {
     data: Omit<RawAssetData, "_id" | "createdAt" | "updatedAt">
   ) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
     const now = new Date();
 

@@ -51,6 +51,9 @@ export class HardDrive {
     data: Omit<HardDriveData, "_id" | "createdAt" | "updatedAt">
   ) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
     const now = new Date();
 
@@ -73,6 +76,9 @@ export class HardDrive {
 
   static async findById(id: string) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     const result = await db
@@ -92,6 +98,9 @@ export class HardDrive {
 
   static async findByLabel(label: string) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     const result = await db
@@ -109,6 +118,9 @@ export class HardDrive {
 
   static async findBySystemName(systemName: string) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     const result = await db
@@ -129,6 +141,9 @@ export class HardDrive {
     capacity: { used: number; available: number }
   ) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     return await db.collection<HardDriveDocument>("hard_drives").updateOne(
@@ -149,6 +164,9 @@ export class HardDrive {
     rawAssetId: string | MongoObjectId
   ) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     return await db.collection<HardDriveDocument>("hard_drives").updateOne(
@@ -165,6 +183,9 @@ export class HardDrive {
     rawAssetId: string | MongoObjectId
   ) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     return await db
@@ -177,6 +198,9 @@ export class HardDrive {
 
   static async findByRawAsset(rawAssetId: string | MongoObjectId) {
     const client = await clientPromise;
+    if (!client) {
+      throw new Error("Failed to connect to database");
+    }
     const db = client.db();
 
     const results = await db
