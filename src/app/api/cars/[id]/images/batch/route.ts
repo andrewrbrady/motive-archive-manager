@@ -20,39 +20,82 @@ interface CarDocument {
   images?: Image[];
 }
 
+// Add OPTIONS handler to make the endpoint testable
+export async function OPTIONS(request: NextRequest) {
+  console.log("========== BATCH OPTIONS REQUEST RECEIVED ==========");
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      Allow: "DELETE, OPTIONS",
+    },
+  });
+}
+
 export async function DELETE(
   request: NextRequest,
   context: { params: { id: Promise<string> } }
 ) {
   console.log("========== BATCH IMAGE DELETION API CALLED ==========");
+  console.log("Request method:", request.method);
+  console.log("Request URL:", request.url);
+
   try {
-    console.log("Batch delete API route called");
     const id = await context.params.id;
-    const requestData = await request.json();
+    console.log("Car ID from URL params:", id);
 
-    console.log("Request data:", JSON.stringify(requestData, null, 2));
-    console.log("Car ID:", id);
-    console.log("deleteFromStorage value:", requestData.deleteFromStorage);
-    console.log(
-      "typeof deleteFromStorage:",
-      typeof requestData.deleteFromStorage
-    );
-
-    // Handle indices array
-    const { indices, deleteFromStorage } = requestData;
-
-    if (!indices || !Array.isArray(indices) || indices.length === 0) {
-      console.log("❌ Error: No valid indices provided in request");
+    // Validate car ID is valid ObjectId
+    let carObjectId: ObjectId;
+    try {
+      carObjectId = new ObjectId(id);
+    } catch (error) {
+      console.error(`Invalid car ID format: ${id}`);
       return NextResponse.json(
-        { error: "No valid indices provided" },
+        { error: "Invalid car ID format" },
         { status: 400 }
       );
     }
 
-    console.log(`Processing batch delete for car ${id}, indices:`, indices);
+    const requestData = await request.json();
+
     console.log(
-      `deleteFromStorage flag=${deleteFromStorage} (${typeof deleteFromStorage})`
+      "DELETE images API called with data:",
+      JSON.stringify(requestData, null, 2)
     );
+    console.log("Request URL:", request.url);
+
+    // Handle both single imageUrl and batch indices
+    const {
+      imageUrl,
+      indices: rawIndices,
+      imageIds: rawImageIds,
+      imageId,
+      cloudflareId,
+      filename,
+    } = requestData;
+
+    // Ensure deleteFromStorage is interpreted as a boolean
+    const deleteFromStorage = Boolean(requestData.deleteFromStorage);
+
+    // Ensure indices is an array
+    const indices = Array.isArray(rawIndices) ? rawIndices : [];
+
+    // Ensure imageIds is an array
+    const imageIds = Array.isArray(rawImageIds) ? rawImageIds : [];
+
+    console.log("deleteFromStorage value:", deleteFromStorage);
+    console.log("indices value:", indices);
+    console.log("imageIds value:", imageIds);
+    if (imageId) console.log("imageId provided:", imageId);
+    if (cloudflareId) console.log("cloudflareId provided:", cloudflareId);
+    if (filename) console.log("filename provided:", filename);
+
+    if (!indices.length && !imageIds.length) {
+      console.log("Error: No indices or imageIds provided in request");
+      return NextResponse.json(
+        { error: "No indices or imageIds provided for deletion" },
+        { status: 400 }
+      );
+    }
 
     // Use the getDatabase helper
     const db = await getDatabase();
@@ -60,7 +103,7 @@ export async function DELETE(
     const carsCollection = db.collection<CarDocument>("cars");
 
     // First check if the car exists
-    const carCheck = await carsCollection.findOne({ _id: new ObjectId(id) });
+    const carCheck = await carsCollection.findOne({ _id: carObjectId });
     console.log(
       `Car check result: Found=${!!carCheck}, imageIds=${
         carCheck?.imageIds?.length || 0
@@ -75,7 +118,7 @@ export async function DELETE(
     // Get the car with its images
     const car = (await carsCollection
       .aggregate([
-        { $match: { _id: new ObjectId(id) } },
+        { $match: { _id: carObjectId } },
         {
           $lookup: {
             from: "images",
@@ -165,7 +208,7 @@ export async function DELETE(
       // Try to fetch all images associated with this car
       const allCarImages = await imagesCollection
         .find({
-          carId: new ObjectId(id),
+          carId: carObjectId,
         })
         .toArray();
 
@@ -186,7 +229,7 @@ export async function DELETE(
 
     // Process all valid indices
     const validIndices = indices.filter(
-      (index) =>
+      (index: number | string) =>
         typeof index === "number" && index >= 0 && index < car.images!.length
     );
 
@@ -195,24 +238,61 @@ export async function DELETE(
       validIndices
     );
 
-    if (validIndices.length === 0) {
-      console.log("Error: No valid images to delete after filtering indices");
-      return NextResponse.json(
-        { error: "No valid images to delete" },
-        { status: 400 }
-      );
-    }
+    // If we have imageIds, convert them to ObjectIds and query directly
+    let imagesToDelete: Image[] = [];
 
-    const imagesToDelete = validIndices.map((index) => car.images![index]);
+    if (imageIds.length > 0) {
+      console.log(`Finding images by ids: ${imageIds.join(", ")}`);
+
+      // Convert string ids to ObjectIds
+      const objectIds = [];
+      for (const imageIdStr of imageIds) {
+        try {
+          if (
+            typeof imageIdStr === "string" &&
+            /^[0-9a-fA-F]{24}$/.test(imageIdStr)
+          ) {
+            objectIds.push(new ObjectId(imageIdStr));
+          } else {
+            console.error(`Invalid ObjectId format: ${imageIdStr}`);
+          }
+        } catch (e) {
+          console.error(`Error converting to ObjectId: ${imageIdStr}`, e);
+        }
+      }
+
+      console.log(`Converted ${objectIds.length} valid ObjectIds`);
+
+      // Find images directly by their ids if we have any valid ones
+      if (objectIds.length > 0) {
+        const images = await imagesCollection
+          .find({ _id: { $in: objectIds } })
+          .toArray();
+
+        console.log(`Found ${images.length} images by id`);
+        imagesToDelete = images as Image[];
+      }
+    } else if (validIndices.length > 0) {
+      // Use indices to get images if no imageIds were provided
+      imagesToDelete = validIndices.map((index: number) => car.images![index]);
+    }
 
     console.log(
       `Found ${imagesToDelete.length} images to delete:`,
-      imagesToDelete.map((img) => ({
+      imagesToDelete.map((img: Image) => ({
         id: img._id.toString(),
         url: img.url.substring(0, 30) + "...", // truncate for readability
         cloudflareId: img.cloudflareId,
       }))
     );
+
+    if (imagesToDelete.length === 0) {
+      console.log("Error: No valid images to delete");
+      return NextResponse.json(
+        { error: "No valid images to delete" },
+        { status: 400 }
+      );
+    }
 
     // Track successful deletions
     const deletedImages = [];
@@ -334,7 +414,7 @@ export async function DELETE(
       ) {
         console.log(`All images deleted, setting imageIds to empty array`);
         await carsCollection.updateOne(
-          { _id: new ObjectId(id) },
+          { _id: carObjectId },
           {
             $set: {
               imageIds: [],
@@ -348,7 +428,7 @@ export async function DELETE(
           `Removing ${imageIdsToRemove.length} image IDs from car document`
         );
         await carsCollection.updateOne(
-          { _id: new ObjectId(id) },
+          { _id: carObjectId },
           {
             $pullAll: { imageIds: imageIdsToRemove },
             $set: { updatedAt: new Date().toISOString() },
@@ -358,7 +438,7 @@ export async function DELETE(
 
       // Double-check that the car document was updated correctly
       const updatedCar = await carsCollection.findOne({
-        _id: new ObjectId(id),
+        _id: carObjectId,
       });
       console.log(
         `Updated car imageIds count: ${updatedCar?.imageIds?.length || 0}`

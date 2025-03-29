@@ -215,29 +215,33 @@ export async function POST(request: NextRequest) {
       "\n\nStyle Guide for Descriptions:\n" + IMAGE_ANALYSIS_CONFIG.styleGuide;
 
     if (vehicleInfo && vehicleInfo.make && vehicleInfo.model) {
-      let vehicleContext = `\n\nThis is a ${vehicleInfo.make} ${vehicleInfo.model}`;
+      let vehicleContext = `\n\nVehicle Information:`;
+      vehicleContext += `\n- Make: ${vehicleInfo.make}`;
+      vehicleContext += `\n- Model: ${vehicleInfo.model}`;
 
       if (vehicleInfo.year) {
-        vehicleContext += ` (${vehicleInfo.year})`;
+        vehicleContext += `\n- Year: ${vehicleInfo.year}`;
       }
 
       if (vehicleInfo.engine?.type) {
-        vehicleContext += ` with a ${vehicleInfo.engine.type}`;
+        vehicleContext += `\n- Engine: ${vehicleInfo.engine.type}`;
       }
 
       if (vehicleInfo.condition) {
-        vehicleContext += ` in ${vehicleInfo.condition} condition`;
+        vehicleContext += `\n- Condition: ${vehicleInfo.condition}`;
       }
 
       if (vehicleInfo.color) {
-        vehicleContext += `, ${vehicleInfo.color} in color`;
+        vehicleContext += `\n- Color: ${vehicleInfo.color}`;
       }
 
       if (vehicleInfo.additionalContext) {
-        vehicleContext += `\nAdditional context: ${vehicleInfo.additionalContext}`;
+        vehicleContext += `\n\nAdditional context: ${vehicleInfo.additionalContext}`;
       }
 
-      prompt += vehicleContext + ".\n\n";
+      prompt +=
+        vehicleContext +
+        "\n\nPlease analyze the image with this vehicle information in mind and ensure the description accurately reflects these details.\n\n";
     }
 
     prompt +=
