@@ -3,6 +3,13 @@ import { toast } from "react-hot-toast";
 
 export type GalleryMode = "editing" | "viewing";
 
+export interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: "uploading" | "complete" | "error";
+  error?: string;
+}
+
 export interface ImageMetadata {
   angle?: string;
   description?: string;

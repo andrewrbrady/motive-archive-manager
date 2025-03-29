@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const metadata = formData.get("metadata") as string;
-    const vehicleInfo = formData.get("vehicleInfo") as string;
+    const metadata = formData.get("metadata");
+    const vehicleInfo = formData.get("vehicleInfo");
     const carId = formData.get("carId") as string;
 
     if (!file) {
@@ -115,6 +115,26 @@ export async function POST(request: NextRequest) {
         { error: "No car ID provided" },
         { status: 400 }
       );
+    }
+
+    // Safely parse metadata and vehicleInfo
+    let parsedMetadata = {};
+    let parsedVehicleInfo = undefined;
+
+    try {
+      if (metadata) {
+        parsedMetadata = JSON.parse(metadata as string);
+      }
+    } catch (e) {
+      console.error("Error parsing metadata:", e);
+    }
+
+    try {
+      if (vehicleInfo) {
+        parsedVehicleInfo = JSON.parse(vehicleInfo as string);
+      }
+    } catch (e) {
+      console.error("Error parsing vehicleInfo:", e);
     }
 
     const uploadFormData = new FormData();
@@ -168,7 +188,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           imageUrl,
-          vehicleInfo: vehicleInfo ? JSON.parse(vehicleInfo) : undefined,
+          vehicleInfo: parsedVehicleInfo,
         }),
       }
     );
@@ -179,7 +199,7 @@ export async function POST(request: NextRequest) {
       const analysisResult = await analysisResponse.json();
       // Combine the original metadata with the AI analysis
       combinedMetadata = {
-        ...JSON.parse(metadata || "{}"),
+        ...parsedMetadata,
         angle: analysisResult.analysis?.angle || "",
         view: analysisResult.analysis?.view || "",
         movement: analysisResult.analysis?.movement || "",
@@ -195,7 +215,7 @@ export async function POST(request: NextRequest) {
         statusText: analysisResponse.statusText,
         body: errorText,
       });
-      combinedMetadata = JSON.parse(metadata || "{}");
+      combinedMetadata = parsedMetadata;
     }
 
     // Store the image metadata in MongoDB

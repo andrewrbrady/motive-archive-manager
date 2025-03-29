@@ -214,14 +214,30 @@ export async function POST(request: NextRequest) {
     prompt +=
       "\n\nStyle Guide for Descriptions:\n" + IMAGE_ANALYSIS_CONFIG.styleGuide;
 
-    if (vehicleInfo) {
-      prompt += `\n\nThis is a ${vehicleInfo.make} ${vehicleInfo.model}`;
-      if (vehicleInfo.year) prompt += ` (${vehicleInfo.year})`;
-      if (vehicleInfo.engine?.type)
-        prompt += ` with a ${vehicleInfo.engine.type}`;
-      if (vehicleInfo.condition)
-        prompt += ` in ${vehicleInfo.condition} condition`;
-      prompt += ".\n\n";
+    if (vehicleInfo && vehicleInfo.make && vehicleInfo.model) {
+      let vehicleContext = `\n\nThis is a ${vehicleInfo.make} ${vehicleInfo.model}`;
+
+      if (vehicleInfo.year) {
+        vehicleContext += ` (${vehicleInfo.year})`;
+      }
+
+      if (vehicleInfo.engine?.type) {
+        vehicleContext += ` with a ${vehicleInfo.engine.type}`;
+      }
+
+      if (vehicleInfo.condition) {
+        vehicleContext += ` in ${vehicleInfo.condition} condition`;
+      }
+
+      if (vehicleInfo.color) {
+        vehicleContext += `, ${vehicleInfo.color} in color`;
+      }
+
+      if (vehicleInfo.additionalContext) {
+        vehicleContext += `\nAdditional context: ${vehicleInfo.additionalContext}`;
+      }
+
+      prompt += vehicleContext + ".\n\n";
     }
 
     prompt +=

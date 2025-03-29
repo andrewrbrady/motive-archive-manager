@@ -232,9 +232,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
 
   return (
     <Link
-      href={`/cars/${car._id}${
-        currentSearchParams ? `?${currentSearchParams}` : ""
-      }`}
+      href={`/cars/${car._id}`}
       className="block bg-background rounded-lg border border-border-primary overflow-hidden hover:border-border-secondary transition-colors relative group"
     >
       {/* Image */}

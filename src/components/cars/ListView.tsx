@@ -145,9 +145,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
             <tr
               key={car._id}
               className="border-b border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 hover:bg-[hsl(var(--background))] dark:hover:bg-black/25 transition-colors cursor-pointer"
-              onClick={() =>
-                router.push(`/cars/${car._id}?${currentSearchParams}`)
-              }
+              onClick={() => router.push(`/cars/${car._id}`)}
             >
               <td className="w-[8%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                 {car.year}

@@ -26,10 +26,7 @@ import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
-import {
-  ImageGalleryEnhanced,
-  ImageFilterButton,
-} from "@/components/cars/ImageGalleryEnhanced";
+import { ImageGalleryRewrite } from "@/components/cars/ImageGalleryRewrite";
 import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
@@ -39,6 +36,7 @@ import Scripts from "@/components/cars/Scripts";
 import { Car } from "@/types/car";
 import { MeasurementValue } from "@/types/measurements";
 import PhotoShoots from "@/components/cars/PhotoShoots";
+import { ImageFilterButton } from "@/components/cars/ImageGalleryEnhanced";
 
 interface Power {
   hp: number;
@@ -966,16 +964,23 @@ export default function CarPage({ params }: { params: { id: string } }) {
         formData.append(
           "vehicleInfo",
           JSON.stringify({
-            year: car.year,
-            make: car.make,
-            model: car.model,
-            type: car.type,
-            color: car.color || undefined,
-            description: car.description,
-            condition: car.condition,
-            mileage: car.mileage,
-            engine: car.engine,
-            additionalContext: additionalContext,
+            year: car?.year,
+            make: car?.make || "",
+            model: car?.model || "",
+            type: car?.type,
+            color: car?.color,
+            description: car?.description,
+            condition: car?.condition,
+            mileage: car?.mileage,
+            engine: car?.engine
+              ? {
+                  type: car.engine.type,
+                  displacement: car.engine.displacement,
+                  power: car.engine.power,
+                  torque: car.engine.torque,
+                }
+              : undefined,
+            additionalContext: additionalContext || undefined,
           })
         );
 
@@ -1730,93 +1735,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 label: "Image Gallery",
                 content: (
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        {!isEditMode && (
-                          <ImageFilterButton
-                            activeFilters={activeFilters}
-                            filterOptions={filterOptions}
-                            onFilterChange={handleFilterChange}
-                            onResetFilters={handleResetFilters}
-                          />
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => {
-                            // Use React's useTransition to make the mode switch smoother
-                            startTransition(() => {
-                              if (isEditMode) {
-                                // Clear filters but don't reset the main image index
-                                setActiveFilters({});
-
-                                // Exit edit mode
-                                setIsEditMode(false);
-
-                                // Only fetch data without visual indicators
-                                fetch(
-                                  `/api/cars/${id}?includeImages=true&t=${Date.now()}`,
-                                  {
-                                    // Add cache-busting headers
-                                    headers: {
-                                      "Cache-Control":
-                                        "no-cache, no-store, must-revalidate",
-                                      Pragma: "no-cache",
-                                      Expires: "0",
-                                    },
-                                    cache: "no-store",
-                                  }
-                                )
-                                  .then((res) => res.json())
-                                  .then((data) => {
-                                    console.log(
-                                      "Retrieved car data silently, images:",
-                                      data.images?.length || 0
-                                    );
-
-                                    // Update car data without triggering a visual refresh
-                                    setCar((prevCar) => {
-                                      if (!prevCar) return data;
-
-                                      // Create a new object that preserves structure
-                                      return {
-                                        ...prevCar,
-                                        ...data,
-                                        images: data.images,
-                                      };
-                                    });
-                                  })
-                                  .catch((error) => {
-                                    console.error(
-                                      "Error retrieving car data:",
-                                      error
-                                    );
-                                  });
-                              } else {
-                                // Enter edit mode without resetting state
-                                setIsEditMode(true);
-                              }
-                            });
-                          }}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))]"
-                        >
-                          {isEditMode ? (
-                            <>
-                              <Check className="w-4 h-4" />
-                              Done
-                            </>
-                          ) : (
-                            <>
-                              <Pencil className="w-4 h-4" />
-                              Edit Gallery
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
                     {/* Use a consistent wrapper for both modes to prevent layout shifts */}
-                    <div className="image-gallery-wrapper mt-4 relative">
+                    <div className="image-gallery-wrapper relative">
                       {/* Add opacity transition for smoother mode switching */}
                       <div
                         className={`transition-opacity duration-300 ${
@@ -1824,8 +1744,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
                         }`}
                       >
                         {isEditMode ? (
-                          <ImageUploadWithContext
-                            carId={params.id}
+                          <ImageGalleryRewrite
                             images={
                               car?.images?.map((img) => ({
                                 id: img._id,
@@ -1847,25 +1766,13 @@ export default function CarPage({ params }: { params: { id: string } }) {
                                   img.updatedAt || new Date().toISOString(),
                               })) || []
                             }
-                            primaryImageId={car?.primaryImageId}
-                            onPrimaryImageChange={handlePrimaryImageChange}
-                            isEditMode={isEditMode}
-                            onRemoveImage={handleRemoveImage}
-                            onImagesChange={handleImageUpload}
-                            uploading={uploadingImages}
-                            uploadProgress={uploadProgress}
-                            setUploadProgress={setUploadProgress}
-                            showMetadata={true}
-                            showFilters={true}
-                            title={
-                              car ? `${car.year} ${car.make} ${car.model}` : ""
+                            onRemoveImage={(indices) =>
+                              handleRemoveImage(indices)
                             }
-                            onContextChange={setAdditionalContext}
-                            context={carsClientContext}
-                            refreshImages={refreshCarData}
+                            carId={id}
                           />
                         ) : (
-                          <ImageGalleryEnhanced
+                          <ImageGalleryRewrite
                             images={
                               car?.images?.map((img) => ({
                                 id: img._id,
@@ -1889,31 +1796,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
                                   img.updatedAt || new Date().toISOString(),
                               })) || []
                             }
-                            isLoading={imagesLoading}
+                            onRemoveImage={() => {}}
                             carId={id}
-                            primaryImageId={car.primaryImageId}
-                            activeFilters={activeFilters}
-                            onFilterChange={handleFilterChange}
-                            onResetFilters={handleResetFilters}
-                            onFilterOptionsChange={handleFilterOptionsChange}
-                            onPrimaryImageChange={(imageId: string) => {
-                              console.log(
-                                "Setting image as primary in ImageGalleryEnhanced:",
-                                imageId
-                              );
-                              // Update the local state to reflect the change
-                              setCar((prevCar) => {
-                                if (!prevCar) return prevCar;
-                                return {
-                                  ...prevCar,
-                                  primaryImageId: imageId,
-                                };
-                              });
-                              // Show a success message
-                              toast.success(
-                                "Featured image updated successfully"
-                              );
-                            }}
                           />
                         )}
                       </div>
