@@ -415,18 +415,14 @@ export default function ImageUploadWithContext({
 
   // Add a function to handle setting the primary image
   const handleSetPrimaryImage = async (imageId: string) => {
-    console.log(`[ImageUploadWithContext] Setting primary image to ${imageId}`);
-
-    // Validate the imageId
-    if (!imageId || typeof imageId !== "string" || imageId.trim() === "") {
-      const errorMsg = `Cannot set primary image: Invalid image ID: ${imageId} (type: ${typeof imageId})`;
-      console.error(errorMsg);
-      toast.error("Failed to update featured image: Invalid image ID");
+    if (!imageId) {
+      console.error("[ImageUploadWithContext] No image ID provided");
+      toast.error("Cannot set primary image: No image selected");
       return;
     }
 
     if (!carId) {
-      console.error("Cannot set primary image: Car ID is not available");
+      console.error("[ImageUploadWithContext] No car ID available");
       toast.error("Cannot set primary image: Car ID is not available");
       return;
     }
@@ -437,6 +433,7 @@ export default function ImageUploadWithContext({
 
     try {
       // Make the API request to update the primary image
+      // The API will convert the string to ObjectId before storing
       const requestBody = JSON.stringify({ primaryImageId: imageId });
       console.log(`Request body: ${requestBody}`);
 
@@ -482,9 +479,9 @@ export default function ImageUploadWithContext({
         );
       }
 
-      toast.success("Featured image updated successfully");
+      toast.success("Primary image updated successfully");
       console.log(
-        `[ImageUploadWithContext] Featured image updated successfully to ${imageId}`
+        `[ImageUploadWithContext] Primary image updated successfully to ${imageId}`
       );
 
       // Call the callback if provided
@@ -500,13 +497,13 @@ export default function ImageUploadWithContext({
       }
     } catch (error) {
       console.error(
-        "[ImageUploadWithContext] Error updating featured image:",
+        "[ImageUploadWithContext] Error updating primary image:",
         error
       );
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to update featured image"
+          : "Failed to update primary image"
       );
     }
   };

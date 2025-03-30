@@ -12,6 +12,7 @@
     "test:mongodb": "tsx scripts/test-mongodb.ts",
     "migrate:cars": "tsx scripts/migrate-to-atlas.ts",
     "migrate:car-images": "tsx src/scripts/migrate-car-images.ts",
+    "migrate:primary-image-ids": "tsx scripts/migrate-primary-image-ids.ts",
     "init-batch-templates": "tsx src/scripts/init-batch-templates.ts",
     "migrate-event-assignees": "tsx src/scripts/migrate-event-assignees.ts",
     "create-template": "tsx scripts/create-motive-studio-template.ts",

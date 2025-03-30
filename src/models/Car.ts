@@ -83,6 +83,11 @@ const Car =
         // Array of ObjectIds referencing documents in the 'images' collection
         // This is the preferred way to store image references
         imageIds: [String],
+        // Reference to the primary image for this car
+        primaryImageId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Image",
+        },
         type: String,
         vin: String,
         interior_color: String,

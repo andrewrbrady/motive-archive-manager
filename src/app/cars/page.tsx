@@ -25,13 +25,8 @@ interface FilterParams {
   search?: string;
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
   try {
-    // Add artificial delay
-    await delay(500);
-
     // Build the query string from filters
     const queryParams = new URLSearchParams();
 

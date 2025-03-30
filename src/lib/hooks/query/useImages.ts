@@ -72,7 +72,7 @@ export function useCarImages(carId: string) {
         console.log(`Fetching images for car: ${carId}`);
 
         // Use only the dedicated images endpoint with pagination
-        const response = await fetch(`/api/cars/${carId}/images?limit=50`);
+        const response = await fetch(`/api/cars/${carId}/images?limit=500`);
 
         if (!response.ok) {
           console.error(
@@ -622,8 +622,8 @@ export function useSetPrimaryImage(carId: string) {
 
   return useMutation({
     mutationFn: async (imageId: string) => {
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "PATCH",
+      const response = await fetch(`/api/cars/${carId}/thumbnail`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },

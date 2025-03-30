@@ -618,8 +618,19 @@ export function ImageGalleryWithQuery({
   const handleSetPrimaryImage = async (imageId: string) => {
     try {
       await setPrimaryMutation.mutateAsync(imageId);
+      toast({
+        title: "Primary image updated",
+        description: "The primary image has been set successfully",
+        duration: 2000,
+      });
     } catch (error) {
       console.error("Error setting primary image:", error);
+      toast({
+        title: "Error setting primary image",
+        description:
+          error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1211,34 +1222,49 @@ export function ImageGalleryWithQuery({
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-2 mt-4">
-                    <Button
-                      onClick={() =>
-                        handlePageChange(Math.max(0, currentPage - 1))
-                      }
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === 0}
-                      className="h-7 w-7 p-0"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <span className="text-xs">
-                      {currentPage + 1}/{totalPages}
-                    </span>
-                    <Button
-                      onClick={() =>
-                        handlePageChange(
-                          Math.min(totalPages - 1, currentPage + 1)
-                        )
-                      }
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === totalPages - 1}
-                      className="h-7 w-7 p-0"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
+                  <div className="flex flex-col items-center gap-2 mt-4">
+                    <div className="flex justify-center items-center gap-2">
+                      <Button
+                        onClick={() =>
+                          handlePageChange(Math.max(0, currentPage - 1))
+                        }
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage === 0}
+                        className="h-7 w-7 p-0"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-xs">
+                        {currentPage + 1}/{totalPages}
+                      </span>
+                      <Button
+                        onClick={() =>
+                          handlePageChange(
+                            Math.min(totalPages - 1, currentPage + 1)
+                          )
+                        }
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage === totalPages - 1}
+                        className="h-7 w-7 p-0"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {totalPages > 5 && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Showing page {currentPage + 1} of {totalPages}
+                        <Button
+                          onClick={() => refetch()}
+                          variant="link"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                        >
+                          Refresh Images
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

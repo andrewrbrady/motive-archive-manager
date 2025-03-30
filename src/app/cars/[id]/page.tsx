@@ -18,6 +18,7 @@ import {
   Trash2,
   Check,
   RefreshCw,
+  ImageIcon,
 } from "lucide-react";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { getUnitsForType } from "@/constants/units";
@@ -46,6 +47,13 @@ import { MeasurementValue } from "@/types/measurements";
 import PhotoShoots from "@/components/cars/PhotoShoots";
 import { ImageGalleryWithQuery } from "@/components/cars/ImageGalleryWithQuery";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Power {
   hp: number;
@@ -558,6 +566,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const [additionalContext, setAdditionalContext] = useState("");
   const [imagesLoading, setImagesLoading] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
 
   // Filtering state
   const [activeFilters, setActiveFilters] = useState<{
@@ -874,6 +883,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
     }
   }, [isEditMode, id]);
 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
   useEffect(() => {
     const fetchCarData = async () => {
       try {
@@ -913,6 +924,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setIsLoading(false);
+        setIsInitialLoading(false);
       }
     };
 
@@ -921,16 +933,15 @@ export default function CarPage({ params }: { params: { id: string } }) {
     }
   }, [id]);
 
-  // Add a new effect to handle image loading state
+  // Simplify image loading state effect
   useEffect(() => {
     if (car && car.images) {
-      setImagesLoading(true);
-      // Set a timeout to simulate loading if images load too quickly
-      const timer = setTimeout(() => {
+      // Only set loading flag initially if no images are loaded yet
+      if (car.images.length === 0) {
+        setImagesLoading(true);
+      } else {
         setImagesLoading(false);
-      }, 1500);
-
-      return () => clearTimeout(timer);
+      }
     }
   }, [car?.images]);
 
@@ -1609,29 +1620,68 @@ export default function CarPage({ params }: { params: { id: string } }) {
       return;
     }
 
-    // Update car state with the new primary image ID
-    setCar((prevCar) => {
-      if (!prevCar) return prevCar;
-      console.log(
-        `[Car Page] Updating car state with primaryImageId: ${imageId}`
-      );
-      console.log(
-        `[Car Page] Previous primaryImageId: ${
-          prevCar.primaryImageId || "None"
-        }`
-      );
-      return {
-        ...prevCar,
-        primaryImageId: imageId,
-      };
-    });
+    // Make API call to update the primaryImageId in the database
+    try {
+      const response = await fetch(`/api/cars/${id}/thumbnail`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ primaryImageId: imageId }),
+      });
 
-    // Refresh car data to ensure UI updates
-    console.log("[Car Page] Refreshing car data after primary image change");
-    await refreshCarData();
+      if (!response.ok) {
+        throw new Error("Failed to update primary image");
+      }
+
+      // Update car state with the new primary image ID
+      setCar((prevCar) => {
+        if (!prevCar) return prevCar;
+        console.log(
+          `[Car Page] Updating car state with primaryImageId: ${imageId}`
+        );
+        console.log(
+          `[Car Page] Previous primaryImageId: ${
+            prevCar.primaryImageId || "None"
+          }`
+        );
+        return {
+          ...prevCar,
+          primaryImageId: imageId,
+        };
+      });
+
+      // Refresh car data to ensure UI updates
+      console.log("[Car Page] Refreshing car data after primary image change");
+      await refreshCarData();
+    } catch (error) {
+      console.error("[Car Page] Error updating primary image:", error);
+    }
   };
 
-  if (isLoading) {
+  // Add scroll event listener
+  useEffect(() => {
+    const handleScroll = () => {
+      setHasScrolled(window.scrollY > 100);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Helper function to generate car title that handles null values
+  const generateCarTitle = () => {
+    if (!car) return "";
+    return [
+      car.year ? car.year : null,
+      car.make ? car.make : null,
+      car.model ? car.model : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -1671,12 +1721,117 @@ export default function CarPage({ params }: { params: { id: string } }) {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {/* Sticky header for primary image and car title when scrolling */}
+      <div
+        className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
+          hasScrolled
+            ? "translate-y-0 opacity-100"
+            : "-translate-y-full opacity-0"
+        }`}
+      >
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border-primary shrink-0">
+              {car.primaryImageId && car.images && car.images.length > 0 ? (
+                car.images.find((img) => img._id === car.primaryImageId) ? (
+                  <Image
+                    src={
+                      car.images.find((img) => img._id === car.primaryImageId)
+                        ?.url || ""
+                    }
+                    alt={generateCarTitle()}
+                    fill
+                    className="object-cover"
+                  />
+                ) : car.images && car.images[0] ? (
+                  <Image
+                    src={car.images[0].url}
+                    alt={generateCarTitle()}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                    <ImageIcon className="w-4 h-4 text-text-secondary" />
+                  </div>
+                )
+              ) : (
+                <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                  <ImageIcon className="w-4 h-4 text-text-secondary" />
+                </div>
+              )}
+            </div>
+            <h1 className="text-base font-semibold text-text-primary truncate">
+              {generateCarTitle()}
+            </h1>
+            <div className="ml-auto text-sm text-text-secondary">
+              {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <PageTitle
-            title={`${car.year} ${car.make} ${car.model}`}
-            className="mb-6"
-          />
+          <div className="flex items-center gap-4 mb-6">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-primary shrink-0">
+                    {car.primaryImageId &&
+                    car.images &&
+                    car.images.length > 0 ? (
+                      car.images.find(
+                        (img) => img._id === car.primaryImageId
+                      ) ? (
+                        <Image
+                          src={
+                            car.images.find(
+                              (img) => img._id === car.primaryImageId
+                            )?.url || ""
+                          }
+                          alt={generateCarTitle()}
+                          fill
+                          className="object-cover"
+                          onError={(e) => {
+                            // If primary image fails, try to show the first image
+                            if (car.images && car.images.length > 0) {
+                              (e.target as HTMLImageElement).src =
+                                car.images[0].url;
+                            }
+                          }}
+                        />
+                      ) : car.images && car.images[0] ? (
+                        <Image
+                          src={car.images[0].url}
+                          alt={generateCarTitle()}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                          <ImageIcon className="w-5 h-5 text-text-secondary" />
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                        <ImageIcon className="w-5 h-5 text-text-secondary" />
+                      </div>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {car.primaryImageId
+                      ? "Primary image"
+                      : "No primary image selected"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <PageTitle title={generateCarTitle()} className="" />
+          </div>
 
           <CustomTabs
             items={[

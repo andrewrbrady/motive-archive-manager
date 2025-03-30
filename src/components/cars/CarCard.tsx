@@ -153,6 +153,17 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
     return `${mileage.value.toLocaleString()} ${mileage.unit || "mi"}`;
   };
 
+  // Helper function to generate car title that handles null values
+  const generateCarTitle = () => {
+    return [
+      car.year ? car.year : null,
+      car.make ? car.make : null,
+      car.model ? car.model : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
   return (
     <Link
       href={`/cars/${car._id}`}
@@ -167,7 +178,7 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
         ) : primaryImage ? (
           <Image
             src={primaryImage.url}
-            alt={`${car.year} ${car.make} ${car.model}`}
+            alt={generateCarTitle()}
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -208,32 +219,9 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       {/* Car Info */}
       <div className="p-4">
         <h3 className="text-lg font-semibold text-text-primary">
-          {car.year} {car.make} {car.model}
-          <span className="ml-1 text-text-secondary">
-            {car.manufacturing?.series || "Base"}
-          </span>
+          {generateCarTitle()}
         </h3>
-        <p className="text-sm text-text-secondary mt-1">
-          {car.manufacturing?.trim || "Standard"}
-        </p>
         <div className="mt-2 space-y-1">
-          {car.price && (
-            <p className="text-sm text-text-secondary">
-              {car.price.listPrice === 0 || car.price.listPrice
-                ? `$${car.price.listPrice.toLocaleString()}`
-                : "Price on request"}
-              {car.status === "sold" && car.price.soldPrice && (
-                <span className="ml-2 text-accent-success">
-                  (Sold: ${car.price.soldPrice.toLocaleString()})
-                </span>
-              )}
-            </p>
-          )}
-          {car.mileage && (
-            <p className="text-sm text-text-secondary">
-              {formatMileage(car.mileage)}
-            </p>
-          )}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
             {car.color && (
               <p className="text-sm text-text-secondary">
@@ -255,18 +243,6 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
           </div>
           {car.location && (
             <p className="text-sm text-text-secondary">{car.location}</p>
-          )}
-          {car.status && (
-            <p
-              className={cn(
-                "text-sm font-medium mt-2",
-                car.status === "sold" && "text-accent-success",
-                car.status === "pending" && "text-accent-warning",
-                car.status === "available" && "text-accent-info"
-              )}
-            >
-              {car.status.charAt(0).toUpperCase() + car.status.slice(1)}
-            </p>
           )}
         </div>
       </div>

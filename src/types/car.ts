@@ -1,6 +1,7 @@
 // types/car.ts
 import type { MeasurementValue } from "./measurements";
 import type { Client } from "./contact";
+import { ObjectId } from "mongodb";
 
 export type { MeasurementValue };
 
@@ -227,7 +228,7 @@ export interface Car {
   research_entries?: any[];
   // Original image array (backward compatibility)
   imageIds: string[];
-  primaryImageId?: string;
+  primaryImageId?: string | ObjectId;
 
   // New standardized image field - only array format
   images?: CarImage[];

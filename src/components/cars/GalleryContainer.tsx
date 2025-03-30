@@ -96,6 +96,9 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
   const handlePrimaryImageChange = useCallback(
     async (imageId: string) => {
       try {
+        console.log(`Setting primary image ID to: ${imageId} for car ${carId}`);
+
+        // Let the API handle the conversion to ObjectId
         const response = await fetch(`/api/cars/${carId}/thumbnail`, {
           method: "PUT",
           headers: {
@@ -105,15 +108,23 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
         });
 
         if (!response.ok) {
-          throw new Error("Failed to update primary image");
+          const errorData = await response
+            .json()
+            .catch(() => ({ error: "Failed to update primary image" }));
+          throw new Error(errorData.error || "Failed to update primary image");
         }
 
+        // Update the local state with the string ID (UI doesn't need ObjectId)
         actions.addPendingChange("primaryImageId", imageId);
         await actions.synchronizeGalleryState();
         toast.success("Primary image updated successfully");
       } catch (error) {
         console.error("Error updating primary image:", error);
-        toast.error("Failed to update primary image");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update primary image"
+        );
       }
     },
     [carId, actions]
@@ -172,6 +183,17 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
     [state.filterState.activeFilters, actions]
   );
 
+  // Helper function to generate car title that handles null values
+  const generateCarTitle = () => {
+    return [
+      car.year ? car.year : null,
+      car.make ? car.make : null,
+      car.model ? car.model : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -225,7 +247,7 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
               uploadProgress={[]}
               showMetadata={true}
               showFilters={true}
-              title={`${car.year} ${car.make} ${car.model}`}
+              title={generateCarTitle()}
               context={carsClientContext}
               onContextChange={() => {}}
               refreshImages={actions.synchronizeGalleryState}
@@ -234,7 +256,11 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
             <ImageGalleryWithQuery
               carId={carId}
               showFilters={true}
-              vehicleInfo={{ year: car.year, make: car.make, model: car.model }}
+              vehicleInfo={{
+                make: car.make || "",
+                model: car.model || "",
+                year: car.year || null,
+              }}
               onFilterOptionsChange={(options: Record<string, string[]>) => {
                 // Convert the Record to FilterOptions
                 const filterOptions: FilterOptions = {

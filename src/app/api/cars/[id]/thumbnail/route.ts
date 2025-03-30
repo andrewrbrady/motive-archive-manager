@@ -78,13 +78,16 @@ export async function PUT(
       }
     }
 
-    // Update the car with the primary image ID
-    const result = await db
-      .collection("cars")
-      .updateOne(
-        { _id: carObjectId },
-        { $set: { primaryImageId, updatedAt: new Date() } }
-      );
+    // Update the car with the primary image ID as ObjectId
+    const result = await db.collection("cars").updateOne(
+      { _id: carObjectId },
+      {
+        $set: {
+          primaryImageId: new ObjectId(primaryImageId),
+          updatedAt: new Date(),
+        },
+      }
+    );
 
     if (result.modifiedCount === 0) {
       return NextResponse.json(

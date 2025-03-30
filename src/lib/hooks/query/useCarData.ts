@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ObjectId } from "mongodb";
 
 // Define types
 export interface MeasurementValue {
@@ -13,7 +14,7 @@ export interface Car {
   year: number;
   price: string | number;
   status?: "available" | "sold" | "pending";
-  primaryImageId?: string;
+  primaryImageId?: string | ObjectId;
   mileage?: {
     value: number;
     unit: string;
