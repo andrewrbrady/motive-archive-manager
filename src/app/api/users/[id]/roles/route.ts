@@ -37,10 +37,10 @@ export async function GET(
         user.customClaims?.creativeRoles || userData?.creativeRoles || [],
       status: user.customClaims?.status || userData?.status || "active",
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching user roles:", error);
     return NextResponse.json(
-      { error: "Failed to fetch user roles" },
+      { error: error.message || "Failed to fetch user roles" },
       { status: 500 }
     );
   }
