@@ -53,8 +53,33 @@ export default function SignUp() {
         name,
         email,
         roles: ["user"],
+        creativeRoles: [],
+        status: "active",
+        accountType: "personal",
+        profileImage: user.photoURL || "",
         createdAt: new Date(),
       });
+
+      // Add custom claims via the Admin SDK
+      try {
+        // Make a request to your API to set custom claims (this requires server-side Admin SDK)
+        const response = await fetch(`/api/users/${user.uid}/roles`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roles: ["user"],
+            creativeRoles: [],
+            status: "active",
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("Failed to set custom claims for new user");
+        }
+      } catch (error) {
+        console.error("Error setting custom claims:", error);
+        // Continue with registration even if setting custom claims fails
+      }
 
       // Redirect to sign in page after successful registration
       router.push("/auth/signin?registered=true");

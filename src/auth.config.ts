@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -107,6 +108,56 @@ export const authConfig: NextAuthConfig = {
         session.user.status = (token.status as string) || "active";
       }
       return session;
+    },
+    async signIn({ user, account }) {
+      try {
+        // Only process OAuth sign-ins (like Google)
+        if (account?.provider === "google") {
+          // Get user ID and email
+          const uid = user.id;
+          const email = user.email;
+
+          if (!uid || !email) return false;
+
+          // Check if this user already exists in Firestore
+          const userDoc = await adminDb.collection("users").doc(uid).get();
+
+          // If user doesn't exist in Firestore, create a new document
+          if (!userDoc.exists) {
+            console.log(
+              `Creating new user document for ${email} with ID: ${uid}`
+            );
+
+            // Create a user document in Firestore
+            await adminDb
+              .collection("users")
+              .doc(uid)
+              .set({
+                name: user.name || email.split("@")[0],
+                email: email,
+                image: user.image || "",
+                roles: ["user"],
+                creativeRoles: [],
+                status: "active",
+                accountType: "personal",
+                createdAt: new Date(),
+              });
+
+            // Set custom claims for the user (optional)
+            await adminAuth.setCustomUserClaims(uid, {
+              roles: ["user"],
+              creativeRoles: [],
+              status: "active",
+            });
+          }
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error in signIn callback:", error);
+        // Still allow sign in even if there was an error saving to Firestore
+        return true;
+      }
     },
   },
   debug: process.env.NODE_ENV === "development",
