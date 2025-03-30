@@ -54,6 +54,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { StatusNotification } from "@/components/StatusNotification";
 
 interface Power {
   hp: number;
@@ -567,6 +568,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const [imagesLoading, setImagesLoading] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [isPending, startTransition] = useReactTransition();
 
   // Filtering state
   const [activeFilters, setActiveFilters] = useState<{
@@ -583,9 +585,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
     tods: string[];
     sides: string[];
   }>({ angles: [], views: [], movements: [], tods: [], sides: [] });
-
-  // Add transition state for smooth mode switching
-  const [isPending, setIsPending] = useState(false);
 
   // Memoized filter option update function to avoid unnecessary rerenders
   const handleFilterOptionsChange = useCallback(
@@ -885,50 +884,95 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const fetchCarData = async () => {
+      if (!id) return;
+
       try {
+        // Always set loading to true immediately without any delay
         setIsLoading(true);
         setError(null);
 
-        // Fetch car data
-        const carResponse = await fetch(`/api/cars/${id}?includeImages=true`);
+        // Create an AbortController to cancel fetch requests if component unmounts
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        // Fetch car data with the signal
+        const carResponse = await fetch(`/api/cars/${id}?includeImages=true`, {
+          signal,
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
+
         if (!carResponse.ok) {
           throw new Error(`Failed to fetch car: ${carResponse.statusText}`);
         }
+
         const carData = await carResponse.json();
         if (!carData) {
           throw new Error("No car data received");
         }
 
-        // Debug car data to understand image structure
-        console.log("=== Car API Response ===");
-        console.log("Car data:", carData);
-        console.log("Car images:", carData.images);
-        console.log("Car imageIds:", carData.imageIds);
-
-        // Fetch documents
-        const docsResponse = await fetch(`/api/cars/${id}/documents`);
-        if (!docsResponse.ok) {
-          console.error("Failed to fetch documents:", docsResponse.statusText);
-          // Don't throw here, just log the error as documents are not critical
-        } else {
-          const docsData = await docsResponse.json();
-          setDocuments(docsData);
-        }
-
+        // Update state with data
         setCar(carData);
         setEditedSpecs(carData ? toCarFormData(carData) : null);
+
+        // Fetch documents in parallel
+        fetch(`/api/cars/${id}/documents`, { signal })
+          .then((response) => {
+            if (!response.ok) {
+              console.error("Failed to fetch documents:", response.statusText);
+              return [];
+            }
+            return response.json();
+          })
+          .then((docsData) => {
+            setDocuments(docsData);
+          })
+          .catch((err) => {
+            console.error("Error fetching documents:", err);
+          });
+
+        // Set loading to false once we have the main car data
+        setIsLoading(false);
       } catch (err) {
         console.error("Error fetching car data:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) {
-      fetchCarData();
-    }
+    // Immediately fetch the car data when the component mounts
+    fetchCarData();
+
+    // Cleanup function
+    return () => {
+      // Cleanup code here
+    };
   }, [id]);
+
+  // Add a useEffect specifically for prefetching related data
+  useEffect(() => {
+    if (!car || !id) return;
+
+    // Prefetch related data to improve navigation experience
+    const prefetchRelatedData = async () => {
+      try {
+        // Prefetch client data if we have car data
+        if (car.client) {
+          fetch(`/api/clients/${car.client}`).catch(() => {});
+        }
+
+        // Prefetch other related endpoints
+        fetch(`/api/cars/${id}/events`).catch(() => {});
+        fetch(`/api/cars/${id}/deliverables`).catch(() => {});
+      } catch (error) {
+        // Silently fail prefetching - it's just an optimization
+      }
+    };
+
+    prefetchRelatedData();
+  }, [car, id]);
 
   // Simplify image loading state effect
   useEffect(() => {
@@ -965,6 +1009,10 @@ export default function CarPage({ params }: { params: { id: string } }) {
     });
   };
 
+  // Add a new state to track if we need to show upload status
+  const [showUploadStatus, setShowUploadStatus] = useState(false);
+
+  // Update the handleImageUpload function to set showUploadStatus
   const handleImageUpload = async (files: FileList) => {
     if (!car) return;
 
@@ -980,6 +1028,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
         }))
       );
       setUploadingImages(true);
+      setShowUploadStatus(true); // Always show status when uploading
 
       // Create upload promises for all files
       const uploadPromises = fileArray.map((file, i) => {
@@ -994,17 +1043,30 @@ export default function CarPage({ params }: { params: { id: string } }) {
             model: car?.model || "",
             type: car?.type,
             color: car?.color,
+            interior_color: car?.interior_color,
             description: car?.description,
             condition: car?.condition,
             mileage: car?.mileage,
+            vin: car?.vin,
+            status: car?.status,
+            doors: car?.doors,
             engine: car?.engine
               ? {
                   type: car.engine.type,
                   displacement: car.engine.displacement,
                   power: car.engine.power,
                   torque: car.engine.torque,
+                  features: car.engine.features,
+                  configuration: car.engine.configuration,
+                  cylinders: car.engine.cylinders,
+                  fuelType: car.engine.fuelType,
+                  manufacturer: car.engine.manufacturer,
                 }
               : undefined,
+            transmission: car?.transmission,
+            dimensions: car?.dimensions,
+            interior_features: car?.interior_features,
+            performance: car?.performance,
             additionalContext: additionalContext || undefined,
           })
         );
@@ -1220,6 +1282,10 @@ export default function CarPage({ params }: { params: { id: string } }) {
         setTimeout(() => {
           setUploadingImages(false);
           setUploadProgress([]);
+          // Don't hide the status immediately to let users see the completion
+          setTimeout(() => {
+            setShowUploadStatus(false);
+          }, 5000); // Keep the status visible for 5 seconds after completion
         }, 2000);
       }
     }
@@ -1678,12 +1744,278 @@ export default function CarPage({ params }: { params: { id: string } }) {
       .join(" ");
   };
 
+  // Add a function to be passed to ImageGalleryWithQuery to notify parent of uploads
+  const notifyUploadStarted = () => {
+    console.log("Upload started notification from ImageGalleryWithQuery");
+    setShowUploadStatus(true);
+    setUploadingImages(true);
+  };
+
+  const notifyUploadEnded = () => {
+    console.log("Upload ended notification from ImageGalleryWithQuery");
+    // Keep the status visible for a moment after completion
+    setTimeout(() => {
+      setUploadingImages(false);
+
+      // Delay hiding status to allow users to see completion
+      setTimeout(() => {
+        setShowUploadStatus(false);
+      }, 5000);
+    }, 1000);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
+      <main className="container mx-auto px-4 py-8 min-h-[70vh]">
+        {error ? (
+          <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
+            {error}
+          </div>
+        ) : (
+          <>
+            {/* Car title and header - always show this */}
+            <div className="flex items-center gap-4 mb-6">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-primary shrink-0">
+                      {car?.primaryImageId &&
+                      car?.images &&
+                      car?.images.length > 0 ? (
+                        car.images.find(
+                          (img) => img._id === car.primaryImageId
+                        ) ? (
+                          <Image
+                            src={
+                              car.images.find(
+                                (img) => img._id === car.primaryImageId
+                              )?.url || ""
+                            }
+                            alt={generateCarTitle()}
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // If primary image fails, try to show the first image
+                              if (car.images && car.images.length > 0) {
+                                (e.target as HTMLImageElement).src =
+                                  car.images[0].url;
+                              }
+                            }}
+                          />
+                        ) : car.images && car.images[0] ? (
+                          <Image
+                            src={car.images[0].url}
+                            alt={generateCarTitle()}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                            <ImageIcon className="w-5 h-5 text-text-secondary" />
+                          </div>
+                        )
+                      ) : (
+                        <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                          <ImageIcon className="w-5 h-5 text-text-secondary" />
+                        </div>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {car?.primaryImageId
+                        ? "Primary image"
+                        : "No primary image selected"}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <PageTitle title={generateCarTitle()} className="" />
+            </div>
+
+            {/* Always render tabs - each tab handles its own loading state */}
+            <CustomTabs
+              items={[
+                {
+                  value: "gallery",
+                  label: "Image Gallery",
+                  content: (
+                    <div className="space-y-4">
+                      <div className="image-gallery-wrapper">
+                        <ImageGalleryWithQuery
+                          carId={params.id}
+                          vehicleInfo={{
+                            make: car?.make || "",
+                            model: car?.model || "",
+                            year: car?.year || 0,
+                            color: car?.color || "",
+                          }}
+                          onFilterOptionsChange={handleFilterOptionsChange}
+                          showFilters={true}
+                          onUploadStarted={notifyUploadStarted}
+                          onUploadEnded={notifyUploadEnded}
+                        />
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  value: "specs",
+                  label: "Specifications",
+                  content: car ? (
+                    <Specifications
+                      car={toCarFormData(car)}
+                      isEditMode={isSpecsEditMode}
+                      onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
+                      onSave={async (editedSpecs) => {
+                        await handleSpecsEdit(editedSpecs as CarData);
+                      }}
+                      editedSpecs={editedSpecs}
+                      onInputChange={(field, value, nestedField) =>
+                        handleInputChange(field, value, nestedField)
+                      }
+                      onMeasurementChange={handleMeasurementChange}
+                      onPowerChange={handlePowerChange}
+                      onTorqueChange={handleTorqueChange}
+                      onEnrich={handleEnrichData}
+                      isEnriching={isEnriching}
+                    />
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Loading specifications...
+                    </div>
+                  ),
+                },
+                {
+                  value: "shoots",
+                  label: "Photo Shoots",
+                  content: <PhotoShoots carId={id} />,
+                },
+                {
+                  value: "shot-lists",
+                  label: "Shot Lists",
+                  content: <ShotList carId={id} />,
+                },
+                {
+                  value: "scripts",
+                  label: "Scripts",
+                  content: <Scripts carId={id} />,
+                },
+                {
+                  value: "bat",
+                  label: "BaT Listing",
+                  content: car ? (
+                    <BaTListingGenerator
+                      carDetails={{
+                        _id: car._id,
+                        year: car.year ?? 0,
+                        make: car.make,
+                        model: car.model,
+                        color: car.color,
+                        mileage: car.mileage
+                          ? {
+                              value: car.mileage.value || 0,
+                              unit: car.mileage.unit,
+                            }
+                          : undefined,
+                        engine: car.engine,
+                        description: car.description || "",
+                      }}
+                    />
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Loading BaT listing...
+                    </div>
+                  ),
+                },
+                {
+                  value: "captions",
+                  label: "Social Media",
+                  content: car ? (
+                    <CaptionGenerator
+                      carDetails={{
+                        _id: car._id,
+                        year: car.year ?? 0,
+                        make: car.make,
+                        model: car.model,
+                        color: car.color,
+                        engine: car.engine,
+                        mileage: car.mileage
+                          ? {
+                              value: car.mileage.value || 0,
+                              unit: car.mileage.unit,
+                            }
+                          : undefined,
+                        type: car.type,
+                        client: car.client,
+                        description: car.description || "",
+                      }}
+                    />
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Loading caption generator...
+                    </div>
+                  ),
+                },
+                {
+                  value: "service",
+                  label: "Service History",
+                  content: (
+                    <div className="text-center py-12 text-muted-foreground">
+                      Service history coming soon
+                    </div>
+                  ),
+                },
+                {
+                  value: "research",
+                  label: "Research",
+                  content: <ResearchFiles carId={id} />,
+                },
+                {
+                  value: "documentation",
+                  label: "Documentation",
+                  content: <DocumentationFiles carId={id} />,
+                },
+                {
+                  value: "article",
+                  label: "Article",
+                  content: car ? (
+                    <ArticleGenerator
+                      car={fromCarFormData(toCarFormData(car), car) as BaseCar}
+                    />
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground">
+                      Loading article generator...
+                    </div>
+                  ),
+                },
+                {
+                  value: "deliverables",
+                  label: "Deliverables",
+                  content: <DeliverablesTab carId={id} />,
+                },
+                {
+                  value: "events",
+                  label: "Events",
+                  content: <EventsTab carId={id} />,
+                },
+                {
+                  value: "calendar",
+                  label: "Calendar",
+                  content: <CalendarTab carId={id} />,
+                },
+              ]}
+              defaultValue={activeTab}
+              basePath={`/cars/${id}`}
+            />
+          </>
+        )}
+      </main>
+
       {/* Sticky header for primary image and car title when scrolling */}
-      {car && (
+      {car && !isLoading && (
         <div
           className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
             hasScrolled
@@ -1734,243 +2066,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      <main className="container mx-auto px-4 py-8">
-        {isLoading && !car && <CarPageSkeleton />}
-
-        {error && (
-          <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
-
-        {car && (
-          <div className="space-y-6">
-            {/* Define carDetails for use in components */}
-            {(() => {
-              // This is just a local variable definition to fix TypeScript errors
-              // It's not rendered but makes carDetails available for components below
-              return null;
-            })()}
-
-            {/* Car title and header */}
-            <div className="flex items-center gap-4 mb-6">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-primary shrink-0">
-                      {car.primaryImageId &&
-                      car.images &&
-                      car.images.length > 0 ? (
-                        car.images.find(
-                          (img) => img._id === car.primaryImageId
-                        ) ? (
-                          <Image
-                            src={
-                              car.images.find(
-                                (img) => img._id === car.primaryImageId
-                              )?.url || ""
-                            }
-                            alt={generateCarTitle()}
-                            fill
-                            className="object-cover"
-                            onError={(e) => {
-                              // If primary image fails, try to show the first image
-                              if (car.images && car.images.length > 0) {
-                                (e.target as HTMLImageElement).src =
-                                  car.images[0].url;
-                              }
-                            }}
-                          />
-                        ) : car.images && car.images[0] ? (
-                          <Image
-                            src={car.images[0].url}
-                            alt={generateCarTitle()}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-text-secondary" />
-                          </div>
-                        )
-                      ) : (
-                        <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                          <ImageIcon className="w-5 h-5 text-text-secondary" />
-                        </div>
-                      )}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      {car.primaryImageId
-                        ? "Primary image"
-                        : "No primary image selected"}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <PageTitle title={generateCarTitle()} className="" />
-            </div>
-
-            <CustomTabs
-              items={[
-                {
-                  value: "gallery",
-                  label: "Image Gallery",
-                  content: (
-                    <div className="space-y-4">
-                      <div className="image-gallery-wrapper">
-                        <ImageGalleryWithQuery
-                          carId={params.id}
-                          vehicleInfo={{
-                            make: car?.make || "",
-                            model: car?.model || "",
-                            year: car?.year || 0,
-                            color: car?.color || "",
-                          }}
-                          onFilterOptionsChange={handleFilterOptionsChange}
-                          showFilters={true}
-                        />
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: "specs",
-                  label: "Specifications",
-                  content: (
-                    <Specifications
-                      car={toCarFormData(car)}
-                      isEditMode={isSpecsEditMode}
-                      onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
-                      onSave={async (editedSpecs) => {
-                        await handleSpecsEdit(editedSpecs as CarData);
-                      }}
-                      editedSpecs={editedSpecs}
-                      onInputChange={(field, value, nestedField) =>
-                        handleInputChange(field, value, nestedField)
-                      }
-                      onMeasurementChange={handleMeasurementChange}
-                      onPowerChange={handlePowerChange}
-                      onTorqueChange={handleTorqueChange}
-                      onEnrich={handleEnrichData}
-                      isEnriching={isEnriching}
-                    />
-                  ),
-                },
-                {
-                  value: "shoots",
-                  label: "Photo Shoots",
-                  content: <PhotoShoots carId={id} />,
-                },
-                {
-                  value: "shot-lists",
-                  label: "Shot Lists",
-                  content: <ShotList carId={id} />,
-                },
-                {
-                  value: "scripts",
-                  label: "Scripts",
-                  content: <Scripts carId={id} />,
-                },
-                {
-                  value: "bat",
-                  label: "BaT Listing",
-                  content: (
-                    <BaTListingGenerator
-                      carDetails={{
-                        _id: car._id,
-                        year: car.year ?? 0,
-                        make: car.make,
-                        model: car.model,
-                        color: car.color,
-                        mileage: car.mileage
-                          ? {
-                              value: car.mileage.value || 0,
-                              unit: car.mileage.unit,
-                            }
-                          : undefined,
-                        engine: car.engine,
-                        description: car.description || "",
-                      }}
-                    />
-                  ),
-                },
-                {
-                  value: "captions",
-                  label: "Social Media",
-                  content: (
-                    <CaptionGenerator
-                      carDetails={{
-                        _id: car._id,
-                        year: car.year ?? 0,
-                        make: car.make,
-                        model: car.model,
-                        color: car.color,
-                        engine: car.engine,
-                        mileage: car.mileage
-                          ? {
-                              value: car.mileage.value || 0,
-                              unit: car.mileage.unit,
-                            }
-                          : undefined,
-                        type: car.type,
-                        client: car.client,
-                        description: car.description || "",
-                      }}
-                    />
-                  ),
-                },
-                {
-                  value: "service",
-                  label: "Service History",
-                  content: (
-                    <div className="text-center py-12 text-muted-foreground">
-                      Service history coming soon
-                    </div>
-                  ),
-                },
-                {
-                  value: "research",
-                  label: "Research",
-                  content: <ResearchFiles carId={id} />,
-                },
-                {
-                  value: "documentation",
-                  label: "Documentation",
-                  content: <DocumentationFiles carId={id} />,
-                },
-                {
-                  value: "article",
-                  label: "Article",
-                  content: (
-                    <ArticleGenerator
-                      car={fromCarFormData(toCarFormData(car), car) as BaseCar}
-                    />
-                  ),
-                },
-                {
-                  value: "deliverables",
-                  label: "Deliverables",
-                  content: <DeliverablesTab carId={id} />,
-                },
-                {
-                  value: "events",
-                  label: "Events",
-                  content: <EventsTab carId={id} />,
-                },
-                {
-                  value: "calendar",
-                  label: "Calendar",
-                  content: <CalendarTab carId={id} />,
-                },
-              ]}
-              defaultValue={activeTab}
-              basePath={`/cars/${id}`}
-            />
-          </div>
-        )}
-      </main>
       <Footer />
 
       <EnrichmentProgress

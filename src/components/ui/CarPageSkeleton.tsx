@@ -2,39 +2,46 @@ import React from "react";
 
 // Common classes for skeleton loading elements
 const skeletonBaseClasses =
-  "bg-background-secondary dark:bg-background-secondary rounded animate-pulse";
+  "bg-background-secondary/70 dark:bg-background-secondary/50 rounded";
 
 export function CarPageSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Title with loading indicator */}
-      <div className="flex items-center gap-2">
-        <div className={`w-12 h-12 rounded-full ${skeletonBaseClasses}`} />
-        <div className={`w-64 h-8 ${skeletonBaseClasses}`} />
-      </div>
+      {/* Title skeleton - already rendered in parent component */}
 
-      {/* Tab bar */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <div className="flex space-x-4 pb-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className={`w-20 h-8 ${skeletonBaseClasses}`} />
+      {/* Tab bar skeleton */}
+      <div className="border-b border-border mb-6">
+        <div className="flex space-x-4 pb-4 overflow-x-auto">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-32 h-10 ${skeletonBaseClasses} animate-pulse flex-shrink-0`}
+              style={{ animationDelay: `${i * 50}ms` }}
+            />
           ))}
         </div>
       </div>
 
-      {/* Main content area */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Main content */}
-        <div className="md:col-span-2 space-y-4">
-          <div className={`w-full aspect-video ${skeletonBaseClasses}`} />
-          <div className={`w-full h-32 ${skeletonBaseClasses}`} />
-        </div>
+      {/* Content skeleton - Gallery */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className={`aspect-square rounded-md ${skeletonBaseClasses} animate-pulse`}
+            style={{ animationDelay: `${i * 30}ms` }}
+          />
+        ))}
+      </div>
 
-        {/* Sidebar */}
-        <div className="space-y-4">
-          <div className={`w-full h-40 ${skeletonBaseClasses}`} />
-          <div className={`w-full h-40 ${skeletonBaseClasses}`} />
-        </div>
+      {/* Filter controls skeleton */}
+      <div className="flex flex-wrap gap-2 mt-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-9 w-24 ${skeletonBaseClasses} animate-pulse`}
+            style={{ animationDelay: `${i * 50}ms` }}
+          />
+        ))}
       </div>
     </div>
   );

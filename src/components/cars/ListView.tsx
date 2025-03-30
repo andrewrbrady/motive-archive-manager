@@ -1,12 +1,13 @@
-import React from "react";
-import { Car } from "@/types/car";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronUpIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import { Trash2 } from "lucide-react";
+import Link from "next/link";
 
 interface ListViewProps {
-  cars: Car[];
-  currentSearchParams: string;
+  cars: any[];
+  onDelete?: (id: string) => void;
+  showDelete?: boolean;
+  currentSearchParams?: string;
 }
 
 type SortField =
@@ -104,7 +105,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
   );
 
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full overflow-auto">
       <table className="w-full border-collapse text-sm table-fixed">
         <thead>
           <tr className="bg-[hsl(var(--background))] dark:bg-black/25 border-y border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
@@ -145,44 +146,99 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
             <tr
               key={car._id}
               className="border-b border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 hover:bg-[hsl(var(--background))] dark:hover:bg-black/25 transition-colors cursor-pointer"
-              onClick={() => router.push(`/cars/${car._id}`)}
             >
               <td className="w-[8%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.year}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.year}
+                </Link>
               </td>
               <td className="w-[12%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.make}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.make}
+                </Link>
               </td>
               <td className="w-[15%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
-                <span className="text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                  {car.model}
-                </span>
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  <span className="text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
+                    {car.model}
+                  </span>
+                </Link>
               </td>
               <td className="w-[12%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.price &&
-                typeof car.price === "object" &&
-                car.price.listPrice
-                  ? `$${car.price.listPrice.toLocaleString()}`
-                  : "Price on request"}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.price &&
+                  typeof car.price === "object" &&
+                  car.price.listPrice
+                    ? `$${car.price.listPrice.toLocaleString()}`
+                    : "Price on request"}
+                </Link>
               </td>
               <td className="w-[12%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.mileage && car.mileage.value !== null
-                  ? `${car.mileage.value.toLocaleString()} ${car.mileage.unit}`
-                  : "-"}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.mileage && car.mileage.value !== null
+                    ? `${car.mileage.value.toLocaleString()} ${
+                        car.mileage.unit
+                      }`
+                    : "-"}
+                </Link>
               </td>
               <td className="w-[8%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.engine?.power?.hp
-                  ? `${car.engine.power.hp.toLocaleString()} hp`
-                  : "-"}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.engine?.power?.hp
+                    ? `${car.engine.power.hp.toLocaleString()} hp`
+                    : "-"}
+                </Link>
               </td>
               <td className="w-[10%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.color}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.color}
+                </Link>
               </td>
               <td className="w-[8%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.condition || "-"}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.condition || "-"}
+                </Link>
               </td>
               <td className="w-[10%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
-                {car.location || "-"}
+                <Link
+                  href={`/cars/${car._id}`}
+                  className="block w-full h-full"
+                  prefetch={true}
+                >
+                  {car.location || "-"}
+                </Link>
               </td>
               <td className="w-[5%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">
                 <button

@@ -11,6 +11,13 @@ export const metadata: Metadata = {
   description: "The Collector's Resource for Premium Automobiles",
 };
 
+// Configure options for Next.js prefetching behavior
+export const dynamic = "force-dynamic";
+export const fetchCache = "default-cache";
+export const revalidate = 0;
+export const runtime = "nodejs";
+export const preferredRegion = "auto";
+
 export default function RootLayout({
   children,
 }: {
