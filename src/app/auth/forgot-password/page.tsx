@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useFirebase } from "@/contexts/FirebaseContext";
 
 export default function ForgotPassword() {
   const router = useRouter();
+  const { resetPassword } = useFirebase();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -18,26 +20,37 @@ export default function ForgotPassword() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send reset email");
-      }
+      await resetPassword(email);
 
       setMessage(
         "If your email exists in our system, you will receive a password reset link shortly."
       );
       setEmail("");
     } catch (err: any) {
-      setError(err.message || "An error occurred. Please try again.");
+      console.error("Password reset error:", err);
+
+      const errorCode = err.code;
+      let errorMessage = "An error occurred. Please try again.";
+
+      // Handle common Firebase Auth errors
+      if (errorCode === "auth/invalid-email") {
+        errorMessage = "Invalid email address.";
+      } else if (errorCode === "auth/missing-email") {
+        errorMessage = "Please enter an email address.";
+      } else if (errorCode === "auth/user-not-found") {
+        // For security reasons, we don't want to reveal if a user exists or not
+        // We'll keep showing the same message as a successful request
+        setMessage(
+          "If your email exists in our system, you will receive a password reset link shortly."
+        );
+        setEmail("");
+        setIsSubmitting(false);
+        return;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

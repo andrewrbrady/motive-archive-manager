@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { auth } from "@/auth";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Just make sure we don't interfere with API routes
+  // Public routes that don't require authentication
+  const publicRoutes = ["/", "/auth"];
+
+  // Check if the current path is public
+  const isPublicRoute = publicRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  // Always allow API routes
   if (pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
@@ -20,6 +29,22 @@ export function middleware(request: NextRequest) {
 
   if (pathname === "/locations") {
     return NextResponse.redirect(new URL("/admin?tab=locations", request.url));
+  }
+
+  // For all non-public routes, redirect to signin if no auth session
+  if (!isPublicRoute) {
+    // Use the NextAuth auth function to check for a session
+    const session = await auth();
+
+    if (!session) {
+      console.log(
+        `No auth session found for ${pathname}, redirecting to signin`
+      );
+      const signInUrl = new URL("/auth/signin", request.url);
+      // Add the current URL as a callback URL
+      signInUrl.searchParams.set("callbackUrl", request.url);
+      return NextResponse.redirect(signInUrl);
+    }
   }
 
   // Get the origin from the request headers
@@ -56,5 +81,14 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/users", "/clients", "/locations", "/admin"],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * 1. _next/static (static files)
+     * 2. _next/image (image optimization files)
+     * 3. favicon.ico (favicon file)
+     * 4. public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
+  ],
 };
