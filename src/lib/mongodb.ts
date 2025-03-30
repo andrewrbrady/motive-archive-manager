@@ -8,9 +8,9 @@ if (!process.env.MONGODB_URI) {
 
 const uri = process.env.MONGODB_URI;
 const options: MongoClientOptions = {
-  maxPoolSize: 10, // Lower pool size for serverless
-  minPoolSize: 1, // Minimal connections for serverless
-  maxIdleTimeMS: 45000, // Close idle connections after 45 seconds (balanced for serverless)
+  maxPoolSize: 50, // Increased from 10 for better performance with low user count
+  minPoolSize: 10, // Increased from 1 to maintain more persistent connections
+  maxIdleTimeMS: 60000, // Increased from 45000 to keep connections alive longer
   connectTimeoutMS: 30000, // Connection timeout increased to 30 seconds (up from 10000)
   socketTimeoutMS: 60000, // Socket timeout increased to 60 seconds (up from 45000)
   serverSelectionTimeoutMS: 30000, // Server selection timeout added (30 seconds)
@@ -98,7 +98,7 @@ if (!global._lastConnectionTime) {
 function shouldForceNewConnection(): boolean {
   const now = Date.now();
   const timeSinceLastConnection = now - (global._lastConnectionTime || 0);
-  const CONNECTION_TTL = 30 * 1000; // Lower to 30 seconds to ensure fresher connections
+  const CONNECTION_TTL = 300 * 1000; // Increased from 30 seconds to 5 minutes for persistent connections in low-user environments
 
   // If more than CONNECTION_TTL has passed since our last connection,
   // we should force a new one to avoid using a stale connection
@@ -256,8 +256,8 @@ function createMongoClient(): Promise<MongoClient> {
 // Add exponential backoff retry mechanism for serverless environments
 // Improved version with more aggressive retry strategy
 export async function getMongoClient(
-  maxRetries = 5,
-  baseDelay = 300
+  maxRetries = 3, // Reduced from 5 for faster connection attempts
+  baseDelay = 200 // Reduced from 300 for faster recovery
 ): Promise<MongoClient> {
   // Keep track of attempts across function calls
   if (!global._connectionAttempts) {
@@ -265,7 +265,8 @@ export async function getMongoClient(
   }
 
   // If too many recent attempts, force a new connection
-  if (global._connectionAttempts > 10) {
+  if (global._connectionAttempts > 7) {
+    // Reduced from 10 for faster connection reset
     console.log("Too many connection attempts detected. Resetting connection.");
     global._mongoClientPromise = null;
     clientPromise = null;
