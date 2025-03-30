@@ -40,15 +40,19 @@ export default function SignUp() {
     setIsLoading(true);
 
     try {
+      console.log("Starting user registration with Firebase...");
       // Create user with Firebase Authentication
       const user = await signUp(email, password);
+      console.log("User created in Firebase Auth:", user.uid);
 
       // Update user profile with name
       await updateProfile(user, {
         displayName: name,
       });
+      console.log("User profile updated with display name");
 
       // Create a user document in Firestore
+      console.log("Creating Firestore document for user:", user.uid);
       await setDoc(doc(db, "users", user.uid), {
         name,
         email,
@@ -59,10 +63,12 @@ export default function SignUp() {
         profileImage: user.photoURL || "",
         createdAt: new Date(),
       });
+      console.log("Firestore document created successfully");
 
       // Add custom claims via the Admin SDK
       try {
         // Make a request to your API to set custom claims (this requires server-side Admin SDK)
+        console.log("Setting custom claims for user:", user.uid);
         const response = await fetch(`/api/users/${user.uid}/roles`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -74,7 +80,12 @@ export default function SignUp() {
         });
 
         if (!response.ok) {
-          console.error("Failed to set custom claims for new user");
+          console.error(
+            "Failed to set custom claims for new user",
+            await response.text()
+          );
+        } else {
+          console.log("Custom claims set successfully");
         }
       } catch (error) {
         console.error("Error setting custom claims:", error);

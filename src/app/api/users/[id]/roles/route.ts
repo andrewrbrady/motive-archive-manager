@@ -91,23 +91,30 @@ export async function PUT(
     // For admin operations, verify admin authentication
     if (!isNewUserRegistration) {
       // Check authentication and authorization
+      console.log("Attempting admin operation - checking authorization");
       const session = await auth();
       if (!session || !session.user || !session.user.roles.includes("admin")) {
+        console.log("Unauthorized access attempt:", session?.user?.email);
         return NextResponse.json(
           { error: "Unauthorized access" },
           { status: 403 }
         );
       }
+    } else {
+      console.log("Processing new user registration for user ID:", params.id);
     }
 
     // Set custom claims (Firebase Auth)
+    console.log("Setting custom claims for user:", params.id, roles);
     await adminAuth.setCustomUserClaims(params.id, {
       roles,
       creativeRoles: creativeRoles || [],
       status: status || "active",
     });
+    console.log("Custom claims set successfully for user:", params.id);
 
     // Update user data in Firestore
+    console.log("Updating Firestore document for user:", params.id);
     await adminDb
       .collection("users")
       .doc(params.id)
@@ -120,9 +127,11 @@ export async function PUT(
         },
         { merge: true }
       );
+    console.log("Firestore document updated successfully for user:", params.id);
 
     // Get updated user data
     const user = await adminAuth.getUser(params.id);
+    console.log("Retrieved updated user data:", user.uid, user.customClaims);
 
     return NextResponse.json({
       uid: user.uid,
@@ -133,10 +142,10 @@ export async function PUT(
       status: user.customClaims?.status || status || "active",
       message: "User roles updated successfully",
     });
-  } catch (error) {
-    console.error("Error updating user roles:", error);
+  } catch (error: any) {
+    console.error("Error updating user roles:", error.message, error.stack);
     return NextResponse.json(
-      { error: "Failed to update user roles" },
+      { error: error.message || "Failed to update user roles" },
       { status: 500 }
     );
   }
