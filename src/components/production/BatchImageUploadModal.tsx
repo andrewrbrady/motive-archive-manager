@@ -16,6 +16,7 @@ import { Upload, X, ImagePlus } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { uploadToCloudflare } from "@/lib/cloudflare";
 
 interface BatchImageUploadModalProps {
   isOpen: boolean;
@@ -99,14 +100,8 @@ export function BatchImageUploadModal({
   };
 
   const handleUpload = async () => {
-    // If we already have a direct upload URL, use that
-    if (directUploadUrl) {
-      onImageUpload(directUploadUrl, itemId);
-      onClose();
-      return;
-    }
-
-    if (!file) {
+    // Use either the selected file or the direct URL
+    if (!file && !directUploadUrl) {
       toast({
         title: "No file selected",
         description: "Please select a file to upload",
@@ -118,46 +113,38 @@ export function BatchImageUploadModal({
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("itemId", itemId);
+      let imageUrl;
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
+      // If we have a direct URL, use that
+      if (directUploadUrl) {
+        imageUrl = directUploadUrl;
+      }
+      // Otherwise upload the file using the uploadToCloudflare function
+      else if (file) {
+        console.log(`Starting upload for ${file.name}`);
+        const result = await uploadToCloudflare(file);
+        console.log(`Upload successful:`, result);
+        imageUrl = result.url;
       }
 
-      const data = await response.json();
-
-      // Check for imageUrl in the response first (Pages Router API)
-      if (data.imageUrl) {
-        onImageUpload(data.imageUrl, itemId);
-        onClose();
-        toast({
-          title: "Upload successful",
-          description: "Image has been uploaded",
-        });
-      }
-      // Fallback to Cloudflare format (App Router API)
-      else if (data.id && data.variants) {
-        // Construct the Cloudflare image URL
-        const imageUrl = `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${data.id}/public`;
+      if (imageUrl) {
         onImageUpload(imageUrl, itemId);
         onClose();
         toast({
           title: "Upload successful",
           description: "Image has been uploaded",
         });
+      } else {
+        throw new Error("No image URL returned from upload");
       }
     } catch (error) {
       console.error("Error uploading image:", error);
       toast({
         title: "Upload failed",
-        description: "Failed to upload image. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to upload image. Please try again.",
         variant: "destructive",
       });
     } finally {

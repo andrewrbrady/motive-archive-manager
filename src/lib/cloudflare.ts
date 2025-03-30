@@ -1,5 +1,6 @@
 import { getCache, setCache } from "./cache";
 import { AIImageAnalysis } from "@/types/car";
+import path from "path";
 
 export interface ImageMetadata {
   angle?: string;
@@ -144,31 +145,73 @@ export function extractImageIdFromUrl(url: string): string | null {
 export async function uploadToCloudflare(
   file: File
 ): Promise<CloudflareImageUploadResult> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
+  console.log("Starting Cloudflare upload:", {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to upload image to Cloudflare");
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("itemId", "inventory-item"); // Add a default itemId that the endpoint requires
+
+  try {
+    console.log("Sending request to /api/upload");
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      // Try to parse error response
+      const errorData = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+      console.error("Upload failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+      });
+      throw new Error(
+        `Failed to upload image to Cloudflare: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log("Upload response:", result);
+
+    // Extract image ID either from result.id or from imageUrl path
+    const imageId =
+      result.id || (result.imageUrl ? path.basename(result.imageUrl) : null);
+
+    if (!imageId) {
+      throw new Error("Failed to get image ID from upload response");
+    }
+
+    // Handle both direct imageUrl response and Cloudflare account ID based response
+    const baseUrl = result.imageUrl
+      ? result.imageUrl.replace(/\/[^\/]+$/, "") // Remove the last part of the URL (filename)
+      : `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}`;
+
+    // Ensure the URL is properly constructed with /public at the end
+    const imageUrl = result.imageUrl || `${baseUrl}/public`;
+
+    console.log("Final image URL:", imageUrl);
+
+    return {
+      id: imageId,
+      filename: result.filename || file.name,
+      uploaded: result.uploaded || new Date().toISOString(),
+      requireSignedURLs: result.requireSignedURLs || false,
+      url: imageUrl,
+      variants:
+        result.variants ||
+        ["public", "thumbnail"].map((variant) => `${baseUrl}/${variant}`),
+    };
+  } catch (error) {
+    console.error("Error during upload:", error);
+    throw error;
   }
-
-  const result = await response.json();
-
-  // Ensure the URL is properly constructed with /public at the end
-  const imageUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${result.id}/public`;
-
-  return {
-    ...result,
-    url: imageUrl,
-    variants: ["public", "thumbnail"].map(
-      (variant) =>
-        `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${result.id}/${variant}`
-    ),
-  };
 }
 
 /**

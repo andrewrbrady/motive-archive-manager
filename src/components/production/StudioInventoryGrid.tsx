@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import EditInventoryItemModal from "./EditInventoryItemModal";
 import { BatchImageUploadModal } from "./BatchImageUploadModal";
+import { uploadToCloudflare } from "@/lib/cloudflare";
 
 interface StudioInventoryGridProps {
   items: StudioInventoryItem[];
@@ -249,85 +250,70 @@ export default function StudioInventoryGrid({
   }, []);
 
   const handleDrop = useCallback(
-    async (e: React.DragEvent<HTMLDivElement>, item: StudioInventoryItem) => {
-      e.preventDefault();
-      e.stopPropagation();
+    async (
+      event: React.DragEvent<HTMLDivElement>,
+      item: StudioInventoryItem
+    ) => {
+      if (!isEditMode) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
       setDraggedOverItem(null);
 
-      if (!isEditMode) return;
+      const files = event.dataTransfer.files;
+      if (!files || files.length === 0) {
+        return;
+      }
 
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length === 0) return;
-
-      // Check if the dropped file is an image
       const imageFile = files[0];
       if (!imageFile.type.startsWith("image/")) {
         toast({
-          title: "Invalid file type",
-          description: "Only image files are allowed",
+          title: "Invalid file",
+          description: "Please upload an image file",
           variant: "destructive",
         });
         return;
       }
 
       try {
-        // Create form data
-        const formData = new FormData();
-        formData.append("file", imageFile);
-        formData.append("itemId", item.id);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
+        console.log("Uploading file:", {
+          fileName: imageFile.name,
+          fileSize: imageFile.size,
+          fileType: imageFile.type,
+          itemId: item.id,
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to upload image");
-        }
+        // Use the uploadToCloudflare function instead of direct fetch
+        const result = await uploadToCloudflare(imageFile);
+        console.log("Upload success response:", result);
 
-        const data = await response.json();
+        // Use the image URL from the result
+        const imageUrl = result.url;
 
-        // Handle the uploaded image URL
-        if (data.imageUrl) {
-          // Use the direct image URL from the response
-          const imageUrl = data.imageUrl;
+        // Update the edited items state with the new image
+        updateEditedItem(item.id, "primaryImage", imageUrl);
 
-          // Update the edited items state with the new image
-          updateEditedItem(item.id, "primaryImage", imageUrl);
+        // Update the images array
+        const currentImages = item.images || [];
+        const updatedImages = [...currentImages, imageUrl];
+        updateEditedItem(item.id, "images", updatedImages);
 
-          // Update the images array
-          const currentImages = item.images || [];
-          const updatedImages = [...currentImages, imageUrl];
-          updateEditedItem(item.id, "images", updatedImages);
-
-          toast({
-            title: "Image uploaded",
-            description:
-              "Image has been uploaded and will be applied when you save changes",
-          });
-        } else if (data.id && data.variants) {
-          // Fallback to the Cloudflare method if imageUrl is not provided
-          const imageUrl = `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${data.id}/public`;
-
-          // Update the edited items state with the new image
-          updateEditedItem(item.id, "primaryImage", imageUrl);
-
-          // Update the images array
-          const currentImages = item.images || [];
-          const updatedImages = [...currentImages, imageUrl];
-          updateEditedItem(item.id, "images", updatedImages);
-
-          toast({
-            title: "Image uploaded",
-            description:
-              "Image has been uploaded and will be applied when you save changes",
-          });
-        }
+        toast({
+          title: "Image uploaded",
+          description:
+            "Image has been uploaded and will be applied when you save changes",
+        });
       } catch (error) {
         console.error("Error uploading image:", error);
         toast({
           title: "Upload failed",
-          description: "Failed to upload image. Please try again.",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Failed to upload image. Please try again.",
           variant: "destructive",
         });
       }

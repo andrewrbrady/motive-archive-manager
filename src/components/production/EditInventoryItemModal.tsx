@@ -242,60 +242,31 @@ export default function EditInventoryItemModal({
         };
         setUploadProgress((prev) => [...prev, uploadingProgress]);
 
+        console.log(`Starting upload for ${file.name}`);
+
         // Upload to Cloudflare
         const result = await uploadToCloudflare(file);
-
-        // Create the image object
-        const newImage: StudioInventoryImage = {
-          id: result.id,
-          url: result.url,
-          filename: file.name,
-          metadata: {
-            description: "",
-            tags: [],
-          },
-          variants: result.variants.reduce((acc, variant) => {
-            acc[variant.split("/").pop() || ""] = variant;
-            return acc;
-          }, {} as { [key: string]: string }),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        // Update form data with the new image
-        setFormData((prev) => ({
-          ...prev,
-          images: [...(prev.images || []), newImage.url],
-          primaryImage: prev.primaryImage || newImage.url,
-        }));
+        console.log(`Upload successful for ${file.name}:`, result);
 
         // Update progress to complete
-        setUploadProgress((prev) =>
-          prev.map((p) =>
-            p.fileName === file.name
-              ? {
-                  ...p,
-                  status: "complete",
-                  progress: 100,
-                  imageUrl: newImage.url,
-                }
-              : p
-          )
-        );
+        handleImageProgress({
+          fileName: file.name,
+          progress: 100,
+          status: "complete",
+          imageUrl: result.url,
+        });
+
+        console.log(`Image added to form data: ${result.url}`);
       } catch (error) {
-        console.error("Error uploading image:", error);
+        console.error(`Error uploading ${file.name}:`, error);
+
         // Update progress to error
-        setUploadProgress((prev) =>
-          prev.map((p) =>
-            p.fileName === file.name
-              ? {
-                  ...p,
-                  status: "error",
-                  error: "Failed to upload image",
-                }
-              : p
-          )
-        );
+        handleImageProgress({
+          fileName: file.name,
+          progress: 0,
+          status: "error",
+          error: error instanceof Error ? error.message : "Upload failed",
+        });
       }
     }
 

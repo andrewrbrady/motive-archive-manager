@@ -26,6 +26,7 @@ import { LocationResponse } from "@/models/location";
 import { Badge } from "@/components/ui/badge";
 import { v4 as uuidv4 } from "uuid";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { uploadToCloudflare } from "@/lib/cloudflare";
 
 // Define a local interface for our upload tracking
 interface FileUploadProgress {
@@ -212,66 +213,55 @@ export default function AddInventoryItemModal({
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
     const files = Array.from(e.target.files);
-    files.forEach((file) => {
-      const uploadId = uuidv4();
-      const newProgress: FileUploadProgress = {
-        id: uploadId,
-        fileName: file.name,
-        status: "uploading",
-        progress: 0,
-        currentStep: "Uploading file",
-      };
 
-      setUploadProgress((prev) => [...prev, newProgress]);
+    for (const file of files) {
+      try {
+        const uploadId = uuidv4();
+        const newProgress: FileUploadProgress = {
+          id: uploadId,
+          fileName: file.name,
+          status: "uploading",
+          progress: 0,
+          currentStep: "Uploading file",
+        };
 
-      const formData = new FormData();
-      formData.append("file", file);
+        setUploadProgress((prev) => [...prev, newProgress]);
 
-      fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          const completeProgress: FileUploadProgress = {
-            ...newProgress,
-            status: "complete",
-            progress: 100,
-            imageUrl: data.url,
-          };
+        console.log(`Starting upload for ${file.name}`);
 
-          handleImageProgress(completeProgress);
+        // Use the fixed uploadToCloudflare function
+        const result = await uploadToCloudflare(file);
+        console.log(`Upload successful for ${file.name}:`, result);
 
-          setFormData((prev) => {
-            // Ensure we only have string values in the images array
-            const currentImages = Array.isArray(prev.images)
-              ? [...prev.images]
-              : [];
-            const newImages = [...currentImages, data.url].filter(
-              Boolean
-            ) as string[];
+        // Update progress with complete status
+        const completeProgress: FileUploadProgress = {
+          ...newProgress,
+          status: "complete",
+          progress: 100,
+          imageUrl: result.url,
+        };
 
-            return {
-              ...prev,
-              images: newImages,
-              primaryImage: prev.primaryImage || data.url,
-            };
-          });
-        })
-        .catch((error) => {
-          console.error("Error uploading file:", error);
-          handleImageProgress({
-            ...newProgress,
-            status: "error",
-            progress: 0,
-            error: "Failed to upload file",
-          });
-        });
-    });
+        handleImageProgress(completeProgress);
+      } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+
+        // Update progress with error status
+        const errorProgress: FileUploadProgress = {
+          id: uuidv4(),
+          fileName: file.name,
+          status: "error",
+          progress: 0,
+          error:
+            error instanceof Error ? error.message : "Failed to upload file",
+        };
+
+        handleImageProgress(errorProgress);
+      }
+    }
   };
 
   const addTag = () => {
