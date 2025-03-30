@@ -31,7 +31,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ImageFilterButton } from "@/components/cars/ImageGalleryEnhanced";
 import { Button } from "@/components/ui/button";
 import {
   useCarImages,
@@ -682,14 +681,6 @@ export function ImageGalleryWithQuery({
                 Upload
               </Button>
               <Button
-                onClick={() => refetch()}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <RefreshCcw className="w-4 h-4" />
-                Refresh
-              </Button>
-              <Button
                 onClick={handleDeleteSelected}
                 disabled={selectedImages.size === 0 || deleteMutation.isPending}
                 variant="destructive"
@@ -1162,13 +1153,6 @@ export function ImageGalleryWithQuery({
                           />
                         )}
 
-                        {/* Primary indicator (small badge) */}
-                        {isPrimary && (
-                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-[8px] px-1 py-0.5 rounded-sm">
-                            P
-                          </div>
-                        )}
-
                         {/* Edit mode controls */}
                         {isEditMode && (
                           <>
@@ -1289,6 +1273,8 @@ export function ImageGalleryWithQuery({
           clearNotifications={() => {
             setUploadProgress([]);
             setShowUploadProgress(false);
+            // Force a refresh of the images after uploads
+            refetch();
           }}
         />
       )}
@@ -1298,3 +1284,204 @@ export function ImageGalleryWithQuery({
     </div>
   );
 }
+
+// Add the ImageFilterButton component
+// Export the filter button to be used in the parent component
+export const ImageFilterButton = React.memo(function ImageFilterButton({
+  activeFilters,
+  filterOptions,
+  onFilterChange,
+  onResetFilters,
+}: {
+  activeFilters: any;
+  filterOptions: any;
+  onFilterChange: (type: string, value: string) => void;
+  onResetFilters: () => void;
+}) {
+  // Control the open state of the popover manually
+  const [open, setOpen] = React.useState(false);
+
+  // Handle filter change without causing multiple renders
+  const handleFilterChange = React.useCallback(
+    (type: string, value: string) => {
+      onFilterChange(type, value);
+    },
+    [onFilterChange]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))]">
+          <Filter className="w-4 h-4" />
+          Filter
+          {Object.keys(activeFilters).length > 0 && (
+            <span className="flex items-center justify-center w-5 h-5 text-xs rounded-full bg-primary text-primary-foreground">
+              {Object.keys(activeFilters).length}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-4 max-h-96 overflow-y-auto bg-[hsl(var(--background))] border border-[hsl(var(--border))] shadow-md">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-medium">Filter Images</h3>
+            {Object.keys(activeFilters).length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onResetFilters();
+                }}
+                className="text-xs text-primary hover:text-primary/90 transition-colors"
+              >
+                Reset All Filters
+              </button>
+            )}
+          </div>
+
+          {filterOptions.angles && filterOptions.angles.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Angle
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.angles.map((angle: string) => (
+                  <button
+                    key={angle}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("angle", angle);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.angle === angle
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {angle}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.views && filterOptions.views.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                View
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.views.map((view: string) => (
+                  <button
+                    key={view}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("view", view);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.view === view
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {view}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.movements && filterOptions.movements.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Movement
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.movements.map((movement: string) => (
+                  <button
+                    key={movement}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("movement", movement);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.movement === movement
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {movement}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.tods && filterOptions.tods.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Time of Day
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.tods.map((tod: string) => (
+                  <button
+                    key={tod}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("tod", tod);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.tod === tod
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {tod}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filterOptions.sides && filterOptions.sides.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Side
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.sides.map((side: string) => (
+                  <button
+                    key={side}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleFilterChange("side", side);
+                    }}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
+                      activeFilters.side === side
+                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
+                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                    }`}
+                  >
+                    {side}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Debug info */}
+          <div className="mt-4 pt-4 border-t border-[hsl(var(--border-subtle))]">
+            <details>
+              <summary className="text-xs text-[hsl(var(--foreground-muted))] cursor-pointer">
+                Debug filter options
+              </summary>
+              <pre className="mt-2 p-2 bg-[hsl(var(--background-subtle))] rounded text-xs overflow-auto max-h-40">
+                {JSON.stringify(filterOptions, null, 2)}
+              </pre>
+            </details>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});

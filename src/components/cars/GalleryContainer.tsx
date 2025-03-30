@@ -1,9 +1,9 @@
 import React, { useCallback } from "react";
 import { useGalleryState, FilterOptions } from "@/hooks/useGalleryState";
-import { ImageGalleryEnhanced } from "./ImageGalleryEnhanced";
+import { ImageGalleryWithQuery } from "./ImageGalleryWithQuery";
 import ImageUploadWithContext from "@/components/ImageUploadWithContext";
 import { Check, Pencil } from "lucide-react";
-import { ImageFilterButton } from "./ImageGalleryEnhanced";
+import { ImageFilterButton } from "./ImageGalleryWithQuery";
 import { toast } from "react-hot-toast";
 
 interface GalleryContainerProps {
@@ -231,16 +231,20 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
               refreshImages={actions.synchronizeGalleryState}
             />
           ) : (
-            <ImageGalleryEnhanced
-              images={state.images}
-              isLoading={state.isLoading}
+            <ImageGalleryWithQuery
               carId={carId}
-              primaryImageId={car.primaryImageId}
-              activeFilters={state.filterState.activeFilters}
-              onFilterChange={handleFilterChange}
-              onResetFilters={() => actions.updateFilters({})}
-              onFilterOptionsChange={(options: FilterOptions) => {
-                actions.addPendingChange("filterOptions", options);
+              showFilters={true}
+              vehicleInfo={{ year: car.year, make: car.make, model: car.model }}
+              onFilterOptionsChange={(options: Record<string, string[]>) => {
+                // Convert the Record to FilterOptions
+                const filterOptions: FilterOptions = {
+                  angles: options.angles || [],
+                  movements: options.movements || [],
+                  tods: options.tods || [],
+                  views: options.views || [],
+                  sides: options.sides || [],
+                };
+                actions.addPendingChange("filterOptions", filterOptions);
               }}
             />
           )}
