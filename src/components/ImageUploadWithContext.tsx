@@ -645,7 +645,11 @@ export default function ImageUploadWithContext({
           uploading={uploading}
           isDeleting={isDeleting}
           onClose={closeNotification}
-          clearNotifications={clearNotifications}
+          clearNotifications={() => {
+            clearNotifications();
+            // Force a refresh after uploads are complete
+            refreshImages();
+          }}
         />
       )}
     </div>

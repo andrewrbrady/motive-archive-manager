@@ -88,7 +88,7 @@ export function StatusNotification({
   const hasErrors = uploadError || deleteError;
 
   return createPortal(
-    <div className="fixed inset-x-0 bottom-0 z-50 p-4 mx-auto max-w-lg">
+    <div className="fixed bottom-4 right-4 z-50 w-full max-w-md">
       <div className="bg-background border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 slide-in-from-bottom-5">
         <div className="flex items-center justify-between p-4 border-b">
           <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -131,7 +131,7 @@ export function StatusNotification({
           </Button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-4">
+        <div className="max-h-[40vh] overflow-y-auto p-4">
           {/* Use our ProgressList component for uploads */}
           {hasUploads && (
             <ProgressList items={uploadProgress as ProgressItem[]} />

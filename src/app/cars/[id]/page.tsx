@@ -35,7 +35,6 @@ import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
-import { ImageGalleryRewrite } from "@/components/cars/ImageGalleryRewrite";
 import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
@@ -45,7 +44,6 @@ import Scripts from "@/components/cars/Scripts";
 import { Car } from "@/types/car";
 import { MeasurementValue } from "@/types/measurements";
 import PhotoShoots from "@/components/cars/PhotoShoots";
-import { ImageFilterButton } from "@/components/cars/ImageGalleryEnhanced";
 import { ImageGalleryWithQuery } from "@/components/cars/ImageGalleryWithQuery";
 import { Button } from "@/components/ui/button";
 
@@ -1794,27 +1792,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 value: "calendar",
                 label: "Calendar",
                 content: <CalendarTab carId={id} />,
-              },
-              {
-                value: "images",
-                label: "Images",
-                content: (
-                  <TabsContent value="images" className="space-y-4">
-                    <div className="bg-white dark:bg-background rounded-lg p-4 shadow-sm">
-                      <h2 className="text-lg font-semibold mb-4">Car Images</h2>
-                      <ImageGalleryWithQuery
-                        carId={params.id}
-                        vehicleInfo={{
-                          make: car.make,
-                          model: car.model,
-                          year: car.year,
-                        }}
-                        onFilterOptionsChange={handleFilterOptionsChange}
-                        showFilters={true}
-                      />
-                    </div>
-                  </TabsContent>
-                ),
               },
             ]}
             defaultValue={activeTab}

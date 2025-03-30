@@ -252,7 +252,8 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
           }
 
           // Start polling for status
-          const imageId = result.id || result.success?.id;
+          const imageId =
+            result.result?.id || result.imageId || result.cloudflareId;
           if (imageId) {
             let isProcessComplete = false;
             let iterations = 0;
@@ -293,6 +294,9 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
 
               // Check status
               try {
+                console.log(
+                  `Checking status for image ${imageId}, iteration ${iterations}`
+                );
                 const statusResponse = await fetch(
                   `/api/cloudflare/images/status`,
                   {
@@ -307,13 +311,46 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
                 if (statusResponse.ok) {
                   // Parse status response
                   const statusResult = await statusResponse.json();
-                  console.log("Status:", statusResult);
+                  console.log("Status result:", statusResult);
+
+                  // If status is "processing", update the progress message
+                  if (statusResult.status === "processing") {
+                    progress[i] = {
+                      ...progress[i],
+                      progress: 50 + openAiProgress / 2, // Map 0-100 to 50-100
+                      currentStep: "OpenAI analysis in progress...",
+                      stepProgress: {
+                        cloudflare: {
+                          status: "complete",
+                          progress: 100,
+                          message: "Cloudflare upload complete",
+                        },
+                        openai: {
+                          status: "analyzing" as const,
+                          progress: openAiProgress,
+                          message: `AI analysis in progress (${Math.min(
+                            openAiProgress,
+                            90
+                          )}%)...`,
+                        },
+                      },
+                    };
+
+                    // Call onProgress callback
+                    if (onProgress) {
+                      onProgress([...progress]);
+                    }
+                  }
 
                   // If image has metadata from AI or has flags, consider it complete
                   if (
                     statusResult.ready ||
-                    statusResult.metadata ||
-                    statusResult.status === "complete"
+                    statusResult.status === "complete" ||
+                    (statusResult.metadata &&
+                      (statusResult.metadata.aiAnalysis?.angle ||
+                        statusResult.metadata.aiAnalysis?.description ||
+                        statusResult.metadata.angle ||
+                        statusResult.metadata.description))
                   ) {
                     isProcessComplete = true;
 
@@ -322,6 +359,7 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
                       id: imageId,
                       url:
                         result.result?.variants?.[0] ||
+                        result.imageUrl ||
                         result.success?.variants?.[0],
                       filename: file.name,
                       metadata: statusResult.metadata || {},
@@ -367,6 +405,7 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
             // If we hit max iterations without completion, still mark as completed
             // but indicate that analysis might not be complete
             if (!isProcessComplete) {
+              console.log("Hit max iterations, marking as complete anyway");
               progress[i] = {
                 ...progress[i],
                 progress: 100,
@@ -387,9 +426,15 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
                 },
               };
 
-              // Call onProgress callback
+              // Call onProgress callback with a slight delay to ensure UI updates
               if (onProgress) {
+                // First update immediately
                 onProgress([...progress]);
+
+                // Then update again after a slight delay for UI consistency
+                setTimeout(() => {
+                  onProgress([...progress]);
+                }, 500);
               }
             }
           }
