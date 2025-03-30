@@ -122,36 +122,13 @@ export const authConfig: NextAuthConfig = {
           // Check if this user already exists in Firestore
           const userDoc = await adminDb.collection("users").doc(uid).get();
 
-          // First-time Google sign-in - check if this email is allowed
+          // First-time Google sign-in - create user
           if (!userDoc.exists) {
-            // OPTION 1: Restrict to specific domains
-            const allowedDomains = process.env.ALLOWED_EMAIL_DOMAINS?.split(
-              ","
-            ) || ["motive.studio"];
-            const emailDomain = email.split("@")[1];
-
-            if (!allowedDomains.includes(emailDomain)) {
-              console.log(
-                `Unauthorized sign-in attempt from ${email} - domain not allowed`
-              );
-              return false; // Reject sign-in for non-allowed domains
-            }
-
-            // OPTION 2: Check against a list of pre-approved emails
-            // Uncomment this if you want to use a specific allowlist instead
-            /*
-            const allowlistedEmails = await adminDb.collection("allowlist").where("email", "==", email).get();
-            if (allowlistedEmails.empty) {
-              console.log(`Unauthorized sign-in attempt from ${email} - not in allowlist`);
-              return false; // Reject sign-in for non-allowlisted emails
-            }
-            */
-
             console.log(
               `Creating new user document for ${email} with ID: ${uid}`
             );
 
-            // Create a user document in Firestore
+            // Create a user document in Firestore with standard user permissions
             await adminDb
               .collection("users")
               .doc(uid)
@@ -166,14 +143,14 @@ export const authConfig: NextAuthConfig = {
                 createdAt: new Date(),
               });
 
-            // Set custom claims for the user
+            // Set custom claims for the user with standard permissions
             await adminAuth.setCustomUserClaims(uid, {
               roles: ["user"],
               creativeRoles: [],
               status: "active",
             });
           } else {
-            // Existing user - check if they're not suspended
+            // Existing user - only check if they're not suspended
             const userData = userDoc.data();
             if (userData?.status === "suspended") {
               console.log(`Sign-in attempt from suspended user: ${email}`);
@@ -185,8 +162,9 @@ export const authConfig: NextAuthConfig = {
         return true;
       } catch (error) {
         console.error("Error in signIn callback:", error);
-        // Don't allow sign-in if there was an error processing the request
-        return false;
+        // Still allow sign-in even if there was an error with Firestore
+        // This prevents users from being locked out due to database issues
+        return true;
       }
     },
   },
