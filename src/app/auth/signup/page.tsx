@@ -41,9 +41,35 @@ export default function SignUp() {
 
     try {
       console.log("Starting user registration with Firebase...");
+      console.log("Email:", email);
+
       // Create user with Firebase Authentication
       const user = await signUp(email, password);
       console.log("User created in Firebase Auth:", user.uid);
+      console.log(
+        "Full user object:",
+        JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          metadata: user.metadata,
+        })
+      );
+
+      // CRITICAL VERIFICATION: Check if user actually exists in Firebase Auth
+      try {
+        const authCheck = await fetch(`/api/auth/verify-user?uid=${user.uid}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const result = await authCheck.json();
+        console.log("User verification check:", result);
+      } catch (verifyError) {
+        console.error("Error verifying user:", verifyError);
+      }
 
       // Update user profile with name
       await updateProfile(user, {
@@ -53,17 +79,24 @@ export default function SignUp() {
 
       // Create a user document in Firestore
       console.log("Creating Firestore document for user:", user.uid);
-      await setDoc(doc(db, "users", user.uid), {
-        name,
-        email,
-        roles: ["user"],
-        creativeRoles: [],
-        status: "active",
-        accountType: "personal",
-        profileImage: user.photoURL || "",
-        createdAt: new Date(),
-      });
-      console.log("Firestore document created successfully");
+      try {
+        await setDoc(doc(db, "users", user.uid), {
+          name,
+          email,
+          roles: ["user"],
+          creativeRoles: [],
+          status: "active",
+          accountType: "personal",
+          profileImage: user.photoURL || "",
+          createdAt: new Date(),
+        });
+        console.log("Firestore document created successfully");
+      } catch (firestoreError: any) {
+        console.error("Firestore document creation error:", firestoreError);
+        console.error("Firestore error code:", firestoreError.code);
+        console.error("Firestore error message:", firestoreError.message);
+        // Continue with registration even if Firestore fails
+      }
 
       // Add custom claims via the Admin SDK
       try {
@@ -96,6 +129,12 @@ export default function SignUp() {
       router.push("/auth/signin?registered=true");
     } catch (err: any) {
       console.error("Registration error:", err);
+      console.error("Error code:", err.code);
+      console.error("Error message:", err.message);
+      console.error(
+        "Full error object:",
+        JSON.stringify(err, Object.getOwnPropertyNames(err))
+      );
 
       const errorCode = err.code;
       let errorMessage = "An unexpected error occurred. Please try again.";
