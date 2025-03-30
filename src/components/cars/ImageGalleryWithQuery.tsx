@@ -59,6 +59,8 @@ interface ImageGalleryWithQueryProps {
   showFilters?: boolean;
   vehicleInfo?: any;
   onFilterOptionsChange?: (options: Record<string, string[]>) => void;
+  onUploadStarted?: () => void;
+  onUploadEnded?: () => void;
 }
 
 // Extend the ImageType to include _id for backward compatibility
@@ -72,6 +74,8 @@ export function ImageGalleryWithQuery({
   showFilters,
   vehicleInfo,
   onFilterOptionsChange,
+  onUploadStarted,
+  onUploadEnded,
 }: ImageGalleryWithQueryProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -118,7 +122,7 @@ export function ImageGalleryWithQuery({
   );
 
   // Add state for upload progress
-  const [uploadProgress, setUploadProgress] = useState<ProgressItem[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
   const [showUploadProgress, setShowUploadProgress] = useState(false);
 
   // Add function to load image details
@@ -370,6 +374,22 @@ export function ImageGalleryWithQuery({
     updateUrl({ mode: isEditMode ? null : "edit" });
   };
 
+  // Add a helper function for showing toasts at the top of the file
+  const showToast = (
+    toast: any,
+    title: string,
+    description: string,
+    duration = 2000,
+    variant?: "default" | "destructive"
+  ) => {
+    toast({
+      title,
+      description,
+      duration,
+      variant,
+    });
+  };
+
   // Handle delete selection using React Query mutation
   const handleDeleteSelected = async () => {
     // Convert Set to Array if needed
@@ -390,6 +410,7 @@ export function ImageGalleryWithQuery({
     try {
       // Show loading toast
       showToast(
+        toast,
         "Deleting images",
         `Deleting ${selectedArray.length} image${
           selectedArray.length > 1 ? "s" : ""
@@ -414,6 +435,7 @@ export function ImageGalleryWithQuery({
 
       if (selectedImageObjects.length === 0) {
         showToast(
+          toast,
           "Error",
           "Could not find selected image data",
           undefined,
@@ -448,6 +470,7 @@ export function ImageGalleryWithQuery({
             await new Promise((resolve) => setTimeout(resolve, waitTime));
 
             showToast(
+              toast,
               "Retrying deletion",
               `Retry ${attempt}/${maxRetries}: Deleting ${
                 selectedArray.length
@@ -466,6 +489,7 @@ export function ImageGalleryWithQuery({
 
           // Update toast with success message
           showToast(
+            toast,
             "Success",
             `Successfully deleted ${selectedArray.length} image${
               selectedArray.length > 1 ? "s" : ""
@@ -509,6 +533,7 @@ export function ImageGalleryWithQuery({
           if (attempt > maxRetries) {
             console.error("Maximum retry attempts reached. Giving up.");
             showToast(
+              toast,
               "Error",
               `Failed to delete images after ${maxRetries} attempts. Please try again later.`,
               undefined,
@@ -520,6 +545,7 @@ export function ImageGalleryWithQuery({
     } catch (error) {
       console.error("Error in handleDeleteSelected:", error);
       showToast(
+        toast,
         "Error",
         "Failed to delete selected images",
         undefined,
@@ -564,43 +590,67 @@ export function ImageGalleryWithQuery({
 
     console.log(`Starting upload of ${files.length} files`);
 
-    // Initialize progress tracking
-    const initialProgress = Array.from(files).map(
-      (file) =>
-        ({
-          fileName: file.name,
+    // Initialize progress tracking with the correct type
+    const initialProgress: ImageProgress[] = Array.from(files).map((file) => ({
+      fileName: file.name,
+      progress: 0,
+      status: "uploading",
+      currentStep: "Preparing to upload...",
+      stepProgress: {
+        cloudflare: {
+          status: "uploading",
           progress: 0,
-          status: "uploading" as const,
-          currentStep: "Preparing to upload...",
-          stepProgress: {
-            cloudflare: {
-              status: "uploading" as const,
-              progress: 0,
-              message: "Starting upload to Cloudflare...",
-            },
-            openai: {
-              status: "pending" as const,
-              progress: 0,
-              message: "Waiting for upload to complete",
-            },
-          },
-        } as ProgressItem)
-    );
+          message: "Starting upload to Cloudflare...",
+        },
+        openai: {
+          status: "pending",
+          progress: 0,
+          message: "Waiting for upload to complete",
+        },
+      },
+    }));
 
-    // Set initial progress state
-    setUploadProgress(initialProgress);
+    // CRITICAL: Set these flags BEFORE starting the actual upload
+    // This ensures the modal is shown immediately
     setShowUploadProgress(true);
+    setUploadProgress(initialProgress);
+
+    // Force a synchronous DOM update with a no-op state update
+    // This helps ensure the modal renders before upload processing begins
+    setShowUploadProgress(true);
+
+    // Explicitly wait a moment for React to render the notification
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    console.log("Upload notification should now be visible");
+
+    // Notify parent component that upload has started
+    if (onUploadStarted) {
+      onUploadStarted();
+    }
 
     try {
       // Execute the upload mutation with progress tracking
       await uploadMutation.mutateAsync({
         files: Array.from(files),
         onProgress: (progress: ImageProgress[]) => {
+          console.log(
+            "Upload progress update:",
+            progress.map((p) => p.progress)
+          );
           setUploadProgress(progress);
         },
       });
 
       console.log("Upload complete");
+
+      // Keep showing the completed status for a moment
+      setTimeout(() => {
+        // Notify parent component that upload has ended
+        if (onUploadEnded) {
+          onUploadEnded();
+        }
+      }, 1000);
     } catch (error) {
       console.error("Error uploading images:", error);
       // Update progress to show error
@@ -611,6 +661,14 @@ export function ImageGalleryWithQuery({
           error: "Upload failed",
         }))
       );
+
+      // Keep showing the error status for a moment
+      setTimeout(() => {
+        // Notify parent component that upload has ended (even though it failed)
+        if (onUploadEnded) {
+          onUploadEnded();
+        }
+      }, 3000);
     }
   };
 
@@ -744,7 +802,7 @@ export function ImageGalleryWithQuery({
   // Empty state
   if (images.length === 0) {
     return (
-      <div className="p-8 text-center border border-border rounded-md bg-muted/10">
+      <div className="relative p-8 text-center border border-border rounded-md bg-muted/10">
         <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
         <h3 className="text-lg font-medium">No images found</h3>
         <p className="text-muted-foreground mb-4">
@@ -757,23 +815,45 @@ export function ImageGalleryWithQuery({
               fileInputRef.current.click();
             }
           }}
-          disabled={uploadMutation.isPending}
+          className="inline-flex items-center gap-2"
         >
-          <UploadIcon className="w-4 h-4 mr-2" />
+          <UploadIcon className="w-4 h-4" />
           Upload Images
         </Button>
         <input
-          ref={fileInputRef}
           type="file"
-          accept="image/*"
+          ref={fileInputRef}
+          className="hidden"
           multiple
+          accept="image/*"
           onChange={(e) => {
-            const fileList = e.target.files;
-            if (fileList && fileList.length > 0) {
-              handleImageUpload(fileList);
+            if (e.target.files && e.target.files.length > 0) {
+              // Set status visibility BEFORE calling the upload function
+              setShowUploadProgress(true);
+              handleImageUpload(e.target.files);
             }
           }}
-          className="hidden"
+        />
+
+        {/* Always include StatusNotification in DOM for empty state too */}
+        <StatusNotification
+          show={showUploadProgress || uploadMutation.isPending}
+          uploadProgress={uploadProgress as any}
+          deleteStatus={[]}
+          uploading={uploadMutation.isPending}
+          isDeleting={false}
+          onClose={() => {
+            if (!uploadMutation.isPending) {
+              setShowUploadProgress(false);
+            }
+          }}
+          clearNotifications={() => {
+            if (!uploadMutation.isPending) {
+              setUploadProgress([]);
+              setShowUploadProgress(false);
+              refetch();
+            }
+          }}
         />
       </div>
     );
@@ -1070,21 +1150,6 @@ export function ImageGalleryWithQuery({
     );
   };
 
-  // Fix toast calls to remove id property
-  const showToast = (
-    title: string,
-    description: string,
-    duration = 2000,
-    variant?: "default" | "destructive"
-  ) => {
-    toast({
-      title,
-      description,
-      duration,
-      variant,
-    });
-  };
-
   // Fix the handling of possibly undefined cloudflareId
   const handleSelectedImageCheck = (image: ExtendedImageType) => {
     return (
@@ -1287,23 +1352,29 @@ export function ImageGalleryWithQuery({
         className="hidden"
       />
 
-      {/* Upload progress notification */}
-      {showUploadProgress && (
-        <StatusNotification
-          show={showUploadProgress}
-          uploadProgress={uploadProgress as any}
-          deleteStatus={[]}
-          uploading={uploadMutation.isPending}
-          isDeleting={false}
-          onClose={() => setShowUploadProgress(false)}
-          clearNotifications={() => {
+      {/* ALWAYS render the StatusNotification component, but conditionally show it */}
+      <StatusNotification
+        show={showUploadProgress || uploadMutation.isPending}
+        uploadProgress={uploadProgress as any} // Cast to any to avoid type issues
+        deleteStatus={[]}
+        uploading={uploadMutation.isPending}
+        isDeleting={false}
+        onClose={() => {
+          // Only allow closing if not currently uploading
+          if (!uploadMutation.isPending) {
+            setShowUploadProgress(false);
+          }
+        }}
+        clearNotifications={() => {
+          // Only allow clearing if not currently uploading
+          if (!uploadMutation.isPending) {
             setUploadProgress([]);
             setShowUploadProgress(false);
             // Force a refresh of the images after uploads
             refetch();
-          }}
-        />
-      )}
+          }
+        }}
+      />
 
       {/* Fullscreen image modal */}
       {renderFullscreenModal()}

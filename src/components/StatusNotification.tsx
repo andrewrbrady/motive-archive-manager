@@ -70,7 +70,32 @@ export function StatusNotification({
   isDeleting,
   clearNotifications,
 }: StatusNotificationProps) {
-  if (!show) return null;
+  // Add useEffect to log visibility state changes
+  useEffect(() => {
+    if (show) {
+      console.log("StatusNotification visibility ON", {
+        uploadProgress: uploadProgress.length,
+        uploading,
+        show,
+      });
+    }
+  }, [show, uploadProgress.length, uploading]);
+
+  // Don't return null, but render with visibility:hidden to keep in DOM
+  // This helps with smoother transitions and ensures it's ready to show
+  if (!show) {
+    return createPortal(
+      <div
+        className="fixed bottom-4 right-4 z-50 w-full max-w-md"
+        style={{ visibility: "hidden" }}
+      >
+        <div className="bg-background border rounded-lg shadow-xl overflow-hidden">
+          {/* Empty placeholder to maintain DOM presence */}
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   const allCompleted =
     !uploading &&
@@ -126,6 +151,7 @@ export function StatusNotification({
             size="icon"
             onClick={onClose}
             className="h-8 w-8 rounded-full"
+            disabled={uploading || isDeleting} // Disable during active operations
           >
             <X className="h-4 w-4" />
           </Button>
@@ -194,6 +220,7 @@ export function StatusNotification({
             size="sm"
             onClick={onClose}
             className="text-sm"
+            disabled={uploading || isDeleting} // Disable during active operations
           >
             {allCompleted ? "Close" : "Hide"}
           </Button>
