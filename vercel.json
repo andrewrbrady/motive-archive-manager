@@ -6,7 +6,7 @@
     "NODE_ENV": "production"
   },
   "functions": {
-    "src/middleware.ts": {
+    "middleware": {
       "memory": 1024,
       "maxDuration": 10
     }
