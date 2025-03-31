@@ -1,49 +1,26 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-
-// Define route role requirements
-const routePermissions: Record<string, string[]> = {
-  // Admin routes require admin role
-  "/admin": ["admin"],
-  "/admin/users": ["admin"],
-  "/admin/clients": ["admin"],
-  "/admin/settings": ["admin"],
-
-  // Editor routes require admin or editor role
-  "/edit": ["admin", "editor"],
-  "/dashboard": ["admin", "editor"],
-  "/profile": ["user", "admin", "editor"], // Any authenticated user
-};
-
-// Path patterns that require admin role (using regex patterns)
-const adminPatterns = [
-  /^\/admin\/.+$/, // All routes under /admin/
-];
-
-// Path patterns that require editor or admin role
-const editorPatterns = [
-  /^\/edit\/.+$/, // All routes under /edit/
-  /^\/cars\/\d+\/edit$/, // Car edit pages
-];
+import {
+  getPublicRoutes,
+  getAdminRoutes,
+  getAdminPatterns,
+  getEditorPatterns,
+  hasRequiredRole,
+  isUserSuspended,
+} from "@/lib/edge-auth";
 
 // Routes that don't require authentication
-const publicRoutes = [
-  "/auth/signin",
-  "/auth/signup",
-  "/auth/error",
-  "/auth/signout",
-  "/auth/reset-password",
-  "/auth/forgot-password",
-  "/api/auth",
-  "/auth",
-  "/",
-  "/about",
-  "/contact",
-];
+const publicRoutes = getPublicRoutes();
 
 // Routes that require admin role
-const adminRoutes = ["/admin", "/api/users"];
+const adminRoutes = getAdminRoutes();
+
+// Path patterns that require admin role
+const adminPatterns = getAdminPatterns();
+
+// Path patterns that require editor or admin role
+const editorPatterns = getEditorPatterns();
 
 // Helper to check if the path starts with any of the patterns
 const pathStartsWith = (path: string, patterns: string[]): boolean => {
@@ -88,7 +65,7 @@ export async function middleware(request: NextRequest) {
       pathMatchesPattern(pathname, adminPatterns))
   ) {
     const roles = (token.roles as string[]) || [];
-    if (!roles.includes("admin")) {
+    if (!hasRequiredRole(roles, ["admin"])) {
       // Redirect to unauthorized page
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
@@ -97,14 +74,14 @@ export async function middleware(request: NextRequest) {
   // Check editor routes - verify user has editor or admin role
   if (token && pathMatchesPattern(pathname, editorPatterns)) {
     const roles = (token.roles as string[]) || [];
-    if (!roles.includes("admin") && !roles.includes("editor")) {
+    if (!hasRequiredRole(roles, ["admin", "editor"])) {
       // Redirect to unauthorized page
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
   }
 
   // Account suspension check
-  if (token && token.status === "suspended") {
+  if (token && isUserSuspended(token.status as string)) {
     // Allow access to signout
     if (pathname === "/auth/signout") {
       return NextResponse.next();

@@ -4,11 +4,5 @@
   "framework": "nextjs",
   "env": {
     "NODE_ENV": "production"
-  },
-  "functions": {
-    "middleware": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
   }
 }
