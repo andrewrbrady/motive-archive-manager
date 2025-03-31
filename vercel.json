@@ -2,17 +2,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "environments": {
-    "production": {
-      "env": {
-        "NODE_ENV": "production"
-      }
-    },
-    "preview": {
-      "env": {
-        "NODE_ENV": "production"
-      }
-    }
+  "env": {
+    "NODE_ENV": "production"
   },
   "functions": {
     "src/middleware.ts": {
