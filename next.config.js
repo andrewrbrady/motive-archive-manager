@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
   output: "standalone",
   images: {
     remotePatterns: [
@@ -109,6 +110,14 @@ const nextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  experimental: {
+    instrumentationHook: true,
+  },
+  // Ensure middleware doesn't run in Edge Runtime
+  middleware: {
+    skipMiddlewareUrlNormalize: true,
+    skipTrailingSlashRedirect: true,
   },
 };
 
