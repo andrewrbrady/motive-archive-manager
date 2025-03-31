@@ -94,14 +94,30 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
-        setAllUsers(data);
-        // Filter users to only include those with video_editor role
-        const editors = data.filter(
-          (user: User) =>
-            user.creativeRoles.includes("video_editor") &&
-            user.status !== "inactive"
+
+        console.log(
+          "Fetched users in DeliverablesTab:",
+          Array.isArray(data) ? data.length : "not an array"
         );
-        setUsers(editors);
+
+        // API returns an array directly, not an object with users property
+        // Store all users
+        if (Array.isArray(data)) {
+          const activeUsers = data.filter(
+            (user: User) => user.status === "active"
+          );
+          setAllUsers(activeUsers);
+
+          // For backward compatibility, still set the editors list
+          // But we'll use allUsers where we need all active users
+          const editors = activeUsers.filter((user: User) =>
+            user.creativeRoles.includes("video_editor")
+          );
+          setUsers(editors);
+        } else {
+          console.error("Unexpected API response structure:", data);
+          toast.error("Failed to load users properly");
+        }
       } catch (error) {
         console.error("Error fetching users:", error);
         toast.error("Failed to fetch users");
@@ -304,18 +320,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   };
 
   const getRelevantUsers = (deliverableType: string) => {
-    if (deliverableType === "Photo Gallery") {
-      return allUsers.filter(
-        (user) =>
-          user.creativeRoles.includes("photographer") &&
-          user.status !== "inactive"
-      );
-    }
-    return allUsers.filter(
-      (user) =>
-        user.creativeRoles.includes("video_editor") &&
-        user.status !== "inactive"
-    );
+    // Return all active users without filtering by creative role
+    // This ensures maximum flexibility in assigning users to deliverables
+    return allUsers;
   };
 
   const renderPillCell = (
@@ -516,28 +523,6 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         );
       }
 
-      if (field === "edit_deadline" || field === "release_date") {
-        return (
-          <div className="flex items-center gap-2">
-            <DatePicker
-              date={safeDateValue(editValue)}
-              setDate={(date) => setEditValue(date ? date.toISOString() : "")}
-              className="w-[180px]"
-            />
-            <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
-              <Check className="h-4 w-4 text-success-500" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setEditingCell(null)}
-            >
-              <X className="h-4 w-4 text-destructive-500" />
-            </Button>
-          </div>
-        );
-      }
-
       if (field === "duration") {
         return (
           <div className="flex items-center gap-2">
@@ -584,13 +569,23 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
 
     if (field === "edit_deadline" || field === "release_date") {
+      // Directly render the DatePicker without requiring an edit mode first
+      // Get the value from the deliverable as a string
+      const deliverableValue = String(deliverable[field] || "");
+      const dateValue = safeDateValue(deliverableValue);
+
       return (
-        <div
-          onClick={() => handleCellClick(deliverable, field)}
-          className="cursor-pointer"
-        >
-          {safeFormat(deliverable[field], "MM/dd/yyyy")}
-        </div>
+        <DatePicker
+          date={dateValue}
+          setDate={(date) => {
+            if (date) {
+              // When date changes, update the deliverable
+              // Need to call the async function but we don't need to await its result here
+              void handleFieldChange(deliverable, field, date.toISOString());
+            }
+          }}
+          className="w-[180px]"
+        />
       );
     }
 
@@ -622,7 +617,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Deliverables</h2>
         <div className="flex gap-2">
@@ -657,12 +652,12 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         </div>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border w-full overflow-x-auto">
+        <Table className="min-w-full">
           <TableHeader>
             <TableRow>
               {isBatchMode && (
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[50px] whitespace-nowrap">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -677,15 +672,33 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                   </Button>
                 </TableHead>
               )}
-              <TableHead>Title</TableHead>
-              <TableHead>Platform</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Editor</TableHead>
-              <TableHead>Deadline</TableHead>
-              <TableHead>Release Date</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="whitespace-nowrap w-[250px]">
+                Title
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[180px]">
+                Platform
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[160px]">
+                Type
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[140px]">
+                Status
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[100px]">
+                Duration
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[180px]">
+                Editor
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[130px]">
+                Deadline
+              </TableHead>
+              <TableHead className="whitespace-nowrap w-[130px]">
+                Release Date
+              </TableHead>
+              <TableHead className="text-right whitespace-nowrap w-[100px]">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

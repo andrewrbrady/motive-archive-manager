@@ -29,7 +29,7 @@ export default function Navbar({ className }: NavbarProps) {
 
       {/* Navbar */}
       <nav className={`${navClasses} ${className || ""}`}>
-        <div className="container mx-auto flex justify-between items-center h-20 px-4">
+        <div className="container-fluid flex justify-between items-center h-20">
           <div className="flex items-center space-x-12">
             <Link href="/" className="shrink-0">
               <Image

@@ -20,7 +20,15 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Trash2, Search, Filter, CheckSquare, Square } from "lucide-react";
+import {
+  Trash2,
+  Search,
+  Filter,
+  CheckSquare,
+  Square,
+  UserPlus,
+  User,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
   Deliverable,
@@ -28,9 +36,11 @@ import {
   DeliverableStatus,
   DeliverableType,
 } from "@/types/deliverable";
+import { FirestoreUser } from "@/lib/firestore/users";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
 import BatchDeliverableForm from "./BatchDeliverableForm";
+import DeliverableAssignment from "./DeliverableAssignment";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,9 +88,14 @@ export default function DeliverablesList() {
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState("");
   const [creativeRole, setCreativeRole] = useState("");
-  const [users, setUsers] = useState<
-    { _id: string; name: string; creativeRoles: string[] }[]
-  >([]);
+  const [users, setUsers] = useState<FirestoreUser[]>([]);
+
+  // State for deliverable assignment
+  const [isAssignmentOpen, setIsAssignmentOpen] = useState(false);
+  const [
+    selectedDeliverableForAssignment,
+    setSelectedDeliverableForAssignment,
+  ] = useState<Deliverable | null>(null);
 
   const filteredUsers = useMemo(() => {
     if (!creativeRole || creativeRole === "all") return users;
@@ -115,11 +130,18 @@ export default function DeliverablesList() {
       const response = await fetch("/api/users");
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
+
+      console.log(
+        "Fetched users:",
+        Array.isArray(data) ? data.length : "not an array"
+      );
+
+      // API returns an array directly, not an object with users property
+      // Include all active users
       setUsers(
-        data.filter(
-          (user: any) =>
-            user.status === "active" && user.creativeRoles.length > 0
-        )
+        Array.isArray(data)
+          ? data.filter((user: FirestoreUser) => user.status === "active")
+          : []
       );
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -250,123 +272,240 @@ export default function DeliverablesList() {
     }
   };
 
+  // Open assignment dialog for a deliverable
+  const handleOpenAssignment = (deliverable: Deliverable) => {
+    // Reset any user filtering that might be in effect
+    fetchUsers();
+    setSelectedDeliverableForAssignment(deliverable);
+    setIsAssignmentOpen(true);
+  };
+
+  // Handle the assignment of a deliverable to a user
+  const handleAssignDeliverable = async (
+    deliverableId: string,
+    userId: string | null
+  ) => {
+    try {
+      const response = await fetch("/api/deliverables/assign", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deliverableId,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to assign deliverable");
+      }
+
+      // Refresh deliverables list
+      fetchDeliverables();
+      return true;
+    } catch (error) {
+      console.error("Error assigning deliverable:", error);
+      toast.error((error as Error).message || "Failed to assign deliverable");
+      return false;
+    }
+  };
+
+  // Find Firebase user for a given editor name (if applicable)
+  const findUserForDeliverable = (deliverable: Deliverable) => {
+    if (deliverable.firebase_uid) {
+      return users.find((user) => user.uid === deliverable.firebase_uid);
+    }
+    return null;
+  };
+
+  // Format user role information for display
+  const formatUserRoles = (user: FirestoreUser) => {
+    const roles = [];
+
+    // Add admin/editor status if present
+    if (user.roles.includes("admin")) {
+      roles.push("Admin");
+    } else if (user.roles.includes("editor")) {
+      roles.push("Editor");
+    }
+
+    // Add creative roles if any
+    if (user.creativeRoles.length > 0) {
+      roles.push(...user.creativeRoles.map((role) => role.replace("_", " ")));
+    }
+
+    return roles.length > 0 ? `(${roles.join(", ")})` : "";
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end items-center">
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="min-w-[200px]">
+            <Input
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full"
+            />
+          </div>
+
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="not_started">Not Started</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={platform} onValueChange={setPlatform}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Platform" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Platforms</SelectItem>
+              <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
+              <SelectItem value="Instagram Post">Instagram Post</SelectItem>
+              <SelectItem value="Instagram Story">Instagram Story</SelectItem>
+              <SelectItem value="YouTube">YouTube</SelectItem>
+              <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
+              <SelectItem value="TikTok">TikTok</SelectItem>
+              <SelectItem value="Facebook">Facebook</SelectItem>
+              <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Photo Gallery">Photo Gallery</SelectItem>
+              <SelectItem value="Video">Video</SelectItem>
+              <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
+              <SelectItem value="Video Gallery">Video Gallery</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedCar} onValueChange={setSelectedCar}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All Cars" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cars</SelectItem>
+              {cars.map((car) => (
+                <SelectItem key={car._id.toString()} value={car._id.toString()}>
+                  {car.year} {car.make} {car.model}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={creativeRole} onValueChange={setCreativeRole}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Creative Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {CREATIVE_ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {role.replace("_", " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={editor} onValueChange={setEditor}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Editor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Editors</SelectItem>
+              {users.map((user) => (
+                <SelectItem key={user.uid} value={user.name}>
+                  {user.name} {formatUserRoles(user)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex gap-2">
           <BatchTemplateManager />
           <NewDeliverableForm onDeliverableCreated={fetchDeliverables} />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search deliverables..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
+          {selectedCar && selectedCar !== "all" && (
+            <BatchDeliverableForm
+              carId={selectedCar}
+              onDeliverableCreated={fetchDeliverables}
             />
-          </div>
+          )}
         </div>
-        <Select value={selectedCar} onValueChange={setSelectedCar}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by car" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Cars</SelectItem>
-            {cars.map((car) => (
-              <SelectItem key={car._id} value={car._id}>
-                {`${car.year} ${car.make} ${car.model}`}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="not_started">Not Started</SelectItem>
-            <SelectItem value="in_progress">In Progress</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={platform} onValueChange={setPlatform}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by platform" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Platforms</SelectItem>
-            <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
-            <SelectItem value="Instagram Post">Instagram Post</SelectItem>
-            <SelectItem value="Instagram Story">Instagram Story</SelectItem>
-            <SelectItem value="YouTube">YouTube</SelectItem>
-            <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
-            <SelectItem value="TikTok">TikTok</SelectItem>
-            <SelectItem value="Facebook">Facebook</SelectItem>
-            <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={type} onValueChange={setType}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="Photo Gallery">Photo Gallery</SelectItem>
-            <SelectItem value="Video">Video</SelectItem>
-            <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
-            <SelectItem value="Video Gallery">Video Gallery</SelectItem>
-            <SelectItem value="Still">Still</SelectItem>
-            <SelectItem value="Graphic">Graphic</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={creativeRole} onValueChange={setCreativeRole}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by creative role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            {CREATIVE_ROLES.map((role) => (
-              <SelectItem key={role} value={role}>
-                {role
-                  .split("_")
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(" ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={editor} onValueChange={setEditor}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by editor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Editors</SelectItem>
-            {filteredUsers.map((user) => (
-              <SelectItem key={user._id} value={user.name}>
-                {user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {isBatchEditing && (
-                <TableHead className="w-[50px]">
+      <div className="space-y-4">
+        {selectedDeliverables.length > 0 && (
+          <div className="p-2 bg-muted rounded-md flex items-center gap-2">
+            <span>
+              {selectedDeliverables.length}{" "}
+              {selectedDeliverables.length === 1
+                ? "deliverable"
+                : "deliverables"}{" "}
+              selected
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelectedDeliverables([])}
+            >
+              Clear
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  Batch Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  onClick={() => handleBatchStatusUpdate("not_started")}
+                >
+                  Mark as Not Started
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleBatchStatusUpdate("in_progress")}
+                >
+                  Mark as In Progress
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleBatchStatusUpdate("done")}
+                >
+                  Mark as Done
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsBatchEditing(true)}>
+                  Edit Selected
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={toggleAllDeliverables}
-                    className="p-0"
                   >
                     {selectedDeliverables.length === deliverables.length ? (
                       <CheckSquare className="h-4 w-4" />
@@ -375,181 +514,185 @@ export default function DeliverablesList() {
                     )}
                   </Button>
                 </TableHead>
-              )}
-              <TableHead className="w-[200px]">Car</TableHead>
-              <TableHead className="w-[200px]">Title</TableHead>
-              <TableHead className="w-[140px]">Platform</TableHead>
-              <TableHead className="w-[120px]">Type</TableHead>
-              <TableHead className="w-[100px]">Status</TableHead>
-              <TableHead className="w-[60px]">Duration</TableHead>
-              <TableHead className="w-[70px]">Aspect</TableHead>
-              <TableHead className="w-[120px]">Editor</TableHead>
-              <TableHead className="w-[100px]">Deadline</TableHead>
-              <TableHead className="w-[100px]">Release</TableHead>
-              <TableHead className="w-[100px] text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={isBatchEditing ? 12 : 11}
-                  className="text-center py-8"
-                >
-                  <LoadingSpinner size="md" />
-                </TableCell>
+                <TableHead>Title</TableHead>
+                <TableHead>Car</TableHead>
+                <TableHead>Platform</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Edit Deadline</TableHead>
+                <TableHead>Release Date</TableHead>
+                <TableHead className="w-[180px]">Editor</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
-            ) : deliverables.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={isBatchEditing ? 12 : 11}
-                  className="text-center py-8"
-                >
-                  No deliverables found
-                </TableCell>
-              </TableRow>
-            ) : (
-              deliverables.map((deliverable) => (
-                <TableRow
-                  key={deliverable._id?.toString()}
-                  className="h-[48px]"
-                >
-                  {isBatchEditing && (
-                    <TableCell className="py-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          toggleDeliverableSelection(
-                            deliverable._id?.toString() || ""
-                          )
-                        }
-                        className="p-0"
-                      >
-                        {selectedDeliverables.includes(
-                          deliverable._id?.toString() || ""
-                        ) ? (
-                          <CheckSquare className="h-4 w-4" />
-                        ) : (
-                          <Square className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                  )}
-                  <TableCell className="py-2">
-                    {deliverable.car ? (
-                      <Link
-                        href={`/cars/${deliverable.car._id}`}
-                        className="text-info-600 dark:text-info-400 hover:underline truncate block"
-                        title={`${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model}`}
-                      >
-                        {`${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model}`}
-                      </Link>
-                    ) : (
-                      "Unknown Car"
-                    )}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <span className="truncate block" title={deliverable.title}>
-                      {deliverable.title}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <span
-                      className="truncate block"
-                      title={deliverable.platform}
-                    >
-                      {deliverable.platform}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <span className="truncate block" title={deliverable.type}>
-                      {deliverable.type}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <Badge
-                      variant={
-                        deliverable.status === "done"
-                          ? "default"
-                          : deliverable.status === "in_progress"
-                          ? "secondary"
-                          : "outline"
-                      }
-                      className="truncate"
-                    >
-                      {deliverable.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    {deliverable.type === "Photo Gallery"
-                      ? "N/A"
-                      : formatDuration(deliverable)}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    {deliverable.aspect_ratio || "N/A"}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <span className="truncate block" title={deliverable.editor}>
-                      {deliverable.editor}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    {deliverable.edit_deadline
-                      ? format(new Date(deliverable.edit_deadline), "MM/dd/yy")
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    {deliverable.release_date
-                      ? format(new Date(deliverable.release_date), "MM/dd/yy")
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <div className="flex justify-end items-center gap-2">
-                      <EditDeliverableForm
-                        deliverable={deliverable}
-                        onDeliverableUpdated={fetchDeliverables}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          handleDelete(
-                            deliverable._id?.toString() || "",
-                            deliverable.car_id.toString()
-                          )
-                        }
-                        className="text-destructive-500 hover:text-destructive-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center p-4">
+                    <LoadingSpinner />
                   </TableCell>
                 </TableRow>
-              ))
+              ) : deliverables.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center p-4">
+                    No deliverables found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                deliverables.map((deliverable) => {
+                  const id = deliverable._id?.toString() || "";
+                  const carId = deliverable.car_id.toString();
+                  const firebaseUser = findUserForDeliverable(deliverable);
+
+                  return (
+                    <TableRow key={id}>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleDeliverableSelection(id)}
+                        >
+                          {selectedDeliverables.includes(id) ? (
+                            <CheckSquare className="h-4 w-4" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/deliverables/${id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {deliverable.title}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {deliverable.car?.year} {deliverable.car?.make}{" "}
+                        {deliverable.car?.model}
+                      </TableCell>
+                      <TableCell>{deliverable.platform}</TableCell>
+                      <TableCell>{deliverable.type}</TableCell>
+                      <TableCell>{formatDuration(deliverable)}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            deliverable.status === "done"
+                              ? "success"
+                              : deliverable.status === "in_progress"
+                              ? "secondary"
+                              : "default"
+                          }
+                        >
+                          {deliverable.status === "not_started"
+                            ? "Not Started"
+                            : deliverable.status === "in_progress"
+                            ? "In Progress"
+                            : "Done"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {format(
+                          new Date(deliverable.edit_deadline),
+                          "MM/dd/yyyy"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {deliverable.release_date
+                          ? format(
+                              new Date(deliverable.release_date),
+                              "MM/dd/yyyy"
+                            )
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {deliverable.firebase_uid && firebaseUser ? (
+                            <>
+                              <User className="h-4 w-4 text-primary" />
+                              <span>{deliverable.editor}</span>
+                              {firebaseUser && (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatUserRoles(firebaseUser)}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span>{deliverable.editor || "Unassigned"}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleOpenAssignment(deliverable)}
+                            title="Assign to user"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                          <EditDeliverableForm
+                            deliverable={deliverable}
+                            onDeliverableUpdated={fetchDeliverables}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(id, carId)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <div>
+            {page > 1 && (
+              <Button
+                variant="outline"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
             )}
-          </TableBody>
-        </Table>
+          </div>
+          <div>
+            Page {page} of {totalPages}
+          </div>
+          <div>
+            {page < totalPages && (
+              <Button
+                variant="outline"
+                onClick={() => setPage(page + 1)}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex justify-center gap-2 mt-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-        >
-          Next
-        </Button>
-      </div>
+      {/* Assignment Modal */}
+      <DeliverableAssignment
+        isOpen={isAssignmentOpen}
+        onClose={() => {
+          setIsAssignmentOpen(false);
+          setSelectedDeliverableForAssignment(null);
+        }}
+        deliverable={selectedDeliverableForAssignment}
+        onAssign={handleAssignDeliverable}
+      />
     </div>
   );
 }

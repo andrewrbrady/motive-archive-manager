@@ -1165,3 +1165,24 @@ body.landing-page {
   overflow: hidden !important;
   border: none !important;
 }
+
+@layer utilities {
+  /* Full-width container without max-width limits */
+  .container-fluid {
+    width: 100%;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Wide container with increased max-width */
+  .container-wide {
+    width: 100%;
+    max-width: 2200px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

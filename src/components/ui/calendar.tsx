@@ -22,7 +22,8 @@ function Calendar({
         className
       )}
       modifiersClassNames={{
-        selected: "text-zinc-50 bg-zinc-800 dark:bg-zinc-700",
+        selected:
+          "text-primary-foreground bg-primary dark:bg-primary outline outline-2 outline-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background font-bold",
         today: "bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-50",
       }}
       classNames={{
@@ -40,22 +41,22 @@ function Calendar({
         table: "w-full border-collapse space-y-1",
         head_row: "flex w-full",
         head_cell:
-          "text-muted-foreground flex-1 font-normal text-[0.8rem] text-center",
+          "text-muted-foreground flex-1 font-normal text-[0.8rem] text-center w-9 m-auto",
         row: "flex w-full mt-2",
-        cell: "flex-1 h-9 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-zinc-800 [&:has([aria-selected].day-outside)]:bg-zinc-700/50 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+        cell: "flex-1 h-9 text-center text-sm p-0 relative flex items-center justify-center [&:has([aria-selected])]:bg-primary/20 [&:has([aria-selected].day-outside)]:bg-primary/10",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-md m-auto"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-md"
         ),
         day_selected:
-          "bg-zinc-800 text-zinc-50 hover:bg-zinc-700 hover:text-zinc-50 focus:bg-zinc-700 focus:text-zinc-50 dark:bg-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-600",
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground ring-2 ring-primary-foreground ring-offset-2 ring-offset-background font-bold outline outline-2 outline-primary-foreground",
         day_today:
           "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50",
         day_outside:
-          "day-outside text-muted-foreground opacity-50 aria-selected:bg-zinc-700/50 aria-selected:text-zinc-50 aria-selected:opacity-30",
+          "day-outside text-muted-foreground opacity-50 aria-selected:bg-primary/50 aria-selected:text-primary-foreground aria-selected:opacity-30",
         day_disabled: "text-muted-foreground opacity-50",
         day_range_middle:
-          "aria-selected:bg-zinc-800 aria-selected:text-zinc-50 dark:aria-selected:bg-zinc-700 dark:aria-selected:text-zinc-50",
+          "aria-selected:bg-primary/20 aria-selected:text-foreground",
         day_hidden: "invisible",
         ...classNames,
       }}

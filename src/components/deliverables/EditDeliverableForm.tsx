@@ -75,12 +75,20 @@ export default function EditDeliverableForm({
         const response = await fetch("/api/users");
         if (response.ok) {
           const data = await response.json();
-          setCreatives(
-            data.filter(
-              (user: User) =>
-                user.status === "active" && user.creativeRoles.length > 0
-            )
+
+          console.log(
+            "EditDeliverableForm - Fetched users:",
+            Array.isArray(data) ? data.length : "not an array"
           );
+
+          // API returns an array directly
+          if (Array.isArray(data)) {
+            // Get all active users regardless of creative role
+            setCreatives(data.filter((user: User) => user.status === "active"));
+          } else {
+            console.error("Unexpected API response structure:", data);
+            toast.error("Invalid user data format received");
+          }
         }
       } catch (error) {
         console.error("Error fetching creatives:", error);
@@ -93,12 +101,9 @@ export default function EditDeliverableForm({
   }, [isOpen]);
 
   const getRelevantCreatives = (deliverableType: DeliverableType) => {
-    return creatives.filter((user) => {
-      if (deliverableType === "Photo Gallery") {
-        return user.creativeRoles.includes("photographer");
-      }
-      return user.creativeRoles.includes("video_editor");
-    });
+    // Return all active users without filtering by creative role
+    // This ensures maximum flexibility in assigning users to deliverables
+    return creatives;
   };
 
   const relevantCreatives = getRelevantCreatives(type);

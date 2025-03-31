@@ -1768,7 +1768,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-8 min-h-[70vh]">
+      <main className="container-wide px-4 py-8 min-h-[70vh]">
         {error ? (
           <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
             {error}
