@@ -37,8 +37,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL("/auth/error", req.url));
     }
 
-    if (path.endsWith("/signout")) {
-      return NextResponse.redirect(new URL("/auth/signout", req.url));
+    // For sign-out requests, redirect to our custom sign-out handler
+    if (path.includes("/signout")) {
+      const callbackUrl = url.searchParams.get("callbackUrl") || "/";
+      return NextResponse.redirect(
+        new URL(
+          `/api/auth/signout?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+          req.url
+        )
+      );
     }
 
     // For session requests, return an empty session

@@ -6,6 +6,16 @@ export async function GET(req: NextRequest) {
   try {
     console.log("Custom NextAuth session handler called:", req.url);
 
+    // Check if this is a request to clear the session
+    const url = new URL(req.url);
+    if (url.searchParams.get("clear_session") === "true") {
+      console.log("Clearing session as requested via query param");
+      return NextResponse.json({
+        user: null,
+        expires: new Date(Date.now()).toISOString(),
+      });
+    }
+
     // Return a mock session with a generic user
     // This prevents null reference errors in the UI
     return NextResponse.json({
