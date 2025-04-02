@@ -119,12 +119,19 @@ export default function SignIn() {
         // Use NextAuth's signIn method with Google provider
         await signIn("google", {
           callbackUrl,
+          redirect: true,
         });
-        // No need to manually redirect, NextAuth handles it
-      } catch (error) {
-        console.error("Google sign-in error:", error);
-        setError("Failed to sign in with Google. Please try again.");
-        setIsLoading(false);
+        // NextAuth should handle the redirect automatically if it works
+      } catch (nextAuthError) {
+        console.warn(
+          "NextAuth Google signin failed, trying direct redirect:",
+          nextAuthError
+        );
+
+        // As a fallback, redirect directly to our custom endpoint
+        window.location.href = `/api/auth/signin/google?callbackUrl=${encodeURIComponent(
+          callbackUrl
+        )}`;
       }
     } catch (error: any) {
       console.error("Google sign-in error:", error);

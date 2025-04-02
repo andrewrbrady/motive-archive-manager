@@ -10,6 +10,25 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const path = url.pathname;
 
+    // For Google sign-in, redirect to our custom endpoint
+    if (path.includes("/signin/google")) {
+      const callbackUrl = url.searchParams.get("callbackUrl") || "/admin";
+      return NextResponse.redirect(
+        new URL(
+          `/api/auth/signin/google?callbackUrl=${encodeURIComponent(
+            callbackUrl
+          )}`,
+          req.url
+        )
+      );
+    }
+
+    // For Google callback, redirect to the callback URL
+    if (path.includes("/callback/google")) {
+      const callbackUrl = url.searchParams.get("callbackUrl") || "/admin";
+      return NextResponse.redirect(new URL(callbackUrl, req.url));
+    }
+
     if (path.endsWith("/signin")) {
       return NextResponse.redirect(new URL("/auth/signin", req.url));
     }

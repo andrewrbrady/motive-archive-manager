@@ -27,7 +27,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     console.log("NextAuth session POST handler called:", req.url);
-    return await handlers.POST(req);
+
+    // Return a simple session response for the POST method too
+    return NextResponse.json({
+      user: null,
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
   } catch (error: any) {
     console.error("Error in NextAuth session POST handler:", error);
     return NextResponse.json(
