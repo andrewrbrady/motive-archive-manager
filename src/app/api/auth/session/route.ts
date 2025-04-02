@@ -1,51 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handlers } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
+// Add more comprehensive error handling for the session route
 export async function GET(req: NextRequest) {
   try {
-    console.log("Custom NextAuth session handler called:", req.url);
+    console.log("NextAuth session handler called:", req.url);
 
-    // Check if this is a request to clear the session
-    const url = new URL(req.url);
-    if (url.searchParams.get("clear_session") === "true") {
-      console.log("Clearing session as requested via query param");
-      return NextResponse.json({
-        user: null,
-        expires: new Date(Date.now()).toISOString(),
-      });
-    }
-
-    // Return a mock session with a generic user
-    // This prevents null reference errors in the UI
-    return NextResponse.json({
-      user: {
-        name: "Demo User",
-        email: "demo@example.com",
-        image: null, // Set to null explicitly so fallback is used
-        id: "mock-user-id",
-        roles: ["user"],
-        creativeRoles: [],
-        status: "active",
-      },
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    // Log out key environment variables (excluding sensitive data)
+    console.log("Auth environment check:", {
+      NEXTAUTH_URL: process.env.NEXTAUTH_URL || "Not set",
+      NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      VERCEL_URL: process.env.VERCEL_URL,
     });
+
+    return await handlers.GET(req);
   } catch (error: any) {
-    console.error("Error in custom session handler:", error);
+    console.error("Error in NextAuth session handler:", error);
 
-    // Return a simple error response
-    return NextResponse.json({
-      user: {
-        name: "Demo User",
-        email: "demo@example.com",
-        image: null,
-        id: "mock-user-id",
-        roles: ["user"],
-        creativeRoles: [],
-        status: "active",
+    // Detailed error response for debugging
+    return NextResponse.json(
+      {
+        error: "Authentication error",
+        message: error?.message || "Unknown error",
+        stack:
+          process.env.NODE_ENV === "development" ? error?.stack : undefined,
+        code: error?.code,
+        name: error?.name,
       },
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+      {
+        status: 500,
+      }
+    );
   }
 }
 
@@ -53,20 +42,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     console.log("NextAuth session POST handler called:", req.url);
-
-    // Return a simple session response for the POST method too
-    return NextResponse.json({
-      user: {
-        name: "Demo User",
-        email: "demo@example.com",
-        image: null,
-        id: "mock-user-id",
-        roles: ["user"],
-        creativeRoles: [],
-        status: "active",
-      },
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+    return await handlers.POST(req);
   } catch (error: any) {
     console.error("Error in NextAuth session POST handler:", error);
     return NextResponse.json(

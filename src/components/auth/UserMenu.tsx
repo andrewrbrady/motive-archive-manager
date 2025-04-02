@@ -22,54 +22,10 @@ export function UserMenu() {
   const handleSignOut = async () => {
     try {
       setIsLoading(true);
-      console.log("Attempting to sign out...");
-
-      try {
-        // First try using NextAuth's signOut
-        await signOut({ callbackUrl: "/" });
-        console.log("NextAuth signOut completed");
-      } catch (nextAuthError) {
-        console.warn(
-          "NextAuth signOut failed, using direct API:",
-          nextAuthError
-        );
-
-        // Fall back to our custom endpoint if NextAuth fails
-        window.location.href = `/api/auth/signout?callbackUrl=${encodeURIComponent(
-          "/"
-        )}`;
-      }
+      await signOut({ callbackUrl: "/" });
     } catch (error) {
       console.error("Error signing out:", error);
       setIsLoading(false);
-    }
-  };
-
-  // Add a direct sign-out function
-  const handleDirectSignOut = async () => {
-    setIsLoading(true);
-
-    try {
-      // Clear any local storage or cookies we can access from client side
-      if (typeof window !== "undefined") {
-        // Clear localStorage
-        localStorage.removeItem("next-auth.session-token");
-        localStorage.removeItem("next-auth.callback-url");
-        localStorage.removeItem("next-auth.csrf-token");
-
-        // First fetch the session endpoint with clear_session=true
-        await fetch("/api/auth/session?clear_session=true", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        // Force redirect to home
-        window.location.href = "/";
-      }
-    } catch (error) {
-      console.error("Error in direct sign out:", error);
-      // Force redirect anyway
-      window.location.href = "/";
     }
   };
 
@@ -89,7 +45,7 @@ export function UserMenu() {
 
   // Get user initials for avatar fallback
   const getInitials = () => {
-    if (!session?.user?.name) return "U";
+    if (!session.user?.name) return "U";
     return session.user.name
       .split(" ")
       .map((n) => n[0])
@@ -105,8 +61,8 @@ export function UserMenu() {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage
-              src={session?.user?.image || ""}
-              alt={session?.user?.name || "User"}
+              src={session.user.image || ""}
+              alt={session.user.name || "User"}
             />
             <AvatarFallback>{getInitials()}</AvatarFallback>
           </Avatar>
@@ -116,10 +72,10 @@ export function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {session?.user?.name || "User"}
+              {session.user.name}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
-              {session?.user?.email || "user@example.com"}
+              {session.user.email}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -128,7 +84,7 @@ export function UserMenu() {
           <DropdownMenuItem asChild>
             <Link href="/profile">Profile</Link>
           </DropdownMenuItem>
-          {session?.user?.roles?.includes("admin") && (
+          {session.user.roles?.includes("admin") && (
             <DropdownMenuItem asChild>
               <Link href="/admin">Admin</Link>
             </DropdownMenuItem>
@@ -144,12 +100,6 @@ export function UserMenu() {
           className="cursor-pointer"
         >
           {isLoading ? "Signing out..." : "Sign out"}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={handleDirectSignOut}
-          className="cursor-pointer text-destructive"
-        >
-          Force Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
