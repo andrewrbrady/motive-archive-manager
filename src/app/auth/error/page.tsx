@@ -2,98 +2,105 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-export default function AuthErrorPage() {
+export default function ErrorPage() {
   const searchParams = useSearchParams();
-  const [errorType, setErrorType] = useState<string>("unknown");
-  const [errorMessage, setErrorMessage] = useState<string>(
-    "An unknown error occurred during authentication."
-  );
+  const [error, setError] = useState<string>("");
+  const [errorCode, setErrorCode] = useState<string>("");
+  const [detailedError, setDetailedError] = useState<string>("");
 
   useEffect(() => {
     const error = searchParams.get("error");
+    const errorCode = error || "unknown";
 
-    if (error) {
-      setErrorType(error);
+    let detailedMessage = "";
 
-      // Set appropriate error message based on error type
-      switch (error) {
-        case "AccessDenied":
-          setErrorMessage(
-            "Access denied. You do not have permission to access this resource."
-          );
-          break;
-        case "Verification":
-          setErrorMessage(
-            "The verification link you used is invalid or has expired."
-          );
-          break;
-        case "OAuthSignin":
-          setErrorMessage("Error occurred during OAuth sign-in.");
-          break;
-        case "OAuthCallback":
-          setErrorMessage("Error occurred during OAuth callback.");
-          break;
-        case "OAuthCreateAccount":
-          setErrorMessage("Error creating OAuth account.");
-          break;
-        case "EmailCreateAccount":
-          setErrorMessage("Error creating email account.");
-          break;
-        case "Callback":
-          setErrorMessage("Error during callback processing.");
-          break;
-        case "OAuthAccountNotLinked":
-          setErrorMessage("Email already in use with different provider.");
-          break;
-        case "EmailSignin":
-          setErrorMessage("Error sending email verification.");
-          break;
-        case "CredentialsSignin":
-          setErrorMessage("Invalid email or password.");
-          break;
-        case "SessionRequired":
-          setErrorMessage("You must be signed in to access this page.");
-          break;
-        default:
-          setErrorMessage(`Authentication error: ${error}`);
-      }
+    switch (errorCode) {
+      case "Configuration":
+        detailedMessage =
+          "There's a problem with the server configuration. Please contact the administrator.";
+        break;
+      case "AccessDenied":
+        detailedMessage = "You don't have permission to sign in.";
+        break;
+      case "Verification":
+        detailedMessage = "The verification link is invalid or has expired.";
+        break;
+      case "OAuthSignin":
+        detailedMessage = "Error in the OAuth sign-in process.";
+        break;
+      case "OAuthCallback":
+        detailedMessage = "Error in the OAuth callback process.";
+        break;
+      case "OAuthCreateAccount":
+        detailedMessage = "Error creating a user from the OAuth provider.";
+        break;
+      case "EmailCreateAccount":
+        detailedMessage = "Error creating a user with the provided email.";
+        break;
+      case "Callback":
+        detailedMessage = "Error in the auth callback process.";
+        break;
+      case "OAuthAccountNotLinked":
+        detailedMessage =
+          "Email already used with a different provider. Please sign in using the original provider.";
+        break;
+      case "EmailSignin":
+        detailedMessage = "Error sending the email for sign in.";
+        break;
+      case "CredentialsSignin":
+        detailedMessage =
+          "Invalid credentials. Please check your email and password.";
+        break;
+      case "SessionRequired":
+        detailedMessage = "You must be signed in to access this page.";
+        break;
+      default:
+        detailedMessage = "An unknown error occurred during authentication.";
     }
+
+    setError(error || "Unknown error");
+    setErrorCode(errorCode);
+    setDetailedError(detailedMessage);
   }, [searchParams]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4 bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6 rounded-lg border border-gray-200 bg-white p-8 shadow-md">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">
             Authentication Error
-          </CardTitle>
-          <CardDescription className="text-center">{errorType}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center space-y-4 text-center">
-          <div className="bg-muted p-4 rounded-md w-full">
-            <p>{errorMessage}</p>
+          </h1>
+          <div className="mt-4 text-sm text-gray-600">
+            <p className="text-red-600 font-semibold">{error}</p>
+            <p className="mt-2">{detailedError}</p>
+
+            {errorCode === "CredentialsSignin" && (
+              <p className="mt-4 text-sm">
+                If you've forgotten your password, you can{" "}
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-blue-600 hover:underline"
+                >
+                  reset it here
+                </Link>
+                .
+              </p>
+            )}
           </div>
-        </CardContent>
-        <CardFooter className="flex justify-center space-x-2">
-          <Button asChild>
+        </div>
+
+        <div className="flex flex-col space-y-3">
+          <Button asChild className="w-full">
             <Link href="/auth/signin">Try Again</Link>
           </Button>
-          <Button variant="outline" asChild>
-            <Link href="/">Back to Home</Link>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/">Return to Home</Link>
           </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -96,4 +96,8 @@ const extendedAuthConfig = {
   },
 };
 
+// Create and export NextAuth instance
 export const { auth, handlers } = NextAuth(extendedAuthConfig);
+
+// Direct export for compatibility with App Router
+export default auth;
