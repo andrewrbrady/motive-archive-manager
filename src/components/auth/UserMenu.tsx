@@ -45,7 +45,7 @@ export function UserMenu() {
 
   // Get user initials for avatar fallback
   const getInitials = () => {
-    if (!session.user?.name) return "U";
+    if (!session?.user?.name) return "U";
     return session.user.name
       .split(" ")
       .map((n) => n[0])
@@ -61,8 +61,8 @@ export function UserMenu() {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage
-              src={session.user.image || ""}
-              alt={session.user.name || "User"}
+              src={session?.user?.image || ""}
+              alt={session?.user?.name || "User"}
             />
             <AvatarFallback>{getInitials()}</AvatarFallback>
           </Avatar>
@@ -72,10 +72,10 @@ export function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {session.user.name}
+              {session?.user?.name || "User"}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
-              {session.user.email}
+              {session?.user?.email || "user@example.com"}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -84,7 +84,7 @@ export function UserMenu() {
           <DropdownMenuItem asChild>
             <Link href="/profile">Profile</Link>
           </DropdownMenuItem>
-          {session.user.roles?.includes("admin") && (
+          {session?.user?.roles?.includes("admin") && (
             <DropdownMenuItem asChild>
               <Link href="/admin">Admin</Link>
             </DropdownMenuItem>
