@@ -7,95 +7,104 @@ let adminApp: App;
 let adminDb: ReturnType<typeof getFirestore>;
 let adminAuth: ReturnType<typeof getAuth>;
 
-// Check that all required environment variables are present
-const requiredEnvVars = [
-  "FIREBASE_PROJECT_ID",
-  "FIREBASE_CLIENT_EMAIL",
-  "FIREBASE_PRIVATE_KEY",
-];
+// Function to safely parse environment variables
+const getEnvVar = (name: string): string | undefined => {
+  const value = process.env[name];
 
-const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+  // Check if value exists and is not empty
+  if (!value || value.trim() === "") {
+    console.error(`❌ Environment variable ${name} is not set or empty`);
+    return undefined;
+  }
 
-if (missingVars.length) {
-  // Log warning but don't crash in development
-  console.error(`❌ Missing required Firebase Admin environment variables: ${missingVars.join(
-    ", "
-  )}
-    Please check your .env.local file and ensure all variables are set properly.
-  `);
-}
+  // For private key, we need to handle special formatting
+  if (name === "FIREBASE_PRIVATE_KEY") {
+    // Handle the case where the private key is stored as a JSON string in Vercel
+    try {
+      // Try to parse JSON if it's in that format
+      if (value.startsWith('"') && value.endsWith('"')) {
+        const parsedValue = JSON.parse(value);
+        if (parsedValue) return parsedValue.replace(/\\n/g, "\n");
+      }
+    } catch (e) {
+      // If parsing fails, proceed with normal replacement
+      console.log(
+        "Private key is not JSON formatted, using direct replacement"
+      );
+    }
+
+    // Normal newline replacement
+    return value.replace(/\\n/g, "\n");
+  }
+
+  return value;
+};
+
+// Get environment variables safely
+const projectId = getEnvVar("FIREBASE_PROJECT_ID");
+const clientEmail = getEnvVar("FIREBASE_CLIENT_EMAIL");
+const privateKey = getEnvVar("FIREBASE_PRIVATE_KEY");
+const databaseURL = getEnvVar("FIREBASE_DATABASE_URL");
 
 // Debug environment variables (with sensitive data redacted)
 console.log("Initializing Firebase Admin with credentials:");
-console.log("- Project ID:", process.env.FIREBASE_PROJECT_ID || "Not set");
-console.log("- Client Email:", process.env.FIREBASE_CLIENT_EMAIL || "Not set");
-console.log(
-  "- Private Key [length]:",
-  process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.length : 0
-);
-console.log("- Database URL:", process.env.FIREBASE_DATABASE_URL || "Not set");
+console.log("- Project ID:", projectId || "Not set");
+console.log("- Client Email:", clientEmail || "Not set");
+console.log("- Private Key [length]:", privateKey ? privateKey.length : 0);
+console.log("- Database URL:", databaseURL || "Not set");
 
-// Extra check for empty values that might pass the initial filter
-if (
-  !process.env.FIREBASE_PROJECT_ID ||
-  !process.env.FIREBASE_CLIENT_EMAIL ||
-  !process.env.FIREBASE_PRIVATE_KEY
-) {
+// Check for missing required variables
+const hasRequiredVars = projectId && clientEmail && privateKey;
+
+if (!hasRequiredVars) {
   console.error(
-    "❌ One or more Firebase Admin environment variables are empty or undefined"
+    "❌ One or more required Firebase Admin environment variables are missing"
   );
 
   if (process.env.NODE_ENV === "production") {
-    console.error("Environment: Production - This will likely cause errors");
+    console.error("Environment: Production - This will cause errors");
+    console.error(
+      "Missing variables must be set in Vercel environment settings"
+    );
   }
 }
 
 try {
   // Check if there are already initialized apps
-  if (!getApps().length) {
+  if (!getApps().length && hasRequiredVars) {
     console.log("No existing Firebase Admin apps, initializing new app");
-
-    // Fix for Vercel environment - ensure private key is properly formatted
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY
-      ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
-      : undefined;
 
     // Log formatted key length for debugging (don't log the actual key)
     console.log(
-      "- Private Key after formatting [length]:",
+      "- Private Key after processing [length]:",
       privateKey ? privateKey.length : 0
     );
-
-    // Additional validation before cert() call
-    if (
-      !process.env.FIREBASE_PROJECT_ID ||
-      !process.env.FIREBASE_CLIENT_EMAIL ||
-      !privateKey
-    ) {
-      throw new Error("Missing required Firebase Admin environment variables");
-    }
 
     // Initialize the app with the service account credentials
     adminApp = initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey,
+        projectId: projectId!,
+        clientEmail: clientEmail!,
+        privateKey: privateKey!,
       }),
       // Optional: Set database URL if needed
-      databaseURL: process.env.FIREBASE_DATABASE_URL,
+      databaseURL: databaseURL,
     });
     console.log("✅ Firebase Admin initialized successfully with new app");
-  } else {
+  } else if (getApps().length) {
     console.log("Using existing Firebase Admin app");
     adminApp = getApps()[0];
     console.log("✅ Retrieved existing Firebase Admin app");
+  } else {
+    throw new Error(
+      "Cannot initialize Firebase Admin due to missing environment variables"
+    );
   }
 } catch (error: any) {
   console.error("❌ Error initializing Firebase Admin:", error);
-  console.error("Error code:", error.code);
-  console.error("Error message:", error.message);
-  console.error("Stack trace:", error.stack);
+  console.error("Error code:", error?.code);
+  console.error("Error message:", error?.message);
+  console.error("Stack trace:", error?.stack);
 
   // In development, provide a mock/fallback if Firebase Admin fails to initialize
   if (process.env.NODE_ENV === "development") {
@@ -112,30 +121,31 @@ try {
 
 try {
   // Initialize Firebase Admin services
-  console.log("Initializing Firebase Admin services (Firestore, Auth)");
-  adminDb = getFirestore(adminApp);
-  console.log("✅ Firebase Admin Firestore initialized");
-  adminAuth = getAuth(adminApp);
-  console.log("✅ Firebase Admin Auth initialized");
+  if (
+    adminApp &&
+    typeof adminApp === "object" &&
+    Object.keys(adminApp).length > 0
+  ) {
+    console.log("Initializing Firebase Admin services (Firestore, Auth)");
+    adminDb = getFirestore(adminApp);
+    console.log("✅ Firebase Admin Firestore initialized");
+    adminAuth = getAuth(adminApp);
+    console.log("✅ Firebase Admin Auth initialized");
+  } else {
+    throw new Error(
+      "Cannot initialize Firebase Admin services: invalid app instance"
+    );
+  }
 } catch (error: any) {
   console.error("❌ Error initializing Firebase Admin services:", error);
-  console.error("Error code:", error.code);
-  console.error("Error message:", error.message);
-  console.error("Stack trace:", error.stack);
+  console.error("Error code:", error?.code);
+  console.error("Error message:", error?.message);
+  console.error("Stack trace:", error?.stack);
 
   // Create mock services for development or as fallback in production
-  if (process.env.NODE_ENV === "development") {
-    console.warn("⚠️ Using mock Firebase Admin services for development");
-    adminDb = {} as ReturnType<typeof getFirestore>;
-    adminAuth = {} as ReturnType<typeof getAuth>;
-  } else {
-    console.error(
-      "⚠️ Failed to initialize Firebase Admin services in production"
-    );
-    // Create placeholders in production as well to prevent crashes
-    adminDb = {} as ReturnType<typeof getFirestore>;
-    adminAuth = {} as ReturnType<typeof getAuth>;
-  }
+  console.warn("⚠️ Using mock Firebase Admin services");
+  adminDb = {} as ReturnType<typeof getFirestore>;
+  adminAuth = {} as ReturnType<typeof getAuth>;
 }
 
 export { adminApp, adminDb, adminAuth };
