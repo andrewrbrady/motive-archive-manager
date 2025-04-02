@@ -62,6 +62,7 @@ export interface Deliverable {
 
   // Production Details
   editor: string;
+  firebase_uid?: string; // Firebase User ID for assignment
   status: DeliverableStatus;
   edit_dates: Date[];
   edit_deadline: Date;

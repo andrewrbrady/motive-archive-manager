@@ -11,19 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-
-interface User {
-  _id?: string;
-  name: string;
-  email: string;
-  roles: string[];
-  status: string;
-  creativeRoles: string[];
-}
+import { User } from "./UserManagement";
 
 interface UserFormProps {
   user: User | null;
-  onSubmit: () => void;
+  onSubmit: (user: User) => void;
   onCancel: () => void;
 }
 
@@ -41,6 +33,8 @@ const CREATIVE_ROLES = [
   "writer",
   "marketing",
   "mechanic",
+  "director",
+  "producer",
 ];
 const STATUS_OPTIONS = ["active", "inactive", "suspended"];
 
@@ -54,37 +48,93 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       creativeRoles: [],
     }
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      const url = user?._id ? `/api/users/${user._id}` : "/api/users";
-      const method = user?._id ? "PUT" : "POST";
+      setIsSubmitting(true);
+
+      // Extract the fields we want to update
+      const userData = {
+        name: formData.name,
+        email: formData.email,
+        roles: formData.roles || ["viewer"],
+        creativeRoles: formData.creativeRoles || [],
+        status: formData.status || "active",
+      };
+
+      console.log("Submitting user data:", {
+        isEdit: !!user,
+        userId: user?._id || user?.uid,
+        userData,
+      });
+
+      // Determine if we're updating an existing user or creating a new one
+      const userId = user?._id || user?.uid;
+      const url = userId
+        ? `/api/users/${userId}` // Use UID for existing user
+        : `/api/users`; // POST to base endpoint for new user
 
       const response = await fetch(url, {
-        method,
+        method: userId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(userData),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save user");
+        const errorData = await response.json().catch(() => null);
+        console.error("API error:", errorData);
+        throw new Error(errorData?.error || "Failed to save user");
+      }
+
+      const responseData = await response.json();
+      console.log("API response:", responseData);
+
+      // If we're editing a user with roles or creativeRoles changes,
+      // immediately refresh the session to synchronize the claims
+      if (
+        userId &&
+        (JSON.stringify(user?.roles || []) !== JSON.stringify(userData.roles) ||
+          JSON.stringify(user?.creativeRoles || []) !==
+            JSON.stringify(userData.creativeRoles))
+      ) {
+        try {
+          console.log("Refreshing session due to role changes");
+          await fetch("/api/auth/refresh-session");
+        } catch (refreshError) {
+          console.error("Error refreshing session:", refreshError);
+          // Don't fail the update if this fails
+        }
       }
 
       toast({
         title: "Success",
-        description: `User ${user?._id ? "updated" : "created"} successfully`,
+        description: userId
+          ? "User updated successfully"
+          : "User created successfully",
       });
-      onSubmit();
-    } catch (error) {
+
+      if (onSubmit) {
+        // Pass the updated user data back to the parent
+        onSubmit({
+          ...userData,
+          uid: responseData.uid || userId || responseData._id,
+          _id: responseData._id || userId,
+        } as User);
+      }
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
       toast({
         title: "Error",
-        description: "Failed to save user",
+        description: error.message || "Something went wrong",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -96,6 +146,9 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
   };
 
   const handleCreativeRoleChange = (value: string) => {
+    // Skip if the role is already selected
+    if (formData.creativeRoles?.includes(value)) return;
+
     setFormData((prev) => ({
       ...prev,
       creativeRoles: [...(prev.creativeRoles || []), value],
@@ -214,12 +267,41 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         >
           Creative Roles
         </label>
-        <Select value="" onValueChange={handleCreativeRoleChange}>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {formData.creativeRoles?.map((role) => (
+            <div
+              key={role}
+              className="flex items-center gap-1 px-3 py-1 rounded-md bg-[hsl(var(--background))] text-sm"
+            >
+              <span>
+                {role
+                  .split("_")
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(" ")}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeCreativeRole(role)}
+                className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+          {formData.creativeRoles?.length === 0 && (
+            <div className="text-sm text-[hsl(var(--muted-foreground))]">
+              No creative roles assigned
+            </div>
+          )}
+        </div>
+        <Select onValueChange={handleCreativeRoleChange}>
           <SelectTrigger className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
             <SelectValue placeholder="Add creative role" />
           </SelectTrigger>
           <SelectContent className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-            {CREATIVE_ROLES.map((role) => (
+            {CREATIVE_ROLES.filter(
+              (role) => !formData.creativeRoles?.includes(role)
+            ).map((role) => (
               <SelectItem
                 key={role}
                 value={role}
@@ -233,28 +315,6 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
             ))}
           </SelectContent>
         </Select>
-        {formData.creativeRoles && formData.creativeRoles.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {formData.creativeRoles.map((role) => (
-              <span
-                key={role}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:bg-[hsl(var(--background))] dark:text-[hsl(var(--foreground))]"
-              >
-                {role
-                  .split("_")
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(" ")}
-                <button
-                  type="button"
-                  className="ml-1 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-zinc-200"
-                  onClick={() => removeCreativeRole(role)}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="flex justify-end space-x-2 pt-4">
@@ -270,7 +330,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           type="submit"
           className="bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] text-white dark:text-[hsl(var(--foreground))]"
         >
-          {user?._id ? "Update User" : "Create User"}
+          {user ? "Update User" : "Create User"}
         </Button>
       </div>
     </form>

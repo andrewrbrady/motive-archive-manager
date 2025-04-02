@@ -591,7 +591,9 @@ export default function BaseCalendar<T extends BaseCalendarEvent>({
         components={components}
         className={cn(
           "events-calendar h-full",
-          isFullscreen && "fullscreen-calendar"
+          isFullscreen && "fullscreen-calendar",
+          view === "week" && "week-view-calendar",
+          view === "work_week" && "week-view-calendar"
         )}
         onEventDrop={onEventDrop as any}
         onEventResize={onEventResize as any}

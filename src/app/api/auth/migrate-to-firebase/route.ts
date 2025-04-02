@@ -40,6 +40,35 @@ export async function POST(request: Request) {
         try {
           const firebaseUser = await adminAuth.getUserByEmail(user.email);
           console.log(`User ${user.email} already exists in Firebase`);
+
+          // Update existing user's custom claims
+          await adminAuth.setCustomUserClaims(firebaseUser.uid, {
+            roles: user.roles || ["user"],
+            creativeRoles: user.creativeRoles || [],
+            status: user.status || "active",
+          });
+
+          // Update user data in Firestore
+          await adminDb
+            .collection("users")
+            .doc(firebaseUser.uid)
+            .set(
+              {
+                name: user.name,
+                email: user.email,
+                roles: user.roles || ["user"],
+                creativeRoles: user.creativeRoles || [],
+                status: user.status || "active",
+                accountType: user.accountType || "individual",
+                profileImage: user.profileImage || null,
+                bio: user.bio || null,
+                createdAt: user.created_at || new Date(),
+                updatedAt: new Date(),
+                lastLoginAt: user.last_login || null,
+              },
+              { merge: true }
+            );
+
           migrationResults.success++;
           continue;
         } catch (error) {
@@ -53,15 +82,17 @@ export async function POST(request: Request) {
             ? user.password
             : Math.random().toString(36).slice(-8), // Generate random password if none exists
           displayName: user.name,
-          disabled: false,
+          disabled: user.status === "suspended",
         });
 
         // Set custom claims for roles
         await adminAuth.setCustomUserClaims(firebaseUser.uid, {
           roles: user.roles || ["user"],
+          creativeRoles: user.creativeRoles || [],
+          status: user.status || "active",
         });
 
-        // Store additional user data in Firestore
+        // Store complete user profile in Firestore
         await adminDb
           .collection("users")
           .doc(firebaseUser.uid)
@@ -69,9 +100,14 @@ export async function POST(request: Request) {
             name: user.name,
             email: user.email,
             roles: user.roles || ["user"],
+            creativeRoles: user.creativeRoles || [],
+            status: user.status || "active",
+            accountType: user.accountType || "individual",
+            profileImage: user.profileImage || null,
+            bio: user.bio || null,
             createdAt: user.created_at || new Date(),
-            lastLoginAt: user.last_login || new Date(),
-            // Add other custom fields as needed
+            updatedAt: new Date(),
+            lastLoginAt: user.last_login || null,
           });
 
         migrationResults.success++;

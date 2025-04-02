@@ -6,16 +6,29 @@
   position: relative;
   height: 100%;
   overflow: hidden;
+  border: none !important;
 }
 
 .dark .events-calendar {
 }
 
+/* General container fixes */
+.events-calendar .rbc-calendar {
+  border: none !important;
+}
+
+.events-calendar .rbc-month-view,
+.events-calendar .rbc-time-view,
+.events-calendar .rbc-agenda-view {
+  border: none !important;
+}
+
 /* Month view optimizations */
 .events-calendar .rbc-month-view {
-  @apply border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  @apply border-0 dark:border-[hsl(var(--border))] dark:border-opacity-20;
   border-radius: 4px;
-  border-width: 1px;
+  overflow: hidden;
+  height: 100%;
 }
 
 /* Cell borders */
@@ -263,106 +276,100 @@
 
 /* Week view optimizations */
 .events-calendar .rbc-time-view {
-  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  @apply border-0;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   flex: 1;
   width: 100%;
-  min-height: 0;
-  border-radius: 4px;
+  min-height: 700px !important;
+  height: 100% !important;
 }
 
-/* Header fixes */
+/* Time header fixes for all-day events */
 .events-calendar .rbc-time-header {
   position: relative !important;
-  z-index: 3 !important;
   background: inherit !important;
-  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.1) !important;
+  min-height: 70px !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
 }
 
 .events-calendar .rbc-time-header-content {
   position: relative !important;
-  z-index: 3 !important;
-  min-height: fit-content !important;
-  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
-}
-
-.events-calendar .rbc-time-header-cell {
-  min-height: fit-content !important;
+  min-height: 70px !important;
   height: auto !important;
-}
-
-.events-calendar .rbc-header {
-  position: relative !important;
-  z-index: 3 !important;
-  background: inherit !important;
-  min-height: 30px !important;
-  height: auto !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  padding: 4px !important;
-  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
-}
-
-.events-calendar .rbc-header:last-child {
-  border-right: none !important;
-}
-
-.events-calendar .rbc-header .rbc-button-link {
-  @apply text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] text-sm font-normal;
-  width: 100%;
-  padding: 4px;
+  border-left: 1px solid hsl(var(--border) / 0.1) !important;
 }
 
 .events-calendar .rbc-allday-cell {
   position: relative !important;
-  z-index: 2 !important;
   background: inherit !important;
-  min-height: fit-content !important;
   height: auto !important;
-  margin-bottom: 8px !important;
-  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
+  min-height: 40px !important;
+  max-height: none !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.1) !important;
 }
 
-.events-calendar .rbc-time-header.rbc-overflowing {
-  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
+/* Fix the height of the week view */
+.events-calendar .rbc-time-content {
+  border-top: none !important;
+  flex: 1;
+  min-height: 600px !important;
+  height: calc(100% - 70px) !important;
 }
 
-.events-calendar .rbc-time-header .rbc-row-bg {
-  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
-}
-
-.events-calendar .rbc-time-header .rbc-day-bg + .rbc-day-bg {
-  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
-}
-
-/* Time slot and vertical border styling */
-.events-calendar .rbc-time-view .rbc-day-slot {
-  @apply border-l border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
-}
-
-.events-calendar .rbc-time-content > .rbc-time-gutter {
-  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
+/* Fix alignment of time column and day columns */
+.events-calendar .rbc-time-gutter {
+  width: 70px !important;
+  text-align: right !important;
+  border-right: 1px solid hsl(var(--border) / 0.1) !important;
 }
 
 .events-calendar .rbc-time-header-gutter {
-  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
+  width: 70px !important;
+  border-right: 1px solid hsl(var(--border) / 0.1) !important;
 }
 
-.events-calendar .rbc-day-slot .rbc-time-slot {
-  @apply border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
-  border-top: 1px solid;
-  min-height: 30px;
+/* Fix time slot display */
+.events-calendar .rbc-timeslot-group {
+  min-height: 40px !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.1) !important;
 }
 
-.events-calendar .rbc-day-slot .rbc-time-slot:first-child {
-  border-top: none;
+/* Fix events in the time cells */
+.events-calendar .rbc-events-container {
+  margin-right: 0 !important;
 }
 
-.events-calendar .rbc-time-slot {
-  @apply text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))];
+.events-calendar .rbc-day-slot .rbc-events-container {
+  margin-top: 0 !important;
+  width: 100% !important;
+  left: 0 !important;
+}
+
+.events-calendar .rbc-day-slot .rbc-event {
+  left: 1px !important;
+  right: 1px !important;
+  width: auto !important;
+}
+
+/* Fix column borders */
+.events-calendar .rbc-time-view .rbc-day-slot {
+  border-left: 1px solid hsl(var(--border) / 0.1) !important;
+}
+
+.events-calendar .rbc-time-view .rbc-day-slot:first-child {
+  border-left: none !important;
+}
+
+/* Override specific Week view heights to match month view */
+.events-calendar .rbc-time-view,
+.events-calendar .rbc-month-view {
+  height: calc(100vh - 220px) !important;
+  min-height: 700px !important;
+  overflow: hidden;
 }
 
 /* Time label styling */
@@ -371,20 +378,168 @@
   padding-right: 8px;
 }
 
-.events-calendar .rbc-timeslot-group {
-  @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 !important;
-}
-
 /* Event container z-index adjustments */
 .events-calendar .rbc-events-container {
   z-index: 1 !important;
 }
 
+/* Fix week view event containers */
 .events-calendar .rbc-time-view .rbc-day-slot .rbc-events-container {
   margin-top: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
 }
 
-/* Ensure proper event layering */
-.events-calendar .rbc-event {
-  z-index: 1 !important;
+.events-calendar .rbc-time-view .rbc-day-slot .rbc-event {
+  width: calc(100% - 4px) !important;
+  margin: 2px !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* Fix all-day events alignment */
+.events-calendar .rbc-allday-cell .rbc-allday-events {
+  width: 100% !important;
+  position: relative !important;
+}
+
+.events-calendar .rbc-row-content {
+  z-index: 3 !important;
+  position: relative !important;
+}
+
+/* Ensure borders align properly */
+.events-calendar .rbc-time-column {
+  border-left: 1px solid hsl(var(--border) / 0.1) !important;
+}
+
+.events-calendar .rbc-time-column:first-child {
+  border-left: none !important;
+}
+
+.events-calendar .rbc-header {
+  padding: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Special week view classes */
+.week-view-calendar .rbc-time-view {
+  height: calc(100vh - 220px) !important;
+  max-height: none !important;
+  min-height: 700px !important;
+  border: none !important;
+}
+
+.week-view-calendar .rbc-time-content {
+  border-top: none !important;
+  padding-top: 0 !important;
+  min-height: 600px;
+  height: calc(100% - 70px) !important;
+}
+
+.week-view-calendar .rbc-time-header {
+  height: 70px !important;
+  min-height: 70px !important;
+  max-height: 70px !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.1) !important;
+}
+
+.week-view-calendar .rbc-allday-cell {
+  max-height: none !important;
+  height: auto !important;
+  min-height: 40px !important;
+}
+
+.week-view-calendar .rbc-row {
+  height: auto !important;
+}
+
+.week-view-calendar .rbc-time-slot {
+  min-height: 40px !important;
+}
+
+.week-view-calendar .rbc-event {
+  z-index: 5 !important; /* Ensure events appear on top */
+}
+
+.week-view-calendar .rbc-day-slot .rbc-events-container {
+  margin-right: 0 !important;
+}
+
+.week-view-calendar .rbc-header {
+  border-bottom: none !important;
+}
+
+/* Fix for time/date alignment */
+.events-calendar .rbc-row-content {
+  z-index: 5 !important;
+}
+
+.events-calendar .rbc-time-header-content .rbc-header {
+  padding: 8px 0 !important;
+  font-size: 0.875rem !important;
+}
+
+.events-calendar .rbc-label {
+  padding-right: 10px !important;
+}
+
+/* Ensure week/month views have consistent heights */
+.events-calendar .rbc-month-view,
+.events-calendar .rbc-time-view {
+  min-height: 700px !important;
+  height: calc(100vh - 220px) !important;
+}
+
+/* Additional fixes for the week view container */
+.events-calendar .rbc-time-view .rbc-time-column {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 0%;
+}
+
+.events-calendar .rbc-time-view .rbc-time-column .rbc-timeslot-group {
+  flex: 1;
+}
+
+/* Make sure all-day events are visible and not cut off */
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-allday-cell-gutter {
+  height: 100% !important;
+}
+
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-row-content {
+  height: 100% !important;
+  position: relative !important;
+}
+
+.events-calendar .rbc-time-view .rbc-allday-cell .rbc-event {
+  position: relative !important;
+  top: 0 !important;
+  margin: 2px 0 !important;
+}
+
+/* Make sure headers and content line up */
+.week-view-calendar .rbc-time-view .rbc-time-header-content .rbc-header {
+  min-height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Ensure overflows are not clipped */
+.events-calendar .rbc-time-content > * + * > * {
+  border-left: 1px solid hsl(var(--border) / 0.1) !important;
+}
+
+/* Fix for all-day events that are potentially overflowing */
+.events-calendar .rbc-time-view .rbc-row {
+  min-height: 20px !important;
+}
+
+.events-calendar .rbc-time-view .rbc-row-segment {
+  padding: 0 2px !important;
 }

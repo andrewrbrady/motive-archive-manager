@@ -68,12 +68,25 @@ export const FirebaseProvider = ({ children }: FirebaseProviderProps) => {
   };
 
   const signUp = async (email: string, password: string): Promise<User> => {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    return userCredential.user;
+    console.log(`Attempting to sign up user with email: ${email}`);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      console.log(
+        `User created successfully with uid: ${userCredential.user.uid}`
+      );
+      console.log(`User email: ${userCredential.user.email}`);
+      console.log(`User email verified: ${userCredential.user.emailVerified}`);
+      return userCredential.user;
+    } catch (error: any) {
+      console.error(`Error signing up user with email: ${email}`);
+      console.error(`Error code: ${error.code}`);
+      console.error(`Error message: ${error.message}`);
+      throw error; // Re-throw the error to be handled by the caller
+    }
   };
 
   const signInWithGoogle = async (): Promise<User> => {

@@ -36,7 +36,7 @@ import {
   DeliverableStatus,
   DeliverableType,
 } from "@/types/deliverable";
-import { FirestoreUser } from "@/lib/firestore/users";
+import { FirestoreUser } from "@/types/firebase";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
 import BatchDeliverableForm from "./BatchDeliverableForm";

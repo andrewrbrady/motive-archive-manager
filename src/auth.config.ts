@@ -89,13 +89,71 @@ export const authConfig: NextAuthConfig = {
     signOut: "/auth/signout",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, trigger, session }) {
       // Initial sign in
       if (user) {
         token.id = user.id || "";
         token.roles = user.roles || ["user"];
         token.creativeRoles = user.creativeRoles || [];
         token.status = user.status || "active";
+
+        // If using Firebase credentials provider, fetch fresh claims directly
+        if (account?.provider === "credentials") {
+          try {
+            console.log("Getting fresh Firebase claims for credentials login");
+            if (!user.id) {
+              console.warn(
+                "User ID is undefined, skipping Firebase claims fetch"
+              );
+            } else {
+              const firebaseUser = await adminAuth.getUser(user.id);
+              const claims = firebaseUser.customClaims || {};
+
+              // Update token with fresh claims from Firebase
+              if (claims.roles) token.roles = claims.roles;
+              if (claims.creativeRoles)
+                token.creativeRoles = claims.creativeRoles;
+              if (claims.status) token.status = claims.status;
+
+              console.log("Fresh Firebase claims added to token:", {
+                uid: user.id,
+                roles: token.roles,
+                creativeRoles: token.creativeRoles,
+              });
+            }
+          } catch (error) {
+            console.error("Error getting Firebase custom claims:", error);
+          }
+        }
+      }
+
+      // Session update (manual refresh or role update)
+      if (trigger === "update" && session) {
+        if (session.refreshClaims === true) {
+          try {
+            console.log("Refreshing Firebase claims for user:", token.id);
+            const firebaseUser = await adminAuth.getUser(token.id as string);
+            const claims = firebaseUser.customClaims || {};
+
+            // Update token with fresh claims
+            token.roles = claims.roles || ["user"];
+            token.creativeRoles = claims.creativeRoles || [];
+            token.status = claims.status || "active";
+
+            console.log("Refreshed Firebase claims in token:", {
+              roles: token.roles,
+              creativeRoles: token.creativeRoles,
+            });
+          } catch (error) {
+            console.error("Error refreshing Firebase claims:", error);
+          }
+        } else if (session.roles || session.creativeRoles || session.status) {
+          // Update with provided values from session
+          if (session.roles) token.roles = session.roles;
+          if (session.creativeRoles)
+            token.creativeRoles = session.creativeRoles;
+          if (session.status) token.status = session.status;
+        }
       }
 
       return token;
@@ -106,6 +164,12 @@ export const authConfig: NextAuthConfig = {
         session.user.roles = (token.roles as string[]) || ["user"];
         session.user.creativeRoles = (token.creativeRoles as string[]) || [];
         session.user.status = (token.status as string) || "active";
+
+        // Add a function reference for refreshing claims
+        // This gets serialized away but is useful for TypeScript types
+        (session as any).refreshClaims = function () {
+          return true;
+        };
       }
       return session;
     },
@@ -113,25 +177,107 @@ export const authConfig: NextAuthConfig = {
       try {
         // Only process OAuth sign-ins (like Google)
         if (account?.provider === "google") {
-          // Get user ID and email
-          const uid = user.id;
+          // IMPORTANT: Use the providerAccountId (Google's user ID) instead of NextAuth's user.id
+          const uid = account.providerAccountId;
           const email = user.email;
 
           if (!uid || !email) return false;
 
-          // Check if this user already exists in Firestore
-          const userDoc = await adminDb.collection("users").doc(uid).get();
+          let firebaseUid = uid;
 
-          // First-time Google sign-in - create user
+          // Try to find existing user by email first
+          try {
+            const existingUser = await adminAuth.getUserByEmail(email);
+            console.log(`User ${email} found with UID: ${existingUser.uid}`);
+
+            // If the user exists but with a different UID, we'll use the existing UID
+            if (existingUser.uid !== uid) {
+              console.log(
+                `User exists with different UID (${existingUser.uid} vs ${uid}). Using existing UID.`
+              );
+              firebaseUid = existingUser.uid;
+            }
+
+            // Set or update custom claims
+            await adminAuth.setCustomUserClaims(firebaseUid, {
+              roles: ["user"],
+              creativeRoles: [],
+              status: "active",
+            });
+            console.log(`Updated claims for existing user: ${firebaseUid}`);
+          } catch (error) {
+            // User doesn't exist by email, continue with normal flow to create them
+            console.log(
+              `User ${email} not found by email, attempting to create with ID: ${uid}`
+            );
+
+            // Attempt to create the user in Firebase Auth if they don't exist yet
+            try {
+              await adminAuth.getUser(uid);
+              console.log(
+                `User ${email} with ID ${uid} already exists in Firebase Auth`
+              );
+            } catch (authError) {
+              // User doesn't exist in Firebase Auth, create them
+              try {
+                // Create the user using our import endpoint that properly sets the provider
+                const importResponse = await fetch(
+                  `${process.env.NEXTAUTH_URL}/api/auth/import-google-user`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      uid: uid,
+                      email: email,
+                      displayName: user.name || email.split("@")[0],
+                      photoURL: user.image || "",
+                    }),
+                  }
+                );
+
+                const importResult = await importResponse.json();
+
+                if (!importResponse.ok) {
+                  throw new Error(
+                    importResult.error || "Failed to import user"
+                  );
+                }
+
+                console.log(
+                  `Successfully imported Firebase Auth user for ${email} with Google provider`
+                );
+
+                // Custom claims are set by the import endpoint
+                console.log(`Claims already set by import endpoint`);
+              } catch (createError) {
+                console.error(
+                  `Error creating Firebase Auth user for ${email}:`,
+                  createError
+                );
+                // Don't fail the sign-in - we'll let the user in anyway
+                // but log the error for debugging
+              }
+            }
+          }
+
+          // Check if this user already exists in Firestore
+          const userDoc = await adminDb
+            .collection("users")
+            .doc(firebaseUid)
+            .get();
+
+          // First-time Google sign-in or missing Firestore document - create user in Firestore
           if (!userDoc.exists) {
             console.log(
-              `Creating new user document for ${email} with ID: ${uid}`
+              `Creating new user document for ${email} with ID: ${firebaseUid}`
             );
 
             // Create a user document in Firestore with standard user permissions
             await adminDb
               .collection("users")
-              .doc(uid)
+              .doc(firebaseUid)
               .set({
                 name: user.name || email.split("@")[0],
                 email: email,
@@ -142,13 +288,6 @@ export const authConfig: NextAuthConfig = {
                 accountType: "personal",
                 createdAt: new Date(),
               });
-
-            // Set custom claims for the user with standard permissions
-            await adminAuth.setCustomUserClaims(uid, {
-              roles: ["user"],
-              creativeRoles: [],
-              status: "active",
-            });
           } else {
             // Existing user - only check if they're not suspended
             const userData = userDoc.data();

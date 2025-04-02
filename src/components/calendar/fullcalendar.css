@@ -1,0 +1,332 @@
+/* FullCalendar styles */
+.motive-calendar {
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+  width: 100%;
+  height: 100%;
+}
+
+/* Calendar container */
+.calendar-container {
+  height: calc(100vh - 220px);
+  width: 100%;
+}
+
+/* Hide the FullCalendar border to avoid double borders */
+.fc .fc-view-harness {
+  border: none !important;
+}
+
+/* Header styling */
+.fc .fc-toolbar-title {
+  @apply text-xl font-bold text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
+}
+
+/* Button styling */
+.fc .fc-button-primary {
+  @apply bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary-hover))] text-[hsl(var(--primary-foreground))] border-[hsl(var(--primary))] shadow-sm;
+}
+
+.fc .fc-button-primary:disabled {
+  @apply bg-[hsl(var(--primary))] opacity-50;
+}
+
+.fc .fc-button-primary:not(:disabled):active,
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  @apply bg-[hsl(var(--primary-hover))] text-[hsl(var(--primary-foreground))] shadow-none;
+}
+
+/* Day header styling */
+.fc .fc-col-header-cell {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
+}
+
+/* Day grid styling */
+.fc .fc-daygrid-day {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+}
+
+.fc .fc-daygrid-day-number {
+  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))];
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+  @apply bg-[hsl(var(--info)/0.1)] dark:bg-[hsl(var(--info)/0.05)];
+}
+
+/* Event styling */
+.fc .fc-event {
+  @apply shadow-sm transition-all duration-200 border-none rounded overflow-hidden;
+  cursor: grab !important;
+  padding: 2px 4px;
+  min-height: 22px;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  font-weight: 500;
+  transition: box-shadow 0.2s, opacity 0.2s, transform 0.1s !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  border-width: 1px !important;
+  margin: 1px 0 !important;
+}
+
+.fc .fc-event:hover {
+  filter: brightness(105%);
+  opacity: 1;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+  z-index: 10 !important;
+  transform: translateY(-1px) !important;
+}
+
+.fc .fc-event:active {
+  filter: brightness(95%);
+}
+
+/* Time grid styling */
+.fc .fc-timegrid-slot {
+  height: 40px !important;
+}
+
+.fc .fc-timegrid-axis {
+  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+.fc .fc-timegrid-now-indicator-line {
+  @apply border-[hsl(var(--destructive))] border-opacity-70;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  @apply border-[hsl(var(--destructive))] border-opacity-70;
+}
+
+/* List view styling */
+.fc .fc-list {
+  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 rounded-md;
+}
+
+.fc .fc-list-day-cushion {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))];
+}
+
+.fc .fc-list-event:hover td {
+  @apply bg-[hsl(var(--primary)/0.1)] dark:bg-[hsl(var(--primary)/0.1)];
+}
+
+/* More link styling */
+.fc .fc-daygrid-more-link {
+  @apply text-[hsl(var(--primary))] dark:text-[hsl(var(--primary))];
+}
+
+/* Popover styling for "more" events */
+.fc .fc-popover {
+  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] shadow-lg;
+  z-index: 1000 !important;
+}
+
+.fc .fc-popover-header {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+}
+
+/* Fix week view heights */
+.fc .fc-timegrid-body {
+  min-height: 600px;
+}
+
+/* Full Calendar Custom Styles */
+
+/* Show visual cue when hovering over draggable events */
+.fc-event:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+  z-index: 10 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Style for when event is being dragged */
+.fc-event.fc-event-dragging {
+  cursor: grabbing !important;
+  opacity: 0.8 !important;
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3) !important;
+  z-index: 100 !important;
+}
+
+/* Style for when event is being resized */
+.fc-event.fc-event-resizing {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+  z-index: 100 !important;
+}
+
+/* Make resizing handles more visible */
+.fc-event .fc-resizer {
+  width: 8px !important;
+  height: 8px !important;
+  background: rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  border-radius: 50% !important;
+  box-sizing: border-box !important;
+}
+
+/* Increase size of resize handle on hover */
+.fc-event:hover .fc-resizer {
+  width: 10px !important;
+  height: 10px !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Fix for event spacing in month view */
+.fc-daygrid-event {
+  margin-top: 2px !important;
+}
+
+/* Style for event dot in month view */
+.fc-daygrid-event-dot {
+  border-width: 5px !important;
+}
+
+/* Improve day cell hover effect */
+.fc-day:hover {
+  background-color: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Ensure dragable cursor shows on day cells */
+.fc-day-grid-event,
+.fc-time-grid-event {
+  cursor: pointer !important;
+}
+
+/* Make sure events are not clipped */
+.fc-day-grid-container,
+.fc-time-grid-container {
+  overflow: visible !important;
+}
+
+/* Make sure events can be interacted with in day view */
+.fc-time-grid-event {
+  cursor: grab !important;
+  min-height: 25px !important;
+}
+
+/* Improve all-day events display in week view */
+.fc-timegrid .fc-daygrid-body {
+  min-height: 150px !important;
+}
+
+.fc-timegrid-axis-cushion,
+.fc-timegrid-slot-label-cushion {
+  padding: 6px !important;
+}
+
+.fc-timegrid-event {
+  min-height: 25px !important;
+}
+
+.fc-timegrid-axis {
+  padding: 8px !important;
+  font-weight: 600 !important;
+}
+
+.fc-timegrid .fc-daygrid-day-events {
+  margin-bottom: 0 !important;
+}
+
+.fc-timegrid-allday-label {
+  font-weight: 600 !important;
+}
+
+/* Make all-day events have enough space by default */
+.fc-timegrid-allday .fc-daygrid-day-events {
+  margin-bottom: 0 !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+/* Increase all-day slot height in week view */
+.fc .fc-timegrid-axis-frame {
+  min-height: 40px !important;
+}
+
+/* Improve visibility of all-day events */
+.fc-timegrid-event.fc-v-event.fc-event-mirror,
+.fc-timegrid-event.fc-v-event.fc-event {
+  min-height: 25px !important;
+  border-radius: 4px !important;
+}
+
+/* Increase space for all-day events in week view */
+.fc-timegrid-axis-frame,
+.fc-timegrid-allday-frame {
+  height: auto !important;
+}
+
+/* Ensure the all-day section can expand properly */
+.fc-timegrid-allday-cushion {
+  min-height: 580px !important;
+  padding: 4px !important;
+}
+
+/* Remove event limits in the all-day section */
+.fc-timegrid-allday .fc-daygrid-more-link {
+  display: none !important;
+}
+
+/* Show more all-day events by default */
+.fc-timegrid-allday .fc-daygrid-event-harness {
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Make all-day event section even taller in week view only */
+.fc-view-timeGridWeek .fc-timegrid-axis-frame,
+.fc-view-timeGridWeek .fc-timegrid-allday-frame {
+  min-height: 500px !important;
+  height: auto !important;
+}
+
+.fc-view-timeGridWeek .fc-timegrid-allday-cushion {
+  min-height: 580px !important;
+  padding: 4px !important;
+}
+
+/* Fix for month view to ensure all cells have consistent height */
+.fc-dayGridMonth-view .fc-daygrid-day {
+  height: 1/6 !important;
+}
+
+/* Enhance all-day events styling in week view */
+.fc-timegrid-allday .fc-daygrid-event {
+  margin: 2px 0 !important;
+  padding: 4px 6px !important;
+  border-radius: 4px !important;
+  min-height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Improve spacing between all-day events */
+.fc-timegrid-allday .fc-daygrid-day-events {
+  padding: 6px 2px !important;
+}
+
+/* Style all-day header in week view */
+.fc-timegrid-allday-label {
+  font-size: 0.875rem !important;
+  letter-spacing: 0.025em !important;
+}
+
+/* Simple solution for the all-day section height in week view */
+.fc-timegrid-slot-label {
+  padding: 5px;
+}
+
+/* Give more height to the all-day section in week view */
+.fc-timegrid-axis-frame,
+.fc-timegrid-allday-frame {
+  min-height: 100px !important;
+}
+
+/* Month view - make cells equal height */
+.fc-dayGridMonth-view .fc-daygrid-body tr {
+  height: auto !important;
+}
+
+/* Make all-day events in week view more visible */
+.fc-timegrid-event {
+  min-height: 24px;
+}

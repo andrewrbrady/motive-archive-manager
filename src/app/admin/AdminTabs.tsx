@@ -8,8 +8,12 @@ import UserManagement from "@/components/users/UserManagement";
 import LocationsClient from "../locations/LocationsClient";
 import ClientsContent from "@/app/admin/ClientsContent";
 import MakesContent from "@/app/admin/MakesContent";
+import CreativeRolesManagement from "@/components/users/CreativeRolesManagement";
 import { Loader2 } from "lucide-react";
 import { LoadingContainer } from "@/components/ui/loading";
+import { Button } from "@/components/ui/button";
+import { DatabaseZap } from "lucide-react";
+import Link from "next/link";
 
 export default function AdminTabs() {
   const searchParams = useSearchParams();
@@ -22,7 +26,7 @@ export default function AdminTabs() {
     const tabParam = searchParams?.get("tab");
     if (
       tabParam &&
-      ["users", "clients", "locations", "makes"].includes(tabParam)
+      ["users", "clients", "locations", "makes", "roles"].includes(tabParam)
     ) {
       setActiveTab(tabParam);
     }
@@ -63,12 +67,25 @@ export default function AdminTabs() {
 
   return (
     <div>
+      <div className="flex justify-end mb-4 space-x-2">
+        <Link href="/admin/migrate">
+          <Button variant="outline" size="sm" className="gap-2">
+            <DatabaseZap size={16} />
+            Migrate Users to Firebase
+          </Button>
+        </Link>
+      </div>
       <CustomTabs
         items={[
           {
             value: "users",
             label: "Users",
             content: renderTabContent("users", <UserManagement />),
+          },
+          {
+            value: "roles",
+            label: "Creative Roles",
+            content: renderTabContent("roles", <CreativeRolesManagement />),
           },
           {
             value: "clients",

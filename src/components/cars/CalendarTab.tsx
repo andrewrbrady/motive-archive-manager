@@ -88,7 +88,12 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
             onEventDrop={handleEventDrop}
             onEventResize={handleEventResize}
             className="flex-1"
-            style={{ minHeight: "700px" }}
+            style={{
+              minHeight: "700px",
+              height: "calc(100vh - 220px)",
+              border: "none",
+              overflow: "hidden",
+            }}
           />
         </div>
       )}

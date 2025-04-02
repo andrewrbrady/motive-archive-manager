@@ -24,6 +24,7 @@ export interface IDeliverable extends Document {
   actual_duration?: number;
   aspect_ratio: string;
   editor: string;
+  firebase_uid?: string; // Firebase User ID for assignment
   status: DeliverableStatus;
   edit_dates: Date[];
   edit_deadline: Date;
@@ -101,6 +102,10 @@ const deliverableSchema = new mongoose.Schema(
     editor: {
       type: String,
       required: true,
+    },
+    firebase_uid: {
+      type: String,
+      index: true,
     },
     status: {
       type: String,

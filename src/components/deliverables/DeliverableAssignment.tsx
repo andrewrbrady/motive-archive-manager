@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
 import { Deliverable } from "@/types/deliverable";
-import { FirestoreUser } from "@/lib/firestore/users";
+import { FirestoreUser } from "@/types/firebase";
 
 interface DeliverableAssignmentProps {
   isOpen: boolean;

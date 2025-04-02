@@ -8,9 +8,14 @@ import { LoadingSpinner } from "@/components/ui/loading";
 interface AuthGuardProps {
   children: React.ReactNode;
   requiredRoles?: string[];
+  requiredCreativeRoles?: string[];
 }
 
-export function AuthGuard({ children, requiredRoles = [] }: AuthGuardProps) {
+export function AuthGuard({
+  children,
+  requiredRoles = [],
+  requiredCreativeRoles = [],
+}: AuthGuardProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -29,6 +34,14 @@ export function AuthGuard({ children, requiredRoles = [] }: AuthGuardProps) {
       return;
     }
 
+    // Check if user is suspended
+    if (session.user?.status === "suspended") {
+      router.push("/account-suspended");
+      return;
+    }
+
+    let authorized = true;
+
     // If roles are required, check if user has any of them
     if (requiredRoles.length > 0) {
       const hasRequiredRole = session.user?.roles?.some((role) =>
@@ -36,15 +49,30 @@ export function AuthGuard({ children, requiredRoles = [] }: AuthGuardProps) {
       );
 
       if (!hasRequiredRole) {
-        // User is authenticated but doesn't have required role
-        router.push("/unauthorized");
-        return;
+        authorized = false;
       }
     }
 
-    // User is authenticated and has required role (if any)
+    // If creative roles are required, check if user has any of them
+    if (requiredCreativeRoles.length > 0 && authorized) {
+      const hasRequiredCreativeRole = session.user?.creativeRoles?.some(
+        (role) => requiredCreativeRoles.includes(role)
+      );
+
+      if (!hasRequiredCreativeRole) {
+        authorized = false;
+      }
+    }
+
+    if (!authorized) {
+      // User is authenticated but doesn't have required roles
+      router.push("/unauthorized");
+      return;
+    }
+
+    // User is authenticated and has required roles
     setIsAuthorized(true);
-  }, [session, status, router, pathname, requiredRoles]);
+  }, [session, status, router, pathname, requiredRoles, requiredCreativeRoles]);
 
   // Show loading spinner while checking authentication
   if (status === "loading" || !isAuthorized) {
@@ -66,6 +94,35 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
 export function EditorGuard({ children }: { children: React.ReactNode }) {
   return <AuthGuard requiredRoles={["admin", "editor"]}>{children}</AuthGuard>;
+}
+
+// Creative role-specific guards
+export function CreativeRoleGuard({
+  children,
+  roles,
+}: {
+  children: React.ReactNode;
+  roles: string[];
+}) {
+  return <AuthGuard requiredCreativeRoles={roles}>{children}</AuthGuard>;
+}
+
+// Combined role guards
+export function CreativeEditorGuard({
+  children,
+  creativeRoles,
+}: {
+  children: React.ReactNode;
+  creativeRoles: string[];
+}) {
+  return (
+    <AuthGuard
+      requiredRoles={["admin", "editor"]}
+      requiredCreativeRoles={creativeRoles}
+    >
+      {children}
+    </AuthGuard>
+  );
 }
 
 export default AuthGuard;

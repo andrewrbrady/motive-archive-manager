@@ -40,6 +40,7 @@ import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
 import CalendarTab from "@/components/cars/CalendarTab";
+import FullCalendarTab from "@/components/cars/FullCalendarTab";
 import ShotList from "@/components/cars/ShotList";
 import Scripts from "@/components/cars/Scripts";
 import { Car } from "@/types/car";
@@ -2004,7 +2005,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
                 {
                   value: "calendar",
                   label: "Calendar",
-                  content: <CalendarTab carId={id} />,
+                  content: <FullCalendarTab carId={id} />,
                 },
               ]}
               defaultValue={activeTab}

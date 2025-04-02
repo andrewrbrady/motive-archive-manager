@@ -3,15 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useFirebase } from "@/contexts/FirebaseContext";
-import { signIn as nextAuthSignIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
 
 export default function SignIn() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams?.get("callbackUrl") || "/admin";
 
-  const { signIn } = useFirebase();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -24,7 +22,11 @@ export default function SignIn() {
     // Check if redirected with error
     const errorParam = searchParams?.get("error");
     if (errorParam) {
-      setError("Authentication failed. Please try again.");
+      if (errorParam === "CredentialsSignin") {
+        setError("Invalid email or password. Please try again.");
+      } else {
+        setError("Authentication failed. Please try again.");
+      }
     }
   }, [searchParams]);
 
@@ -34,11 +36,8 @@ export default function SignIn() {
     setIsLoading(true);
 
     try {
-      // First, authenticate with Firebase
-      await signIn(email, password);
-
-      // Then, use NextAuth to create a session
-      const result = await nextAuthSignIn("credentials", {
+      // Use NextAuth to create a session
+      const result = await signIn("credentials", {
         email,
         password,
         callbackUrl,
@@ -54,21 +53,12 @@ export default function SignIn() {
       router.refresh();
     } catch (error: any) {
       console.error("Sign-in error:", error);
-      const errorCode = error.code;
-      let errorMessage = "An unexpected error occurred. Please try again.";
 
-      // Handle common Firebase Auth errors
-      if (errorCode === "auth/invalid-credential") {
-        errorMessage = "Invalid email or password.";
-      } else if (errorCode === "auth/user-disabled") {
-        errorMessage = "This account has been disabled.";
-      } else if (errorCode === "auth/user-not-found") {
-        errorMessage = "No account found with this email.";
-      } else if (errorCode === "auth/wrong-password") {
-        errorMessage = "Incorrect password.";
-      } else if (errorCode === "auth/too-many-requests") {
+      // Set error message
+      let errorMessage = "Invalid email or password. Please try again.";
+      if (error.message !== "CredentialsSignin") {
         errorMessage =
-          "Too many unsuccessful login attempts. Please try again later.";
+          error.message || "An unexpected error occurred. Please try again.";
       }
 
       setError(errorMessage);
@@ -82,22 +72,10 @@ export default function SignIn() {
 
     try {
       // Use NextAuth's signIn method with Google provider
-      const result = await nextAuthSignIn("google", {
+      await signIn("google", {
         callbackUrl,
-        redirect: false,
       });
-
-      if (result?.error) {
-        throw new Error(result.error);
-      }
-
-      // If no redirect happened, manually redirect
-      if (result?.url) {
-        window.location.href = result.url;
-      } else {
-        router.push(callbackUrl);
-        router.refresh();
-      }
+      // No need to manually redirect, NextAuth handles it
     } catch (error: any) {
       console.error("Google sign-in error:", error);
       setError("Failed to sign in with Google. Please try again.");

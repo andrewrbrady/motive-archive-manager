@@ -36,3 +36,7 @@ yarn-error.log*
 /scripts/*.js
 /src/scripts/*.js
 /src/scripts/*.ts
+
+# temp files
+.temp-env-*
+cookies.txt

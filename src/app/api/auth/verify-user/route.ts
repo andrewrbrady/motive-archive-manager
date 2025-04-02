@@ -39,10 +39,19 @@ export async function GET(request: Request) {
       });
     } catch (error: any) {
       console.error(`User with UID ${uid} not found in Firebase Auth:`, error);
+      console.error(
+        `Error details - code: ${error.code}, message: ${error.message}`
+      );
+      console.error(
+        `Full error:`,
+        JSON.stringify(error, Object.getOwnPropertyNames(error))
+      );
+
       return NextResponse.json({
         exists: false,
         error: error.message,
         code: error.code,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
       });
     }
   } catch (error: any) {

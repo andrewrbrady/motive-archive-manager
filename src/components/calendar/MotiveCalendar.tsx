@@ -63,6 +63,8 @@ export interface MotiveCalendarProps {
   style?: React.CSSProperties;
   showFilterControls?: boolean;
   showVisibilityControls?: boolean;
+  isFullscreen?: boolean;
+  calendarRef?: React.RefObject<HTMLDivElement>;
 }
 
 export function MotiveCalendar({
@@ -76,6 +78,8 @@ export function MotiveCalendar({
   style,
   showFilterControls = true,
   showVisibilityControls = true,
+  isFullscreen = false,
+  calendarRef,
 }: MotiveCalendarProps) {
   const [showEvents, setShowEvents] = useState(true);
   const [showDeliverables, setShowDeliverables] = useState(true);
@@ -715,9 +719,11 @@ export function MotiveCalendar({
       style={{
         ...style,
         minHeight: "700px",
+        height: style?.height || "calc(100vh - 220px)",
         flex: 1,
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
       }}
       eventPropGetter={eventPropGetter}
       components={components}
