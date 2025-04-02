@@ -14,6 +14,13 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Add fallback for callback URL
+  useEffect(() => {
+    // Log the callback URL for debugging
+    console.log("Callback URL:", callbackUrl);
+  }, [callbackUrl]);
 
   // Handle registered parameter to show success message
   const isRegistered = searchParams?.get("registered") === "true";
@@ -36,27 +43,62 @@ export default function SignIn() {
     setIsLoading(true);
 
     try {
-      // Use NextAuth to create a session
-      const result = await signIn("credentials", {
-        email,
-        password,
-        callbackUrl,
-        redirect: false,
-      });
+      console.log("Attempting to sign in with credentials");
 
-      if (result?.error) {
-        throw new Error(result.error);
+      try {
+        // Try using NextAuth's signIn first
+        const result = await signIn("credentials", {
+          email,
+          password,
+          callbackUrl,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          console.log("NextAuth signin error:", result.error);
+          throw new Error(result.error);
+        }
+
+        if (result?.url) {
+          console.log("Sign-in successful, redirecting to:", result.url);
+          router.push(result.url);
+          router.refresh();
+          return;
+        }
+      } catch (nextAuthError) {
+        console.warn(
+          "NextAuth signin failed, trying direct API:",
+          nextAuthError
+        );
+
+        // Fallback to our custom API endpoint if NextAuth fails
+        const response = await fetch("/api/auth/signin/credentials", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            callbackUrl,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || "Authentication failed");
+        }
+
+        console.log("Direct API signin successful, redirecting to:", data.url);
+        router.push(data.url || callbackUrl);
+        router.refresh();
       }
-
-      // Manually redirect to the callback URL
-      router.push(callbackUrl);
-      router.refresh();
     } catch (error: any) {
       console.error("Sign-in error:", error);
 
       // Set error message
       let errorMessage = "Invalid email or password. Please try again.";
-      if (error.message !== "CredentialsSignin") {
+      if (error.message && error.message !== "CredentialsSignin") {
         errorMessage =
           error.message || "An unexpected error occurred. Please try again.";
       }
@@ -71,11 +113,19 @@ export default function SignIn() {
     setIsLoading(true);
 
     try {
-      // Use NextAuth's signIn method with Google provider
-      await signIn("google", {
-        callbackUrl,
-      });
-      // No need to manually redirect, NextAuth handles it
+      console.log("Attempting to sign in with Google");
+
+      try {
+        // Use NextAuth's signIn method with Google provider
+        await signIn("google", {
+          callbackUrl,
+        });
+        // No need to manually redirect, NextAuth handles it
+      } catch (error) {
+        console.error("Google sign-in error:", error);
+        setError("Failed to sign in with Google. Please try again.");
+        setIsLoading(false);
+      }
     } catch (error: any) {
       console.error("Google sign-in error:", error);
       setError("Failed to sign in with Google. Please try again.");

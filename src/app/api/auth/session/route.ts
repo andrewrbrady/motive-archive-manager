@@ -1,40 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handlers } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
-// Add more comprehensive error handling for the session route
 export async function GET(req: NextRequest) {
   try {
-    console.log("NextAuth session handler called:", req.url);
+    console.log("Custom NextAuth session handler called:", req.url);
 
-    // Log out key environment variables (excluding sensitive data)
-    console.log("Auth environment check:", {
-      NEXTAUTH_URL: process.env.NEXTAUTH_URL || "Not set",
-      NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
-      NODE_ENV: process.env.NODE_ENV,
-      VERCEL_ENV: process.env.VERCEL_ENV,
-      VERCEL_URL: process.env.VERCEL_URL,
+    // Return an empty session response
+    // This allows the client to initialize properly while we debug
+    return NextResponse.json({
+      user: null,
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
-
-    return await handlers.GET(req);
   } catch (error: any) {
-    console.error("Error in NextAuth session handler:", error);
+    console.error("Error in custom session handler:", error);
 
-    // Detailed error response for debugging
-    return NextResponse.json(
-      {
-        error: "Authentication error",
-        message: error?.message || "Unknown error",
-        stack:
-          process.env.NODE_ENV === "development" ? error?.stack : undefined,
-        code: error?.code,
-        name: error?.name,
-      },
-      {
-        status: 500,
-      }
-    );
+    // Return a simple error response
+    return NextResponse.json({
+      user: null,
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
   }
 }
 
