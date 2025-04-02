@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     // Get the UID from the query params

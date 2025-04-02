@@ -1,3 +1,6 @@
+// Add the dynamic export at the top of the file
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { listUsers } from "@/lib/firestore/users";
