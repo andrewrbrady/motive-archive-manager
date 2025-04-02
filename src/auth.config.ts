@@ -8,10 +8,10 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 // Set NEXTAUTH_URL if on Vercel and not already set
 if (process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
-  console.log(
-    `Setting NEXTAUTH_URL from VERCEL_URL: https://${process.env.VERCEL_URL}`
-  );
-  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+  const vercelUrl = process.env.VERCEL_URL;
+  const fullUrl = `https://${vercelUrl}`;
+  console.log(`Setting NEXTAUTH_URL from VERCEL_URL: ${fullUrl}`);
+  process.env.NEXTAUTH_URL = fullUrl;
 }
 
 // Log critical environment variables (redacting sensitive values)
@@ -30,6 +30,7 @@ console.log(
   "- GOOGLE_CLIENT_SECRET:",
   process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
 );
+console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
 
 // Define a fallback URL for environments where NEXTAUTH_URL isn't set properly
 const getBaseUrl = () => {
@@ -39,11 +40,20 @@ const getBaseUrl = () => {
   return "http://localhost:3000";
 };
 
+// Make sure we have a valid base URL
+const baseUrl = getBaseUrl();
+console.log("- Base URL for auth:", baseUrl);
+
 export const authConfig: NextAuthConfig = {
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          redirect_uri: `${baseUrl}/api/auth/callback/google`,
+        },
+      },
     }),
     Credentials({
       credentials: {
