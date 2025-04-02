@@ -9,12 +9,26 @@ const extendedAuthConfig = {
   ...authConfig,
   callbacks: {
     async session({ session, token }: { session: any; token: JWT }) {
+      // Add error handling for undefined token or session
+      if (!session || !session.user) {
+        console.error(
+          "Session or session.user is undefined in session callback"
+        );
+        return session;
+      }
+
       // Pass Firebase custom claims from token to session
       if (token) {
         session.user.id = token.sub as string;
         session.user.roles = token.roles || [];
         session.user.creativeRoles = token.creativeRoles || [];
         session.user.status = token.status || "active";
+      } else {
+        console.warn("Token is undefined in session callback, using defaults");
+        // Set default values
+        session.user.roles = ["user"];
+        session.user.creativeRoles = [];
+        session.user.status = "active";
       }
       return session;
     },
@@ -33,6 +47,17 @@ const extendedAuthConfig = {
       trigger?: string;
       session?: any;
     }) {
+      // Add error handling for undefined token
+      if (!token) {
+        console.error("Token is undefined in jwt callback");
+        return {
+          sub: "",
+          roles: ["user"],
+          creativeRoles: [],
+          status: "active",
+        } as JWT;
+      }
+
       // If signing in
       if (account && user) {
         // If Firebase account

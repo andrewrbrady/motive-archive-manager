@@ -6,6 +6,39 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
+// Set NEXTAUTH_URL if on Vercel and not already set
+if (process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
+  console.log(
+    `Setting NEXTAUTH_URL from VERCEL_URL: https://${process.env.VERCEL_URL}`
+  );
+  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+}
+
+// Log critical environment variables (redacting sensitive values)
+console.log("NextAuth Environment Check:");
+console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
+console.log(
+  "- NEXTAUTH_SECRET:",
+  process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
+);
+console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
+console.log(
+  "- GOOGLE_CLIENT_ID:",
+  process.env.GOOGLE_CLIENT_ID ? "Set" : "Not set"
+);
+console.log(
+  "- GOOGLE_CLIENT_SECRET:",
+  process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
+);
+
+// Define a fallback URL for environments where NEXTAUTH_URL isn't set properly
+const getBaseUrl = () => {
+  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
+  return "http://localhost:3000";
+};
+
 export const authConfig: NextAuthConfig = {
   providers: [
     Google({
@@ -309,6 +342,7 @@ export const authConfig: NextAuthConfig = {
   },
   debug: process.env.NODE_ENV === "development",
   trustHost: true,
+  basePath: "/api/auth",
 };
 
 export default authConfig;
