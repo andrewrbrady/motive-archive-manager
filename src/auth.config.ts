@@ -5,7 +5,6 @@ import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import crypto from "crypto";
 
 // Import environment setup (this must be first)
 import "@/lib/env-setup";
@@ -18,34 +17,26 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 // Log critical environment variables
-console.log("NextAuth Environment Check:");
-console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
-console.log(
-  "- NEXTAUTH_SECRET:",
-  process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
-);
-console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
-console.log(
-  "- GOOGLE_CLIENT_ID:",
-  process.env.GOOGLE_CLIENT_ID
-    ? `Set (${process.env.GOOGLE_CLIENT_ID.length} chars)`
-    : "Not set"
-);
-console.log(
-  "- GOOGLE_CLIENT_SECRET:",
-  process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
-);
+console.log("OAuth Configuration Check:", {
+  GOOGLE_CLIENT_ID_SET: !!process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_ID_LENGTH: process.env.GOOGLE_CLIENT_ID?.length || 0,
+  GOOGLE_CLIENT_SECRET_SET: !!process.env.GOOGLE_CLIENT_SECRET,
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL || "Not set",
+  NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  NODE_ENV: process.env.NODE_ENV,
+});
 
 export const authConfig: NextAuthConfig = {
+  debug: true, // Enable debug logs
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
-          prompt: "select_account",
           access_type: "offline",
-          response_type: "code",
+          prompt: "consent",
         },
       },
     }),
@@ -116,51 +107,8 @@ export const authConfig: NextAuthConfig = {
     }),
   ],
   session: {
-    // Use JWT-based sessions for better compatibility with Edge runtime
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
-    // Add cookie configuration
-    generateSessionToken: () => crypto.randomUUID(),
-  },
-  cookies: {
-    // Configure cookies for better security and compatibility
-    sessionToken: {
-      name: `__Secure-next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: true,
-      },
-    },
-    callbackUrl: {
-      name: `__Secure-next-auth.callback-url`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: true,
-      },
-    },
-    csrfToken: {
-      name: `__Host-next-auth.csrf-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: true,
-      },
-    },
-    pkceCodeVerifier: {
-      name: `__Host-next-auth.pkce.code_verifier`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: true,
-        maxAge: 900, // 15 minutes in seconds
-      },
-    },
   },
   pages: {
     signIn: "/auth/signin",
@@ -386,7 +334,6 @@ export const authConfig: NextAuthConfig = {
       }
     },
   },
-  debug: process.env.NODE_ENV === "development",
   trustHost: true,
   basePath: "/api/auth",
 };
