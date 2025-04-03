@@ -39,6 +39,7 @@ export const authConfig: NextAuthConfig = {
           prompt: "consent",
         },
       },
+      checks: ["state"],
     }),
     Credentials({
       credentials: {
