@@ -9,6 +9,13 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 // Import environment setup (this must be first)
 import "@/lib/env-setup";
 
+// Check required environment variables
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  throw new Error(
+    "Missing required environment variables for Google OAuth: GOOGLE_CLIENT_ID and/or GOOGLE_CLIENT_SECRET"
+  );
+}
+
 // Log critical environment variables
 console.log("NextAuth Environment Check:");
 console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
@@ -19,7 +26,9 @@ console.log(
 console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
 console.log(
   "- GOOGLE_CLIENT_ID:",
-  process.env.GOOGLE_CLIENT_ID ? "Set" : "Not set"
+  process.env.GOOGLE_CLIENT_ID
+    ? `Set (${process.env.GOOGLE_CLIENT_ID.length} chars)`
+    : "Not set"
 );
 console.log(
   "- GOOGLE_CLIENT_SECRET:",
@@ -29,11 +38,13 @@ console.log(
 export const authConfig: NextAuthConfig = {
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
           prompt: "select_account",
+          access_type: "offline",
+          response_type: "code",
         },
       },
     }),
