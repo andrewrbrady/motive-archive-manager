@@ -6,46 +6,12 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
-// Get the deployment URL based on environment
-const getDeploymentUrl = (): string => {
-  // For production deployments
-  if (
-    process.env.VERCEL_ENV === "production" &&
-    process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ) {
-    return process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  }
-  // For preview deployments (including branches and PRs)
-  if (process.env.VERCEL_ENV === "preview") {
-    return (
-      process.env.VERCEL_BRANCH_URL ||
-      process.env.VERCEL_URL ||
-      "localhost:3000"
-    );
-  }
-  // For development environment
-  if (process.env.VERCEL_ENV === "development") {
-    return "localhost:3000";
-  }
-  // Fallback to VERCEL_URL if available, otherwise use localhost
-  return process.env.VERCEL_URL || "localhost:3000";
-};
+// Import environment setup (this must be first)
+import "@/lib/env-setup";
 
-// Resolve the base URL first, before any provider configuration
-const deploymentUrl = getDeploymentUrl();
-const protocol = deploymentUrl.includes("localhost") ? "http://" : "https://";
-const baseUrl = `${protocol}${deploymentUrl}`;
-
-// Set NEXTAUTH_URL if not already set
-if (!process.env.NEXTAUTH_URL) {
-  console.log(`Setting NEXTAUTH_URL based on environment: ${baseUrl}`);
-  process.env.NEXTAUTH_URL = baseUrl;
-}
-
-// Log critical environment variables and deployment context
+// Log critical environment variables
 console.log("NextAuth Environment Check:");
 console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
-console.log("- Base URL resolved:", baseUrl);
 console.log(
   "- NEXTAUTH_SECRET:",
   process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
@@ -58,15 +24,6 @@ console.log(
 console.log(
   "- GOOGLE_CLIENT_SECRET:",
   process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
-);
-console.log("\nVercel Deployment Context:");
-console.log("- VERCEL:", process.env.VERCEL || "Not set");
-console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
-console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
-console.log("- VERCEL_BRANCH_URL:", process.env.VERCEL_BRANCH_URL || "Not set");
-console.log(
-  "- VERCEL_PROJECT_PRODUCTION_URL:",
-  process.env.VERCEL_PROJECT_PRODUCTION_URL || "Not set"
 );
 
 export const authConfig: NextAuthConfig = {
@@ -290,7 +247,7 @@ export const authConfig: NextAuthConfig = {
               try {
                 // Create the user using our import endpoint that properly sets the provider
                 const importResponse = await fetch(
-                  `${baseUrl}/api/auth/import-google-user`,
+                  `${process.env.NEXTAUTH_URL}/api/auth/import-google-user`,
                   {
                     method: "POST",
                     headers: {
