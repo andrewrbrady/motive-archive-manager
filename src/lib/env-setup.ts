@@ -2,15 +2,17 @@
 function setupEnvironment() {
   // For production deployments
   if (process.env.VERCEL_ENV === "production") {
-    // Use the main deployment URL
-    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+    process.env.NEXTAUTH_URL =
+      process.env.NEXT_PUBLIC_APP_URL || `https://${process.env.VERCEL_URL}`;
     return;
   }
 
   // For preview deployments
   if (process.env.VERCEL_ENV === "preview") {
-    // Use the deployment URL provided by Vercel
-    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+    // Use custom preview domain if set, otherwise fall back to Vercel URL
+    process.env.NEXTAUTH_URL =
+      process.env.NEXT_PUBLIC_PREVIEW_URL ||
+      `https://${process.env.VERCEL_URL}`;
     return;
   }
 
@@ -34,4 +36,6 @@ console.log("Auth configuration:", {
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
   NODE_ENV: process.env.NODE_ENV,
   VERCEL_ENV: process.env.VERCEL_ENV,
+  APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  PREVIEW_URL: process.env.NEXT_PUBLIC_PREVIEW_URL,
 });
