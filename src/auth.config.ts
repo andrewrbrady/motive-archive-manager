@@ -31,18 +31,21 @@ const getDeploymentUrl = (): string => {
   return process.env.VERCEL_URL || "localhost:3000";
 };
 
+// Resolve the base URL first, before any provider configuration
+const deploymentUrl = getDeploymentUrl();
+const protocol = deploymentUrl.includes("localhost") ? "http://" : "https://";
+const baseUrl = `${protocol}${deploymentUrl}`;
+
 // Set NEXTAUTH_URL if not already set
 if (!process.env.NEXTAUTH_URL) {
-  const deploymentUrl = getDeploymentUrl();
-  const protocol = deploymentUrl.includes("localhost") ? "http://" : "https://";
-  const fullUrl = `${protocol}${deploymentUrl}`;
-  console.log(`Setting NEXTAUTH_URL based on environment: ${fullUrl}`);
-  process.env.NEXTAUTH_URL = fullUrl;
+  console.log(`Setting NEXTAUTH_URL based on environment: ${baseUrl}`);
+  process.env.NEXTAUTH_URL = baseUrl;
 }
 
 // Log critical environment variables and deployment context
 console.log("NextAuth Environment Check:");
 console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
+console.log("- Base URL resolved:", baseUrl);
 console.log(
   "- NEXTAUTH_SECRET:",
   process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
@@ -66,18 +69,6 @@ console.log(
   process.env.VERCEL_PROJECT_PRODUCTION_URL || "Not set"
 );
 
-// Define a fallback URL for environments where NEXTAUTH_URL isn't set properly
-const getBaseUrl = () => {
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
-  return "http://localhost:3000";
-};
-
-// Make sure we have a valid base URL
-const baseUrl = getBaseUrl();
-console.log("- Base URL for auth:", baseUrl);
-
 export const authConfig: NextAuthConfig = {
   providers: [
     Google({
@@ -86,7 +77,7 @@ export const authConfig: NextAuthConfig = {
       authorization: {
         params: {
           prompt: "select_account",
-          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/google`,
+          redirect_uri: `${baseUrl}/api/auth/callback/google`,
         },
       },
     }),
@@ -300,7 +291,7 @@ export const authConfig: NextAuthConfig = {
               try {
                 // Create the user using our import endpoint that properly sets the provider
                 const importResponse = await fetch(
-                  `${process.env.NEXTAUTH_URL}/api/auth/import-google-user`,
+                  `${baseUrl}/api/auth/import-google-user`,
                   {
                     method: "POST",
                     headers: {
