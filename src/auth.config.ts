@@ -77,7 +77,6 @@ export const authConfig: NextAuthConfig = {
       authorization: {
         params: {
           prompt: "select_account",
-          redirect_uri: `${baseUrl}/api/auth/callback/google`,
         },
       },
     }),
