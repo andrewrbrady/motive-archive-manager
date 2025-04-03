@@ -1,45 +1,22 @@
 // Environment setup that runs before any other imports
 function setupEnvironment() {
   // For production deployments
-  if (
-    process.env.VERCEL_ENV === "production" &&
-    process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ) {
-    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_ENV === "production") {
+    // Use the main deployment URL
+    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
     return;
   }
 
-  // For preview deployments (including branches and PRs)
+  // For preview deployments
   if (process.env.VERCEL_ENV === "preview") {
-    // Use the git-based URL with branch name if available
-    if (process.env.VERCEL_GIT_COMMIT_REF) {
-      // Clean the branch name to be URL-safe
-      const branchName = process.env.VERCEL_GIT_COMMIT_REF.replace(
-        /[^a-zA-Z0-9-]/g,
-        "-"
-      );
-      const gitBasedUrl = `motive-archive-manager-git-${branchName}-andrew-andrewrbradys-projects.vercel.app`;
-      process.env.NEXTAUTH_URL = `https://${gitBasedUrl}`;
-      console.log("Using git-based preview URL:", process.env.NEXTAUTH_URL);
-    } else if (process.env.VERCEL_URL) {
-      process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
-      console.log("Using standard preview URL:", process.env.NEXTAUTH_URL);
-    }
+    // Use the deployment URL provided by Vercel
+    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
     return;
   }
 
   // For development environment
-  if (
-    process.env.VERCEL_ENV === "development" ||
-    process.env.NODE_ENV === "development"
-  ) {
+  if (process.env.NODE_ENV === "development") {
     process.env.NEXTAUTH_URL = "http://localhost:3000";
-    return;
-  }
-
-  // Fallback to NEXT_PUBLIC_BASE_URL if available
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    process.env.NEXTAUTH_URL = process.env.NEXT_PUBLIC_BASE_URL;
     return;
   }
 
@@ -52,12 +29,9 @@ function setupEnvironment() {
 // Run setup immediately
 setupEnvironment();
 
-// Log environment for debugging
-console.log("Auth environment check:", {
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL || "Not set",
-  NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
+// Log environment for verification
+console.log("Auth configuration:", {
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
   NODE_ENV: process.env.NODE_ENV,
   VERCEL_ENV: process.env.VERCEL_ENV,
-  VERCEL_URL: process.env.VERCEL_URL,
-  VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF || "Not set",
 });
