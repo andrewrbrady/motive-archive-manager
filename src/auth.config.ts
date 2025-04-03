@@ -39,7 +39,8 @@ export const authConfig: NextAuthConfig = {
           prompt: "consent",
         },
       },
-      checks: ["state"],
+      // Disable all OAuth state checks in preview environment
+      ...(process.env.VERCEL_ENV === "preview" ? { checks: [] } : {}),
     }),
     Credentials({
       credentials: {
