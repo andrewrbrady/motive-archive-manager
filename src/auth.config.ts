@@ -49,11 +49,8 @@ export const authConfig: NextAuthConfig = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          redirect_uri: `${baseUrl}/api/auth/callback/google`,
-        },
-      },
+      // Do not use dynamic URL construction in the authorization configuration
+      // Google requires a fixed, authorized redirect URI
     }),
     Credentials({
       credentials: {
