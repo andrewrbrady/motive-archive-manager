@@ -10,15 +10,10 @@ function setupEnvironment() {
   }
 
   // For preview deployments (including branches and PRs)
-  if (process.env.VERCEL_ENV === "preview") {
-    if (process.env.VERCEL_BRANCH_URL) {
-      process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_BRANCH_URL}`;
-      return;
-    }
-    if (process.env.VERCEL_URL) {
-      process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
-      return;
-    }
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    // Always use the standard Vercel preview URL
+    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+    return;
   }
 
   // For development environment
@@ -46,7 +41,10 @@ function setupEnvironment() {
 setupEnvironment();
 
 // Log environment for debugging
-console.log("Environment Setup Complete:");
-console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
-console.log("- VERCEL_ENV:", process.env.VERCEL_ENV);
-console.log("- NODE_ENV:", process.env.NODE_ENV);
+console.log("Auth environment check:", {
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL || "Not set",
+  NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  VERCEL_URL: process.env.VERCEL_URL,
+});
