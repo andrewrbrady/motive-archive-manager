@@ -6,15 +6,41 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
-// Set NEXTAUTH_URL if on Vercel and not already set
-if (process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
-  const vercelUrl = process.env.VERCEL_URL;
-  const fullUrl = `https://${vercelUrl}`;
-  console.log(`Setting NEXTAUTH_URL from VERCEL_URL: ${fullUrl}`);
+// Get the deployment URL based on environment
+const getDeploymentUrl = (): string => {
+  // For production deployments
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ) {
+    return process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  }
+  // For preview deployments (including branches and PRs)
+  if (process.env.VERCEL_ENV === "preview") {
+    return (
+      process.env.VERCEL_BRANCH_URL ||
+      process.env.VERCEL_URL ||
+      "localhost:3000"
+    );
+  }
+  // For development environment
+  if (process.env.VERCEL_ENV === "development") {
+    return "localhost:3000";
+  }
+  // Fallback to VERCEL_URL if available, otherwise use localhost
+  return process.env.VERCEL_URL || "localhost:3000";
+};
+
+// Set NEXTAUTH_URL if not already set
+if (!process.env.NEXTAUTH_URL) {
+  const deploymentUrl = getDeploymentUrl();
+  const protocol = deploymentUrl.includes("localhost") ? "http://" : "https://";
+  const fullUrl = `${protocol}${deploymentUrl}`;
+  console.log(`Setting NEXTAUTH_URL based on environment: ${fullUrl}`);
   process.env.NEXTAUTH_URL = fullUrl;
 }
 
-// Log critical environment variables (redacting sensitive values)
+// Log critical environment variables and deployment context
 console.log("NextAuth Environment Check:");
 console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
 console.log(
@@ -30,7 +56,15 @@ console.log(
   "- GOOGLE_CLIENT_SECRET:",
   process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
 );
+console.log("\nVercel Deployment Context:");
+console.log("- VERCEL:", process.env.VERCEL || "Not set");
+console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
 console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
+console.log("- VERCEL_BRANCH_URL:", process.env.VERCEL_BRANCH_URL || "Not set");
+console.log(
+  "- VERCEL_PROJECT_PRODUCTION_URL:",
+  process.env.VERCEL_PROJECT_PRODUCTION_URL || "Not set"
+);
 
 // Define a fallback URL for environments where NEXTAUTH_URL isn't set properly
 const getBaseUrl = () => {
@@ -49,8 +83,12 @@ export const authConfig: NextAuthConfig = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      // Do not use dynamic URL construction in the authorization configuration
-      // Google requires a fixed, authorized redirect URI
+      authorization: {
+        params: {
+          prompt: "select_account",
+          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/google`,
+        },
+      },
     }),
     Credentials({
       credentials: {
