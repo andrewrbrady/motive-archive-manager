@@ -19,10 +19,17 @@ const extendedAuthConfig = {
 
       // Pass Firebase custom claims from token to session
       if (token) {
-        session.user.id = token.sub as string;
-        session.user.roles = token.roles || [];
+        // For Google users, use the firebase_uid if available
+        session.user.id = token.firebase_uid || (token.sub as string);
+        session.user.roles = token.roles || ["user"];
         session.user.creativeRoles = token.creativeRoles || [];
         session.user.status = token.status || "active";
+
+        console.log("Session user data:", {
+          id: session.user.id,
+          roles: session.user.roles,
+          provider: token.provider,
+        });
       } else {
         console.warn("Token is undefined in session callback, using defaults");
         // Set default values
@@ -61,14 +68,14 @@ const extendedAuthConfig = {
       // If signing in
       if (account && user) {
         // If Firebase account
-        if (account.provider === "firebase") {
+        if (account.provider === "credentials") {
           try {
             // Get Firebase custom claims
             const firebaseUser = await adminAuth.getUser(user.id);
             const claims = firebaseUser.customClaims || {};
 
             // Add claims to token
-            token.roles = claims.roles || [];
+            token.roles = claims.roles || ["user"];
             token.creativeRoles = claims.creativeRoles || [];
             token.status = claims.status || "active";
 
@@ -79,6 +86,58 @@ const extendedAuthConfig = {
             });
           } catch (error) {
             console.error("Error getting Firebase custom claims:", error);
+            // Set default values on error
+            token.roles = ["user"];
+            token.creativeRoles = [];
+            token.status = "active";
+          }
+        }
+        // If Google account
+        else if (account.provider === "google") {
+          try {
+            // Check if user exists in Firebase
+            let firebaseUser;
+            try {
+              firebaseUser = await adminAuth.getUserByEmail(user.email!);
+            } catch (error) {
+              // User doesn't exist in Firebase, create them
+              firebaseUser = await adminAuth.createUser({
+                email: user.email!,
+                displayName: user.name || user.email?.split("@")[0],
+                photoURL: user.image || undefined,
+              });
+              // Set default claims
+              await adminAuth.setCustomUserClaims(firebaseUser.uid, {
+                roles: ["user"],
+                creativeRoles: [],
+                status: "active",
+              });
+            }
+
+            // Get or set default claims
+            const claims = firebaseUser.customClaims || {
+              roles: ["user"],
+              creativeRoles: [],
+              status: "active",
+            };
+
+            // Add claims and Firebase UID to token
+            token.roles = claims.roles;
+            token.creativeRoles = claims.creativeRoles;
+            token.status = claims.status;
+            token.firebase_uid = firebaseUser.uid;
+
+            console.log("Added Google user claims to token:", {
+              email: user.email,
+              firebaseUid: firebaseUser.uid,
+              roles: token.roles,
+            });
+          } catch (error) {
+            console.error("Error handling Google sign-in:", error);
+            // Set default values on error
+            token.roles = ["user"];
+            token.creativeRoles = [];
+            token.status = "active";
           }
         }
       }
