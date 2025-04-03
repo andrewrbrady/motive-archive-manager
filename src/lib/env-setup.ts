@@ -10,9 +10,16 @@ function setupEnvironment() {
   }
 
   // For preview deployments (including branches and PRs)
-  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
-    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
-    console.log("Using Vercel preview URL:", process.env.NEXTAUTH_URL);
+  if (process.env.VERCEL_ENV === "preview") {
+    // Use the git-based URL if available
+    if (process.env.VERCEL_GIT_COMMIT_REF) {
+      const gitBasedUrl = `motive-archive-manager-git-${process.env.VERCEL_GIT_COMMIT_REF}-andrew-andrewrbradys-projects.vercel.app`;
+      process.env.NEXTAUTH_URL = `https://${gitBasedUrl}`;
+      console.log("Using git-based preview URL:", process.env.NEXTAUTH_URL);
+    } else if (process.env.VERCEL_URL) {
+      process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+      console.log("Using standard preview URL:", process.env.NEXTAUTH_URL);
+    }
     return;
   }
 
@@ -47,4 +54,5 @@ console.log("Auth environment check:", {
   NODE_ENV: process.env.NODE_ENV,
   VERCEL_ENV: process.env.VERCEL_ENV,
   VERCEL_URL: process.env.VERCEL_URL,
+  VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF || "Not set",
 });

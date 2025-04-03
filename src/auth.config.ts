@@ -28,7 +28,7 @@ console.log("OAuth Configuration Check:", {
 });
 
 export const authConfig: NextAuthConfig = {
-  debug: true, // Enable debug logs
+  debug: process.env.NODE_ENV === "development", // Only enable debug in development
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
