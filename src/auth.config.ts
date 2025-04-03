@@ -5,6 +5,7 @@ import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import crypto from "crypto";
 
 // Import environment setup (this must be first)
 import "@/lib/env-setup";
@@ -118,6 +119,48 @@ export const authConfig: NextAuthConfig = {
     // Use JWT-based sessions for better compatibility with Edge runtime
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
+    // Add cookie configuration
+    generateSessionToken: () => crypto.randomUUID(),
+  },
+  cookies: {
+    // Configure cookies for better security and compatibility
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+    callbackUrl: {
+      name: `__Secure-next-auth.callback-url`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+    csrfToken: {
+      name: `__Host-next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+    pkceCodeVerifier: {
+      name: `__Host-next-auth.pkce.code_verifier`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        maxAge: 900, // 15 minutes in seconds
+      },
+    },
   },
   pages: {
     signIn: "/auth/signin",
