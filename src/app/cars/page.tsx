@@ -7,6 +7,7 @@ import { Client } from "@/types/contact";
 import CarsPageClient from "./CarsPageClient";
 import { headers } from "next/headers";
 import { Make } from "@/lib/fetchMakes";
+import { getBaseUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -42,24 +43,14 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
     });
 
     // Create the URL differently based on environment
-    // Using simplified API endpoint for better image handling
     let url: string;
-
     if (typeof window === "undefined") {
-      // Server-side: Use new URL() with a base URL from env or defaults
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NODE_ENV === "development"
-        ? "http://localhost:3000"
-        : "";
-
-      url = new URL(
-        `/api/cars/simple?${queryParams.toString()}`,
-        baseUrl
-      ).toString();
+      // Server-side: Use absolute URL
+      const baseUrl = getBaseUrl();
+      url = `${baseUrl}/api/cars/simple?${queryParams.toString()}`;
       console.log("Server-side cars URL:", url);
     } else {
-      // Client-side: Use relative URL (will be automatically resolved)
+      // Client-side: Use relative URL
       url = `/api/cars/simple?${queryParams.toString()}`;
       console.log("Client-side cars URL:", url);
     }

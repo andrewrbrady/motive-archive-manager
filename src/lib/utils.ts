@@ -24,6 +24,39 @@ export function getTimeRemaining(endDate?: string): string {
   return `${minutes}m`;
 }
 
+// Get the deployment URL based on environment
+export function getBaseUrl(): string {
+  // For production deployments
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  // For preview deployments (including branches and PRs)
+  if (process.env.VERCEL_ENV === "preview") {
+    if (process.env.VERCEL_BRANCH_URL) {
+      return `https://${process.env.VERCEL_BRANCH_URL}`;
+    }
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`;
+    }
+  }
+  // For development environment
+  if (
+    process.env.VERCEL_ENV === "development" ||
+    process.env.NODE_ENV === "development"
+  ) {
+    return "http://localhost:3000";
+  }
+  // Fallback to NEXT_PUBLIC_BASE_URL if available
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL;
+  }
+  // Final fallback
+  return "http://localhost:3000";
+}
+
 export function getApiUrl(path: string): string {
   // Remove leading slash if present
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
@@ -35,8 +68,6 @@ export function getApiUrl(path: string): string {
   if (cleanPath === "openai") {
     console.log("[DEBUG] getApiUrl - Environment variables:", {
       NODE_ENV: process.env.NODE_ENV,
-      VERCEL_URL: process.env.VERCEL_URL,
-      NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
       hasOpenAIEndpoint: !!process.env.OPENAI_API_ENDPOINT,
       hasOpenAIKey: !!process.env.OPENAI_API_KEY,
     });
@@ -50,79 +81,17 @@ export function getApiUrl(path: string): string {
       );
     }
 
-    // Log the endpoint for debugging
-    console.log("[DEBUG] getApiUrl - OpenAI endpoint details:", {
-      raw: endpoint,
-      cleaned: endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint,
-      environment: process.env.NODE_ENV,
-      isBrowser: typeof window !== "undefined",
-      isHttps: endpoint.startsWith("https://"),
-      isLocalhost: endpoint.includes("localhost"),
-    });
-
-    // Ensure the endpoint is a valid URL
-    try {
-      const url = new URL(endpoint);
-      console.log("[DEBUG] getApiUrl - Parsed URL details:", {
-        protocol: url.protocol,
-        host: url.host,
-        pathname: url.pathname,
-        search: url.search,
-      });
-    } catch (error) {
-      console.error("[ERROR] getApiUrl - Invalid OpenAI endpoint URL:", {
-        endpoint,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-      throw new Error("Invalid OpenAI API endpoint URL");
-    }
-
-    // Ensure the endpoint doesn't end with a slash
     return endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
   }
 
-  // In development
-  if (process.env.NODE_ENV === "development") {
-    console.log("[DEBUG] getApiUrl - Development environment");
-    return `http://localhost:3000/api/${cleanPath}`;
-  }
-
-  // In production
-  if (isBrowser) {
-    console.log("[DEBUG] getApiUrl - Browser environment");
-    // Client-side: use relative URL
+  // In development or browser environment, use relative paths
+  if (process.env.NODE_ENV === "development" || isBrowser) {
     return `/api/${cleanPath}`;
-  } else {
-    console.log("[DEBUG] getApiUrl - Server environment");
-    // Server-side: construct absolute URL
-    let baseUrl = "";
-
-    if (process.env.VERCEL_URL) {
-      // Using Vercel's deployment URL
-      baseUrl = `https://${process.env.VERCEL_URL}`;
-    } else if (process.env.NEXT_PUBLIC_BASE_URL) {
-      // Using configured base URL
-      baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-      // Ensure HTTPS for non-localhost URLs
-      if (!baseUrl.startsWith("http://localhost")) {
-        baseUrl = baseUrl.replace(/^http:/, "https:");
-      }
-    } else {
-      console.error(
-        "[ERROR] getApiUrl - No base URL configured for production"
-      );
-      throw new Error("No base URL configured for production environment");
-    }
-
-    // Ensure baseUrl doesn't end with a slash
-    baseUrl = baseUrl.replace(/\/$/, "");
-
-    console.log(
-      "[DEBUG] getApiUrl - Constructed URL:",
-      `${baseUrl}/api/${cleanPath}`
-    );
-    return `${baseUrl}/api/${cleanPath}`;
   }
+
+  // In production server-side, use absolute URLs
+  const baseUrl = getBaseUrl();
+  return `${baseUrl}/api/${cleanPath}`;
 }
 
 /**

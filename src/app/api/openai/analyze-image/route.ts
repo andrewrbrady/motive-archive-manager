@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
+import { getBaseUrl } from "@/lib/utils";
 
 // Set maximum execution time to 60 seconds
 export const maxDuration = 60;
@@ -149,11 +150,7 @@ async function validateColorWithSerper(
   }
 
   try {
-    // Get the base URL from the environment, defaulting to localhost for development
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
-
+    const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/serper`, {
       method: "POST",
       headers: {
