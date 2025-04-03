@@ -37,8 +37,6 @@ export function getPublicRoutes(): string[] {
     "/api/auth",
     "/auth",
     "/",
-    "/about",
-    "/contact",
   ];
 }
 

@@ -35,12 +35,12 @@ const pathMatchesPattern = (path: string, patterns: RegExp[]): boolean => {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip middleware for public routes and static assets
+  // Skip middleware for static assets and API auth routes
   if (
-    pathStartsWith(pathname, publicRoutes) ||
     pathname.includes("_next") ||
     pathname.includes("favicon.ico") ||
-    pathname.match(/\.(jpg|jpeg|png|gif|svg|css|js)$/)
+    pathname.match(/\.(jpg|jpeg|png|gif|svg|css|js)$/) ||
+    pathname.startsWith("/api/auth/")
   ) {
     return NextResponse.next();
   }
@@ -51,8 +51,25 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  // If no token and not on a public route, redirect to signin
-  if (!token && !pathStartsWith(pathname, publicRoutes)) {
+  // Check if the current path is a public route
+  const isPublicRoute = pathStartsWith(pathname, publicRoutes);
+
+  // If not a public route and no token, redirect to signin
+  if (!isPublicRoute && !token) {
+    const signInUrl = new URL("/auth/signin", request.url);
+    signInUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(signInUrl);
+  }
+
+  // If public route, allow access
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
+
+  // At this point, we know it's not a public route and we have a token
+  // Ensure the token has been properly initialized with roles
+  if (!token || !token.roles || !Array.isArray(token.roles)) {
+    console.error("Token missing or invalid roles:", token);
     const signInUrl = new URL("/auth/signin", request.url);
     signInUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(signInUrl);
@@ -60,28 +77,23 @@ export async function middleware(request: NextRequest) {
 
   // Check admin routes - verify user has admin role
   if (
-    token &&
-    (pathStartsWith(pathname, adminRoutes) ||
-      pathMatchesPattern(pathname, adminPatterns))
+    pathStartsWith(pathname, adminRoutes) ||
+    pathMatchesPattern(pathname, adminPatterns)
   ) {
-    const roles = (token.roles as string[]) || [];
-    if (!hasRequiredRole(roles, ["admin"])) {
-      // Redirect to unauthorized page
+    if (!hasRequiredRole(token.roles as string[], ["admin"])) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
   }
 
   // Check editor routes - verify user has editor or admin role
-  if (token && pathMatchesPattern(pathname, editorPatterns)) {
-    const roles = (token.roles as string[]) || [];
-    if (!hasRequiredRole(roles, ["admin", "editor"])) {
-      // Redirect to unauthorized page
+  if (pathMatchesPattern(pathname, editorPatterns)) {
+    if (!hasRequiredRole(token.roles as string[], ["admin", "editor"])) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
   }
 
   // Account suspension check
-  if (token && isUserSuspended(token.status as string)) {
+  if (isUserSuspended(token.status as string)) {
     // Allow access to signout
     if (pathname === "/auth/signout") {
       return NextResponse.next();
@@ -90,10 +102,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/account-suspended", request.url));
   }
 
-  // Get the origin from the request headers
+  // Handle CORS
   const origin = request.headers.get("origin") || "*";
 
-  // Handle preflight requests
   if (request.method === "OPTIONS") {
     return new NextResponse(null, {
       status: 204,
@@ -106,10 +117,7 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Get response from the endpoint
   const response = NextResponse.next();
-
-  // Add CORS headers to the response
   response.headers.set("Access-Control-Allow-Origin", origin);
   response.headers.set(
     "Access-Control-Allow-Methods",
@@ -125,13 +133,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * 1. _next/static (static files)
-     * 2. _next/image (image optimization files)
-     * 3. favicon.ico (favicon file)
-     * 4. public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
+    // Match all paths except static files and API auth routes
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

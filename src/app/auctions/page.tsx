@@ -7,6 +7,7 @@ import { FiltersSection } from "@/components/auctions/FiltersSection";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import { AuctionsViewWrapper } from "@/components/auctions/AuctionsViewWrapper";
 import { PageTitle } from "@/components/ui/PageTitle";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 interface PageProps {
   searchParams: {
@@ -91,29 +92,31 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   // Return the page
   return (
-    <div className="flex flex-col space-y-6">
-      {!isMarketPage && (
-        <PageTitle title="Auctions" count={total}>
-          <div className="flex items-center gap-4">
-            <ViewModeSelector currentView={view} />
-          </div>
-        </PageTitle>
-      )}
+    <AuthGuard>
+      <div className="flex flex-col space-y-6">
+        {!isMarketPage && (
+          <PageTitle title="Auctions" count={total}>
+            <div className="flex items-center gap-4">
+              <ViewModeSelector currentView={view} />
+            </div>
+          </PageTitle>
+        )}
 
-      <FiltersSection
-        platforms={platforms}
-        makes={makes}
-        currentFilters={{
-          platformId: params.platformId || "",
-          make: params.make || "",
-          minYear: params.minYear || "",
-          maxYear: params.maxYear || "",
-          endDate: params.endDate || "",
-          noReserve: params.noReserve === "true",
-        }}
-      />
+        <FiltersSection
+          platforms={platforms}
+          makes={makes}
+          currentFilters={{
+            platformId: params.platformId || "",
+            make: params.make || "",
+            minYear: params.minYear || "",
+            maxYear: params.maxYear || "",
+            endDate: params.endDate || "",
+            noReserve: params.noReserve === "true",
+          }}
+        />
 
-      <AuctionsViewWrapper auctions={auctions} view={view} />
-    </div>
+        <AuctionsViewWrapper auctions={auctions} view={view} />
+      </div>
+    </AuthGuard>
   );
 }

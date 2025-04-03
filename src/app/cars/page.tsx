@@ -8,6 +8,7 @@ import CarsPageClient from "./CarsPageClient";
 import { headers } from "next/headers";
 import { Make } from "@/lib/fetchMakes";
 import { getBaseUrl } from "@/lib/utils";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -171,18 +172,20 @@ export default async function CarsPage({
     }));
 
     return (
-      <CarsPageClient
-        cars={cars}
-        totalPages={totalPages}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        totalCount={totalCount}
-        view={view}
-        isEditMode={isEditMode}
-        filters={filters}
-        makes={makes}
-        clients={formattedClients}
-      />
+      <AuthGuard>
+        <CarsPageClient
+          cars={cars}
+          totalPages={totalPages}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          view={view}
+          isEditMode={isEditMode}
+          filters={filters}
+          makes={makes}
+          clients={formattedClients}
+        />
+      </AuthGuard>
     );
   } catch (error) {
     console.error("Error in CarsPage:", error);

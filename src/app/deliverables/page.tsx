@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import DeliverablesTabs from "@/components/deliverables/DeliverablesTabs";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export const metadata: Metadata = {
   title: "Deliverables | Motive Archive",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function DeliverablePage() {
   return (
-    <>
+    <AuthGuard>
       <Navbar />
       <main className="min-h-screen bg-background">
         <div className="container mx-auto py-8 space-y-8">
@@ -19,6 +20,6 @@ export default function DeliverablePage() {
         </div>
       </main>
       <Footer />
-    </>
+    </AuthGuard>
   );
 }

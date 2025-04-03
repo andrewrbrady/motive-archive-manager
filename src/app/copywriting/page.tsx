@@ -5,6 +5,7 @@ import Navbar from "@/components/layout/navbar";
 import ArticleGenerator from "@/app/copywriting/components/ArticleGenerator";
 import EmailMarketing from "@/app/copywriting/components/EmailMarketing";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export default function CopywritingPage() {
   // Define tab items
@@ -22,7 +23,7 @@ export default function CopywritingPage() {
   ];
 
   return (
-    <>
+    <AuthGuard>
       <Navbar />
       <div className="container mx-auto py-10">
         <CustomTabs
@@ -31,6 +32,6 @@ export default function CopywritingPage() {
           basePath="/copywriting"
         />
       </div>
-    </>
+    </AuthGuard>
   );
 }

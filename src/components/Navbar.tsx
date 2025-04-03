@@ -3,9 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 
-const navItems = [
-  { href: "/", label: "Home" },
+const publicNavItems = [{ href: "/", label: "Home" }];
+
+const protectedNavItems = [
   { href: "/production", label: "Production" },
   { href: "/inventory", label: "Inventory" },
   { href: "/cars", label: "Cars" },
@@ -13,6 +15,11 @@ const navItems = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const navItems = session
+    ? [...publicNavItems, ...protectedNavItems]
+    : publicNavItems;
 
   return (
     <div className="container mx-auto px-4 py-4">
@@ -35,6 +42,21 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
+          {!session ? (
+            <Link
+              href="/auth/signin"
+              className="text-sm font-medium text-primary hover:text-primary/80"
+            >
+              Sign In
+            </Link>
+          ) : (
+            <Link
+              href="/auth/signout"
+              className="text-sm font-medium text-primary hover:text-primary/80"
+            >
+              Sign Out
+            </Link>
+          )}
         </div>
       </nav>
     </div>

@@ -56,6 +56,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { StatusNotification } from "@/components/StatusNotification";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 interface Power {
   hp: number;
@@ -1766,318 +1767,323 @@ export default function CarPage({ params }: { params: { id: string } }) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
+    <AuthGuard>
+      <div className="min-h-screen bg-background">
+        <Navbar />
 
-      <main className="container-wide px-4 py-8 min-h-[70vh]">
-        {error ? (
-          <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
-            {error}
-          </div>
-        ) : (
-          <>
-            {/* Car title and header - always show this */}
-            <div className="flex items-center gap-4 mb-6">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-primary shrink-0">
-                      {car?.primaryImageId &&
-                      car?.images &&
-                      car?.images.length > 0 ? (
-                        car.images.find(
-                          (img) => img._id === car.primaryImageId
-                        ) ? (
-                          <Image
-                            src={
-                              car.images.find(
-                                (img) => img._id === car.primaryImageId
-                              )?.url || ""
-                            }
-                            alt={generateCarTitle()}
-                            fill
-                            className="object-cover"
-                            onError={(e) => {
-                              // If primary image fails, try to show the first image
-                              if (car.images && car.images.length > 0) {
-                                (e.target as HTMLImageElement).src =
-                                  car.images[0].url;
+        <main className="container-wide px-4 py-8 min-h-[70vh]">
+          {error ? (
+            <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
+              {error}
+            </div>
+          ) : (
+            <>
+              {/* Car title and header - always show this */}
+              <div className="flex items-center gap-4 mb-6">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-primary shrink-0">
+                        {car?.primaryImageId &&
+                        car?.images &&
+                        car?.images.length > 0 ? (
+                          car.images.find(
+                            (img) => img._id === car.primaryImageId
+                          ) ? (
+                            <Image
+                              src={
+                                car.images.find(
+                                  (img) => img._id === car.primaryImageId
+                                )?.url || ""
                               }
-                            }}
-                          />
-                        ) : car.images && car.images[0] ? (
-                          <Image
-                            src={car.images[0].url}
-                            alt={generateCarTitle()}
-                            fill
-                            className="object-cover"
-                          />
+                              alt={generateCarTitle()}
+                              fill
+                              className="object-cover"
+                              onError={(e) => {
+                                // If primary image fails, try to show the first image
+                                if (car.images && car.images.length > 0) {
+                                  (e.target as HTMLImageElement).src =
+                                    car.images[0].url;
+                                }
+                              }}
+                            />
+                          ) : car.images && car.images[0] ? (
+                            <Image
+                              src={car.images[0].url}
+                              alt={generateCarTitle()}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                              <ImageIcon className="w-5 h-5 text-text-secondary" />
+                            </div>
+                          )
                         ) : (
                           <div className="w-full h-full bg-background-secondary flex items-center justify-center">
                             <ImageIcon className="w-5 h-5 text-text-secondary" />
                           </div>
-                        )
-                      ) : (
-                        <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                          <ImageIcon className="w-5 h-5 text-text-secondary" />
-                        </div>
-                      )}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      {car?.primaryImageId
-                        ? "Primary image"
-                        : "No primary image selected"}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <PageTitle title={generateCarTitle()} className="" />
-            </div>
-
-            {/* Always render tabs - each tab handles its own loading state */}
-            <CustomTabs
-              items={[
-                {
-                  value: "gallery",
-                  label: "Image Gallery",
-                  content: (
-                    <div className="space-y-4">
-                      <div className="image-gallery-wrapper">
-                        <ImageGalleryWithQuery
-                          carId={params.id}
-                          vehicleInfo={{
-                            make: car?.make || "",
-                            model: car?.model || "",
-                            year: car?.year || 0,
-                            color: car?.color || "",
-                          }}
-                          onFilterOptionsChange={handleFilterOptionsChange}
-                          showFilters={true}
-                          onUploadStarted={notifyUploadStarted}
-                          onUploadEnded={notifyUploadEnded}
-                        />
+                        )}
                       </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: "specs",
-                  label: "Specifications",
-                  content: car ? (
-                    <Specifications
-                      car={toCarFormData(car)}
-                      isEditMode={isSpecsEditMode}
-                      onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
-                      onSave={async (editedSpecs) => {
-                        await handleSpecsEdit(editedSpecs as CarData);
-                      }}
-                      editedSpecs={editedSpecs}
-                      onInputChange={(field, value, nestedField) =>
-                        handleInputChange(field, value, nestedField)
-                      }
-                      onMeasurementChange={handleMeasurementChange}
-                      onPowerChange={handlePowerChange}
-                      onTorqueChange={handleTorqueChange}
-                      onEnrich={handleEnrichData}
-                      isEnriching={isEnriching}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading specifications...
-                    </div>
-                  ),
-                },
-                {
-                  value: "shoots",
-                  label: "Photo Shoots",
-                  content: <PhotoShoots carId={id} />,
-                },
-                {
-                  value: "shot-lists",
-                  label: "Shot Lists",
-                  content: <ShotList carId={id} />,
-                },
-                {
-                  value: "scripts",
-                  label: "Scripts",
-                  content: <Scripts carId={id} />,
-                },
-                {
-                  value: "bat",
-                  label: "BaT Listing",
-                  content: car ? (
-                    <BaTListingGenerator
-                      carDetails={{
-                        _id: car._id,
-                        year: car.year ?? 0,
-                        make: car.make,
-                        model: car.model,
-                        color: car.color,
-                        mileage: car.mileage
-                          ? {
-                              value: car.mileage.value || 0,
-                              unit: car.mileage.unit,
-                            }
-                          : undefined,
-                        engine: car.engine,
-                        description: car.description || "",
-                      }}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading BaT listing...
-                    </div>
-                  ),
-                },
-                {
-                  value: "captions",
-                  label: "Social Media",
-                  content: car ? (
-                    <CaptionGenerator
-                      carDetails={{
-                        _id: car._id,
-                        year: car.year ?? 0,
-                        make: car.make,
-                        model: car.model,
-                        color: car.color,
-                        engine: car.engine,
-                        mileage: car.mileage
-                          ? {
-                              value: car.mileage.value || 0,
-                              unit: car.mileage.unit,
-                            }
-                          : undefined,
-                        type: car.type,
-                        client: car.client,
-                        description: car.description || "",
-                      }}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading caption generator...
-                    </div>
-                  ),
-                },
-                {
-                  value: "service",
-                  label: "Service History",
-                  content: (
-                    <div className="text-center py-12 text-muted-foreground">
-                      Service history coming soon
-                    </div>
-                  ),
-                },
-                {
-                  value: "research",
-                  label: "Research",
-                  content: <ResearchFiles carId={id} />,
-                },
-                {
-                  value: "documentation",
-                  label: "Documentation",
-                  content: <DocumentationFiles carId={id} />,
-                },
-                {
-                  value: "article",
-                  label: "Article",
-                  content: car ? (
-                    <ArticleGenerator
-                      car={fromCarFormData(toCarFormData(car), car) as BaseCar}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading article generator...
-                    </div>
-                  ),
-                },
-                {
-                  value: "deliverables",
-                  label: "Deliverables",
-                  content: <DeliverablesTab carId={id} />,
-                },
-                {
-                  value: "events",
-                  label: "Events",
-                  content: <EventsTab carId={id} />,
-                },
-                {
-                  value: "calendar",
-                  label: "Calendar",
-                  content: <FullCalendarTab carId={id} />,
-                },
-              ]}
-              defaultValue={activeTab}
-              basePath={`/cars/${id}`}
-            />
-          </>
-        )}
-      </main>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {car?.primaryImageId
+                          ? "Primary image"
+                          : "No primary image selected"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <PageTitle title={generateCarTitle()} className="" />
+              </div>
 
-      {/* Sticky header for primary image and car title when scrolling */}
-      {car && !isLoading && (
-        <div
-          className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
-            hasScrolled
-              ? "translate-y-0 opacity-100"
-              : "-translate-y-full opacity-0"
-          }`}
-        >
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border-primary shrink-0">
-                {car.primaryImageId && car.images && car.images.length > 0 ? (
-                  car.images.find((img) => img._id === car.primaryImageId) ? (
-                    <Image
-                      src={
-                        car.images.find((img) => img._id === car.primaryImageId)
-                          ?.url || ""
-                      }
-                      alt={generateCarTitle()}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : car.images && car.images[0] ? (
-                    <Image
-                      src={car.images[0].url}
-                      alt={generateCarTitle()}
-                      fill
-                      className="object-cover"
-                    />
+              {/* Always render tabs - each tab handles its own loading state */}
+              <CustomTabs
+                items={[
+                  {
+                    value: "gallery",
+                    label: "Image Gallery",
+                    content: (
+                      <div className="space-y-4">
+                        <div className="image-gallery-wrapper">
+                          <ImageGalleryWithQuery
+                            carId={params.id}
+                            vehicleInfo={{
+                              make: car?.make || "",
+                              model: car?.model || "",
+                              year: car?.year || 0,
+                              color: car?.color || "",
+                            }}
+                            onFilterOptionsChange={handleFilterOptionsChange}
+                            showFilters={true}
+                            onUploadStarted={notifyUploadStarted}
+                            onUploadEnded={notifyUploadEnded}
+                          />
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "specs",
+                    label: "Specifications",
+                    content: car ? (
+                      <Specifications
+                        car={toCarFormData(car)}
+                        isEditMode={isSpecsEditMode}
+                        onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
+                        onSave={async (editedSpecs) => {
+                          await handleSpecsEdit(editedSpecs as CarData);
+                        }}
+                        editedSpecs={editedSpecs}
+                        onInputChange={(field, value, nestedField) =>
+                          handleInputChange(field, value, nestedField)
+                        }
+                        onMeasurementChange={handleMeasurementChange}
+                        onPowerChange={handlePowerChange}
+                        onTorqueChange={handleTorqueChange}
+                        onEnrich={handleEnrichData}
+                        isEnriching={isEnriching}
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading specifications...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "shoots",
+                    label: "Photo Shoots",
+                    content: <PhotoShoots carId={id} />,
+                  },
+                  {
+                    value: "shot-lists",
+                    label: "Shot Lists",
+                    content: <ShotList carId={id} />,
+                  },
+                  {
+                    value: "scripts",
+                    label: "Scripts",
+                    content: <Scripts carId={id} />,
+                  },
+                  {
+                    value: "bat",
+                    label: "BaT Listing",
+                    content: car ? (
+                      <BaTListingGenerator
+                        carDetails={{
+                          _id: car._id,
+                          year: car.year ?? 0,
+                          make: car.make,
+                          model: car.model,
+                          color: car.color,
+                          mileage: car.mileage
+                            ? {
+                                value: car.mileage.value || 0,
+                                unit: car.mileage.unit,
+                              }
+                            : undefined,
+                          engine: car.engine,
+                          description: car.description || "",
+                        }}
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading BaT listing...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "captions",
+                    label: "Social Media",
+                    content: car ? (
+                      <CaptionGenerator
+                        carDetails={{
+                          _id: car._id,
+                          year: car.year ?? 0,
+                          make: car.make,
+                          model: car.model,
+                          color: car.color,
+                          engine: car.engine,
+                          mileage: car.mileage
+                            ? {
+                                value: car.mileage.value || 0,
+                                unit: car.mileage.unit,
+                              }
+                            : undefined,
+                          type: car.type,
+                          client: car.client,
+                          description: car.description || "",
+                        }}
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading caption generator...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "service",
+                    label: "Service History",
+                    content: (
+                      <div className="text-center py-12 text-muted-foreground">
+                        Service history coming soon
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "research",
+                    label: "Research",
+                    content: <ResearchFiles carId={id} />,
+                  },
+                  {
+                    value: "documentation",
+                    label: "Documentation",
+                    content: <DocumentationFiles carId={id} />,
+                  },
+                  {
+                    value: "article",
+                    label: "Article",
+                    content: car ? (
+                      <ArticleGenerator
+                        car={
+                          fromCarFormData(toCarFormData(car), car) as BaseCar
+                        }
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading article generator...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "deliverables",
+                    label: "Deliverables",
+                    content: <DeliverablesTab carId={id} />,
+                  },
+                  {
+                    value: "events",
+                    label: "Events",
+                    content: <EventsTab carId={id} />,
+                  },
+                  {
+                    value: "calendar",
+                    label: "Calendar",
+                    content: <FullCalendarTab carId={id} />,
+                  },
+                ]}
+                defaultValue={activeTab}
+                basePath={`/cars/${id}`}
+              />
+            </>
+          )}
+        </main>
+
+        {/* Sticky header for primary image and car title when scrolling */}
+        {car && !isLoading && (
+          <div
+            className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
+              hasScrolled
+                ? "translate-y-0 opacity-100"
+                : "-translate-y-full opacity-0"
+            }`}
+          >
+            <div className="container mx-auto px-4">
+              <div className="flex items-center gap-3">
+                <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border-primary shrink-0">
+                  {car.primaryImageId && car.images && car.images.length > 0 ? (
+                    car.images.find((img) => img._id === car.primaryImageId) ? (
+                      <Image
+                        src={
+                          car.images.find(
+                            (img) => img._id === car.primaryImageId
+                          )?.url || ""
+                        }
+                        alt={generateCarTitle()}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : car.images && car.images[0] ? (
+                      <Image
+                        src={car.images[0].url}
+                        alt={generateCarTitle()}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-background-secondary flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4 text-text-secondary" />
+                      </div>
+                    )
                   ) : (
                     <div className="w-full h-full bg-background-secondary flex items-center justify-center">
                       <ImageIcon className="w-4 h-4 text-text-secondary" />
                     </div>
-                  )
-                ) : (
-                  <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                    <ImageIcon className="w-4 h-4 text-text-secondary" />
-                  </div>
-                )}
-              </div>
-              <h1 className="text-base font-semibold text-text-primary truncate">
-                {generateCarTitle()}
-              </h1>
-              <div className="ml-auto text-sm text-text-secondary">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                  )}
+                </div>
+                <h1 className="text-base font-semibold text-text-primary truncate">
+                  {generateCarTitle()}
+                </h1>
+                <div className="ml-auto text-sm text-text-secondary">
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <Footer />
+        <Footer />
 
-      <EnrichmentProgress
-        isVisible={showEnrichProgress}
-        step={enrichProgress.step}
-        _currentStep={enrichProgress.currentStep}
-        status={enrichProgress.status}
-        error={enrichProgress.error}
-        details={enrichProgress.details}
-        onClose={() => setShowEnrichProgress(false)}
-      />
-    </div>
+        <EnrichmentProgress
+          isVisible={showEnrichProgress}
+          step={enrichProgress.step}
+          _currentStep={enrichProgress.currentStep}
+          status={enrichProgress.status}
+          error={enrichProgress.error}
+          details={enrichProgress.details}
+          onClose={() => setShowEnrichProgress(false)}
+        />
+      </div>
+    </AuthGuard>
   );
 }

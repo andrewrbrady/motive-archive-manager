@@ -7,6 +7,7 @@ import CarEntryForm from "@/components/cars/CarEntryForm";
 import { Car } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import type { CarFormData } from "@/components/cars/CarEntryForm";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export default function NewCarPage() {
   const router = useRouter();
@@ -38,14 +39,16 @@ export default function NewCarPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-24">
-        <div className="max-w-4xl mx-auto">
-          <PageTitle title="Add New Car" className="mb-8" />
-          <CarEntryForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
-        </div>
-      </main>
-    </div>
+    <AuthGuard>
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-24">
+          <div className="max-w-4xl mx-auto">
+            <PageTitle title="Add New Car" className="mb-8" />
+            <CarEntryForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+          </div>
+        </main>
+      </div>
+    </AuthGuard>
   );
 }

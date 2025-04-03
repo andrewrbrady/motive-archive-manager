@@ -1,6 +1,7 @@
 import React from "react";
 import { Metadata } from "next";
 import ProductionClient from "./ProductionClient";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export const metadata: Metadata = {
   title: "Production | Motive Archive",
@@ -10,5 +11,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ProductionPage() {
-  return <ProductionClient />;
+  return (
+    <AuthGuard>
+      <ProductionClient />
+    </AuthGuard>
+  );
 }

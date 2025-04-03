@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import ScheduleClient from "./ScheduleClient";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export const metadata: Metadata = {
   title: "Schedule | Motive Archive",
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function SchedulePage() {
-  return <ScheduleClient />;
+  return (
+    <AuthGuard>
+      <ScheduleClient />
+    </AuthGuard>
+  );
 }
