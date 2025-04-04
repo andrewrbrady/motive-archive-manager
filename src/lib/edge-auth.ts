@@ -9,18 +9,15 @@ export function hasRequiredRole(
   userRoles: string[] | undefined,
   requiredRoles: string[]
 ): boolean {
-  if (!userRoles || userRoles.length === 0) {
-    return false;
-  }
-
+  if (!userRoles || !Array.isArray(userRoles)) return false;
   return requiredRoles.some((role) => userRoles.includes(role));
 }
 
 /**
  * Edge-compatible function to verify if a user is suspended
  */
-export function isUserSuspended(userStatus: string | undefined): boolean {
-  return userStatus === "suspended";
+export function isUserSuspended(status?: string): boolean {
+  return status === "suspended";
 }
 
 /**
@@ -28,15 +25,19 @@ export function isUserSuspended(userStatus: string | undefined): boolean {
  */
 export function getPublicRoutes(): string[] {
   return [
+    "/",
     "/auth/signin",
-    "/auth/signup",
     "/auth/error",
     "/auth/signout",
-    "/auth/reset-password",
-    "/auth/forgot-password",
-    "/api/auth",
-    "/auth",
-    "/",
+    "/api/auth/callback",
+    "/api/auth/session",
+    "/api/auth/csrf",
+    "/api/auth/providers",
+    "/api/auth/signin",
+    "/api/auth/signout",
+    "/unauthorized",
+    "/404",
+    "/500",
   ];
 }
 
@@ -44,12 +45,21 @@ export function getPublicRoutes(): string[] {
  * Get admin routes and patterns
  */
 export function getAdminRoutes(): string[] {
-  return ["/admin", "/api/users"];
+  return [
+    "/admin",
+    "/api/users",
+    "/api/users/list",
+    "/api/users/index",
+    "/api/system",
+  ];
 }
 
 export function getAdminPatterns(): RegExp[] {
   return [
     /^\/admin\/.+$/, // All routes under /admin/
+    /^\/api\/users\/[^/]+$/, // Individual user routes
+    /^\/api\/users\/[^/]+\/.*$/, // Nested user routes
+    /^\/api\/system\/.+$/, // All system routes
   ];
 }
 
@@ -58,7 +68,7 @@ export function getAdminPatterns(): RegExp[] {
  */
 export function getEditorPatterns(): RegExp[] {
   return [
-    /^\/edit\/.+$/, // All routes under /edit/
-    /^\/cars\/\d+\/edit$/, // Car edit pages
+    /^\/editor\/.+$/, // All routes under /editor/
+    /^\/api\/editor\/.+$/, // All editor API routes
   ];
 }

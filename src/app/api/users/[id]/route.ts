@@ -43,18 +43,13 @@ async function getUser(
     const session = await auth();
     console.log("Session for getUser:", session?.user);
 
-    // TEMPORARY BYPASS: Commenting out the admin check during debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("Unauthorized access attempt:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for getting user"
-    );
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("Unauthorized access attempt:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
     const userId = context.params.id;
     if (!userId) {
@@ -92,18 +87,13 @@ async function updateUser(
     const session = await auth();
     console.log("Session for updateUser:", session?.user);
 
-    // TEMPORARY BYPASS: Commenting out the admin check during debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("Unauthorized access attempt:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for updating user"
-    );
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("Unauthorized access attempt:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
     const userId = context.params.id;
     if (!userId) {
@@ -246,18 +236,13 @@ export async function DELETE(
     const session = await auth();
     console.log("Session for deleteUser:", session?.user);
 
-    // TEMPORARY BYPASS: Commenting out the admin check during debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("Unauthorized access attempt:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for deleting user"
-    );
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("Unauthorized access attempt:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
     const userId = params.id;
     if (!userId) {

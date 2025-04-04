@@ -6,6 +6,8 @@ import Image from "next/image";
 import { logos } from "@/data/site-content";
 import { useTheme } from "@/components/ThemeProvider";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { useSession } from "next-auth/react";
+import { AdminOnly } from "@/components/auth/RoleBasedAccess";
 
 // Common classes for consistent styling
 const navClasses =
@@ -21,6 +23,7 @@ interface NavbarProps {
 
 export default function Navbar({ className }: NavbarProps) {
   const { theme, toggleTheme } = useTheme();
+  const { data: session } = useSession();
 
   return (
     <>
@@ -59,9 +62,11 @@ export default function Navbar({ className }: NavbarProps) {
               <Link href="/copywriting" className={linkClasses}>
                 Copywriting
               </Link>
-              <Link href="/admin" className={linkClasses}>
-                Admin
-              </Link>
+              <AdminOnly>
+                <Link href="/admin" className={linkClasses}>
+                  Admin
+                </Link>
+              </AdminOnly>
             </div>
           </div>
           <div className="flex items-center space-x-6">

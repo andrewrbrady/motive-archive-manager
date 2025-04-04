@@ -93,10 +93,27 @@ export async function PUT(
       // Check authentication and authorization
       console.log("Attempting admin operation - checking authorization");
       const session = await auth();
+
+      // Check if user is authenticated and has admin role
       if (!session || !session.user || !session.user.roles.includes("admin")) {
         console.log("Unauthorized access attempt:", session?.user?.email);
         return NextResponse.json(
           { error: "Unauthorized access" },
+          { status: 403 }
+        );
+      }
+
+      // Prevent users from modifying their own roles
+      if (session.user.id === params.id) {
+        console.log(
+          "User attempting to modify their own roles:",
+          session.user.id
+        );
+        return NextResponse.json(
+          {
+            error:
+              "For security reasons, you cannot modify your own roles. Please ask another administrator to make any necessary changes.",
+          },
           { status: 403 }
         );
       }

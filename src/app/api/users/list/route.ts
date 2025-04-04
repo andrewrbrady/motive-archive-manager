@@ -40,18 +40,13 @@ export async function GET(
       roles: session?.user?.roles,
     });
 
-    // TEMPORARY BYPASS: Commenting out the admin check for debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("User does not have admin role:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for user listing"
-    );
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("User does not have admin role:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
     // Get query parameters
     const { searchParams } = new URL(request.url);

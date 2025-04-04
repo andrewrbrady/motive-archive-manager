@@ -20,8 +20,8 @@ import UserDetailModal from "./UserDetailModal";
 
 // Shared User interface to be consistent across components
 export interface User {
-  uid: string;
-  _id?: string;
+  uid: string; // Firebase Auth UID (required)
+  _id?: string; // MongoDB ID (optional)
   name: string;
   email: string;
   roles: string[];
@@ -163,7 +163,12 @@ export default function UserManagement() {
       });
 
       // Process the response (might be different format for the non-paginated endpoint)
-      const users = Array.isArray(data) ? data : data.users || [];
+      const users = (Array.isArray(data) ? data : data.users || []).map(
+        (user: any) => ({
+          ...user,
+          uid: user.uid || user.id, // Handle both uid and id fields
+        })
+      );
       const hasMoreData = data.pagination?.hasMore || false;
       const lastUserId = data.pagination?.lastId || undefined;
 
@@ -226,6 +231,16 @@ export default function UserManagement() {
   };
 
   const handleEditUser = (user: User) => {
+    // Ensure we have a valid uid
+    if (!user.uid) {
+      console.error("Cannot edit user without uid:", user);
+      toast({
+        title: "Error",
+        description: "Invalid user data. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedUser(user);
     setIsUserModalOpen(true);
   };
@@ -261,36 +276,47 @@ export default function UserManagement() {
   };
 
   const handleUserUpdated = (updatedUser: User) => {
-    setIsUserModalOpen(false);
-    fetchUsers(); // Refresh the user list
-  };
-
-  const syncSession = async () => {
-    try {
-      setIsLoading(true);
-
-      // Refresh the session from Firebase Auth
-      const refreshResponse = await fetch("/api/auth/refresh-session");
-      const refreshData = await refreshResponse.json();
-
-      console.log("Session refresh result:", refreshData);
-
-      // Now fetch users with the refreshed session
-      await fetchUsers();
-
-      toast({
-        title: "Success",
-        description: "User data refreshed successfully",
-      });
-    } catch (error) {
-      console.error("Error refreshing session:", error);
+    // Ensure we have a valid uid
+    if (!updatedUser.uid) {
+      console.error("Updated user data missing uid:", updatedUser);
       toast({
         title: "Error",
-        description: "Failed to refresh user data",
+        description:
+          "Invalid user data received. Please refresh and try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      return;
+    }
+
+    setIsUserModalOpen(false);
+    // Refresh the user list to show updated data
+    fetchUsers();
+  };
+
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue) return "N/A";
+    try {
+      // Handle Firestore timestamp format
+      if (dateValue._seconds) {
+        const date = new Date(dateValue._seconds * 1000);
+        return date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+
+      // Handle regular date strings/objects
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "N/A";
     }
   };
 
@@ -306,14 +332,6 @@ export default function UserManagement() {
           />
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => syncSession()}
-            variant="outline"
-            disabled={isLoading}
-            className="border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]"
-          >
-            Refresh Users
-          </Button>
           <Button
             onClick={handleCreateUser}
             variant="outline"
@@ -340,107 +358,118 @@ export default function UserManagement() {
           </TableHeader>
           <TableBody>
             {isLoading && users.length === 0 ? (
-              <TableRow>
+              <TableRow key="loading">
                 <TableCell colSpan={7} className="text-center py-4">
                   <LoadingSpinner size="sm" />
                 </TableCell>
               </TableRow>
             ) : filteredUsers.length === 0 ? (
-              <TableRow>
+              <TableRow key="no-users">
                 <TableCell colSpan={7} className="text-center py-4">
                   <span className="text-muted-foreground">No users found</span>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers.map((user) => (
-                <TableRow
-                  key={user.uid}
-                  className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
-                >
-                  <TableCell className="font-medium">
-                    <a
-                      href={`/admin/users/${user.uid}`}
-                      className="text-primary hover:underline cursor-pointer"
-                    >
-                      {user.name}
-                    </a>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map((role) => (
-                        <span
-                          key={role}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+              filteredUsers.map((user: User) => {
+                // Ensure we have a valid uid for the key
+                const rowKey = user.uid || user._id || `temp-${user.email}`;
+                return (
+                  <TableRow
+                    key={rowKey}
+                    className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
+                  >
+                    <TableCell className="font-medium">
+                      {user.uid ? (
+                        <a
+                          href={`/admin/users/${user.uid}`}
+                          className="text-primary hover:underline cursor-pointer"
                         >
-                          {role.charAt(0).toUpperCase() + role.slice(1)}
-                        </span>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.creativeRoles.length > 0 ? (
-                        user.creativeRoles.map((role) => (
+                          {user.name}
+                        </a>
+                      ) : (
+                        <span>{user.name}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles.map((role: string, index: number) => (
                           <span
-                            key={role}
+                            key={`${rowKey}-role-${index}`}
                             className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
                           >
-                            {role
-                              .split("_")
-                              .map(
-                                (word) =>
-                                  word.charAt(0).toUpperCase() + word.slice(1)
-                              )
-                              .join(" ")}
+                            {role.charAt(0).toUpperCase() + role.slice(1)}
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          None
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.status === "active"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-destructive/10 text-destructive"
-                      }`}
-                    >
-                      {user.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.createdAt
-                      ? user.createdAt instanceof Date
-                        ? user.createdAt.toLocaleDateString()
-                        : new Date(user.createdAt).toLocaleDateString()
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() => handleEditUser(user)}
-                        variant="ghost"
-                        size="sm"
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.creativeRoles.length > 0 ? (
+                          user.creativeRoles.map(
+                            (role: string, index: number) => (
+                              <span
+                                key={`${rowKey}-creative-role-${index}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+                              >
+                                {role
+                                  .split("_")
+                                  .map(
+                                    (word: string) =>
+                                      word.charAt(0).toUpperCase() +
+                                      word.slice(1)
+                                  )
+                                  .join(" ")}
+                              </span>
+                            )
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            None
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.status === "active"
+                            ? "bg-primary/10 text-primary"
+                            : "bg-destructive/10 text-destructive"
+                        }`}
                       >
-                        Edit
-                      </Button>
-                      <Button
-                        onClick={() => handleDeleteUser(user.uid)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {user.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(user.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {user.uid && (
+                          <>
+                            <Button
+                              onClick={() => handleEditUser(user)}
+                              variant="ghost"
+                              size="sm"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteUser(user.uid)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

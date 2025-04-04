@@ -19,7 +19,7 @@ interface UserFormProps {
   onCancel: () => void;
 }
 
-const ROLES = ["admin", "editor", "viewer"];
+const ROLES = ["user", "admin", "editor", "viewer"];
 const CREATIVE_ROLES = [
   "video_editor",
   "photographer",
@@ -63,16 +63,17 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         roles: formData.roles || ["viewer"],
         creativeRoles: formData.creativeRoles || [],
         status: formData.status || "active",
+        updateType: "roles",
       };
 
       console.log("Submitting user data:", {
         isEdit: !!user,
-        userId: user?._id || user?.uid,
+        userId: user?.uid,
         userData,
       });
 
       // Determine if we're updating an existing user or creating a new one
-      const userId = user?._id || user?.uid;
+      const userId = user?.uid;
       const url = userId
         ? `/api/users/${userId}` // Use UID for existing user
         : `/api/users`; // POST to base endpoint for new user
@@ -122,8 +123,8 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         // Pass the updated user data back to the parent
         onSubmit({
           ...userData,
-          uid: responseData.uid || userId || responseData._id,
-          _id: responseData._id || userId,
+          uid: responseData.uid || userId,
+          _id: responseData._id,
         } as User);
       }
     } catch (error: any) {
@@ -139,10 +140,26 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
   };
 
   const handleRoleChange = (value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      roles: [value], // Since we only allow one role at a time
-    }));
+    setFormData((prev) => {
+      // Always include the "user" role
+      let newRoles = prev.roles || ["user"];
+
+      if (value === "user") {
+        // If selecting "user", keep only user role
+        newRoles = ["user"];
+      } else if (newRoles.includes(value)) {
+        // If role already exists, remove it (except "user")
+        newRoles = newRoles.filter((r) => r === "user" || r !== value);
+      } else {
+        // Add the new role while keeping existing roles
+        newRoles = [...newRoles, value];
+      }
+
+      return {
+        ...prev,
+        roles: newRoles,
+      };
+    });
   };
 
   const handleCreativeRoleChange = (value: string) => {
@@ -212,14 +229,35 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           htmlFor="roles"
           className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
         >
-          Role
+          Roles
         </label>
-        <Select value={formData.roles?.[0]} onValueChange={handleRoleChange}>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {formData.roles?.map((role) => (
+            <div
+              key={role}
+              className="flex items-center gap-1 px-3 py-1 rounded-md bg-[hsl(var(--background))] text-sm"
+            >
+              <span>{role.charAt(0).toUpperCase() + role.slice(1)}</span>
+              {role !== "user" && (
+                <button
+                  type="button"
+                  onClick={() => handleRoleChange(role)}
+                  className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <Select onValueChange={handleRoleChange}>
           <SelectTrigger className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-            <SelectValue placeholder="Select a role" />
+            <SelectValue placeholder="Add role" />
           </SelectTrigger>
           <SelectContent className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-            {ROLES.map((role) => (
+            {ROLES.filter(
+              (role) => !formData.roles?.includes(role) || role === "user"
+            ).map((role) => (
               <SelectItem
                 key={role}
                 value={role}

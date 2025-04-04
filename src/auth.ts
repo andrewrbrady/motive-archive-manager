@@ -12,7 +12,8 @@ const extendedAuthConfig = {
       // Add error handling for undefined token or session
       if (!session || !session.user) {
         console.error(
-          "Session or session.user is undefined in session callback"
+          "Session or session.user is undefined in session callback",
+          { session, token }
         );
         return session;
       }
@@ -25,13 +26,25 @@ const extendedAuthConfig = {
         session.user.creativeRoles = token.creativeRoles || [];
         session.user.status = token.status || "active";
 
-        console.log("Session user data:", {
-          id: session.user.id,
+        console.log("Session callback - token data:", {
+          tokenExists: !!token,
+          tokenRoles: token.roles,
+          tokenFirebaseUid: token.firebase_uid,
+          tokenSub: token.sub,
+          allTokenData: token,
+        });
+
+        console.log("Session callback - updated session:", {
+          userId: session.user.id,
           roles: session.user.roles,
           provider: token.provider,
+          allSessionData: session,
         });
       } else {
-        console.warn("Token is undefined in session callback, using defaults");
+        console.warn("Token is undefined in session callback, using defaults", {
+          session,
+          token,
+        });
         // Set default values
         session.user.roles = ["user"];
         session.user.creativeRoles = [];
@@ -56,7 +69,12 @@ const extendedAuthConfig = {
     }) {
       // Add error handling for undefined token
       if (!token) {
-        console.error("Token is undefined in jwt callback");
+        console.error("Token is undefined in jwt callback", {
+          user,
+          account,
+          trigger,
+          session,
+        });
         return {
           sub: "",
           roles: ["user"],
@@ -64,6 +82,17 @@ const extendedAuthConfig = {
           status: "active",
         } as JWT;
       }
+
+      console.log("JWT callback - input data:", {
+        hasToken: !!token,
+        hasUser: !!user,
+        hasAccount: !!account,
+        trigger,
+        tokenData: token,
+        userData: user,
+        accountData: account,
+        sessionData: session,
+      });
 
       // If signing in
       if (account && user) {
@@ -74,15 +103,22 @@ const extendedAuthConfig = {
             const firebaseUser = await adminAuth.getUser(user.id);
             const claims = firebaseUser.customClaims || {};
 
+            console.log("JWT callback - Firebase claims:", {
+              userId: user.id,
+              claims,
+              firebaseUser,
+            });
+
             // Add claims to token
             token.roles = claims.roles || ["user"];
             token.creativeRoles = claims.creativeRoles || [];
             token.status = claims.status || "active";
 
-            console.log("Added Firebase claims to token:", {
+            console.log("JWT callback - updated token:", {
               userId: user.id,
               roles: token.roles,
               creativeRoles: token.creativeRoles,
+              allTokenData: token,
             });
           } catch (error) {
             console.error("Error getting Firebase custom claims:", error);
