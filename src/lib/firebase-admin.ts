@@ -36,7 +36,7 @@ const firebaseAdmin = !apps.length
   : getApp();
 
 // Initialize Firestore
-const db = getFirestore();
+const adminDb = getFirestore();
 
 console.log("Firebase Admin initialized successfully");
 
@@ -44,4 +44,4 @@ console.log("Firebase Admin initialized successfully");
 const adminAuth = getAuth(firebaseAdmin);
 console.log("✅ Firebase Admin Auth initialized");
 
-export { firebaseAdmin, db, adminAuth };
+export { firebaseAdmin, adminDb, adminAuth };

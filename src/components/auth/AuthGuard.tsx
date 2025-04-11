@@ -28,4 +28,28 @@ export function AuthGuard({ children }: AuthGuardProps) {
   return <>{children}</>;
 }
 
+interface AdminGuardProps {
+  children: React.ReactNode;
+}
+
+export function AdminGuard({ children }: AdminGuardProps) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated" || !session?.user?.isAdmin) {
+    router.push("/");
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
 export default AuthGuard;

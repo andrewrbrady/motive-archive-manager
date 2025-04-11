@@ -4,7 +4,7 @@
  * User caching utility to reduce API calls
  * This file only runs on the server side
  */
-import { db as adminDb, adminAuth } from "@/lib/firebase-admin";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { FirestoreUser } from "@/lib/firestore/users";
 import { logger } from "@/lib/logging";
 

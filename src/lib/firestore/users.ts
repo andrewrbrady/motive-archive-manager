@@ -230,3 +230,51 @@ export async function updateUser(
     return null;
   }
 }
+
+/**
+ * Get user with both Firestore and Auth data
+ * @param uid User ID
+ * @returns UserWithAuth data or null if not found
+ */
+export async function getUserWithAuth(
+  uid: string
+): Promise<UserWithAuth | null> {
+  try {
+    // Get Firestore data
+    const firestoreUser = await getUserById(uid);
+    if (!firestoreUser) {
+      return null;
+    }
+
+    // Get Auth data
+    const authUser = await adminAuth.getUser(uid);
+
+    // Combine data
+    return {
+      ...firestoreUser,
+      emailVerified: authUser.emailVerified,
+      providerData: authUser.providerData,
+      disabled: authUser.disabled,
+      metadata: {
+        creationTime: authUser.metadata.creationTime,
+        lastSignInTime: authUser.metadata.lastSignInTime,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting user with auth:", error);
+    return null;
+  }
+}
+
+/**
+ * Update a user's roles
+ * @param uid User ID
+ * @param roles New roles array
+ * @returns Updated user data or null if update fails
+ */
+export async function updateUserRoles(
+  uid: string,
+  roles: string[]
+): Promise<FirestoreUser | null> {
+  return updateUser(uid, { roles });
+}
