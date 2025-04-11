@@ -37,10 +37,15 @@ export function CarAvatar({
 }: CarAvatarProps) {
   const [imageError, setImageError] = React.useState(false);
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
+  const isMounted = React.useRef(true);
+  const hasErrored = React.useRef(false);
 
   React.useEffect(() => {
+    isMounted.current = true;
+    hasErrored.current = false;
+
     const fetchImageUrl = async () => {
-      if (!primaryImageId) return;
+      if (!primaryImageId || !isMounted.current) return;
 
       try {
         const response = await fetch(
@@ -53,17 +58,34 @@ export function CarAvatar({
         if (!imageData.url) {
           throw new Error("No URL in image data");
         }
-        setImageUrl(imageData.url);
-        setImageError(false);
+        if (isMounted.current) {
+          setImageUrl(imageData.url);
+          setImageError(false);
+        }
       } catch (error) {
         console.error("Error fetching image:", error);
-        setImageError(true);
+        if (isMounted.current) {
+          setImageError(true);
+        }
       }
     };
 
-    setImageError(false);
-    fetchImageUrl();
+    if (!hasErrored.current) {
+      setImageError(false);
+      fetchImageUrl();
+    }
+
+    return () => {
+      isMounted.current = false;
+    };
   }, [primaryImageId]);
+
+  const handleImageError = React.useCallback(() => {
+    if (!hasErrored.current) {
+      hasErrored.current = true;
+      setImageError(true);
+    }
+  }, []);
 
   const avatar = (
     <div
@@ -78,7 +100,7 @@ export function CarAvatar({
           src={imageUrl}
           alt={alt}
           className="w-full h-full object-cover"
-          onError={() => setImageError(true)}
+          onError={handleImageError}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
