@@ -1,61 +1,47 @@
-// Environment setup that runs before any other imports
-function setupEnvironment() {
-  // For production deployments
+// This file validates and exports environment variables for type safety
+// It runs on the server side only
+
+// Type-safe environment variables
+export const env = {
+  firebase: {
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  },
+  baseUrl:
+    process.env.NEXTAUTH_URL ||
+    (process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : undefined),
+} as const;
+
+// Server-side environment validation
+if (typeof window === "undefined") {
+  const requiredServerVars = [
+    "FIREBASE_CLIENT_EMAIL",
+    "FIREBASE_PRIVATE_KEY",
+    "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+  ];
+
+  const missing = requiredServerVars.filter((name) => !process.env[name]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`
+    );
+  }
+
+  // Map public Firebase config to Admin SDK
+  process.env.FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+  // Format private key if needed
   if (
-    process.env.VERCEL_ENV === "production" &&
-    process.env.VERCEL_PROJECT_PRODUCTION_URL
+    process.env.FIREBASE_PRIVATE_KEY &&
+    !process.env.FIREBASE_PRIVATE_KEY.includes("-----BEGIN PRIVATE KEY-----")
   ) {
-    process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-    return;
-  }
-
-  // For preview deployments (including branches and PRs)
-  if (process.env.VERCEL_ENV === "preview") {
-    // Get the actual URL from the request if available
-    const actualUrl = process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL;
-    if (actualUrl) {
-      // Ensure we're using the git-based preview URL pattern
-      if (actualUrl.includes("-git-")) {
-        process.env.NEXTAUTH_URL = `https://${actualUrl}`;
-      } else {
-        // Convert to git-based URL pattern
-        const [projectName, ...rest] = actualUrl.split("-");
-        const branchId = rest.join("-").split(".")[0];
-        process.env.NEXTAUTH_URL = `https://${projectName}-git-${branchId}-andrew-andrewrbradys-projects.vercel.app`;
-      }
-      return;
-    }
-  }
-
-  // For development environment
-  if (
-    process.env.VERCEL_ENV === "development" ||
-    process.env.NODE_ENV === "development"
-  ) {
-    process.env.NEXTAUTH_URL = "http://localhost:3000";
-    return;
-  }
-
-  // Fallback to NEXT_PUBLIC_BASE_URL if available
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    process.env.NEXTAUTH_URL = process.env.NEXT_PUBLIC_BASE_URL;
-    return;
-  }
-
-  // Final fallback
-  if (!process.env.NEXTAUTH_URL) {
-    process.env.NEXTAUTH_URL = "http://localhost:3000";
+    process.env.FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY.replace(
+      /\\n/g,
+      "\n"
+    );
   }
 }
-
-// Run setup immediately
-setupEnvironment();
-
-// Log environment for debugging
-console.log("Auth environment check:", {
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL || "Not set",
-  NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
-  NODE_ENV: process.env.NODE_ENV,
-  VERCEL_ENV: process.env.VERCEL_ENV,
-  VERCEL_URL: process.env.VERCEL_URL,
-});
