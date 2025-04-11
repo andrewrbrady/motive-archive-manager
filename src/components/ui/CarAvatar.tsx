@@ -39,18 +39,27 @@ export function CarAvatar({
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
   const isMounted = React.useRef(true);
   const hasErrored = React.useRef(false);
+  const isLoading = React.useRef(false);
 
   React.useEffect(() => {
-    isMounted.current = true;
-    hasErrored.current = false;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!primaryImageId || isLoading.current || hasErrored.current) return;
 
     const fetchImageUrl = async () => {
-      if (!primaryImageId || !isMounted.current) return;
+      if (!isMounted.current) return;
 
+      isLoading.current = true;
       try {
         const response = await fetch(
           `/api/images/${primaryImageId.toString()}`
         );
+        if (!isMounted.current) return;
+
         if (!response.ok) {
           throw new Error("Failed to fetch image URL");
         }
@@ -64,50 +73,49 @@ export function CarAvatar({
         }
       } catch (error) {
         console.error("Error fetching image:", error);
-        if (isMounted.current) {
+        if (isMounted.current && !hasErrored.current) {
+          hasErrored.current = true;
           setImageError(true);
         }
+      } finally {
+        isLoading.current = false;
       }
     };
 
-    if (!hasErrored.current) {
-      setImageError(false);
-      fetchImageUrl();
-    }
-
-    return () => {
-      isMounted.current = false;
-    };
+    fetchImageUrl();
   }, [primaryImageId]);
 
   const handleImageError = React.useCallback(() => {
-    if (!hasErrored.current) {
+    if (!hasErrored.current && isMounted.current) {
       hasErrored.current = true;
       setImageError(true);
     }
   }, []);
 
-  const avatar = (
-    <div
-      className={cn(
-        "relative rounded-full overflow-hidden border border-border shrink-0 bg-muted",
-        sizeClasses[size],
-        className
-      )}
-    >
-      {imageUrl && !imageError ? (
-        <img
-          src={imageUrl}
-          alt={alt}
-          className="w-full h-full object-cover"
-          onError={handleImageError}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <ImageIcon className="w-1/3 h-1/3 text-muted-foreground" />
-        </div>
-      )}
-    </div>
+  const avatar = React.useMemo(
+    () => (
+      <div
+        className={cn(
+          "relative rounded-full overflow-hidden border border-border shrink-0 bg-muted",
+          sizeClasses[size],
+          className
+        )}
+      >
+        {imageUrl && !imageError ? (
+          <img
+            src={imageUrl}
+            alt={alt}
+            className="w-full h-full object-cover"
+            onError={handleImageError}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon className="w-1/3 h-1/3 text-muted-foreground" />
+          </div>
+        )}
+      </div>
+    ),
+    [imageUrl, imageError, size, className, alt, handleImageError]
   );
 
   if (showTooltip) {
