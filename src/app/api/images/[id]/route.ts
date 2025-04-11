@@ -1,31 +1,12 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { createStaticResponse } from "@/lib/cache-utils";
+import { getMongoClient } from "@/lib/mongodb";
 
-const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
-
-if (!MONGODB_URI) {
-  throw new Error("Please add your Mongo URI to .env.local");
-}
-
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  try {
-    const client = new MongoClient(MONGODB_URI as string, {
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-    });
-    await client.connect();
-    return client;
-  } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
-    throw error;
-  }
-}
 
 // GET image by ID
 export async function GET(request: Request) {
@@ -80,10 +61,6 @@ export async function GET(request: Request) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 
