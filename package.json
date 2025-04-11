@@ -16,6 +16,13 @@
     "migrate:cars": "tsx scripts/migrate-to-atlas.ts",
     "migrate:car-images": "tsx src/scripts/migrate-car-images.ts",
     "migrate:primary-image-ids": "tsx scripts/migrate-primary-image-ids.ts",
+    "migrate:deliverable-editors": "tsx src/scripts/standalone-migration.ts",
+    "migrate:deliverable-editors-direct": "tsx src/scripts/migrate-deliverable-editors.ts",
+    "migrate:deliverable-editors-simple": "node src/scripts/run-simple.mjs",
+    "migrate:deliverable-editors-node": "node --loader ts-node/esm src/scripts/migrate-deliverable-editors.ts",
+    "migrate:deliverable-editors-sh": "bash src/scripts/migrate.sh",
+    "migrate:deliverable-editors-direct-run": "node src/scripts/direct-run.cjs",
+    "migrate:deliverable-editors-bash": "bash src/scripts/migrate-deliverable-editors.sh",
     "init-batch-templates": "tsx src/scripts/init-batch-templates.ts",
     "migrate-event-assignees": "tsx src/scripts/migrate-event-assignees.ts",
     "create-template": "tsx scripts/create-motive-studio-template.ts",
@@ -31,7 +38,9 @@
     "migrate:raw-locations": "tsx src/scripts/migrate-raw-locations.ts",
     "reconcile-raw-assets": "tsx src/scripts/reconcile-raw-assets-hard-drives.ts",
     "migrate:created-at": "tsx src/scripts/migrate-created-at.ts",
-    "update:user-claims": "tsx src/scripts/update-user-claims.ts"
+    "update:user-claims": "tsx src/scripts/update-user-claims.ts",
+    "migrate:oauth-users": "node src/scripts/migrate-oauth-users.cjs",
+    "cleanup-users": "tsx src/scripts/cleanup-mongodb-refs.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
@@ -109,7 +118,7 @@
     "lucide-react": "^0.460.0",
     "monaco-vim": "^0.4.2",
     "mongoose": "^8.8.3",
-    "next": "^14.1.0",
+    "next": "^15.3.0",
     "next-auth": "^5.0.0-beta.25",
     "next-themes": "^0.4.4",
     "nodemailer": "^6.10.0",

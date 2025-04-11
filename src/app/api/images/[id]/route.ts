@@ -52,23 +52,18 @@ export async function GET(
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    // Process URL to ensure it works with Cloudflare
-    const processedImage = {
-      ...image,
+    // Return the Cloudflare image URL in a JSON response
+    const imageUrl = getFormattedImageUrl(image.url);
+    return NextResponse.json({
       _id: image._id.toString(),
-      carId: image.carId ? image.carId.toString() : null,
-      url: getFormattedImageUrl(image.url),
-      // Add metadata.category if not present but can be derived from old structure
-      metadata: {
-        ...image.metadata,
-        category: image.metadata?.category || determineImageCategory(image),
-      },
-    };
-
-    console.log(`Found image: ${id}, URL: ${processedImage.url}`);
-
-    // Return with appropriate cache headers - images are static and can be cached longer
-    return createStaticResponse(processedImage);
+      cloudflareId: image.cloudflareId,
+      url: imageUrl,
+      filename: image.filename,
+      metadata: image.metadata,
+      carId: image.carId.toString(),
+      createdAt: image.createdAt,
+      updatedAt: image.updatedAt,
+    });
   } catch (error) {
     console.error("Error fetching image:", error);
     return NextResponse.json(

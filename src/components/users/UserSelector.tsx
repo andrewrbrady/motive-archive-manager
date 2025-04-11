@@ -142,7 +142,11 @@ export default function UserSelector({
                 {showAvatar && (
                   <Avatar className="h-6 w-6">
                     <AvatarImage
-                      src={selectedUser.profileImage || selectedUser.image}
+                      src={
+                        selectedUser.profileImage ||
+                        selectedUser.photoURL ||
+                        selectedUser.image
+                      }
                       alt={selectedUser.name}
                     />
                     <AvatarFallback>
@@ -184,7 +188,9 @@ export default function UserSelector({
                       {showAvatar ? (
                         <Avatar className="h-6 w-6">
                           <AvatarImage
-                            src={user.profileImage || user.image}
+                            src={
+                              user.profileImage || user.photoURL || user.image
+                            }
                             alt={user.name}
                           />
                           <AvatarFallback>

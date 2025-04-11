@@ -68,12 +68,30 @@ export async function getUsers(): Promise<FirestoreUser[]> {
     });
 
     const snapshot = await adminDb.collection("users").get();
-    const allUsers = snapshot.docs.map(
-      (doc) =>
-        ({
-          uid: doc.id,
-          ...doc.data(),
-        } as FirestoreUser)
+    const allUsers = await Promise.all(
+      snapshot.docs.map(async (doc) => {
+        const data = doc.data();
+        // Get Firebase Auth data for each user
+        try {
+          const authUser = await adminAuth.getUser(doc.id);
+          return {
+            uid: doc.id,
+            ...data,
+            photoURL: authUser.photoURL || data.photoURL,
+            image: authUser.photoURL || data.image,
+          } as FirestoreUser;
+        } catch (error) {
+          logger.warn({
+            message: "Failed to get Firebase Auth data for user",
+            uid: doc.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return {
+            uid: doc.id,
+            ...data,
+          } as FirestoreUser;
+        }
+      })
     );
 
     logger.info({

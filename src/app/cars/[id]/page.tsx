@@ -36,15 +36,27 @@ import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
-import type { Car as BaseCar, CarImage, PriceHistory } from "@/types/car";
+import type { Car as BaseCar, CarImage } from "@/types/car";
+import type { MeasurementValue } from "@/types/measurements";
+import type {
+  ExtendedCar,
+  CarFormData,
+  EditableSpecs,
+  UploadProgress,
+  UploadedImageData,
+  BaTCarDetails,
+  FormClientInfo,
+  ApiClientInfo,
+  ImageData,
+  CarData,
+  Performance,
+} from "@/types/car-page";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
 import CalendarTab from "@/components/cars/CalendarTab";
 import FullCalendarTab from "@/components/cars/FullCalendarTab";
 import ShotList from "@/components/cars/ShotList";
 import Scripts from "@/components/cars/Scripts";
-import { Car } from "@/types/car";
-import { MeasurementValue } from "@/types/measurements";
 import PhotoShoots from "@/components/cars/PhotoShoots";
 import { ImageGalleryWithQuery } from "@/components/cars/ImageGalleryWithQuery";
 import { Button } from "@/components/ui/button";
@@ -57,6 +69,26 @@ import {
 } from "@/components/ui/tooltip";
 import { StatusNotification } from "@/components/StatusNotification";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import {
+  isString,
+  isMeasurementValue,
+  handleDimensions,
+  handleInteriorFeatures,
+  handleTransmission,
+  isStringField,
+  handleNestedPath,
+  toCarFormData,
+  toBaseMileage,
+  fromCarFormData,
+  toBaTCarDetails,
+  formatMeasurement,
+  formatMileage,
+  formatPower,
+  formatTorque,
+  formatAddress,
+  generateCarTitle,
+} from "@/utils/car-helpers";
+import { CarAvatar } from "@/components/ui/CarAvatar";
 
 interface Power {
   hp: number;
@@ -69,465 +101,30 @@ interface Torque {
   Nm: number;
 }
 
-interface ApiCarResponse {
-  _id?: string;
-  make: string;
-  model: string;
-  year: number;
-  price: string | number;
-  mileage?: {
-    value: number;
-    unit: string;
-  };
-  color?: string;
-  interior_color?: string;
-  vin?: string;
-  status?: "available" | "sold" | "pending";
-  condition?: string;
-  location?: string;
-  description?: string;
-  type?: string;
-  engine?: {
-    type?: string;
-    displacement?: {
-      value: number;
-      unit: string;
-    };
-    power?: {
-      hp: number;
-      kW: number;
-      ps: number;
-    };
-    torque?: {
-      "lb-ft": number;
-      Nm: number;
-    };
-    features?: string[];
-    configuration?: string;
-    cylinders?: number;
-    fuelType?: string;
-    manufacturer?: string;
-  };
-  images?: CarImage[];
-  client?: string;
-  clientInfo?: any;
-  manufacturing?: any;
-  dimensions?: any;
-  safety?: any;
-  doors?: number;
-  interior_features?: any;
-  transmission?: {
-    type: string;
-  };
-  performance?: any;
-  aiAnalysis?: any;
-}
-
-interface ExtendedCar
-  extends Omit<BaseCar, "mileage" | "year" | "images" | "imageIds"> {
-  mileage: MeasurementValue;
-  year: number;
-  images?: CarImage[];
-  imageIds: string[];
-}
-
-interface Dimensions {
-  length: MeasurementValue;
-  width: MeasurementValue;
-  height: MeasurementValue;
-  wheelbase: MeasurementValue;
-}
-
-interface InteriorFeatures {
-  [key: string]: number | string | undefined;
-  seats?: number;
-  upholstery?: string;
-}
-
-interface Performance {
-  "0_to_60_mph": MeasurementValue;
-  top_speed: MeasurementValue;
-}
-
-interface Transmission {
-  type: string;
-}
-
-interface Weight {
-  curb_weight: MeasurementValue;
-}
-
-interface ImageMetadata {
-  angle?: string;
-  description?: string;
-  movement?: string;
-  tod?: string;
-  view?: string;
-  side?: string;
-  aiAnalysis?: {
-    angle?: string;
-    description?: string;
-    movement?: string;
-    tod?: string;
-    view?: string;
-    side?: string;
-  };
-}
-
-interface ImageVariants {
-  [key: string]: string;
-}
-
-interface UploadedImageData {
+interface PageParams {
   id: string;
-  url: string;
-  filename: string;
-  metadata: ImageMetadata;
-  variants: ImageVariants;
-  createdAt: string;
-  updatedAt: string;
 }
 
-interface UploadProgress {
-  fileName: string;
-  progress: number;
-  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
-  error?: string;
-  currentStep?: string;
-}
-
-interface EditableSpecs {
-  [key: string]: any;
-  color?: string;
-  interior_color?: string;
-  mileage?: MeasurementValue;
-  engine?: {
-    displacement?: MeasurementValue;
-    power?: Power;
-    torque?: Torque;
-    [key: string]: any;
-  };
-  dimensions?: {
-    [key: string]: MeasurementValue | undefined;
-  };
-  interior_features?: {
-    [key: string]: string | number | undefined;
-  };
-  transmission?: {
-    [key: string]: string | number | undefined;
-  };
-}
-
-interface Address {
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-}
-
-interface ClientInfo {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: Address;
-  businessType: string;
-}
-
-interface CarFormData extends CarData {
-  // Add form-specific fields here
-  _id: string;
-  images?: CarImage[];
-  status: "available" | "sold" | "pending";
-}
-
-interface BaTCarDetails {
-  _id: string;
-  year: number;
-  make: string;
-  model: string;
-  color?: string;
-  mileage?: {
-    value: number;
-    unit: string;
-  };
-  engine?: {
-    type?: string;
-    displacement?: {
-      value: number;
-      unit: string;
-    };
-    power?: {
-      hp: number;
-    };
-  };
-  transmission: {
-    type: string;
-  };
-  vin?: string;
-  condition?: string;
-  interior_color?: string;
-  interior_features?: {
-    seats: number;
-    upholstery?: string;
-  };
-  description?: string;
-}
-
-interface CarData
-  extends Omit<
-    ExtendedCar,
-    | "dimensions"
-    | "interior_features"
-    | "transmission"
-    | "mileage"
-    | "year"
-    | "clientInfo"
-  > {
-  year: number;
-  mileage: MeasurementValue;
-  dimensions?: Record<string, MeasurementValue>;
-  interior_features?: {
-    seats?: number;
-    upholstery?: string;
-    features?: string[];
-  };
-  transmission?: {
-    type: string;
-    speeds?: number;
-  };
-  clientInfo?: {
-    name: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    company?: string;
-    role?: string;
-    [key: string]: string | undefined;
-  };
-}
-
-interface DimensionsMap {
-  length?: { value: number; unit: string };
-  width?: { value: number; unit: string };
-  height?: { value: number; unit: string };
-  wheelbase?: { value: number; unit: string };
-  trackWidth?: { value: number; unit: string };
-  weight?: { value: number; unit: string };
-  gvwr?: { value: number; unit: string };
-}
-
-interface InteriorFeaturesMap {
-  seats?: number;
-  upholstery?: string;
-  features?: string[];
-}
-
-interface TransmissionMap {
-  [key: string]: string | number | undefined;
-  type: string;
-  speeds?: number;
-}
-
-// Type guard to check if a value is a string
-function isString(value: unknown): value is string {
-  return typeof value === "string";
-}
-
-// Type guard to check if a value is a MeasurementValue
-function isMeasurementValue(value: unknown): value is MeasurementValue {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "value" in value &&
-    "unit" in value &&
-    (typeof (value as MeasurementValue).value === "number" ||
-      (value as MeasurementValue).value === null) &&
-    typeof (value as MeasurementValue).unit === "string"
-  );
-}
-
-// Handle dimensions with proper type checking
-function handleDimensions(
-  dimensions: Record<string, unknown>
-): Record<string, MeasurementValue | undefined> {
-  const result: Record<string, MeasurementValue | undefined> = {};
-  for (const [key, value] of Object.entries(dimensions)) {
-    if (isMeasurementValue(value)) {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-// Handle interior features with proper type checking
-function handleInteriorFeatures(
-  features: Record<string, unknown>
-): CarFormData["interior_features"] {
-  return {
-    seats: typeof features.seats === "number" ? features.seats : undefined,
-    upholstery: isString(features.upholstery) ? features.upholstery : undefined,
-    features: Array.isArray(features.features)
-      ? features.features.filter(isString)
-      : undefined,
-  };
-}
-
-// Handle transmission with proper type checking
-function handleTransmission(
-  transmission: Record<string, unknown>
-): CarFormData["transmission"] {
-  return {
-    type: isString(transmission.type) ? transmission.type : "",
-    speeds:
-      typeof transmission.speeds === "number" ? transmission.speeds : undefined,
-  };
-}
-
-// Type guard for field type
-const isStringField = (field: string | number): field is string => {
-  return typeof field === "string";
-};
-
-// Handle nested paths like "engine.displacement"
-const handleNestedPath = (
-  field: string,
-  value: unknown,
-  prev: EditableSpecs
-) => {
-  if (field.includes(".")) {
-    const [parentField, childField] = field.split(".");
-    const parentValue = (prev[parentField as keyof EditableSpecs] ||
-      {}) as Record<string, unknown>;
-    return {
-      ...prev,
-      [parentField]: {
-        ...parentValue,
-        [childField]: value,
-      },
-    };
-  }
-  return prev;
-};
-
-// Convert car data to form data with proper type handling
-const toCarFormData = (car: ExtendedCar): CarFormData => {
-  const transformedClientInfo = car.clientInfo
-    ? {
-        name: car.clientInfo.name,
-        email: car.clientInfo.email,
-        phone: car.clientInfo.phone,
-        address: car.clientInfo.address
-          ? `${car.clientInfo.address.street || ""}, ${
-              car.clientInfo.address.city || ""
-            }, ${car.clientInfo.address.state || ""} ${
-              car.clientInfo.address.zipCode || ""
-            }, ${car.clientInfo.address.country || ""}`
-          : undefined,
-        company: car.clientInfo.businessType,
-      }
-    : undefined;
-
-  return {
-    ...car,
-    year: car.year ?? 0,
-    mileage: car.mileage ?? { value: 0, unit: "mi" },
-    clientInfo: transformedClientInfo,
-  };
-};
-
-const toBaseMileage = (
-  measurement: MeasurementValue | undefined
-): { value: number; unit: string } | undefined => {
-  if (!measurement || measurement.value === null) {
-    return { value: 0, unit: measurement?.unit || "mi" };
-  }
-  return {
-    value: measurement.value,
-    unit: measurement.unit,
-  };
-};
-
-// Convert form data back to car data with proper type handling
-const fromCarFormData = (
-  formData: CarFormData,
-  originalCar: ExtendedCar
-): Partial<BaseCar> => {
-  const {
-    dimensions,
-    interior_features,
-    transmission,
-    mileage,
-    clientInfo,
-    ...rest
-  } = formData;
-
-  return {
-    ...rest,
-    mileage: toBaseMileage(mileage),
-    dimensions: dimensions
-      ? Object.entries(dimensions).reduce(
-          (acc, [key, value]) => ({
-            ...acc,
-            [key]: toBaseMileage(value),
-          }),
-          {}
-        )
-      : undefined,
-    interior_features,
-    transmission,
-    clientInfo: originalCar.clientInfo,
-  };
-};
-
-// Convert to BaT car details
-const toBaTCarDetails = (car: ExtendedCar): BaTCarDetails => ({
-  _id: car._id,
-  year: car.year ?? 0,
-  make: car.make,
-  model: car.model,
-  color: car.color,
-  mileage:
-    car.mileage && car.mileage.value !== null
-      ? {
-          value: car.mileage.value,
-          unit: car.mileage.unit,
-        }
-      : undefined,
-  engine: car.engine
-    ? {
-        type: car.engine.type,
-        displacement:
-          car.engine.displacement && car.engine.displacement.value !== null
-            ? {
-                value: car.engine.displacement.value,
-                unit: car.engine.displacement.unit,
-              }
-            : undefined,
-        power: car.engine.power
-          ? {
-              hp: car.engine.power.hp,
-            }
-          : undefined,
-      }
-    : undefined,
-  transmission: car.transmission ?? { type: "" },
-  vin: car.vin,
-  condition: car.condition,
-  interior_color: car.interior_color,
-  interior_features: car.interior_features
-    ? {
-        seats: car.interior_features.seats ?? 0,
-        upholstery: car.interior_features.upholstery,
-      }
-    : undefined,
-  description: car.description,
-});
-
-export default function CarPage({ params }: { params: { id: string } }) {
+export default function CarPage() {
+  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Safely extract and validate the ID
+  const id = params?.id?.toString();
+
+  // Redirect if no valid ID
+  useEffect(() => {
+    if (!id) {
+      router.push("/cars");
+    }
+  }, [id, router]);
+
+  // Return early if no ID
+  if (!id) {
+    return null;
+  }
+
   const [activeTab, setActiveTab] = useState<string>(() => {
     // Initialize from URL search params or hash
     const tab = searchParams?.get("tab");
@@ -537,7 +134,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
     }
     return "gallery";
   });
-  const { id } = params as { id: string };
   const [car, setCar] = useState<ExtendedCar | null>(null);
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -545,27 +141,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSpecsEditMode, setIsSpecsEditMode] = useState(false);
   const [isSpecsSaving, setIsSpecsSaving] = useState(false);
-  const [editedSpecs, setEditedSpecs] = useState<Partial<CarData> | null>(null);
+  const [editedSpecs, setEditedSpecs] = useState<EditableSpecs | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
-  const [isEnriching, setIsEnriching] = useState(false);
-  const [showEnrichProgress, setShowEnrichProgress] = useState(false);
-  const [enrichProgress, setEnrichProgress] = useState<{
-    step: number;
-    currentStep: string;
-    status: "pending" | "processing" | "complete" | "error";
-    error?: string;
-    details?: {
-      searchTermsGenerated?: number;
-      additionalSearchesCompleted?: number;
-      fieldsUpdated?: number;
-      protectedFieldsPreserved?: string[];
-    };
-  }>({
-    step: 0,
-    currentStep: "",
-    status: "pending",
-  });
   const [additionalContext, setAdditionalContext] = useState("");
   const [imagesLoading, setImagesLoading] = useState(true);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -723,49 +301,28 @@ export default function CarPage({ params }: { params: { id: string } }) {
     return "";
   };
 
-  // Helper function to format structured measurement values
-  const formatMeasurement = (
-    measurement: MeasurementValue | string | undefined
-  ): string => {
-    if (!measurement) return "N/A";
-    if (typeof measurement === "string") return measurement;
-    if (measurement.value === null) return "N/A";
-    return `${measurement.value} ${measurement.unit}`;
-  };
-
-  // Helper function to display mileage
-  const formatMileage = (mileage: MeasurementValue | undefined): string => {
-    if (!mileage || mileage.value === null || mileage.value === undefined)
-      return "0";
-    return (
-      mileage.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
-      " " +
-      (mileage.unit || "")
-    );
-  };
-
   // Type guard for nested fields
-  const isNestedField = (field: keyof EditableSpecs): field is NestedFields => {
+  const isNestedField = (
+    field: keyof EditableSpecs
+  ): field is keyof EditableSpecs => {
     return [
       "engine",
       "dimensions",
       "interior_features",
       "performance",
       "transmission",
-      "weight",
     ].includes(field as string);
   };
 
-  // Update the handleInputChange function to handle nested paths safely
+  // Update the handleInputChange function
   const handleInputChange = (
     field: string,
     value: string | number,
     nestedField?: string
   ) => {
-    setEditedSpecs((prev) => {
+    setEditedSpecs((prev: EditableSpecs | null) => {
       if (!prev) return prev;
 
-      // Handle direct field updates
       if (!nestedField) {
         return {
           ...prev,
@@ -773,11 +330,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
         };
       }
 
-      // Handle nested fields
-      const existingFieldValue = (prev[field as keyof CarData] || {}) as Record<
-        string,
-        unknown
-      >;
+      const existingFieldValue = (prev[field as keyof EditableSpecs] ||
+        {}) as Record<string, unknown>;
       return {
         ...prev,
         [field]: {
@@ -790,17 +344,17 @@ export default function CarPage({ params }: { params: { id: string } }) {
 
   // Helper function to handle measurement input changes
   const handleMeasurementChange = (
-    field: keyof EditableSpecs | string,
+    field: string,
     value: MeasurementValue,
     nestedField?: string
   ): void => {
-    setEditedSpecs((prev: Partial<CarData> | null) => {
+    setEditedSpecs((prev: EditableSpecs | null) => {
       if (!prev) return prev;
-      // Handle nested paths like "engine.displacement"
-      if (typeof field === "string" && field.includes(".")) {
+
+      if (field.includes(".")) {
         const [parentField, childField] = field.split(".");
-        const parentValue = (prev[parentField as keyof CarData] ||
-          {}) as Record<string, any>;
+        const parentValue = (prev[parentField as keyof EditableSpecs] ||
+          {}) as Record<string, unknown>;
         return {
           ...prev,
           [parentField]: {
@@ -811,7 +365,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
       }
       return {
         ...prev,
-        [field]: value,
+        [field as keyof EditableSpecs]: value,
       };
     });
   };
@@ -824,7 +378,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
     const kW = Math.round(hp * 0.7457 * 100) / 100;
     const ps = Math.round(hp * 1.01387 * 100) / 100;
 
-    setEditedSpecs((prev) => {
+    setEditedSpecs((prev: EditableSpecs | null) => {
       if (!prev) return prev;
       return {
         ...prev,
@@ -843,7 +397,7 @@ export default function CarPage({ params }: { params: { id: string } }) {
     const lbFt = value.value;
     const Nm = Math.round(lbFt * 1.3558 * 100) / 100;
 
-    setEditedSpecs((prev) => {
+    setEditedSpecs((prev: EditableSpecs | null) => {
       if (!prev) return prev;
       return {
         ...prev,
@@ -1287,113 +841,9 @@ export default function CarPage({ params }: { params: { id: string } }) {
           // Don't hide the status immediately to let users see the completion
           setTimeout(() => {
             setShowUploadStatus(false);
-          }, 5000); // Keep the status visible for 5 seconds after completion
+          }, 5000);
         }, 2000);
       }
-    }
-  };
-
-  const handleEnrichData = async () => {
-    if (!car) return;
-
-    setIsEnriching(true);
-    setShowEnrichProgress(true);
-    setEnrichProgress({
-      step: 1,
-      currentStep: "Initial Search",
-      status: "processing",
-    });
-
-    try {
-      // Start enrichment process
-      const response = await fetch(`/api/cars/${car._id}/enrich`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to enrich car data");
-      }
-
-      const data = await response.json();
-      console.log("Enrichment response:", data);
-
-      if (data.success && data.data) {
-        // Update progress based on backend response
-        if (data.progress) {
-          setEnrichProgress(data.progress);
-        } else {
-          setEnrichProgress({
-            step: 6,
-            currentStep: "Complete",
-            status: "complete",
-          });
-        }
-
-        // Add a small delay to ensure database write is complete
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Fetch fresh data after the delay
-        const freshDataResponse = await fetch(`/api/cars/${car._id}`);
-        if (!freshDataResponse.ok) {
-          throw new Error("Failed to fetch updated car data");
-        }
-        const freshData = await freshDataResponse.json();
-        console.log("Fresh car data:", freshData);
-
-        // Only update if we have valid data
-        if (freshData._id) {
-          // Force a re-render by creating a new object
-          setCar({ ...freshData });
-          toast({
-            title: "Car Data Enriched",
-            description: "Car data enriched successfully",
-          });
-        } else {
-          throw new Error("Invalid car data received");
-        }
-      } else {
-        // Handle error progress from backend
-        const errorMessage = data.error || "Failed to enrich car data";
-        setEnrichProgress({
-          step: 0,
-          currentStep: "",
-          status: "error",
-          error: errorMessage,
-        });
-        toast({
-          title: "Enrichment Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        console.error("Failed to enrich car data:", errorMessage);
-      }
-    } catch (error) {
-      // Handle error progress
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to enrich car data";
-      setEnrichProgress({
-        step: 0,
-        currentStep: "",
-        status: "error",
-        error: errorMessage,
-      });
-      toast({
-        title: "Enrichment Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      console.error("Error enriching car data:", error);
-    } finally {
-      // Keep isEnriching true for a moment to show completion state
-      setTimeout(() => {
-        setIsEnriching(false);
-        setShowEnrichProgress(false);
-        setEnrichProgress({
-          step: 0,
-          currentStep: "",
-          status: "pending",
-        });
-      }, 2000);
     }
   };
 
@@ -1453,18 +903,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // Add helper function to format power values
-  const formatPower = (power?: Power): string => {
-    if (!power) return "N/A";
-    return `${power.hp} hp / ${power.kW} kW / ${power.ps} ps`;
-  };
-
-  // Add helper function to format torque values
-  const formatTorque = (torque?: Torque): string => {
-    if (!torque) return "N/A";
-    return `${torque["lb-ft"]} lb-ft / ${torque.Nm} Nm`;
-  };
-
   const handleDelete = async () => {
     if (
       !window.confirm(
@@ -1488,17 +926,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
       console.error("Error deleting car:", error);
       alert("Failed to delete car. Please try again.");
     }
-  };
-
-  // Helper to format address object to string
-  const formatAddress = (address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  }) => {
-    return `${address.street}, ${address.city}, ${address.state} ${address.zipCode}, ${address.country}`;
   };
 
   // Handle image operations
@@ -1734,18 +1161,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Helper function to generate car title that handles null values
-  const generateCarTitle = () => {
-    if (!car) return "";
-    return [
-      car.year ? car.year : null,
-      car.make ? car.make : null,
-      car.model ? car.model : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
-  };
-
   // Add a function to be passed to ImageGalleryWithQuery to notify parent of uploads
   const notifyUploadStarted = () => {
     console.log("Upload started notification from ImageGalleryWithQuery");
@@ -1780,62 +1195,20 @@ export default function CarPage({ params }: { params: { id: string } }) {
             <>
               {/* Car title and header - always show this */}
               <div className="flex items-center gap-4 mb-6">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-primary shrink-0">
-                        {car?.primaryImageId &&
-                        car?.images &&
-                        car?.images.length > 0 ? (
-                          car.images.find(
-                            (img) => img._id === car.primaryImageId
-                          ) ? (
-                            <Image
-                              src={
-                                car.images.find(
-                                  (img) => img._id === car.primaryImageId
-                                )?.url || ""
-                              }
-                              alt={generateCarTitle()}
-                              fill
-                              className="object-cover"
-                              onError={(e) => {
-                                // If primary image fails, try to show the first image
-                                if (car.images && car.images.length > 0) {
-                                  (e.target as HTMLImageElement).src =
-                                    car.images[0].url;
-                                }
-                              }}
-                            />
-                          ) : car.images && car.images[0] ? (
-                            <Image
-                              src={car.images[0].url}
-                              alt={generateCarTitle()}
-                              fill
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                              <ImageIcon className="w-5 h-5 text-text-secondary" />
-                            </div>
-                          )
-                        ) : (
-                          <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-text-secondary" />
-                          </div>
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        {car?.primaryImageId
-                          ? "Primary image"
-                          : "No primary image selected"}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <PageTitle title={generateCarTitle()} className="" />
+                <CarAvatar
+                  images={car?.images}
+                  primaryImageId={car?.primaryImageId}
+                  alt={generateCarTitle(car)}
+                  showTooltip
+                  tooltipContent={
+                    <p>
+                      {car?.primaryImageId
+                        ? "Primary image"
+                        : "No primary image selected"}
+                    </p>
+                  }
+                />
+                <PageTitle title={generateCarTitle(car)} className="" />
               </div>
 
               {/* Always render tabs - each tab handles its own loading state */}
@@ -1875,6 +1248,8 @@ export default function CarPage({ params }: { params: { id: string } }) {
                         onSave={async (editedSpecs) => {
                           await handleSpecsEdit(editedSpecs as CarData);
                         }}
+                        onCancel={() => setIsSpecsEditMode(false)}
+                        onRefresh={refreshCarData}
                         editedSpecs={editedSpecs}
                         onInputChange={(field, value, nestedField) =>
                           handleInputChange(field, value, nestedField)
@@ -1882,8 +1257,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
                         onMeasurementChange={handleMeasurementChange}
                         onPowerChange={handlePowerChange}
                         onTorqueChange={handleTorqueChange}
-                        onEnrich={handleEnrichData}
-                        isEnriching={isEnriching}
                       />
                     ) : (
                       <div className="py-8 text-center text-muted-foreground">
@@ -2030,39 +1403,14 @@ export default function CarPage({ params }: { params: { id: string } }) {
           >
             <div className="container mx-auto px-4">
               <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border-primary shrink-0">
-                  {car.primaryImageId && car.images && car.images.length > 0 ? (
-                    car.images.find((img) => img._id === car.primaryImageId) ? (
-                      <Image
-                        src={
-                          car.images.find(
-                            (img) => img._id === car.primaryImageId
-                          )?.url || ""
-                        }
-                        alt={generateCarTitle()}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : car.images && car.images[0] ? (
-                      <Image
-                        src={car.images[0].url}
-                        alt={generateCarTitle()}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                        <ImageIcon className="w-4 h-4 text-text-secondary" />
-                      </div>
-                    )
-                  ) : (
-                    <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                      <ImageIcon className="w-4 h-4 text-text-secondary" />
-                    </div>
-                  )}
-                </div>
+                <CarAvatar
+                  images={car?.images}
+                  primaryImageId={car?.primaryImageId}
+                  alt={generateCarTitle(car)}
+                  size="sm"
+                />
                 <h1 className="text-base font-semibold text-text-primary truncate">
-                  {generateCarTitle()}
+                  {generateCarTitle(car)}
                 </h1>
                 <div className="ml-auto text-sm text-text-secondary">
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
@@ -2073,16 +1421,6 @@ export default function CarPage({ params }: { params: { id: string } }) {
         )}
 
         <Footer />
-
-        <EnrichmentProgress
-          isVisible={showEnrichProgress}
-          step={enrichProgress.step}
-          _currentStep={enrichProgress.currentStep}
-          status={enrichProgress.status}
-          error={enrichProgress.error}
-          details={enrichProgress.details}
-          onClose={() => setShowEnrichProgress(false)}
-        />
       </div>
     </AuthGuard>
   );

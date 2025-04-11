@@ -20,18 +20,18 @@ import UserDetailModal from "./UserDetailModal";
 
 // Shared User interface to be consistent across components
 export interface User {
-  uid: string; // Firebase Auth UID (required)
-  _id?: string; // MongoDB ID (optional)
-  name: string;
+  uid: string;
   email: string;
+  name: string;
   roles: string[];
   creativeRoles: string[];
   status: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  accountType?: string;
   photoURL?: string;
+  image?: string;
+  accountType?: string;
   bio?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export default function UserManagement() {
@@ -123,6 +123,8 @@ export default function UserManagement() {
               roles: ["user"],
               creativeRoles: [],
               status: "active",
+              createdAt: new Date(),
+              updatedAt: new Date(),
             },
           ]);
           setFilteredUsers([
@@ -133,6 +135,8 @@ export default function UserManagement() {
               roles: ["user"],
               creativeRoles: [],
               status: "active",
+              createdAt: new Date(),
+              updatedAt: new Date(),
             },
           ]);
 
@@ -195,6 +199,8 @@ export default function UserManagement() {
           roles: ["user"],
           creativeRoles: [],
           status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]);
       setFilteredUsers([
@@ -205,6 +211,8 @@ export default function UserManagement() {
           roles: ["user"],
           creativeRoles: [],
           status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]);
 
@@ -276,21 +284,11 @@ export default function UserManagement() {
   };
 
   const handleUserUpdated = (updatedUser: User) => {
-    // Ensure we have a valid uid
-    if (!updatedUser.uid) {
-      console.error("Updated user data missing uid:", updatedUser);
-      toast({
-        title: "Error",
-        description:
-          "Invalid user data received. Please refresh and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsUserModalOpen(false);
-    // Refresh the user list to show updated data
-    fetchUsers();
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.uid === updatedUser.uid ? updatedUser : user
+      )
+    );
   };
 
   const formatDate = (dateValue: any): string => {
@@ -318,6 +316,29 @@ export default function UserManagement() {
       console.error("Error formatting date:", error);
       return "N/A";
     }
+  };
+
+  const syncUserProfile = async (userId: string) => {
+    try {
+      const response = await fetch("/api/users/sync-profile", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync user profile");
+      }
+
+      // Refresh user list after sync
+      fetchUsers();
+    } catch (error) {
+      console.error("Error syncing user profile:", error);
+      // Handle error appropriately
+    }
+  };
+
+  const getDisplayImage = (user: User) => {
+    // Use photoURL from Google Auth if available, fallback to image field
+    return user.photoURL || user.image || "/default-avatar.png";
   };
 
   return (
@@ -372,7 +393,7 @@ export default function UserManagement() {
             ) : (
               filteredUsers.map((user: User) => {
                 // Ensure we have a valid uid for the key
-                const rowKey = user.uid || user._id || `temp-${user.email}`;
+                const rowKey = user.uid || `temp-${user.email}`;
                 return (
                   <TableRow
                     key={rowKey}
@@ -495,6 +516,59 @@ export default function UserManagement() {
         user={selectedUser}
         onUserUpdated={handleUserUpdated}
       />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {users.map((user) => {
+          const rowKey = user.uid || `temp-${user.email}`;
+          return (
+            <div
+              key={rowKey}
+              className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
+            >
+              <div className="flex-shrink-0">
+                <img
+                  className="h-10 w-10 rounded-full"
+                  src={getDisplayImage(user)}
+                  alt={user.name}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {user.roles.map((role) => (
+                    <span
+                      key={role}
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <button
+                  onClick={() => syncUserProfile(user.uid)}
+                  className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

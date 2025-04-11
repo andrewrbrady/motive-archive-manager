@@ -5,7 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth, db } from "@/lib/firebase-admin";
 
 // Import environment setup (this must be first)
 import "@/lib/env-setup";
@@ -300,12 +300,12 @@ export const authConfig: NextAuthConfig = {
             }
 
             // Ensure Firestore document exists
-            const userDoc = await adminDb
+            const userDoc = await db
               .collection("users")
               .doc(existingUser.uid)
               .get();
             if (!userDoc.exists) {
-              await adminDb
+              await db
                 .collection("users")
                 .doc(existingUser.uid)
                 .set({
@@ -348,7 +348,7 @@ export const authConfig: NextAuthConfig = {
               });
 
               // Create Firestore document
-              await adminDb
+              await db
                 .collection("users")
                 .doc(newUser.uid)
                 .set({

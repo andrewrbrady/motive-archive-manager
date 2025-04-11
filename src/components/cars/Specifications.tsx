@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { Client } from "@/types/contact";
 import { toast } from "react-hot-toast";
+import { SpecificationsEnrichment } from "./SpecificationsEnrichment";
 
 // Define the car data structure as we receive it from the API
 interface CarData {
@@ -109,8 +110,7 @@ interface SpecificationProps {
   onEdit?: () => void;
   onSave?: (editedSpecs: Partial<CarData>) => void;
   onCancel?: () => void;
-  onEnrich?: () => void;
-  isEnriching?: boolean;
+  onRefresh?: () => void;
   editedSpecs?: any;
   onInputChange?: (field: string, value: any, nestedField?: string) => void;
   onMeasurementChange?: (
@@ -309,8 +309,7 @@ const Specifications = ({
   onEdit,
   onSave,
   onCancel,
-  onEnrich,
-  isEnriching,
+  onRefresh,
   editedSpecs = {},
   onInputChange,
   onMeasurementChange,
@@ -322,38 +321,27 @@ const Specifications = ({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedId, setLastSavedId] = useState(car._id);
 
-  // Only update localSpecs when car ID changes or edit mode is toggled off
+  // Update localSpecs when car changes or edit mode is toggled
   useEffect(() => {
-    const isNewCar = car._id !== lastSavedId;
-    if (isNewCar || (!isEditMode && !isSaving)) {
-      console.log(
-        "Updating localSpecs - Reason:",
-        isNewCar ? "New car" : "Edit mode off"
-      );
+    if (car._id !== lastSavedId || !isEditMode) {
       setLocalSpecs(car);
       setLastSavedId(car._id);
     }
-  }, [car._id, isEditMode, isSaving, lastSavedId]);
+  }, [car._id, isEditMode, lastSavedId]);
 
   const handleInputChange = (field: string, value: any) => {
-    console.log(`Updating field ${field} with value:`, value);
-    setLocalSpecs((prev) => {
-      // Handle nested fields (e.g., "engine.type")
-      if (field.includes(".")) {
-        const [parent, child] = field.split(".");
-        return {
-          ...prev,
-          [parent]: {
-            ...((prev as any)[parent] || {}),
-            [child]: value,
-          },
-        };
-      }
-      return {
-        ...prev,
-        [field]: value,
+    const newSpecs = { ...localSpecs } as Record<string, any>;
+    if (field.includes(".")) {
+      const [parent, child] = field.split(".");
+      newSpecs[parent] = {
+        ...(newSpecs[parent] || {}),
+        [child]: value,
       };
-    });
+    } else {
+      newSpecs[field] = value;
+    }
+    setLocalSpecs(newSpecs as Partial<CarData>);
+    onInputChange?.(field, value);
   };
 
   const handleNestedInputChange = (
@@ -361,37 +349,33 @@ const Specifications = ({
     field: string,
     value: any
   ) => {
-    console.log(`Updating nested field ${parent}.${field} with value:`, value);
-    setLocalSpecs((prev) => ({
-      ...prev,
+    const newSpecs = {
+      ...localSpecs,
       [parent]: {
-        ...((prev as Record<string, any>)[parent] || {}),
+        ...((localSpecs as Record<string, any>)[parent] || {}),
         [field]: value,
       },
-    }));
+    };
+    setLocalSpecs(newSpecs);
+    onInputChange?.(parent, value, field);
   };
 
   const handleSave = async () => {
-    console.log("\n=== SAVING SPECIFICATIONS ===");
-    console.log("Current local specs:", localSpecs);
+    if (!onSave) return;
 
     setIsSaving(true);
     try {
-      await onSave?.(localSpecs);
+      await onSave(localSpecs);
       console.log("Save successful");
-      // Don't reset localSpecs here - let the server response update the car prop
     } catch (error) {
       console.error("Error saving specifications:", error);
       toast.error("Failed to save specifications");
-      // Only reset on error
-      setLocalSpecs(car);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    console.log("Cancelling edit, resetting to car data");
     setLocalSpecs(car);
     onCancel?.();
   };
@@ -432,59 +416,42 @@ const Specifications = ({
   }, [car.client]);
 
   return (
-    <div className="dark:bg-background-primary rounded-lg border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-      <div className="flex justify-between items-center p-4 border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-        <h2 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
-          Specifications
-        </h2>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Specifications</h2>
         <div className="flex items-center gap-2">
-          {onEnrich && (
-            <Button
-              variant="outline"
-              onClick={onEnrich}
-              disabled={isEnriching || isEditMode}
-              className="flex items-center gap-2 text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-zinc-50"
-            >
-              {isEnriching ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Enriching...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Enrich Data
-                </>
-              )}
-            </Button>
-          )}
-          {isEditMode && (
+          {!isEditMode ? (
             <>
-              <Button
-                variant="default"
-                onClick={handleSave}
-                className="bg-[hsl(var(--background))] text-white hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--background))]"
-              >
-                Save
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-zinc-50"
-              >
-                Cancel
+              <SpecificationsEnrichment
+                carId={car._id || ""}
+                onEnrichComplete={onRefresh || (() => {})}
+              />
+              <Button variant="outline" size="sm" onClick={onEdit}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit
               </Button>
             </>
-          )}
-          {onEdit && !isEditMode && (
-            <Button
-              variant="outline"
-              onClick={onEdit}
-              disabled={isEnriching}
-              className="text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-zinc-50"
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </>
           )}
         </div>
       </div>
