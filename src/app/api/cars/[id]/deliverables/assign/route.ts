@@ -6,6 +6,8 @@ import { adminDb } from "@/lib/firebase-admin";
 import { getUserById } from "@/lib/firestore/users";
 import { logger } from "@/lib/logging";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Validates the request payload for deliverable assignment
  * @param body - The request body to validate
@@ -42,18 +44,19 @@ function validateAssignmentPayload(body: any) {
   };
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(req: Request) {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
+    const url = new URL(req.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/deliverables/assign
+
     logger.info({
       message: "Assignment request received",
       requestId,
-      carId: params.id,
+      carId: id,
       route: "api/cars/[id]/deliverables/assign",
     });
 
@@ -111,7 +114,7 @@ export async function POST(
     }
 
     const { deliverableId, userId, editorName } = body;
-    const carId = params.id;
+    const carId = id;
 
     logger.info({
       message: "Processing assignment request",
@@ -151,7 +154,7 @@ export async function POST(
     // Handle assignment logic
     if (userId === null) {
       // Explicitly unassigning
-      deliverable.firebase_uid = undefined;
+      deliverable.firebase_uid = "";
       deliverable.editor = "Unassigned";
 
       logger.info({
@@ -226,7 +229,7 @@ export async function POST(
     } else if (finalEditorName) {
       // If no userId provided but editorName exists, just update the editor name
       deliverable.editor = finalEditorName;
-      deliverable.firebase_uid = undefined;
+      deliverable.firebase_uid = "";
 
       logger.info({
         message: "Updating editor name only",
@@ -236,7 +239,7 @@ export async function POST(
       });
     } else {
       deliverable.editor = "Unassigned";
-      deliverable.firebase_uid = undefined;
+      deliverable.firebase_uid = "";
 
       logger.info({
         message: "Setting deliverable to unassigned (no userId or editorName)",
@@ -294,4 +297,15 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

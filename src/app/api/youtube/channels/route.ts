@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { dbConnect } from "@/lib/mongodb";
 import { YoutubeChannel } from "@/models/youtube_channel";
 
@@ -13,7 +15,12 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Error fetching YouTube channels:", error);
     return NextResponse.json(
-      { error: "Failed to fetch YouTube channels" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch YouTube channels",
+      },
       { status: 500 }
     );
   }
@@ -60,21 +67,25 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Error adding YouTube channel:", error);
     return NextResponse.json(
-      { error: "Failed to add YouTube channel" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to add YouTube channel",
+      },
       { status: 500 }
     );
   }
 }
 
 // DELETE /api/youtube/channels/:id - Delete a channel
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
-    await dbConnect();
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
-    const { id } = params;
+    await dbConnect();
 
     const result = await YoutubeChannel.deleteOne({ channel_id: id });
 
@@ -86,8 +97,24 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting YouTube channel:", error);
     return NextResponse.json(
-      { error: "Failed to delete YouTube channel" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete YouTube channel",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

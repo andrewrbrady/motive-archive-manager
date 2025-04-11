@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string; assetId: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const driveIdStr = segments[segments.length - 3];
+    const assetIdStr = segments[segments.length - 1];
+
+    // Validate the IDs
+    if (!ObjectId.isValid(driveIdStr) || !ObjectId.isValid(assetIdStr)) {
+      return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
+    }
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -14,24 +23,18 @@ export async function DELETE(
         { status: 500 }
       );
     }
-    const db = client.db();
 
-    // Validate the IDs
-    if (!ObjectId.isValid(params.id) || !ObjectId.isValid(params.assetId)) {
-      return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
-    }
-
-    const driveId = new ObjectId(params.id);
-    const assetId = new ObjectId(params.assetId);
+    const db = client.db("motive_archive");
+    const driveId = new ObjectId(driveIdStr);
+    const assetId = new ObjectId(assetIdStr);
 
     // Update the hard drive to remove the asset reference using standard update
     const hardDriveResult = await db.collection("hard_drives").updateOne(
       { _id: driveId },
       {
         $pull: {
-          // Use the correct cast for MongoDB types
-          rawAssets: assetId as any,
-        },
+          rawAssets: assetId,
+        } as any,
       }
     );
 
@@ -47,9 +50,8 @@ export async function DELETE(
       { _id: assetId },
       {
         $pull: {
-          // Use the correct cast for MongoDB types
-          hardDriveIds: driveId as any,
-        },
+          hardDriveIds: driveId,
+        } as any,
       }
     );
 
@@ -66,10 +68,24 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error removing asset from hard drive:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to remove asset from hard drive" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

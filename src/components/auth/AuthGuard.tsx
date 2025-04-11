@@ -44,7 +44,10 @@ export function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  if (status === "unauthenticated" || !session?.user?.isAdmin) {
+  if (
+    status === "unauthenticated" ||
+    !session?.user?.roles?.includes("admin")
+  ) {
     router.push("/");
     return null;
   }

@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -14,12 +17,13 @@ export async function POST(
         { status: 500 }
       );
     }
+
     const db = client.db("motive_archive");
 
     // Validate ObjectId
     let kitId;
     try {
-      kitId = new ObjectId(params.id);
+      kitId = new ObjectId(id);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid kit ID format" },
@@ -50,8 +54,6 @@ export async function POST(
       kit.checkoutHistory.length > 0
     ) {
       const lastCheckoutIndex = kit.checkoutHistory.length - 1;
-
-      // Create a field path for the specific array element
       const checkoutHistoryPath = `checkoutHistory.${lastCheckoutIndex}.actualReturnDate`;
 
       // Update the kit with the actual return date
@@ -129,10 +131,24 @@ export async function POST(
       _id: undefined,
     });
   } catch (error) {
-    console.error("Error checking in kit:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

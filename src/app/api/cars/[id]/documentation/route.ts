@@ -5,15 +5,18 @@ import { getDocumentationFileUrl } from "@/lib/s3";
 import { Car } from "@/models/Car";
 import { Documentation } from "@/models/Documentation";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/documentation
+
     const db = await getDatabase();
     const documentationFiles = await db
       .collection("documentation_files")
-      .find({ carId: new ObjectId(params.id) })
+      .find({ carId: new ObjectId(id) })
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -43,8 +46,24 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching documentation files:", error);
     return NextResponse.json(
-      { error: "Failed to fetch documentation files" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch documentation files",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

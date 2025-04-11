@@ -9,13 +9,16 @@ interface Car {
   eventIds: ObjectId[];
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/events
+
     const db = await getDatabase();
-    const carId = params.id;
+    const carId = id;
     console.log("Fetching events for car ID:", carId); // Debug log
 
     const eventModel = new EventModel(db);
@@ -49,13 +52,14 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/events
+
     const db = await getDatabase();
-    const carId = new ObjectId(params.id);
+    const carId = new ObjectId(id);
     const data = await request.json();
     const eventModel = new EventModel(db);
 
@@ -112,13 +116,22 @@ export async function POST(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const path = url.pathname;
+    const eventIdStr = path.split("/").pop();
+
+    if (!eventIdStr) {
+      return NextResponse.json(
+        { error: "Event ID is required" },
+        { status: 400 }
+      );
+    }
+
     const db = await getDatabase();
-    const eventId = new ObjectId(params.id);
+    const eventId = new ObjectId(eventIdStr);
     const data = await request.json();
     const eventModel = new EventModel(db);
 
@@ -148,13 +161,21 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const eventIdStr = path.split("/").pop();
+
+    if (!eventIdStr) {
+      return NextResponse.json(
+        { error: "Event ID is required" },
+        { status: 400 }
+      );
+    }
+
     const db = await getDatabase();
-    const eventId = new ObjectId(params.id);
+    const eventId = new ObjectId(eventIdStr);
     const eventModel = new EventModel(db);
 
     await eventModel.delete(eventId);
@@ -170,4 +191,15 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

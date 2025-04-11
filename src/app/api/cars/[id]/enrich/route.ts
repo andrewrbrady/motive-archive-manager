@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { MongoClient, ObjectId } from "mongodb";
 import { Car, MeasurementValue } from "@/types/car";
 
+export const dynamic = "force-dynamic";
+
 interface SerperResult {
   organic: Array<{
     title: string;
@@ -458,108 +460,135 @@ function generateSearchQueries(
   return queries;
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  console.log("\n🚀 Starting car data enrichment process...");
-  const client = await getMongoClient();
-
+export async function POST(request: Request) {
   try {
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
-    const collection = db.collection("cars");
-    const carId = new ObjectId(params.id);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
 
-    // Get existing car data
-    const existingCarData = await collection.findOne<Car>({ _id: carId });
-    if (!existingCarData) {
-      throw new Error("Car not found");
-    }
+    console.log("\n🚀 Starting car data enrichment process...");
+    const client = await getMongoClient();
 
-    // Identify missing fields
-    const missingFields = getMissingFields(existingCarData);
-    console.log("Missing fields:", missingFields);
+    try {
+      const db = client.db(process.env.MONGODB_DB || "motive_archive");
+      const collection = db.collection("cars");
+      const carId = new ObjectId(id);
 
-    // Generate targeted search queries
-    const searchQueries = generateSearchQueries(existingCarData, missingFields);
-    console.log("Generated search queries:", searchQueries);
+      // Get existing car data
+      const existingCarData = await collection.findOne<Car>({ _id: carId });
+      if (!existingCarData) {
+        throw new Error("Car not found");
+      }
 
-    // Perform searches concurrently
-    const searchPromises = searchQueries.map((query) =>
-      searchVehicleInfo(query)
-    );
-    const searchResults = await Promise.all(searchPromises);
+      // Identify missing fields
+      const missingFields = getMissingFields(existingCarData);
+      console.log("Missing fields:", missingFields);
 
-    // Clean and structure the data
-    const enrichedData = await cleanAndStructureData(
-      searchResults,
-      existingCarData
-    );
+      // Generate targeted search queries
+      const searchQueries = generateSearchQueries(
+        existingCarData,
+        missingFields
+      );
+      console.log("Generated search queries:", searchQueries);
 
-    // Preserve protected fields
-    const updatedCarData = {
-      ...enrichedData,
-      _id: existingCarData._id,
-      year: existingCarData.year,
-      make: existingCarData.make,
-      model: existingCarData.model,
-      color: existingCarData.color,
-      mileage: existingCarData.mileage,
-      vin: existingCarData.vin,
-      client: existingCarData.client,
-      location: existingCarData.location,
-      price: existingCarData.price,
-    };
+      // Perform searches concurrently
+      const searchPromises = searchQueries.map((query) =>
+        searchVehicleInfo(query)
+      );
+      const searchResults = await Promise.all(searchPromises);
 
-    // Update the car in the database
-    await collection.updateOne({ _id: carId }, { $set: updatedCarData });
+      // Clean and structure the data
+      const enrichedData = await cleanAndStructureData(
+        searchResults,
+        existingCarData
+      );
 
-    return NextResponse.json({
-      success: true,
-      message: "Car data enriched successfully",
-      data: updatedCarData,
-      progress: {
-        step: 6,
-        currentStep: "Complete",
-        status: "complete",
-        details: {
-          missingFields,
-          searchQueriesGenerated: searchQueries.length,
-          searchesCompleted: searchResults.length,
-          fieldsUpdated: Object.keys(enrichedData).length,
-          protectedFieldsPreserved: [
-            "year",
-            "make",
-            "model",
-            "color",
-            "mileage",
-            "vin",
-            "client",
-            "location",
-            "price",
-          ],
-        },
-      },
-    });
-  } catch (error) {
-    console.error("❌ Error enriching car data:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to enrich car data",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
+      // Preserve protected fields
+      const updatedCarData = {
+        ...enrichedData,
+        _id: existingCarData._id,
+        year: existingCarData.year,
+        make: existingCarData.make,
+        model: existingCarData.model,
+        color: existingCarData.color,
+        mileage: existingCarData.mileage,
+        vin: existingCarData.vin,
+        client: existingCarData.client,
+        location: existingCarData.location,
+        price: existingCarData.price,
+      };
+
+      // Update the car in the database
+      await collection.updateOne({ _id: carId }, { $set: updatedCarData });
+
+      return NextResponse.json({
+        success: true,
+        message: "Car data enriched successfully",
+        data: updatedCarData,
         progress: {
-          step: 0,
-          currentStep: "",
-          status: "error",
+          step: 6,
+          currentStep: "Complete",
+          status: "complete",
+          details: {
+            missingFields,
+            searchQueriesGenerated: searchQueries.length,
+            searchesCompleted: searchResults.length,
+            fieldsUpdated: Object.keys(enrichedData).length,
+            protectedFieldsPreserved: [
+              "year",
+              "make",
+              "model",
+              "color",
+              "mileage",
+              "vin",
+              "client",
+              "location",
+              "price",
+            ],
+          },
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error enriching car data:", error);
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Failed to enrich car data",
           error:
             error instanceof Error ? error.message : "Unknown error occurred",
+          progress: {
+            step: 0,
+            currentStep: "",
+            status: "error",
+            error:
+              error instanceof Error ? error.message : "Unknown error occurred",
+          },
         },
+        { status: 500 }
+      );
+    } finally {
+      await client.close();
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to enrich car data",
       },
       { status: 500 }
     );
-  } finally {
-    await client.close();
   }
+}
+
+// OPTIONS handler for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

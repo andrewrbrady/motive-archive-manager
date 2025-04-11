@@ -5,6 +5,8 @@ import { ImageMetadata, getFormattedImageUrl } from "@/lib/cloudflare";
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
+export const dynamic = "force-dynamic";
+
 if (!MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
@@ -106,13 +108,13 @@ async function getMongoClient() {
 }
 
 // GET car by ID
-export async function GET(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   let client;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
+
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
@@ -122,7 +124,6 @@ export async function GET(
     const objectId = new ObjectId(id);
 
     // Parse query parameters for field selection
-    const url = new URL(request.url);
     const fieldsParam = url.searchParams.get("fields");
     const includeImages = url.searchParams.get("includeImages");
     const imageCategory = url.searchParams.get("imageCategory");
@@ -336,13 +337,13 @@ export async function GET(
 }
 
 // PUT/PATCH to update car information
-export async function PUT(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   const client = await getMongoClient();
   try {
-    const { id } = await Promise.resolve(context.params);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
+
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
@@ -382,13 +383,13 @@ export async function PUT(
 }
 
 // DELETE car
-export async function DELETE(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   let client;
   try {
-    const { id } = context.params;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
+
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid car ID format" },
@@ -419,7 +420,7 @@ export async function DELETE(
     );
   } finally {
     if (client) {
-      console.log(`Closing MongoDB connection for car ${context.params.id}`);
+      console.log(`Closing MongoDB connection for car`);
       await client.close();
     }
   }
@@ -478,14 +479,15 @@ function convertToPlainObject(doc: any): any {
 }
 
 // PATCH to update car information
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request) {
   let client;
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
+
     console.log("\n=== CAR UPDATE API CALLED ===");
-    console.log("Car ID:", params.id);
+    console.log("Car ID:", id);
 
     const updates = await request.json();
     console.log("\nReceived Updates:", JSON.stringify(updates, null, 2));
@@ -596,15 +598,15 @@ export async function PATCH(
     const db = client.db(DB_NAME);
 
     // Validate car ID
-    if (!ObjectId.isValid(params.id)) {
-      throw new Error(`Invalid car ID format: ${params.id}`);
+    if (!ObjectId.isValid(id)) {
+      throw new Error(`Invalid car ID format: ${id}`);
     }
-    const objectId = new ObjectId(params.id);
+    const objectId = new ObjectId(id);
 
     // First verify the car exists
     const existingCar = await db.collection("cars").findOne({ _id: objectId });
     if (!existingCar) {
-      console.error(`Car not found with ID: ${params.id}`);
+      console.error(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
@@ -652,4 +654,15 @@ export async function PATCH(
       await client.close();
     }
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, PATCH, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

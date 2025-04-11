@@ -5,17 +5,18 @@ import { deleteResearchFile } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/scripts/all
+
     const db = await getDatabase();
 
     // Get all script files for this car
     const files = await db
       .collection("script_files")
-      .find({ carId: new ObjectId(params.id) })
+      .find({ carId: new ObjectId(id) })
       .toArray();
 
     // Delete files from S3
@@ -35,9 +36,7 @@ export async function DELETE(
     );
 
     // Delete all files from MongoDB
-    await db
-      .collection("script_files")
-      .deleteMany({ carId: new ObjectId(params.id) });
+    await db.collection("script_files").deleteMany({ carId: new ObjectId(id) });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -47,4 +46,15 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

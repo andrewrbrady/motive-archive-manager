@@ -422,374 +422,167 @@ Please provide the complete revised version.`;
   );
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
-    const id = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because the url is /cars/[id]/article
+
     const db = await getDatabase();
 
+    // First try to find a car_article document
     const article = await db
-      .collection<ArticleMetadata>("car_articles")
-      .findOne({ carId: id });
+      .collection("car_articles")
+      .findOne({ carId: new ObjectId(id) });
 
-    if (!article) {
-      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+    if (article) {
+      return NextResponse.json({
+        article: article.content,
+        generatedAt: article.generatedAt,
+        updatedAt: article.updatedAt,
+        model: article.model,
+      });
     }
 
-    return NextResponse.json(article);
+    // If no article found, check if there's an in-progress article state
+    const articleState = await db
+      .collection("article_states")
+      .findOne({ carId: new ObjectId(id) });
+
+    if (articleState) {
+      return NextResponse.json({
+        stage: articleState.stage,
+        outline: articleState.outline,
+        workingDraft: articleState.workingDraft,
+        currentPoint: articleState.currentPoint,
+        lastUpdated: articleState.lastUpdated,
+      });
+    }
+
+    // Neither article nor state found
+    return NextResponse.json(
+      { message: "No article found for this car" },
+      { status: 404 }
+    );
   } catch (error) {
     console.error("Error fetching article:", error);
     return NextResponse.json(
-      { error: "Failed to fetch article" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to fetch article",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { model, stage, context, focus } = body;
-    const carId = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because the url is /cars/[id]/article
 
-    if (!carId) {
+    const data = await request.json();
+    const { content, model } = data;
+
+    if (!content) {
       return NextResponse.json(
-        { error: "Car ID is required" },
+        { error: "Content is required" },
         { status: 400 }
       );
     }
 
     const db = await getDatabase();
+    const now = new Date();
 
-    // Get car details with proper typing
-    const carData = await db
-      .collection<CarWithId>("cars")
-      .findOne({ _id: new ObjectId(carId) });
-
-    if (!carData) {
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
-    }
-
-    // Get research files
-    const researchFiles = await db
-      .collection("research_files")
-      .find({
-        $or: [
-          { carId: new ObjectId(carId) },
-          { carId: carId },
-          { "metadata.carId": new ObjectId(carId) },
-          { "metadata.carId": carId },
-        ],
-      })
-      .toArray();
-
-    // Fetch content for each research file
-    const researchContent = await Promise.all(
-      researchFiles.map(async (file) => {
-        // First check if content is stored in MongoDB
-        if (file.content) {
-          return file.content;
-        }
-
-        // If no content in MongoDB and has S3 key, get from S3
-        if (file.s3Key) {
-          try {
-            const s3Response = await s3.send(
-              new GetObjectCommand({
-                Bucket: process.env.AWS_BUCKET_NAME!,
-                Key: file.s3Key,
-              })
-            );
-
-            if (!s3Response.Body) {
-              console.error("S3 response has no body for file:", file._id);
-              return "";
-            }
-
-            const content = await s3Response.Body.transformToString();
-
-            // Store content in MongoDB for future use
-            await db.collection("research_files").updateOne(
-              { _id: file._id },
-              {
-                $set: {
-                  content,
-                  updatedAt: new Date(),
-                },
-              }
-            );
-
-            return content;
-          } catch (error) {
-            console.error("Error fetching content from S3:", error);
-            return "";
-          }
-        }
-
-        return "";
-      })
+    // Save the article
+    const result = await db.collection("car_articles").updateOne(
+      { carId: new ObjectId(id) },
+      {
+        $set: {
+          content,
+          model: model || "manual",
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          carId: new ObjectId(id),
+          createdAt: now,
+          generatedAt: now,
+        },
+      },
+      { upsert: true }
     );
 
-    const combinedResearchContent = researchContent
-      .filter(Boolean)
-      .join("\n\n---\n\n");
+    // Clean up any article states
+    await db
+      .collection("article_states")
+      .deleteOne({ carId: new ObjectId(id) });
 
-    // Initialize the car with clientInfo upfront
-    console.log("[DEBUG] Raw car data:", {
-      _id: carData._id.toString(),
-      hasClientInfo: "clientInfo" in carData,
-      keys: Object.keys(carData),
-      researchFilesCount: researchFiles.length,
-      researchContentLength: combinedResearchContent.length,
+    return NextResponse.json({
+      success: true,
+      updatedAt: now,
+      article: content,
     });
-
-    const car: CarWithId = {
-      ...carData,
-      _id: carData._id,
-      clientInfo: carData.clientInfo || {
-        _id: "",
-        name: "",
-        email: "",
-        phone: "",
-        address: {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          country: "",
-        },
-        businessType: "",
+  } catch (error) {
+    console.error("Error saving article:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to save article",
       },
-    };
+      { status: 500 }
+    );
+  }
+}
 
-    // Ensure proper serialization of ObjectId in logs
-    const serializedCar = {
-      _id: car._id.toString(),
-      clientInfo: car.clientInfo,
-      keys: Object.keys(car),
-    };
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because the url is /cars/[id]/article
 
-    console.log("[DEBUG] GET - Initial car data:", serializedCar);
+    const db = await getDatabase();
 
-    // Fetch client info if it exists
-    if (car.client) {
-      console.log(
-        "[DEBUG] GET - Fetching client info for car",
-        carId,
-        "client ID:",
-        car.client
+    // Delete the article
+    const result = await db
+      .collection("car_articles")
+      .deleteOne({ carId: new ObjectId(id) });
+
+    // Also clean up any article states
+    await db
+      .collection("article_states")
+      .deleteOne({ carId: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { message: "No article found to delete" },
+        { status: 404 }
       );
-
-      try {
-        const clientId = new ObjectId(car.client);
-        const clientInfo = await db
-          .collection("clients")
-          .findOne({ _id: clientId });
-
-        if (clientInfo) {
-          console.log("[DEBUG] GET - Found client document:", {
-            _id: clientInfo._id.toString(),
-            name: clientInfo.name,
-            hasEmail: !!clientInfo.email,
-            hasPhone: !!clientInfo.phone,
-          });
-
-          car.clientInfo = {
-            _id: clientInfo._id.toString(),
-            name: clientInfo.name || "",
-            email: clientInfo.email || "",
-            phone: clientInfo.phone || "",
-            address: {
-              street:
-                (clientInfo.address && typeof clientInfo.address === "object"
-                  ? clientInfo.address.street
-                  : "") || "",
-              city:
-                (clientInfo.address && typeof clientInfo.address === "object"
-                  ? clientInfo.address.city
-                  : "") || "",
-              state:
-                (clientInfo.address && typeof clientInfo.address === "object"
-                  ? clientInfo.address.state
-                  : "") || "",
-              zipCode:
-                (clientInfo.address && typeof clientInfo.address === "object"
-                  ? clientInfo.address.zipCode
-                  : "") || "",
-              country:
-                (clientInfo.address && typeof clientInfo.address === "object"
-                  ? clientInfo.address.country
-                  : "") || "",
-            },
-            businessType: clientInfo.businessType || "",
-          };
-
-          console.log(
-            "[DEBUG] GET - Updated car with client info:",
-            car.clientInfo
-          );
-        } else {
-          console.warn("[WARN] Client not found for ID:", car.client);
-        }
-      } catch (error) {
-        console.error("[ERROR] Error fetching client info:", error);
-      }
     }
 
-    // Create EventSource response
-    const stream = new TransformStream();
-    const writer = stream.writable.getWriter();
-    const encoder = new TextEncoder();
-
-    const sendProgress = async (progress: any) => {
-      const event = {
-        type: "progress",
-        ...progress,
-      };
-      await writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-    };
-
-    // Start SSE response
-    const response = new Response(stream.readable, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
-
-    // Process in background with the already initialized car
-    (async () => {
-      try {
-        let metadata = await db
-          .collection<ArticleMetadata>("article_metadata")
-          .findOne({ carId });
-
-        if (!metadata) {
-          metadata = {
-            _id: new ObjectId(),
-            carId,
-            model,
-            stages: [],
-            currentStage: "planning",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isComplete: false,
-            sessionId: new ObjectId().toString(),
-          };
-        }
-
-        let content;
-
-        if (!context) {
-          switch (stage) {
-            case "planning":
-              content = await generateArticlePlan(
-                car,
-                combinedResearchContent,
-                model,
-                undefined,
-                focus,
-                sendProgress
-              );
-              break;
-            case "drafting":
-              const plan = metadata.stages.find(
-                (s) => s.stage === "planning"
-              )?.content;
-              if (!plan) throw new Error("No planning stage found");
-              content = await generateDraft(
-                plan,
-                car,
-                combinedResearchContent,
-                model,
-                undefined,
-                focus,
-                sendProgress
-              );
-              break;
-            case "polishing":
-              const draft = metadata.stages.find(
-                (s) => s.stage === "drafting"
-              )?.content;
-              if (!draft) throw new Error("No draft stage found");
-              content = await polishArticle(draft, model, sendProgress);
-              break;
-            default:
-              throw new Error("Invalid stage");
-          }
-        } else {
-          await sendProgress({
-            stage,
-            step: "revision",
-            message: "Processing revision request...",
-          });
-          const currentContent = metadata.stages.find(
-            (s) => s.stage === stage
-          )?.content;
-          if (!currentContent) throw new Error("No content found for revision");
-          content = await reviseContent(currentContent, context, model, stage);
-          await sendProgress({
-            stage,
-            step: "revision-complete",
-            message: "Revision completed",
-          });
-        }
-
-        if (!content) {
-          throw new Error("Failed to generate content");
-        }
-
-        // Update metadata
-        const stageIndex = metadata.stages.findIndex((s) => s.stage === stage);
-        if (stageIndex >= 0) {
-          metadata.stages[stageIndex] = {
-            stage,
-            content,
-            timestamp: new Date(),
-          };
-        } else {
-          metadata.stages.push({ stage, content, timestamp: new Date() });
-        }
-
-        metadata.currentStage = stage;
-        metadata.updatedAt = new Date();
-        metadata.isComplete = stage === "polishing";
-
-        await db
-          .collection("article_metadata")
-          .updateOne({ carId }, { $set: metadata }, { upsert: true });
-
-        await sendProgress({
-          type: "complete",
-          metadata,
-          message: `${stage} stage completed successfully`,
-        });
-      } catch (error) {
-        console.error("Error in article generation:", error);
-        await sendProgress({
-          type: "error",
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to generate article",
-        });
-      } finally {
-        await writer.close();
-      }
-    })();
-
-    return response;
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error in article generation:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to generate article";
-    const status = errorMessage === "Request timeout" ? 504 : 500;
-    return NextResponse.json({ error: errorMessage }, { status });
+    console.error("Error deleting article:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete article",
+      },
+      { status: 500 }
+    );
   }
+}
+
+// OPTIONS handler for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

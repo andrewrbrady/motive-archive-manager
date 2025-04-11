@@ -1,4 +1,6 @@
 import { MongoClient, ObjectId } from "mongodb";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { createStaticResponse } from "@/lib/cache-utils";
@@ -12,22 +14,26 @@ if (!MONGODB_URI) {
 
 // Helper function to get MongoDB client
 async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI as string, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  await client.connect();
-  return client;
+  try {
+    const client = new MongoClient(MONGODB_URI as string, {
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    await client.connect();
+    return client;
+  } catch (error) {
+    console.error("Error connecting to MongoDB:", error);
+    throw error;
+  }
 }
 
 // GET image by ID
-export async function GET(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   let client;
   try {
-    const { id } = await Promise.resolve(context.params);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {
@@ -63,11 +69,15 @@ export async function GET(
       carId: image.carId.toString(),
       createdAt: image.createdAt,
       updatedAt: image.updatedAt,
+      category: determineImageCategory(image),
     });
   } catch (error) {
-    console.error("Error fetching image:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch image" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   } finally {
@@ -81,7 +91,7 @@ export async function GET(
  * Helper function to determine image category from metadata
  * Used for backward compatibility with older image data
  */
-function determineImageCategory(image: any): string | undefined {
+function determineImageCategory(image: any): string {
   const metadata = image.metadata || {};
 
   // Check for explicit view fields
@@ -124,4 +134,15 @@ function determineImageCategory(image: any): string | undefined {
 
   // Default to 'other' if we can't determine
   return "other";
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

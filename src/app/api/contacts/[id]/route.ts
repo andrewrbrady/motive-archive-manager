@@ -1,86 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+export const dynamic = "force-dynamic";
+
+import { getDatabase } from "@/lib/mongodb";
 import { Contact } from "@/types/contact";
 import { ObjectId } from "mongodb";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
-    const { db } = await connectToDatabase();
-    const collection = db.collection<Contact>("contacts");
-    const contact = await collection.findOne({
-      _id: new ObjectId(params.id),
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    const db = await getDatabase();
+
+    // Check if this contact is a primary contact for any client
+    const clientWithPrimaryContact = await db.collection("clients").findOne({
+      primaryContactId: new ObjectId(id),
     });
 
-    if (!contact) {
-      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    if (clientWithPrimaryContact) {
+      return NextResponse.json(
+        {
+          error: "Cannot delete contact that is set as primary for a client",
+          clientId: clientWithPrimaryContact._id.toString(),
+          clientName: clientWithPrimaryContact.name,
+        },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({
-      ...contact,
-      _id: contact._id.toString(),
-    });
-  } catch (error) {
-    console.error("Error fetching contact:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch contact" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const body = await request.json();
-    const { db } = await connectToDatabase();
-    const collection = db.collection<Contact>("contacts");
-
-    const updateData = {
-      ...body,
-      updatedAt: new Date(),
-    };
-
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(params.id) },
-      { $set: updateData },
-      { returnDocument: "after" }
-    );
-
-    if (!result) {
-      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      ...result,
-      _id: result._id.toString(),
-    });
-  } catch (error) {
-    console.error("Error updating contact:", error);
-    return NextResponse.json(
-      { error: "Failed to update contact" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { db } = await connectToDatabase();
-    const collection = db.collection<Contact>("contacts");
-
-    const result = await collection.findOneAndDelete({
-      _id: new ObjectId(params.id),
+    // Delete contact
+    const result = await db.collection("contacts").deleteOne({
+      _id: new ObjectId(id),
     });
 
-    if (!result) {
+    if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
 
@@ -92,4 +46,15 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

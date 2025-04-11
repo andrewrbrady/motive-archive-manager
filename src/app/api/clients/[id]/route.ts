@@ -1,130 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Client } from "@/types/contact";
+export const dynamic = "force-dynamic";
+
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { db } = await connectToDatabase();
-    const collection = db.collection<Client>("clients");
-    const client = await collection.findOne({
-      _id: new ObjectId(params.id),
-    });
-
-    if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
-    }
-
-    // Fetch associated contact if exists
-    let primaryContact = null;
-    if (client.primaryContactId) {
-      const contactsCollection = db.collection("contacts");
-      primaryContact = await contactsCollection.findOne({
-        _id: client.primaryContactId,
-      });
-    }
-
-    // Format the response with string IDs
-    const formattedClient = {
-      ...client,
-      _id: client._id.toString(),
-      primaryContactId: client.primaryContactId?.toString(),
-      primaryContact,
-      // Format the cars array if it exists
-      cars:
-        client.cars?.map((car) => ({
-          ...car,
-          _id: car._id.toString(),
-        })) || [],
-      // Format document IDs if they exist
-      documents:
-        client.documents?.map((doc) => ({
-          ...doc,
-          _id: doc._id.toString(),
-        })) || [],
-    };
-
-    return NextResponse.json(formattedClient);
-  } catch (error) {
-    console.error("Error fetching client:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch client" },
-      { status: 500 }
-    );
-  }
+interface Client {
+  _id: ObjectId;
+  name: string;
+  website?: string;
+  primaryContactId?: ObjectId;
+  cars?: any[];
+  documents?: any[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
-    const body = await request.json();
-    const { db } = await connectToDatabase();
-    const collection = db.collection<Client>("clients");
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
-    // Validate primary contact exists if provided
-    if (body.primaryContactId) {
-      const contactsCollection = db.collection("contacts");
-      const contact = await contactsCollection.findOne({
-        _id: new ObjectId(body.primaryContactId),
-      });
-      if (!contact) {
-        return NextResponse.json(
-          { error: "Primary contact not found" },
-          { status: 400 }
-        );
-      }
-    }
+    const db = await getDatabase();
 
-    const updateData = {
-      ...body,
-      primaryContactId: body.primaryContactId
-        ? new ObjectId(body.primaryContactId)
-        : null,
-      updatedAt: new Date(),
-    };
-
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(params.id) },
-      { $set: updateData },
-      { returnDocument: "after" }
-    );
-
-    if (!result) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      ...result,
-      _id: result._id.toString(),
-      primaryContactId: result.primaryContactId?.toString(),
-    });
-  } catch (error) {
-    console.error("Error updating client:", error);
-    return NextResponse.json(
-      { error: "Failed to update client" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { db } = await connectToDatabase();
-    const collection = db.collection<Client>("clients");
-
-    const result = await collection.findOneAndDelete({
-      _id: new ObjectId(params.id),
+    // Check if there are any associated cars
+    const carCount = await db.collection("cars").countDocuments({
+      clientId: new ObjectId(id),
     });
 
-    if (!result) {
+    if (carCount > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete client with associated cars" },
+        { status: 400 }
+      );
+    }
+
+    // Delete client
+    const result = await db.collection("clients").deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
@@ -136,4 +52,15 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

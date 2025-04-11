@@ -20,13 +20,13 @@ const chatModel = new ChatOpenAI({
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/research/chat
+
     const { messages, prompt } = await request.json();
-    const carId = params.id;
 
     console.log("Processing chat request:");
     console.log("Car ID:", carId);
@@ -82,8 +82,24 @@ ${researchContext}`
   } catch (error) {
     console.error("Error in research chat:", error);
     return NextResponse.json(
-      { error: "Failed to process research chat" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to process research chat",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

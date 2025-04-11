@@ -125,6 +125,12 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
           ...userData,
           uid: responseData.uid || userId,
           _id: responseData._id,
+          createdAt: responseData.createdAt
+            ? new Date(responseData.createdAt)
+            : new Date(),
+          updatedAt: responseData.updatedAt
+            ? new Date(responseData.updatedAt)
+            : new Date(),
         } as User);
       }
     } catch (error: any) {

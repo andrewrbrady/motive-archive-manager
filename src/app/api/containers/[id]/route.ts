@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Container, formatContainer } from "@/models/container";
 
-// GET a single container
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
     const client = await clientPromise;
     if (!client) {
@@ -16,10 +13,21 @@ export async function GET(
         { status: 500 }
       );
     }
+
     const db = client.db("motive_archive");
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid container ID" },
+        { status: 400 }
+      );
+    }
 
     const container = await db.collection("containers").findOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (!container) {
@@ -31,30 +39,19 @@ export async function GET(
 
     return NextResponse.json(formatContainer(container as Container));
   } catch (error) {
-    console.error("Error fetching container:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-// UPDATE a container
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
-    const data = await request.json();
-
-    // Validate required fields
-    if (!data.name || !data.type) {
-      return NextResponse.json(
-        { error: "Name and type are required fields" },
-        { status: 400 }
-      );
-    }
-
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -62,6 +59,19 @@ export async function PUT(
         { status: 500 }
       );
     }
+
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid container ID" },
+        { status: 400 }
+      );
+    }
+
+    const data = await request.json();
     const db = client.db("motive_archive");
 
     // Prepare update data
@@ -76,7 +86,7 @@ export async function PUT(
 
     const result = await db
       .collection("containers")
-      .updateOne({ _id: new ObjectId(params.id) }, { $set: updateData });
+      .updateOne({ _id: new ObjectId(id) }, { $set: updateData });
 
     if (result.matchedCount === 0) {
       return NextResponse.json(
@@ -85,26 +95,20 @@ export async function PUT(
       );
     }
 
-    // Get the updated container
-    const updatedContainer = await db.collection("containers").findOne({
-      _id: new ObjectId(params.id),
-    });
-
-    return NextResponse.json(formatContainer(updatedContainer as Container));
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating container:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-// DELETE a container
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
     const client = await clientPromise;
     if (!client) {
@@ -113,25 +117,21 @@ export async function DELETE(
         { status: 500 }
       );
     }
-    const db = client.db("motive_archive");
 
-    // Check if this container is used by any inventory items
-    const usedInInventory = await db.collection("studio_inventory").findOne({
-      container_id: params.id,
-    });
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
-    if (usedInInventory) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json(
-        {
-          error:
-            "Container cannot be deleted because it is being used by inventory items",
-        },
+        { error: "Invalid container ID" },
         { status: 400 }
       );
     }
 
+    const db = client.db("motive_archive");
     const result = await db.collection("containers").deleteOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (result.deletedCount === 0) {
@@ -141,12 +141,26 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ id: params.id });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting container:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

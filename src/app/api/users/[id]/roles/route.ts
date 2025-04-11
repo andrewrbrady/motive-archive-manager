@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/auth";
 
 /**
  * GET user roles
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     // Check authentication and authorization
     const session = await auth();
     if (!session || !session.user || !session.user.roles.includes("admin")) {
@@ -20,10 +23,10 @@ export async function GET(
     }
 
     // Get user from Firebase
-    const user = await adminAuth.getUser(params.id);
+    const user = await adminAuth.getUser(id);
 
     // Get user data from Firestore
-    const userDoc = await adminDb.collection("users").doc(params.id).get();
+    const userDoc = await adminDb.collection("users").doc(id).get();
     const userData = userDoc.exists ? userDoc.data() : null;
 
     // Combine custom claims with user data
@@ -49,11 +52,12 @@ export async function GET(
 /**
  * UPDATE user roles
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     // Get request data
     const data = await request.json();
     const { roles, creativeRoles, status } = data;
@@ -102,39 +106,19 @@ export async function PUT(
           { status: 403 }
         );
       }
-
-      // Prevent users from modifying their own roles
-      if (session.user.id === params.id) {
-        console.log(
-          "User attempting to modify their own roles:",
-          session.user.id
-        );
-        return NextResponse.json(
-          {
-            error:
-              "For security reasons, you cannot modify your own roles. Please ask another administrator to make any necessary changes.",
-          },
-          { status: 403 }
-        );
-      }
-    } else {
-      console.log("Processing new user registration for user ID:", params.id);
     }
 
-    // Set custom claims (Firebase Auth)
-    console.log("Setting custom claims for user:", params.id, roles);
-    await adminAuth.setCustomUserClaims(params.id, {
+    // Update user custom claims in Firebase Auth
+    await adminAuth.setCustomUserClaims(id, {
       roles,
       creativeRoles: creativeRoles || [],
       status: status || "active",
     });
-    console.log("Custom claims set successfully for user:", params.id);
 
     // Update user data in Firestore
-    console.log("Updating Firestore document for user:", params.id);
     await adminDb
       .collection("users")
-      .doc(params.id)
+      .doc(id)
       .set(
         {
           roles,
@@ -144,26 +128,39 @@ export async function PUT(
         },
         { merge: true }
       );
-    console.log("Firestore document updated successfully for user:", params.id);
 
     // Get updated user data
-    const user = await adminAuth.getUser(params.id);
-    console.log("Retrieved updated user data:", user.uid, user.customClaims);
+    const user = await adminAuth.getUser(id);
+    const userDoc = await adminDb.collection("users").doc(id).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
 
     return NextResponse.json({
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
-      roles: user.customClaims?.roles || roles,
-      creativeRoles: user.customClaims?.creativeRoles || creativeRoles || [],
-      status: user.customClaims?.status || status || "active",
-      message: "User roles updated successfully",
+      disabled: user.disabled,
+      roles: user.customClaims?.roles || userData?.roles || ["user"],
+      creativeRoles:
+        user.customClaims?.creativeRoles || userData?.creativeRoles || [],
+      status: user.customClaims?.status || userData?.status || "active",
     });
   } catch (error: any) {
-    console.error("Error updating user roles:", error.message, error.stack);
+    console.error("Error updating user roles:", error);
     return NextResponse.json(
       { error: error.message || "Failed to update user roles" },
       { status: 500 }
     );
   }
+}
+
+// OPTIONS for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }

@@ -48,9 +48,9 @@ import type {
   FormClientInfo,
   ApiClientInfo,
   ImageData,
-  CarData,
   Performance,
 } from "@/types/car-page";
+import { Power, Torque } from "@/types/car";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
 import CalendarTab from "@/components/cars/CalendarTab";
@@ -89,17 +89,6 @@ import {
   generateCarTitle,
 } from "@/utils/car-helpers";
 import { CarAvatar } from "@/components/ui/CarAvatar";
-
-interface Power {
-  hp: number;
-  kW: number;
-  ps: number;
-}
-
-interface Torque {
-  "lb-ft": number;
-  Nm: number;
-}
 
 interface PageParams {
   id: string;
@@ -246,8 +235,9 @@ export default function CarPage() {
       );
   }, []);
 
-  // Return early if no ID, but after hooks
+  // Return early if no ID
   if (!id) {
+    router.push("/cars");
     return null;
   }
 
@@ -291,7 +281,120 @@ export default function CarPage() {
     }
   };
 
-  // ... rest of the component code ...
+  const notifyUploadStarted = () => {
+    toast({
+      title: "Upload Started",
+      description: "Your images are being uploaded...",
+    });
+  };
+
+  const notifyUploadEnded = () => {
+    toast({
+      title: "Upload Complete",
+      description: "Your images have been uploaded successfully.",
+    });
+    refreshCarData();
+  };
+
+  const handleSpecsEdit = async (editedSpecs: ExtendedCar) => {
+    try {
+      const response = await fetch(`/api/cars/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editedSpecs),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update specifications");
+      }
+
+      await refreshCarData();
+      setIsSpecsEditMode(false);
+      toast({
+        title: "Success",
+        description: "Car specifications updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating specifications:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update specifications",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleInputChange = (
+    field: string,
+    value: any,
+    nestedField?: string
+  ) => {
+    setEditedSpecs((prev: any) => ({
+      ...prev,
+      [field]: nestedField ? { ...prev[field], [nestedField]: value } : value,
+    }));
+  };
+
+  const handleMeasurementChange = (
+    field: string,
+    value: any,
+    nestedField?: string
+  ) => {
+    handleInputChange(field, value, nestedField);
+  };
+
+  const handlePowerChange = (value: MeasurementValue) => {
+    const hp = value.value || 0;
+    const kW = Math.round(hp * 0.7457);
+    const ps = Math.round(hp * 1.014);
+
+    setEditedSpecs((prev: any) => ({
+      ...prev,
+      engine: {
+        ...prev.engine,
+        power: { hp, kW, ps },
+      },
+    }));
+  };
+
+  const handleTorqueChange = (value: MeasurementValue) => {
+    const isLbFt = value.unit === "lb-ft";
+    const lbFt = isLbFt
+      ? value.value || 0
+      : Math.round((value.value || 0) * 0.7376);
+    const Nm = isLbFt
+      ? Math.round((value.value || 0) * 1.3558)
+      : value.value || 0;
+
+    setEditedSpecs((prev: any) => ({
+      ...prev,
+      engine: {
+        ...prev.engine,
+        torque: { "lb-ft": lbFt, Nm },
+      },
+    }));
+  };
+
+  const refreshCarData = async () => {
+    try {
+      const response = await fetch(`/api/cars/${params.id}`);
+      if (!response.ok) {
+        throw new Error("Failed to refresh car data");
+      }
+      const data = await response.json();
+      // Update your car state here
+      setCar(data);
+    } catch (error) {
+      console.error("Error refreshing car data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh car data",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <AuthGuard>
@@ -333,7 +436,7 @@ export default function CarPage() {
                       <div className="space-y-4">
                         <div className="image-gallery-wrapper">
                           <ImageGalleryWithQuery
-                            carId={params.id}
+                            carId={params.id as string}
                             vehicleInfo={{
                               make: car?.make || "",
                               model: car?.model || "",
@@ -358,7 +461,7 @@ export default function CarPage() {
                         isEditMode={isSpecsEditMode}
                         onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
                         onSave={async (editedSpecs) => {
-                          await handleSpecsEdit(editedSpecs as CarData);
+                          await handleSpecsEdit(editedSpecs as ExtendedCar);
                         }}
                         onCancel={() => setIsSpecsEditMode(false)}
                         onRefresh={refreshCarData}

@@ -5,16 +5,13 @@ import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
 
-type RouteContext = {
-  params: {
-    id: string;
-  };
-};
-
 // GET single asset
-export async function GET(_request: NextRequest, { params }: RouteContext) {
+export async function GET(request: Request) {
   try {
-    const id = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     console.log(`Fetching asset with ID: ${id}`);
 
     const db = await getDatabase();
@@ -40,31 +37,20 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 }
 
 // PATCH single asset
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
+export async function PATCH(request: Request) {
   try {
-    const id = params.id;
-    const data = await request.json();
-    const { field, value } = data;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
-    if (!field || value === undefined) {
-      return NextResponse.json(
-        { error: "Field and value are required" },
-        { status: 400 }
-      );
-    }
+    const data = await request.json();
 
     const db = await getDatabase();
-    const updateResult = await db.collection("raw_assets").updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          [field]: value,
-          updatedAt: new Date(),
-        },
-      }
-    );
+    const result = await db
+      .collection("raw_assets")
+      .updateOne({ _id: new ObjectId(id) }, { $set: data });
 
-    if (updateResult.matchedCount === 0) {
+    if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
@@ -82,16 +68,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 }
 
 // DELETE single asset
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+export async function DELETE(request: Request) {
   try {
-    const id = params.id;
-    const db = await getDatabase();
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
-    const deleteResult = await db.collection("raw_assets").deleteOne({
+    const db = await getDatabase();
+    const result = await db.collection("raw_assets").deleteOne({
       _id: new ObjectId(id),
     });
 
-    if (deleteResult.deletedCount === 0) {
+    if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
@@ -109,11 +97,11 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 }
 
 // OPTIONS handler for CORS
-export async function OPTIONS(_request: NextRequest) {
+export async function OPTIONS(request: Request) {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, PATCH, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Allow-Origin": "*",
     },

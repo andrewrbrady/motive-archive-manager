@@ -116,12 +116,9 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
   }
 }
 
-export default async function CarsPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function CarsPage(props: any) {
   try {
+    const searchParams = props.searchParams || {};
     const resolvedParams = await Promise.resolve(searchParams);
 
     const page = Number(resolvedParams.page) || 1;

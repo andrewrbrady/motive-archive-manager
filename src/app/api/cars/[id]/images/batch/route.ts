@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDatabase } from "@/lib/mongodb";
 
+export const dynamic = "force-dynamic";
+
 // This file handles batch image deletion requests more efficiently
 
 interface Image {
@@ -22,12 +24,14 @@ interface CarDocument {
 }
 
 // Add OPTIONS handler to make the endpoint testable
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS(request: Request) {
   console.log("======== BATCH OPTIONS REQUEST RECEIVED ========");
   return new NextResponse(null, {
     status: 204,
     headers: {
-      Allow: "DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }
@@ -35,10 +39,7 @@ export async function OPTIONS(request: NextRequest) {
 /**
  * Improved DELETE handler for batch image deletion - handles both UUID and ObjectId formats
  */
-export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: Promise<string> } }
-) {
+export async function DELETE(request: Request) {
   console.log("======== BATCH IMAGE DELETION API CALLED ========");
   console.log("Request URL:", request.url);
   console.log("Request method:", request.method);
@@ -48,7 +49,10 @@ export async function DELETE(
   );
 
   try {
-    const carId = await context.params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/images/batch
+
     console.log("Car ID from URL params:", carId);
 
     // Parse request body

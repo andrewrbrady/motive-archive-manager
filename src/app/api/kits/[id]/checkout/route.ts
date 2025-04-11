@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -14,6 +17,7 @@ export async function POST(
         { status: 500 }
       );
     }
+
     const db = client.db("motive_archive");
     const data = await request.json();
 
@@ -28,7 +32,7 @@ export async function POST(
     // Validate ObjectId
     let kitId;
     try {
-      kitId = new ObjectId(params.id);
+      kitId = new ObjectId(id);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid kit ID format" },
@@ -71,7 +75,7 @@ export async function POST(
             _id: { $in: itemObjectIds },
             $or: [
               { is_available: false },
-              { current_kit_id: { $exists: true, $ne: params.id } },
+              { current_kit_id: { $exists: true, $ne: id } },
             ],
           })
           .toArray();
@@ -108,7 +112,7 @@ export async function POST(
       expectedReturnDate: data.expectedReturnDate
         ? new Date(data.expectedReturnDate)
         : null,
-    };
+    } as const;
 
     // Update kit status
     const updateResult = await db.collection("kits").updateOne(
@@ -131,7 +135,6 @@ export async function POST(
 
     // Update all items in the kit to be unavailable
     if (kit.items && Array.isArray(kit.items)) {
-      // Convert string IDs to ObjectIds, filtering out any invalid IDs
       const itemObjectIds: ObjectId[] = [];
 
       for (const id of kit.items) {
@@ -148,17 +151,17 @@ export async function POST(
           {
             $set: {
               is_available: false,
+              kit_status: "checked-out",
               checked_out_to: checkoutRecord.checkedOutTo,
               checkout_date: checkoutRecord.checkedOutDate,
               expected_return_date: checkoutRecord.expectedReturnDate,
-              kit_status: "checked-out",
             },
           }
         );
       }
     }
 
-    // Get the updated kit
+    // Get updated kit
     const updatedKit = await db.collection("kits").findOne({ _id: kitId });
 
     return NextResponse.json({
@@ -167,10 +170,24 @@ export async function POST(
       _id: undefined,
     });
   } catch (error) {
-    console.error("Error checking out kit:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

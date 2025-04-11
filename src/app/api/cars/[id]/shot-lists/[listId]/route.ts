@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string; listId: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3];
+    const listId = segments[segments.length - 1];
+
     const { db } = await connectToDatabase();
     const data = await request.json();
 
     const result = await db.collection("shotLists").findOneAndUpdate(
-      { _id: new ObjectId(params.listId), carId: params.id },
+      { _id: new ObjectId(listId), carId: id },
       {
         $set: {
           name: data.name,
@@ -43,16 +47,18 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string; listId: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3];
+    const listId = segments[segments.length - 1];
+
     const { db } = await connectToDatabase();
 
     const result = await db.collection("shotLists").deleteOne({
-      _id: new ObjectId(params.listId),
-      carId: params.id,
+      _id: new ObjectId(listId),
+      carId: id,
     });
 
     if (result.deletedCount === 0) {
@@ -72,16 +78,18 @@ export async function DELETE(
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string; listId: string } }
-) {
+export async function PATCH(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3];
+    const listId = segments[segments.length - 1];
+
     const { db } = await connectToDatabase();
     const data = await request.json();
 
     const result = await db.collection("shotLists").findOneAndUpdate(
-      { _id: new ObjectId(params.listId), carId: params.id },
+      { _id: new ObjectId(listId), carId: id },
       {
         $set: {
           ...data,
@@ -109,4 +117,15 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

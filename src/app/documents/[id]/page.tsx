@@ -29,12 +29,8 @@ async function getReceipt(id: string) {
   return receipt;
 }
 
-export default async function ReceiptPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const receipt = await getReceipt(params.id);
+export default async function ReceiptPage(props: any) {
+  const receipt = await getReceipt(props.params.id);
 
   return (
     <>

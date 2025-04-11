@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { HardDrive } from "@/models/hard-drive";
@@ -23,17 +25,25 @@ interface HardDriveDocument {
   updatedAt: Date;
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid hard drive ID format" },
+        { status: 400 }
+      );
+    }
+
     const db = await getDatabase();
     const hardDrivesCollection =
       db.collection<HardDriveDocument>("hard_drives");
 
     const hardDrive = await hardDrivesCollection.findOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (!hardDrive) {
@@ -52,19 +62,30 @@ export async function GET(
 
     return NextResponse.json(formattedDrive);
   } catch (error) {
-    console.error("Error fetching hard drive:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch hard drive" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid hard drive ID format" },
+        { status: 400 }
+      );
+    }
+
     const updates = await request.json();
     const db = await getDatabase();
     const hardDrivesCollection =
@@ -81,9 +102,16 @@ export async function PUT(
 
     // Convert rawAssetIds to ObjectIds if present
     if (updates.rawAssetIds) {
-      updates.rawAssetIds = updates.rawAssetIds.map(
-        (id: string) => new ObjectId(id)
-      );
+      try {
+        updates.rawAssetIds = updates.rawAssetIds.map(
+          (id: string) => new ObjectId(id)
+        );
+      } catch (err) {
+        return NextResponse.json(
+          { error: "Invalid raw asset ID format" },
+          { status: 400 }
+        );
+      }
 
       // Verify all assets exist
       const assetCount = await rawAssetsCollection.countDocuments({
@@ -98,53 +126,17 @@ export async function PUT(
       }
     }
 
-    // Add updatedAt timestamp
-    updates.updatedAt = new Date();
-
-    const result = await hardDrivesCollection.findOneAndUpdate(
-      { _id: new ObjectId(params.id) },
-      { $set: updates },
-      { returnDocument: "after" }
+    const result = await hardDrivesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          ...updates,
+          updatedAt: new Date(),
+        },
+      }
     );
 
-    if (!result) {
-      return NextResponse.json(
-        { error: "Hard drive not found" },
-        { status: 404 }
-      );
-    }
-
-    // Convert ObjectIds back to strings for response
-    const formattedResult = {
-      ...result,
-      _id: result._id.toString(),
-      rawAssetIds: result.rawAssetIds?.map((id) => id.toString()) || [],
-    };
-
-    return NextResponse.json(formattedResult);
-  } catch (error) {
-    console.error("Error updating hard drive:", error);
-    return NextResponse.json(
-      { error: "Failed to update hard drive" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const db = await getDatabase();
-    const hardDrivesCollection =
-      db.collection<HardDriveDocument>("hard_drives");
-
-    const result = await hardDrivesCollection.deleteOne({
-      _id: new ObjectId(params.id),
-    });
-
-    if (result.deletedCount === 0) {
+    if (result.matchedCount === 0) {
       return NextResponse.json(
         { error: "Hard drive not found" },
         { status: 404 }
@@ -153,10 +145,91 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting hard drive:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to delete hard drive" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid hard drive ID format" },
+        { status: 400 }
+      );
+    }
+
+    const db = await getDatabase();
+    const hardDrivesCollection =
+      db.collection<HardDriveDocument>("hard_drives");
+    const rawAssetsCollection = db.collection<HardDriveAsset>("raw_assets");
+
+    // Get the hard drive to check if it exists and get its raw assets
+    const hardDrive = await hardDrivesCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!hardDrive) {
+      return NextResponse.json(
+        { error: "Hard drive not found" },
+        { status: 404 }
+      );
+    }
+
+    // Remove the hard drive ID from all associated raw assets
+    if (hardDrive.rawAssetIds?.length > 0) {
+      await rawAssetsCollection.updateMany(
+        { _id: { $in: hardDrive.rawAssetIds } },
+        {
+          $pull: {
+            hardDriveIds: new ObjectId(id),
+          },
+        }
+      );
+    }
+
+    // Delete the hard drive
+    const result = await hardDrivesCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "Failed to delete hard drive" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

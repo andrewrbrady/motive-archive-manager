@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Location, formatLocation } from "@/models/location";
@@ -10,8 +12,12 @@ interface RouteParams {
 }
 
 // GET a specific location by ID
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -19,8 +25,8 @@ export async function GET(request: Request, { params }: RouteParams) {
         { status: 500 }
       );
     }
+
     const db = client.db("motive_archive");
-    const { id } = params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -51,8 +57,12 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 // PUT (update) a specific location by ID
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -60,8 +70,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
         { status: 500 }
       );
     }
+
     const db = client.db("motive_archive");
-    const { id } = params;
     const data = await request.json();
 
     if (!ObjectId.isValid(id)) {
@@ -71,15 +81,21 @@ export async function PUT(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Add updated timestamp
+    const location = await db
+      .collection("locations")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!location) {
+      return NextResponse.json(
+        { error: "Location not found" },
+        { status: 404 }
+      );
+    }
+
     const updateData = {
       ...data,
       updatedAt: new Date(),
     };
-
-    // Remove id from update data if present
-    if (updateData.id) delete updateData.id;
-    if (updateData._id) delete updateData._id;
 
     const result = await db
       .collection("locations")
@@ -92,14 +108,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Get the updated document
-    const updatedLocation = await db
-      .collection("locations")
-      .findOne({ _id: new ObjectId(id) });
-
-    return NextResponse.json(
-      formatLocation(updatedLocation as unknown as Location)
-    );
+    return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("Error updating location:", error);
     return NextResponse.json(
@@ -110,8 +119,12 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 // DELETE a specific location by ID
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -119,13 +132,24 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         { status: 500 }
       );
     }
+
     const db = client.db("motive_archive");
-    const { id } = params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid location ID" },
         { status: 400 }
+      );
+    }
+
+    const location = await db
+      .collection("locations")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!location) {
+      return NextResponse.json(
+        { error: "Location not found" },
+        { status: 404 }
       );
     }
 
@@ -148,4 +172,16 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       { status: 500 }
     );
   }
+}
+
+// OPTIONS for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }

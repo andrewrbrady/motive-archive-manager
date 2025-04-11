@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+export const dynamic = "force-dynamic";
+
 // Define types for our formatted kit response
 interface FormattedKitItem {
   id: string;
@@ -27,16 +29,23 @@ interface FormattedKit {
   checkedOutTo?: string;
   checkoutDate?: Date;
   expectedReturnDate?: Date;
-  checkoutHistory?: any[];
+  checkoutHistory?: Array<{
+    checkedOutDate?: Date;
+    expectedReturnDate?: Date;
+    actualReturnDate?: Date;
+    checkedOutBy?: string;
+    checkedOutTo?: string;
+  }>;
   [key: string]: any;
 }
 
 // GET a specific kit
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -49,7 +58,7 @@ export async function GET(
     // Validate ObjectId
     let kitId;
     try {
-      kitId = new ObjectId(params.id);
+      kitId = new ObjectId(id);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid kit ID format" },
@@ -68,13 +77,12 @@ export async function GET(
     const formattedKit: FormattedKit = {
       ...kit,
       id: kit._id.toString(),
-      _id: undefined,
     };
+    delete formattedKit._id;
 
     // Get the items in this kit
     if (kit.items && Array.isArray(kit.items)) {
-      // Filter out invalid ObjectIds
-      const itemIds: ObjectId[] = kit.items
+      const itemIds = kit.items
         .map((id: string) => {
           try {
             return new ObjectId(id);
@@ -90,8 +98,7 @@ export async function GET(
           .find({ _id: { $in: itemIds } })
           .toArray();
 
-        // Format the items
-        const formattedItems = kitItems.map((item) => ({
+        formattedKit.itemDetails = kitItems.map((item) => ({
           id: item._id.toString(),
           name: item.name,
           category: item.category,
@@ -101,8 +108,6 @@ export async function GET(
           kitStatus: item.kit_status,
           primaryImage: item.primary_image,
         }));
-
-        formattedKit.itemDetails = formattedItems;
       }
     }
 
@@ -117,11 +122,12 @@ export async function GET(
 }
 
 // UPDATE a kit
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -135,7 +141,7 @@ export async function PUT(
     // Validate ObjectId
     let kitId;
     try {
-      kitId = new ObjectId(params.id);
+      kitId = new ObjectId(id);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid kit ID format" },
@@ -151,27 +157,19 @@ export async function PUT(
     }
 
     // Process dates
-    if (data.createdAt) {
-      data.createdAt = new Date(data.createdAt);
-    }
-
-    if (data.updatedAt) {
-      data.updatedAt = new Date();
-    } else {
-      data.updatedAt = new Date();
-    }
-
-    if (data.checkoutDate) {
-      data.checkoutDate = new Date(data.checkoutDate);
-    }
-
-    if (data.expectedReturnDate) {
-      data.expectedReturnDate = new Date(data.expectedReturnDate);
-    }
+    const updateData = {
+      ...data,
+      createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+      updatedAt: new Date(),
+      checkoutDate: data.checkoutDate ? new Date(data.checkoutDate) : undefined,
+      expectedReturnDate: data.expectedReturnDate
+        ? new Date(data.expectedReturnDate)
+        : undefined,
+    };
 
     // Process checkout history if it exists
     if (data.checkoutHistory && Array.isArray(data.checkoutHistory)) {
-      data.checkoutHistory = data.checkoutHistory.map((record: any) => ({
+      updateData.checkoutHistory = data.checkoutHistory.map((record: any) => ({
         ...record,
         checkedOutDate: record.checkedOutDate
           ? new Date(record.checkedOutDate)
@@ -196,55 +194,43 @@ export async function PUT(
       (id: string) => !newItems.includes(id)
     );
 
-    // Update the kit
-    const updateResult = await db
-      .collection("kits")
-      .updateOne({ _id: kitId }, { $set: data });
+    // Update items' kit_status
+    if (itemsToAdd.length > 0 || itemsToRemove.length > 0) {
+      const addPromise = itemsToAdd.length
+        ? db
+            .collection("studio_inventory")
+            .updateMany(
+              {
+                _id: { $in: itemsToAdd.map((id: string) => new ObjectId(id)) },
+              },
+              { $set: { kit_status: kitId.toString() } }
+            )
+        : Promise.resolve();
 
-    if (updateResult.matchedCount === 0) {
+      const removePromise = itemsToRemove.length
+        ? db.collection("studio_inventory").updateMany(
+            {
+              _id: {
+                $in: itemsToRemove.map((id: string) => new ObjectId(id)),
+              },
+            },
+            { $set: { kit_status: null } }
+          )
+        : Promise.resolve();
+
+      await Promise.all([addPromise, removePromise]);
+    }
+
+    // Update the kit
+    const result = await db
+      .collection("kits")
+      .updateOne({ _id: kitId }, { $set: updateData });
+
+    if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Kit not found" }, { status: 404 });
     }
 
-    // Update items being added to the kit
-    if (itemsToAdd.length > 0) {
-      const addPromises = itemsToAdd.map((itemId: string) =>
-        db.collection("studio_inventory").updateOne(
-          { _id: new ObjectId(itemId) },
-          {
-            $set: {
-              current_kit_id: params.id,
-              is_available: true,
-              kit_status: "in-kit",
-            },
-          }
-        )
-      );
-
-      await Promise.all(addPromises);
-    }
-
-    // Update items being removed from the kit
-    if (itemsToRemove.length > 0) {
-      const removePromises = itemsToRemove.map((itemId: string) =>
-        db.collection("studio_inventory").updateOne(
-          { _id: new ObjectId(itemId), current_kit_id: params.id },
-          {
-            $set: {
-              is_available: true,
-              kit_status: null,
-            },
-            $unset: { current_kit_id: "" },
-          }
-        )
-      );
-
-      await Promise.all(removePromises);
-    }
-
-    return NextResponse.json({
-      id: params.id,
-      ...data,
-    });
+    return NextResponse.json({ success: true, id: kitId.toString() });
   } catch (error) {
     console.error("Error updating kit:", error);
     return NextResponse.json(
@@ -255,11 +241,12 @@ export async function PUT(
 }
 
 // DELETE a kit
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const client = await clientPromise;
     if (!client) {
       return NextResponse.json(
@@ -272,7 +259,7 @@ export async function DELETE(
     // Validate ObjectId
     let kitId;
     try {
-      kitId = new ObjectId(params.id);
+      kitId = new ObjectId(id);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid kit ID format" },
@@ -280,39 +267,33 @@ export async function DELETE(
       );
     }
 
-    // Get the kit to find its items
+    // Get the kit to be deleted
     const kit = await db.collection("kits").findOne({ _id: kitId });
 
     if (!kit) {
       return NextResponse.json({ error: "Kit not found" }, { status: 404 });
     }
 
-    // Delete the kit
-    const deleteResult = await db.collection("kits").deleteOne({ _id: kitId });
+    // Remove kit_status from all items in the kit
+    if (kit.items && Array.isArray(kit.items)) {
+      await db.collection("studio_inventory").updateMany(
+        {
+          _id: {
+            $in: kit.items.map((id: string) => new ObjectId(id)),
+          },
+        },
+        { $set: { kit_status: null } }
+      );
+    }
 
-    if (deleteResult.deletedCount === 0) {
+    // Delete the kit
+    const result = await db.collection("kits").deleteOne({ _id: kitId });
+
+    if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Kit not found" }, { status: 404 });
     }
 
-    // Update all items that were part of this kit
-    if (kit.items && Array.isArray(kit.items)) {
-      const updatePromises = kit.items.map((itemId: string) =>
-        db.collection("studio_inventory").updateOne(
-          { _id: new ObjectId(itemId), current_kit_id: params.id },
-          {
-            $set: {
-              is_available: true,
-              kit_status: null,
-            },
-            $unset: { current_kit_id: "" },
-          }
-        )
-      );
-
-      await Promise.all(updatePromises);
-    }
-
-    return NextResponse.json({ id: params.id, deleted: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting kit:", error);
     return NextResponse.json(
@@ -320,4 +301,16 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+// OPTIONS for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }

@@ -1,5 +1,5 @@
 import { getDatabase } from "../src/lib/mongodb.js";
-import { db } from "../src/lib/firebase-admin.js";
+import { adminDb } from "../src/lib/firebase-admin.js";
 import { DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
 
 interface FirestoreUser {
@@ -22,7 +22,7 @@ async function migrateDeliverables() {
     );
 
     // Get all users from Firestore
-    const usersSnapshot = await db.collection("users").get();
+    const usersSnapshot = await adminDb.collection("users").get();
     const userMap = new Map<string, string>();
 
     usersSnapshot.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {

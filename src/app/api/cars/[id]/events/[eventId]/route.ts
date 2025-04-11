@@ -3,16 +3,20 @@ import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { EventModel } from "@/models/Event";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string; eventId: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/events/[eventId]
+    const eventId = segments[segments.length - 1]; // -1 for the eventId
+
     const db = await getDatabase();
     const eventModel = new EventModel(db);
-    const eventId = new ObjectId(params.eventId);
+    const eventObjectId = new ObjectId(eventId);
 
-    const success = await eventModel.delete(eventId);
+    const success = await eventModel.delete(eventObjectId);
 
     if (!success) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -22,20 +26,25 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting event:", error);
     return NextResponse.json(
-      { error: "Failed to delete event" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete event",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string; eventId: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/events/[eventId]
+    const eventId = segments[segments.length - 1]; // -1 for the eventId
+
     const db = await getDatabase();
     const eventModel = new EventModel(db);
-    const eventId = new ObjectId(params.eventId);
+    const eventObjectId = new ObjectId(eventId);
     const data = await request.json();
 
     console.log("Updating event with data:", data); // Debug log
@@ -57,7 +66,7 @@ export async function PUT(
 
     console.log("Mapped updates:", mappedUpdates); // Debug log
 
-    const success = await eventModel.update(eventId, mappedUpdates);
+    const success = await eventModel.update(eventObjectId, mappedUpdates);
 
     if (!success) {
       console.log("Event not found or update failed"); // Debug log
@@ -65,7 +74,7 @@ export async function PUT(
     }
 
     // Fetch the updated event to verify changes
-    const updatedEvent = await eventModel.findById(eventId);
+    const updatedEvent = await eventModel.findById(eventObjectId);
     console.log("Updated event:", updatedEvent); // Debug log
 
     return NextResponse.json({
@@ -75,8 +84,22 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating event:", error);
     return NextResponse.json(
-      { error: "Failed to update event" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to update event",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

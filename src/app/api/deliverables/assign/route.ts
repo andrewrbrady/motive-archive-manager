@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     // Handle assignment logic
     if (userId === null || userId === "unassigned") {
       // Explicitly unassigning
-      deliverable.firebase_uid = undefined;
+      deliverable.firebase_uid = "";
       deliverable.editor = "Unassigned";
       console.log("Unassigning deliverable:", deliverableId);
     } else if (userId) {
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
       } else {
         deliverable.editor = "Unassigned";
       }
-      deliverable.firebase_uid = undefined;
+      deliverable.firebase_uid = "";
     }
 
     console.log("Updating deliverable assignment:", {

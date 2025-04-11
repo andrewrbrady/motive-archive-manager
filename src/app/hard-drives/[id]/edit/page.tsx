@@ -43,7 +43,7 @@ interface LocationOption {
   type: string;
 }
 
-export default function HardDriveEditPage({ params }: HardDriveEditPageProps) {
+export default function HardDriveEditPage({ params }: any) {
   const router = useRouter();
   const [drive, setDrive] = useState<HardDriveData>({
     label: "",

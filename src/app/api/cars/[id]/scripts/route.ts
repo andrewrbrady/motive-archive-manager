@@ -38,31 +38,37 @@ const scriptSchema = z.object({
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const db = await getDatabase();
     const scripts = await db
       .collection("scripts")
-      .find({ carId: new ObjectId(params.id) })
+      .find({ carId: new ObjectId(id) })
       .toArray();
 
     return NextResponse.json(scripts);
   } catch (error) {
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get("fileId");
 
@@ -78,7 +84,7 @@ export async function DELETE(
     // Delete the script from MongoDB
     const result = await db
       .collection("scripts")
-      .deleteOne({ _id: new ObjectId(fileId), carId: new ObjectId(params.id) });
+      .deleteOne({ _id: new ObjectId(fileId), carId: new ObjectId(id) });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Script not found" }, { status: 404 });
@@ -86,19 +92,23 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting script:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to delete script" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const db = await getDatabase();
     const body = await request.json();
 
@@ -110,7 +120,7 @@ export async function POST(
 
     const result = await db.collection("scripts").insertOne({
       ...validatedData,
-      carId: new ObjectId(params.id),
+      carId: new ObjectId(id),
     });
 
     return NextResponse.json(
@@ -124,18 +134,23 @@ export async function POST(
         { status: 400 }
       );
     }
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const db = await getDatabase();
     const body = await request.json();
 
@@ -147,7 +162,7 @@ export async function PUT(
     const result = await db
       .collection("scripts")
       .updateOne(
-        { _id: new ObjectId(body._id), carId: new ObjectId(params.id) },
+        { _id: new ObjectId(body._id), carId: new ObjectId(id) },
         { $set: validatedData }
       );
 
@@ -166,9 +181,24 @@ export async function PUT(
         { status: 400 }
       );
     }
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, DELETE, POST, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

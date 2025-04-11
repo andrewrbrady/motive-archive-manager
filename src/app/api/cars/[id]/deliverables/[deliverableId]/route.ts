@@ -7,13 +7,16 @@ interface Car {
   deliverableIds: ObjectId[];
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string; deliverableId: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 for cars/[id]/deliverables/[deliverableId]
+    const deliverableId = segments[segments.length - 1]; // -1 for the deliverableId
+
     const db = await getDatabase();
-    const deliverableId = params.deliverableId;
 
     const data = await request.json();
     const { _id, car_id, ...updateData } = data;
@@ -38,20 +41,26 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating deliverable:", error);
     return NextResponse.json(
-      { error: "Failed to update deliverable" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update deliverable",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string; deliverableId: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 for cars/[id]/deliverables/[deliverableId]
+    const deliverableId = segments[segments.length - 1]; // -1 for the deliverableId
+
     const db = await getDatabase();
-    const carId = new ObjectId(params.id);
-    const deliverableId = params.deliverableId;
+    const carId = new ObjectId(id);
     const deliverableObjectId = new ObjectId(deliverableId);
 
     // Remove the deliverable
@@ -77,8 +86,24 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting deliverable:", error);
     return NextResponse.json(
-      { error: "Failed to delete deliverable" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete deliverable",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

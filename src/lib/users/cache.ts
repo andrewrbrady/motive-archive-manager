@@ -49,15 +49,31 @@ async function isOAuthUser(uid: string): Promise<boolean> {
 /**
  * Get all users from Firestore with caching
  */
-export async function getUsers(): Promise<FirestoreUser[]> {
+export async function getUsers(
+  creativeRole?: string,
+  forceRefresh: boolean = false
+): Promise<FirestoreUser[]> {
   const now = Date.now();
 
-  // Return cached users if available and not expired
-  if (userCache && lastFetchTime && now - lastFetchTime < CACHE_TTL) {
+  // Return cached users if available and not expired, unless forceRefresh is true
+  if (
+    !forceRefresh &&
+    userCache &&
+    lastFetchTime &&
+    now - lastFetchTime < CACHE_TTL
+  ) {
     logger.debug({
       message: "Returning cached users",
       count: userCache.length,
     });
+
+    // Filter by creative role if specified
+    if (creativeRole) {
+      return userCache.filter((user) =>
+        user.creativeRoles?.includes(creativeRole)
+      );
+    }
+
     return userCache;
   }
 
@@ -133,6 +149,13 @@ export async function getUsers(): Promise<FirestoreUser[]> {
     userCache = filteredUsers;
     lastFetchTime = now;
 
+    // Filter by creative role if specified
+    if (creativeRole) {
+      return filteredUsers.filter((user) =>
+        user.creativeRoles?.includes(creativeRole)
+      );
+    }
+
     return filteredUsers;
   } catch (error) {
     logger.error({
@@ -146,6 +169,14 @@ export async function getUsers(): Promise<FirestoreUser[]> {
         message: "Returning expired cached users due to error",
         count: userCache.length,
       });
+
+      // Filter by creative role if specified
+      if (creativeRole) {
+        return userCache.filter((user) =>
+          user.creativeRoles?.includes(creativeRole)
+        );
+      }
+
       return userCache;
     }
 

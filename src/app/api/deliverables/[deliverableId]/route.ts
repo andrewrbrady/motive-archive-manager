@@ -1,15 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { deliverableId: string } }
-) {
-  try {
-    const db = await getDatabase();
-    const deliverableId = params.deliverableId;
+export const dynamic = "force-dynamic";
 
+export async function GET(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const deliverableId = segments[segments.length - 1]; // /deliverables/[deliverableId]
+
+    // Validate ID format
     if (!ObjectId.isValid(deliverableId)) {
       return NextResponse.json(
         { error: "Invalid deliverable ID" },
@@ -17,9 +18,12 @@ export async function GET(
       );
     }
 
-    const deliverable = await db
-      .collection("deliverables")
-      .findOne({ _id: new ObjectId(deliverableId) });
+    const db = await getDatabase();
+
+    // Find deliverable by ID
+    const deliverable = await db.collection("deliverables").findOne({
+      _id: new ObjectId(deliverableId),
+    });
 
     if (!deliverable) {
       return NextResponse.json(
@@ -28,7 +32,15 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(deliverable);
+    // Return deliverable with string IDs
+    return NextResponse.json({
+      ...deliverable,
+      id: deliverable._id.toString(),
+      carId: deliverable.carId ? deliverable.carId.toString() : null,
+      assignedTo: deliverable.assignedTo
+        ? deliverable.assignedTo.toString()
+        : null,
+    });
   } catch (error) {
     console.error("Error fetching deliverable:", error);
     return NextResponse.json(
@@ -38,14 +50,13 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { deliverableId: string } }
-) {
+export async function PATCH(request: Request) {
   try {
-    const db = await getDatabase();
-    const deliverableId = params.deliverableId;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const deliverableId = segments[segments.length - 1];
 
+    // Validate ID format
     if (!ObjectId.isValid(deliverableId)) {
       return NextResponse.json(
         { error: "Invalid deliverable ID" },
@@ -53,49 +64,34 @@ export async function PATCH(
       );
     }
 
+    const db = await getDatabase();
     const data = await request.json();
 
-    // Only allow updating specific fields through this endpoint
-    // Primarily focused on status updates for dashboard view
-    const allowedFields = ["status"];
+    // Find and update deliverable
+    const result = await db.collection("deliverables").findOneAndUpdate(
+      { _id: new ObjectId(deliverableId) },
+      {
+        $set: {
+          ...data,
+          updatedAt: new Date(),
+        },
+      },
+      { returnDocument: "after" }
+    );
 
-    const updateFields: Record<string, any> = {
-      updated_at: new Date(),
-    };
-
-    // Only include allowed fields that are present in the request
-    for (const field of allowedFields) {
-      if (data[field] !== undefined) {
-        updateFields[field] = data[field];
-      }
-    }
-
-    // Validate status if it's being updated
-    if (
-      updateFields.status !== undefined &&
-      !["not_started", "in_progress", "done"].includes(updateFields.status)
-    ) {
-      return NextResponse.json(
-        { error: "Invalid status value" },
-        { status: 400 }
-      );
-    }
-
-    const result = await db
-      .collection("deliverables")
-      .updateOne({ _id: new ObjectId(deliverableId) }, { $set: updateFields });
-
-    if (result.matchedCount === 0) {
+    if (!result) {
       return NextResponse.json(
         { error: "Deliverable not found" },
         { status: 404 }
       );
     }
 
+    // Return updated deliverable with string IDs
     return NextResponse.json({
-      success: true,
-      message: "Deliverable updated successfully",
-      updatedFields: updateFields,
+      ...result,
+      id: result._id.toString(),
+      carId: result.carId ? result.carId.toString() : null,
+      assignedTo: result.assignedTo ? result.assignedTo.toString() : null,
     });
   } catch (error) {
     console.error("Error updating deliverable:", error);
@@ -104,4 +100,15 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

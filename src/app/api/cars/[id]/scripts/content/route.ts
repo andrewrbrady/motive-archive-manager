@@ -13,12 +13,13 @@ const s3 = new S3Client({
   },
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/scripts/content
+
+    const { searchParams } = url;
     const fileId = searchParams.get("fileId");
 
     if (!fileId) {
@@ -104,11 +105,12 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/scripts/content
+
     const body = await request.json();
     const {
       fileId,
@@ -133,7 +135,7 @@ export async function PUT(
 
     // Update the script in MongoDB
     const result = await db.collection("scripts").findOneAndUpdate(
-      { _id: new ObjectId(fileId), carId: new ObjectId(params.id) },
+      { _id: new ObjectId(fileId), carId: new ObjectId(id) },
       {
         $set: {
           content,
@@ -162,4 +164,15 @@ export async function PUT(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

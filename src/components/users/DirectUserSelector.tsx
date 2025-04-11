@@ -19,17 +19,27 @@ import { LoadingSpinner } from "@/components/ui/loading";
 interface DirectUserSelectorProps {
   value: string | null;
   onChange: (userId: string | null) => void;
+  onUserInfoRetrieved?: (username: string | null) => void;
   showAvatar?: boolean;
   editorName?: string;
   className?: string;
+  label?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  allowUnassign?: boolean;
 }
 
 function DirectUserSelector({
   value,
   onChange,
+  onUserInfoRetrieved,
   showAvatar = false,
   editorName,
   className,
+  label,
+  placeholder = "Select user",
+  disabled = false,
+  allowUnassign = false,
 }: DirectUserSelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -172,6 +182,7 @@ function DirectUserSelector({
 
     // Notify parent
     onChange(userId);
+    onUserInfoRetrieved?.(userName);
   };
 
   // Handle unassign
@@ -187,6 +198,7 @@ function DirectUserSelector({
 
     // Notify parent
     onChange(null);
+    onUserInfoRetrieved?.(null);
   };
 
   return (
@@ -197,16 +209,12 @@ function DirectUserSelector({
           role="combobox"
           aria-expanded={open}
           className={`w-full justify-between ${className} transition-all duration-200`}
+          disabled={disabled}
         >
-          {loading && users.length === 0 ? (
-            <div className="flex items-center gap-2">
-              <LoadingSpinner className="h-3 w-3" />
-              <span>Loading...</span>
-            </div>
-          ) : selectedUserId ? (
+          {selectedUserId ? (
             <div className="flex items-center gap-2">
               {showAvatar && (
-                <Avatar className="h-5 w-5">
+                <Avatar className="h-6 w-6">
                   <AvatarImage
                     src={
                       users.find((u) => u.uid === selectedUserId)
@@ -214,27 +222,28 @@ function DirectUserSelector({
                     }
                     alt={selectedUserName || ""}
                   />
-                  <AvatarFallback className="text-[10px]">
-                    {getInitials(selectedUserName || "")}
+                  <AvatarFallback>
+                    {selectedUserName
+                      ? getInitials(selectedUserName)
+                      : "Unknown"}
                   </AvatarFallback>
                 </Avatar>
               )}
               <span className="truncate">{selectedUserName}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>Unassigned</span>
-            </div>
+            <span className="text-muted-foreground">{placeholder}</span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="p-0 w-[220px] bg-background border shadow-md"
-        align="start"
-      >
-        <div className="flex flex-col">
-          <div className="p-2 bg-background">
+      <PopoverContent className="w-[300px] p-0" align="start">
+        <div className="flex flex-col gap-1 p-2">
+          {label && (
+            <div className="px-2 py-1.5">
+              <h3 className="text-sm font-medium">{label}</h3>
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-2">
             <Input
               placeholder="Search users..."
               value={search}
@@ -242,45 +251,58 @@ function DirectUserSelector({
               className="h-8"
             />
           </div>
-          <div className="border-t max-h-[300px] overflow-y-auto bg-background">
-            <button
-              className="w-full flex items-center gap-2 p-2 hover:bg-accent transition-colors bg-background"
+          {allowUnassign && (
+            <Button
+              variant="ghost"
+              className="flex w-full items-center justify-between px-2 py-1.5"
               onClick={handleClearSelection}
             >
-              <div className="w-5 h-5 flex items-center justify-center text-muted-foreground">
+              <div className="flex items-center gap-2">
                 <UserMinus className="h-4 w-4" />
+                <span>Unassign</span>
               </div>
-              <span>Unassigned</span>
-              {selectedUserId === null && <Check className="ml-auto h-4 w-4" />}
-            </button>
-            {filteredUsers.map((user) => (
-              <button
-                key={user.uid}
-                className={cn(
-                  "w-full flex items-center gap-2 p-2 hover:bg-accent transition-colors",
-                  user.uid === selectedUserId ? "bg-accent" : "bg-background"
-                )}
-                onClick={() => handleSelectUser(user.uid, user.name)}
-              >
-                <Avatar className="h-5 w-5">
-                  <AvatarImage
-                    src={user.profileImage || user.image || ""}
-                    alt={user.name}
-                  />
-                  <AvatarFallback className="text-[10px]">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate">{user.name}</span>
-                {user.uid === selectedUserId && (
-                  <Check className="ml-auto h-4 w-4" />
-                )}
-              </button>
-            ))}
-            {filteredUsers.length === 0 && (
-              <div className="text-center p-2 text-muted-foreground text-sm bg-background">
-                No users found
+              {!selectedUserId && <Check className="h-4 w-4" />}
+            </Button>
+          )}
+          <div className="max-h-[300px] overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-4">
+                <LoadingSpinner />
               </div>
+            ) : (
+              filteredUsers.map((user) => (
+                <Button
+                  key={user.uid}
+                  variant="ghost"
+                  className="flex w-full items-center justify-between px-2 py-1.5"
+                  onClick={() => handleSelectUser(user.uid, user.name)}
+                >
+                  <div className="flex items-center gap-2">
+                    {showAvatar ? (
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage
+                          src={user.profileImage || ""}
+                          alt={user.name}
+                        />
+                        <AvatarFallback>
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <User className="h-4 w-4" />
+                    )}
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm">{user.name}</span>
+                      {user.email && (
+                        <span className="text-xs text-muted-foreground">
+                          {user.email}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {selectedUserId === user.uid && <Check className="h-4 w-4" />}
+                </Button>
+              ))
             )}
           </div>
         </div>
