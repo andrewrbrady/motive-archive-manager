@@ -116,6 +116,7 @@ export function ImageGalleryWithQuery({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLoadingRef = useRef(false);
   const isMountedRef = useRef(true);
+  const loadedImageDetailsRef = useRef(new Set<string>());
 
   // Cleanup on unmount
   useEffect(() => {
@@ -123,6 +124,19 @@ export function ImageGalleryWithQuery({
       isMountedRef.current = false;
     };
   }, []);
+
+  const handleImageError = useCallback(
+    (imageId: string) => {
+      if (!isMountedRef.current) return;
+      console.error(`Failed to load image: ${imageId}`);
+      setLoadedImages((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(imageId);
+        return newSet;
+      });
+    },
+    [isMountedRef]
+  );
 
   // Memoized values
   const currentImageId = useMemo(() => {
@@ -143,7 +157,8 @@ export function ImageGalleryWithQuery({
         !imageId ||
         !isMountedRef.current ||
         isLoadingRef.current ||
-        loadingImageIds.has(imageId)
+        loadingImageIds.has(imageId) ||
+        loadedImageDetailsRef.current.has(imageId)
       )
         return;
 
@@ -158,9 +173,11 @@ export function ImageGalleryWithQuery({
           const imageData = await response.json();
           if (!isMountedRef.current) return;
 
+          // Update the query data without triggering a refetch
           queryClient.setQueryData(
             ["carImages", carId],
             (oldData: any[] = []) => {
+              if (!Array.isArray(oldData)) return oldData;
               return oldData.map((img) =>
                 img._id === imageId || img.id === imageId
                   ? {
@@ -174,6 +191,9 @@ export function ImageGalleryWithQuery({
               );
             }
           );
+
+          // Mark this image as having its details loaded
+          loadedImageDetailsRef.current.add(imageId);
         }
       } catch (error) {
         console.error(`Failed to load image details for ${imageId}:`, error);
@@ -196,14 +216,22 @@ export function ImageGalleryWithQuery({
     if (!images || images.length === 0 || !isMountedRef.current) return;
 
     const imagesToLoad = images
-      .filter((img: ExtendedImageType) => !img.url && (img._id || img.id))
+      .filter(
+        (img: ExtendedImageType) =>
+          !img.url &&
+          (img._id || img.id) &&
+          !loadedImageDetailsRef.current.has(img._id || img.id)
+      )
       .slice(0, 5);
 
-    imagesToLoad.forEach((img: ExtendedImageType) => {
-      if (isMountedRef.current) {
-        loadImageDetails(img._id || img.id);
-      }
-    });
+    // Use Promise.all to load images in parallel and prevent multiple state updates
+    Promise.all(
+      imagesToLoad.map((img: ExtendedImageType) => {
+        if (isMountedRef.current) {
+          return loadImageDetails(img._id || img.id);
+        }
+      })
+    ).catch(console.error);
   }, [images, loadImageDetails]);
 
   // Load current image if needed
@@ -215,7 +243,12 @@ export function ImageGalleryWithQuery({
         img.id === currentImageId || img._id === currentImageId
     );
 
-    if (currentImage && !currentImage.url && isMountedRef.current) {
+    if (
+      currentImage &&
+      !currentImage.url &&
+      isMountedRef.current &&
+      !loadedImageDetailsRef.current.has(currentImageId)
+    ) {
       loadImageDetails(currentImageId);
     }
   }, [currentImageId, images, loadImageDetails]);
@@ -874,7 +907,7 @@ export function ImageGalleryWithQuery({
               }}
             >
               <Image
-                src={`${currentImage.url.replace(/\/public$/, "")}/public`}
+                src={currentImage.url}
                 alt={
                   currentImage.metadata?.description || `Image ${mainIndex + 1}`
                 }
@@ -889,6 +922,7 @@ export function ImageGalleryWithQuery({
                 sizes="66vw"
                 priority
                 onLoad={() => handleImageLoad(currentImage.id)}
+                onError={() => handleImageError(currentImage.id)}
               />
             </div>
           )}
@@ -926,61 +960,6 @@ export function ImageGalleryWithQuery({
                 {currentImage.metadata.description}
               </div>
             )}
-
-            <table className="w-full border-separate border-spacing-y-2">
-              <tbody>
-                <tr>
-                  <td className="text-muted-foreground font-medium w-24">
-                    Filename:
-                  </td>
-                  <td className="flex justify-between">
-                    <span className="truncate">{currentImage.filename}</span>
-                    <button
-                      onClick={() =>
-                        handleCopy(currentImage.filename || "", "filename")
-                      }
-                      className="text-xs flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-muted hover:bg-muted/80"
-                    >
-                      {copiedField === "filename" ? (
-                        <>
-                          <Check className="h-3 w-3" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </td>
-                </tr>
-                {currentImage.url && (
-                  <tr>
-                    <td className="text-muted-foreground font-medium">URL:</td>
-                    <td className="flex justify-between">
-                      <span className="truncate">{currentImage.url}</span>
-                      <button
-                        onClick={() => handleCopy(currentImage.url, "url")}
-                        className="text-xs flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-muted hover:bg-muted/80"
-                      >
-                        {copiedField === "url" ? (
-                          <>
-                            <Check className="h-3 w-3" />
-                            <span>Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         )}
       </div>

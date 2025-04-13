@@ -9,7 +9,7 @@ export const env = {
   baseUrl:
     process.env.NEXTAUTH_URL ||
     (process.env.NODE_ENV === "development"
-      ? "http://localhost:3000"
+      ? "http://localhost:3001"
       : process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : undefined),

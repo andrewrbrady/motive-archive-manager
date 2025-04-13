@@ -283,7 +283,7 @@ async function regenerateEmbedding(doc: any): Promise<void> {
       try {
         // Construct proper URL with origin for server-side fetch
         const origin =
-          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
         const url = new URL(`/api/research/content`, origin);
         url.searchParams.append("fileId", doc._id.toString());
 

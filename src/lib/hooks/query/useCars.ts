@@ -71,6 +71,12 @@ export function useCars(params: CarsQueryParams = {}) {
         currentPage: page,
       };
     },
+    // Add caching configuration
+    staleTime: 1000 * 60 * 5, // Data stays fresh for 5 minutes
+    gcTime: 1000 * 60 * 30, // Cache persists for 30 minutes
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnMount: false, // Prevent refetch on component mount
+    retry: 2, // Only retry failed requests twice
   });
 }
 

@@ -69,33 +69,14 @@ export function useCarImages(carId: string) {
     queryKey: ["carImages", carId],
     queryFn: async () => {
       try {
-        console.log(`Fetching images for car: ${carId}`);
-
         // Use only the dedicated images endpoint with pagination
         const response = await fetch(`/api/cars/${carId}/images?limit=500`);
 
         if (!response.ok) {
-          console.error(
-            `Images endpoint failed with status: ${response.status}`
-          );
-
-          // Log the error response body if available
-          try {
-            const errorData = await response.json();
-            console.error("Error response:", errorData);
-          } catch (e) {
-            console.error("Could not parse error response");
-          }
-
           throw new Error(`Failed to fetch images: ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log(`Images endpoint response:`, {
-          imageCount: data.images?.length || 0,
-          pagination: data.pagination,
-          firstImageId: data.images?.[0]?.id || "none",
-        });
 
         // If we have images from the images endpoint, return them
         if (
@@ -110,32 +91,26 @@ export function useCarImages(carId: string) {
           }));
         }
 
-        // Handle empty array case - could be legitimate, just log it
+        // Handle empty array case
         if (
           data.images &&
           Array.isArray(data.images) &&
           data.images.length === 0
         ) {
-          console.log(
-            "API returned empty images array - possibly no images available for this car"
-          );
           return [];
         }
 
         // No images found or response structure was incorrect
-        console.log("No valid images found in response:", data);
         return [];
       } catch (error) {
         console.error("Error fetching car images:", error);
-
-        // Return empty array on error rather than throwing
         return [];
       }
     },
     refetchOnWindowFocus: false,
-    // Add stale time and cache time for better performance
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnMount: false,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 

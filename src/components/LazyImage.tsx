@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ImageIcon } from "lucide-react";
 
 interface LazyImageProps {
   src: string;
@@ -31,8 +32,8 @@ const LazyImage: React.FC<LazyImageProps> = ({
   onClick,
 }) => {
   const [loading, setLoading] = useState(true);
-  const [imgSrc, setImgSrc] = useState(src || placeholderSrc || "");
   const [error, setError] = useState(false);
+  const [imgSrc, setImgSrc] = useState(src || placeholderSrc || "");
 
   useEffect(() => {
     setImgSrc(src || placeholderSrc || "");
@@ -42,50 +43,62 @@ const LazyImage: React.FC<LazyImageProps> = ({
 
   const handleLoad = () => {
     setLoading(false);
+    setError(false);
   };
 
   const handleError = () => {
     setError(true);
     setLoading(false);
-    // Use a default placeholder for errors
-    setImgSrc("/images/placeholder.jpg");
+    // Don't set a placeholder image URL here, render a fallback component instead
   };
 
-  const renderImage = () => (
-    <Image
-      src={imgSrc}
-      alt={alt}
-      width={width}
-      height={height}
-      quality={quality}
-      priority={priority}
-      onLoad={handleLoad}
-      onError={handleError}
-      className={cn(
-        "transition-opacity duration-300",
-        loading ? "opacity-0" : "opacity-100",
-        className
-      )}
-      style={{ objectFit }}
-      onClick={onClick}
-    />
-  );
-
-  const renderSkeleton = () => (
-    <Skeleton
-      className={cn(
-        "rounded-md transition-opacity duration-300",
-        loading ? "opacity-100" : "opacity-0",
-        className
-      )}
-      style={{ width, height }}
-    />
-  );
+  if (error) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-center bg-muted rounded-md",
+          className
+        )}
+        style={{ width, height }}
+        onClick={onClick}
+      >
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <ImageIcon className="w-8 h-8" />
+          <span className="text-xs">Failed to load image</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={cn("relative", className)} style={{ width, height }}>
-      {loadingVariant === "skeleton" && loading && renderSkeleton()}
-      {renderImage()}
+    <div
+      className={cn("relative", className)}
+      style={{ width, height }}
+      onClick={onClick}
+    >
+      {loadingVariant === "skeleton" && loading && (
+        <Skeleton
+          className={cn(
+            "absolute inset-0 rounded-md",
+            loading ? "opacity-100" : "opacity-0"
+          )}
+        />
+      )}
+      <Image
+        src={imgSrc}
+        alt={alt}
+        width={width}
+        height={height}
+        quality={quality}
+        priority={priority}
+        onLoad={handleLoad}
+        onError={handleError}
+        className={cn(
+          "rounded-md transition-opacity duration-300",
+          loading ? "opacity-0" : "opacity-100",
+          objectFit === "contain" ? "object-contain" : "object-cover"
+        )}
+      />
     </div>
   );
 };

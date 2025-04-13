@@ -13,7 +13,7 @@ const nextConfig = {
         hostname: "**",
       },
     ],
-    domains: ["localhost"],
+    domains: ["localhost", "imagedelivery.net"],
   },
   // Add webpack configuration for Node.js modules
   webpack: (config, { isServer }) => {
@@ -31,8 +31,14 @@ const nextConfig = {
     }
     return config;
   },
-  // Remove middleware settings that might be interfering
-  // These will be handled by Vercel automatically
+  // Set server port
+  serverRuntimeConfig: {
+    port: 3001,
+  },
+  // Set public runtime config
+  publicRuntimeConfig: {
+    port: 3001,
+  },
 };
 
 export default nextConfig;

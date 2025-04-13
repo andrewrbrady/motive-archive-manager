@@ -225,25 +225,32 @@ export function getFormattedImageUrl(
   variant: string = "public"
 ): string {
   if (!url) {
-    console.warn("Empty URL passed to getFormattedImageUrl");
     return ""; // Return empty string for null/undefined URLs
   }
 
   try {
-    // Clean any existing variants and trailing slashes
-    const baseUrl = url.replace(/\/(public|thumbnail|avatar)(\/)?$/, "");
-
-    // Ensure the URL is properly formed for Cloudflare Images
-    if (!baseUrl.includes("imagedelivery.net")) {
-      console.warn("Non-Cloudflare image URL detected:", url);
+    // Check if it's a Cloudflare Images URL
+    if (!url.includes("imagedelivery.net")) {
       return url; // Return as-is if not a Cloudflare URL
     }
 
-    // Always use "public" variant as it's the most reliable
-    return `${baseUrl}/public`;
+    // Remove any existing variant and trailing slashes
+    const baseUrl = url.replace(
+      /\/(public|thumbnail|avatar|medium|large)(\/)?$/,
+      ""
+    );
+
+    // Ensure the URL is properly formed
+    if (!baseUrl.match(/^https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+$/)) {
+      console.error("[Cloudflare] Malformed image URL:", url);
+      return url;
+    }
+
+    // Add the requested variant
+    return `${baseUrl}/${variant}`;
   } catch (error) {
-    console.error("Error formatting image URL:", error);
-    return url || ""; // Return original URL if there's an error
+    console.error("[Cloudflare] Error formatting image URL:", error);
+    return url;
   }
 }
 

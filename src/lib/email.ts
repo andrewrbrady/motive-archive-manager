@@ -53,7 +53,7 @@ export async function sendPasswordResetEmail(
   const baseUrl =
     process.env.NODE_ENV === "production"
       ? process.env.NEXT_PUBLIC_BASE_URL || "https://yourdomain.com"
-      : "http://localhost:3000";
+      : "http://localhost:3001";
 
   // Create the reset link
   const resetLink = `${baseUrl}/auth/reset-password?token=${resetToken}`;

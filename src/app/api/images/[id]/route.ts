@@ -39,18 +39,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Image not found" }, { status: 404 });
     }
 
-    // Return the Cloudflare image URL in a JSON response
-    const imageUrl = getFormattedImageUrl(image.url);
-    return NextResponse.json({
-      _id: image._id.toString(),
+    // Format the image URL with appropriate variant based on metadata
+    const variant = determineImageVariant(image);
+    const imageUrl = getFormattedImageUrl(image.url, variant);
+
+    // Return the formatted response with cache headers
+    return createStaticResponse({
+      id: image._id.toString(),
       cloudflareId: image.cloudflareId,
       url: imageUrl,
       filename: image.filename,
-      metadata: image.metadata,
+      metadata: image.metadata || {},
       carId: image.carId.toString(),
       createdAt: image.createdAt,
       updatedAt: image.updatedAt,
       category: determineImageCategory(image),
+      variant,
     });
   } catch (error) {
     console.error("Error:", error);
@@ -61,7 +65,31 @@ export async function GET(request: Request) {
       },
       { status: 500 }
     );
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
+}
+
+/**
+ * Helper function to determine image variant based on metadata and context
+ */
+function determineImageVariant(image: any): string {
+  const metadata = image.metadata || {};
+
+  // Use thumbnail for small preview images
+  if (metadata.isPreview || metadata.isThumbnail) {
+    return "thumbnail";
+  }
+
+  // Use medium for gallery views
+  if (metadata.isGallery) {
+    return "medium";
+  }
+
+  // Default to public variant for full-size images
+  return "public";
 }
 
 /**

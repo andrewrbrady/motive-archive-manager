@@ -47,14 +47,14 @@ export function getBaseUrl(): string {
     process.env.VERCEL_ENV === "development" ||
     process.env.NODE_ENV === "development"
   ) {
-    return "http://localhost:3000";
+    return "http://localhost:3001";
   }
   // Fallback to NEXT_PUBLIC_BASE_URL if available
   if (process.env.NEXT_PUBLIC_BASE_URL) {
     return process.env.NEXT_PUBLIC_BASE_URL;
   }
   // Final fallback
-  return "http://localhost:3000";
+  return "http://localhost:3001";
 }
 
 export function getApiUrl(path: string): string {
@@ -99,19 +99,13 @@ export function getApiUrl(path: string): string {
  * @param date The date to format
  * @returns Formatted date string
  */
-export function formatDate(date: Date | string | number | undefined): string {
-  if (!date) return "";
-
-  const dateObj = date instanceof Date ? date : new Date(date);
-
-  // Check if the date is valid
-  if (isNaN(dateObj.getTime())) return "";
-
-  // Format: Month Day, Year
-  return dateObj.toLocaleDateString("en-US", {
+export function formatDate(date: string | number | Date): string {
+  return new Date(date).toLocaleDateString("en-US", {
+    year: "numeric",
     month: "short",
     day: "numeric",
-    year: "numeric",
+    hour: "numeric",
+    minute: "numeric",
   });
 }
 
