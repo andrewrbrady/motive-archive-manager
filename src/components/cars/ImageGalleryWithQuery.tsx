@@ -80,6 +80,7 @@ export function ImageGalleryWithQuery({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // URL-based state
   const isEditMode = searchParams?.get("mode") === "edit";
@@ -88,7 +89,6 @@ export function ImageGalleryWithQuery({
   // React Query hooks
   const { data: images = [], isLoading, error, refetch } = useCarImages(carId);
   const uploadMutation = useUploadImages(carId, vehicleInfo);
-  const queryClient = useQueryClient();
   const deleteMutation = useDeleteImages(carId, queryClient);
   const setPrimaryMutation = useSetPrimaryImage(carId);
 
@@ -105,49 +105,85 @@ export function ImageGalleryWithQuery({
   const [copiedField, setCopiedField] = useState<"filename" | "url" | null>(
     null
   );
-
-  // UI state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const itemsPerPage = 15; // 3 columns x 5 rows for thumbnails
-
-  const currentImageId = searchParams?.get("image") || images[0]?.id;
-  const primaryImageId = images.find(
-    (img: ExtendedImageType) => img.id === currentImageId
-  )?.id;
-
-  // Add state to track image loading
   const [loadingImageIds, setLoadingImageIds] = useState<Set<string>>(
     new Set()
   );
-
-  // Add state for upload progress
   const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
   const [showUploadProgress, setShowUploadProgress] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Add function to load image details
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isLoadingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const loadedImageDetailsRef = useRef(new Set<string>());
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const handleImageError = useCallback(
+    (imageId: string) => {
+      if (!isMountedRef.current) return;
+      console.error(`Failed to load image: ${imageId}`);
+      setLoadedImages((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(imageId);
+        return newSet;
+      });
+    },
+    [isMountedRef]
+  );
+
+  // Memoized values
+  const currentImageId = useMemo(() => {
+    return searchParams?.get("image") || images[0]?.id;
+  }, [searchParams, images]);
+
+  const primaryImageId = useMemo(() => {
+    return images.find((img: ExtendedImageType) => img.id === currentImageId)
+      ?.id;
+  }, [images, currentImageId]);
+
+  const itemsPerPage = 15; // 3 columns x 5 rows for thumbnails
+
+  // Memoized callbacks
   const loadImageDetails = useCallback(
     async (imageId: string) => {
-      if (!imageId || loadingImageIds.has(imageId)) return;
+      if (
+        !imageId ||
+        !isMountedRef.current ||
+        isLoadingRef.current ||
+        loadingImageIds.has(imageId) ||
+        loadedImageDetailsRef.current.has(imageId)
+      )
+        return;
 
       try {
+        isLoadingRef.current = true;
         setLoadingImageIds((prev) => new Set([...prev, imageId]));
+
         const response = await fetch(`/api/images/${imageId}`);
+        if (!isMountedRef.current) return;
 
         if (response.ok) {
           const imageData = await response.json();
+          if (!isMountedRef.current) return;
 
-          // Update the images array with the loaded image data
+          // Update the query data without triggering a refetch
           queryClient.setQueryData(
             ["carImages", carId],
             (oldData: any[] = []) => {
+              if (!Array.isArray(oldData)) return oldData;
               return oldData.map((img) =>
                 img._id === imageId || img.id === imageId
                   ? {
                       ...img,
                       ...imageData,
                       url: getFormattedImageUrl(imageData.url),
-                      // Ensure both id formats
                       id: imageData.id || imageData._id,
                       _id: imageData._id || imageData.id,
                     }
@@ -155,46 +191,65 @@ export function ImageGalleryWithQuery({
               );
             }
           );
+
+          // Mark this image as having its details loaded
+          loadedImageDetailsRef.current.add(imageId);
         }
       } catch (error) {
         console.error(`Failed to load image details for ${imageId}:`, error);
       } finally {
-        setLoadingImageIds((prev) => {
-          const newSet = new Set([...prev]);
-          newSet.delete(imageId);
-          return newSet;
-        });
+        if (isMountedRef.current) {
+          isLoadingRef.current = false;
+          setLoadingImageIds((prev) => {
+            const newSet = new Set([...prev]);
+            newSet.delete(imageId);
+            return newSet;
+          });
+        }
       }
     },
-    [carId, loadingImageIds, queryClient]
+    [carId, queryClient]
   );
 
-  // Load image details for images with empty URLs
+  // Load initial images
   useEffect(() => {
-    if (!images || images.length === 0) return;
+    if (!images || images.length === 0 || !isMountedRef.current) return;
 
-    // Find images with empty URLs that need to be loaded
-    const imagesToLoad = images.filter(
-      (img: ExtendedImageType) => !img.url && (img._id || img.id)
-    );
+    const imagesToLoad = images
+      .filter(
+        (img: ExtendedImageType) =>
+          !img.url &&
+          (img._id || img.id) &&
+          !loadedImageDetailsRef.current.has(img._id || img.id)
+      )
+      .slice(0, 5);
 
-    // Load the first few images to avoid too many requests at once
-    const initialBatch = imagesToLoad.slice(0, 5);
-    initialBatch.forEach((img: ExtendedImageType) =>
-      loadImageDetails(img._id || img.id)
-    );
+    // Use Promise.all to load images in parallel and prevent multiple state updates
+    Promise.all(
+      imagesToLoad.map((img: ExtendedImageType) => {
+        if (isMountedRef.current) {
+          return loadImageDetails(img._id || img.id);
+        }
+      })
+    ).catch(console.error);
   }, [images, loadImageDetails]);
 
-  // When showing an image, ensure it's loaded
+  // Load current image if needed
   useEffect(() => {
-    if (currentImageId && images.length > 0) {
-      const currentImage = images.find(
-        (img: ExtendedImageType) =>
-          img.id === currentImageId || img._id === currentImageId
-      );
-      if (currentImage && !currentImage.url) {
-        loadImageDetails(currentImageId);
-      }
+    if (!currentImageId || !images.length || !isMountedRef.current) return;
+
+    const currentImage = images.find(
+      (img: ExtendedImageType) =>
+        img.id === currentImageId || img._id === currentImageId
+    );
+
+    if (
+      currentImage &&
+      !currentImage.url &&
+      isMountedRef.current &&
+      !loadedImageDetailsRef.current.has(currentImageId)
+    ) {
+      loadImageDetails(currentImageId);
     }
   }, [currentImageId, images, loadImageDetails]);
 
@@ -208,33 +263,35 @@ export function ImageGalleryWithQuery({
 
   // Extract filter options from images
   useEffect(() => {
-    if (images.length > 0) {
-      const options = {
-        angles: new Set<string>(),
-        views: new Set<string>(),
-        movements: new Set<string>(),
-        tods: new Set<string>(),
-        sides: new Set<string>(),
-      };
+    if (!images.length || !isMountedRef.current) return;
 
-      images.forEach((image: ExtendedImageType) => {
-        const { metadata } = image;
-        if (metadata?.angle?.trim()) options.angles.add(metadata.angle.trim());
-        if (metadata?.view?.trim()) options.views.add(metadata.view.trim());
-        if (metadata?.movement?.trim())
-          options.movements.add(metadata.movement.trim());
-        if (metadata?.tod?.trim()) options.tods.add(metadata.tod.trim());
-        if (metadata?.side?.trim()) options.sides.add(metadata.side.trim());
-      });
+    const options = {
+      angles: new Set<string>(),
+      views: new Set<string>(),
+      movements: new Set<string>(),
+      tods: new Set<string>(),
+      sides: new Set<string>(),
+    };
 
-      const newFilterOptions = {
-        angles: Array.from(options.angles).sort(),
-        views: Array.from(options.views).sort(),
-        movements: Array.from(options.movements).sort(),
-        tods: Array.from(options.tods).sort(),
-        sides: Array.from(options.sides).sort(),
-      };
+    images.forEach((image: ExtendedImageType) => {
+      const { metadata } = image;
+      if (metadata?.angle?.trim()) options.angles.add(metadata.angle.trim());
+      if (metadata?.view?.trim()) options.views.add(metadata.view.trim());
+      if (metadata?.movement?.trim())
+        options.movements.add(metadata.movement.trim());
+      if (metadata?.tod?.trim()) options.tods.add(metadata.tod.trim());
+      if (metadata?.side?.trim()) options.sides.add(metadata.side.trim());
+    });
 
+    const newFilterOptions = {
+      angles: Array.from(options.angles).sort(),
+      views: Array.from(options.views).sort(),
+      movements: Array.from(options.movements).sort(),
+      tods: Array.from(options.tods).sort(),
+      sides: Array.from(options.sides).sort(),
+    };
+
+    if (isMountedRef.current) {
       setFilterOptions(newFilterOptions);
       if (onFilterOptionsChange) {
         onFilterOptionsChange(newFilterOptions);
@@ -247,7 +304,7 @@ export function ImageGalleryWithQuery({
     return images.filter((image: ExtendedImageType) => {
       return Object.entries(filters).every(([key, value]) => {
         if (!value) return true;
-        return image.metadata[key as keyof typeof image.metadata] === value;
+        return image.metadata?.[key as keyof typeof image.metadata] === value;
       });
     });
   }, [images, filters]);
@@ -260,437 +317,309 @@ export function ImageGalleryWithQuery({
     return index >= 0 ? index : 0;
   }, [filteredImages, currentImageId]);
 
-  // Update URL when page changes
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-    const params = new URLSearchParams(searchParams?.toString() || "");
-    params.set("page", (newPage + 1).toString());
-    router.replace(`?${params.toString()}`, { scroll: false });
-  };
+  // Memoized handlers
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      if (!isMountedRef.current) return;
+      setCurrentPage(newPage);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", (newPage + 1).toString());
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router]
+  );
 
-  // Navigation handlers
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
+    if (!isMountedRef.current) return;
     const prevIndex =
       (mainIndex - 1 + filteredImages.length) % filteredImages.length;
     const targetPage = Math.floor(prevIndex / itemsPerPage);
 
-    // Update both page and image in URL
     const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("image", filteredImages[prevIndex].id);
     params.set("page", (targetPage + 1).toString());
     router.replace(`?${params.toString()}`, { scroll: false });
 
-    // Update local state
     setCurrentPage(targetPage);
-  };
+  }, [mainIndex, filteredImages, itemsPerPage, searchParams, router]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
+    if (!isMountedRef.current) return;
     const nextIndex = (mainIndex + 1) % filteredImages.length;
     const targetPage = Math.floor(nextIndex / itemsPerPage);
 
-    // Update both page and image in URL
     const params = new URLSearchParams(searchParams?.toString() || "");
     params.set("image", filteredImages[nextIndex].id);
     params.set("page", (targetPage + 1).toString());
     router.replace(`?${params.toString()}`, { scroll: false });
 
-    // Update local state
     setCurrentPage(targetPage);
-  };
+  }, [mainIndex, filteredImages, itemsPerPage, searchParams, router]);
 
-  // Set main image
-  const setMainImage = (imageId: string) => {
-    const imageIndex = filteredImages.findIndex(
-      (img: ExtendedImageType) => img.id === imageId
-    );
-    if (imageIndex >= 0) {
-      const targetPage = Math.floor(imageIndex / itemsPerPage);
+  const setMainImage = useCallback(
+    (imageId: string) => {
+      if (!isMountedRef.current) return;
+      const imageIndex = filteredImages.findIndex(
+        (img: ExtendedImageType) => img.id === imageId
+      );
+      if (imageIndex >= 0) {
+        const targetPage = Math.floor(imageIndex / itemsPerPage);
 
-      // Update both page and image in URL
-      const params = new URLSearchParams(searchParams?.toString() || "");
-      params.set("image", imageId);
-      params.set("page", (targetPage + 1).toString());
-      router.replace(`?${params.toString()}`, { scroll: false });
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.set("image", imageId);
+        params.set("page", (targetPage + 1).toString());
+        router.replace(`?${params.toString()}`, { scroll: false });
 
-      // Update local state
-      setCurrentPage(targetPage);
-    }
-  };
-
-  // Handle filter changes
-  const handleFilterChange = (type: string, value: string) => {
-    // Reset to first page when changing filters
-    handlePageChange(0);
-
-    setFilters((prev: FilterState) => {
-      const newFilters = { ...prev };
-      if (value === newFilters[type as keyof FilterState]) {
-        delete newFilters[type as keyof FilterState];
-      } else {
-        newFilters[type as keyof FilterState] = value;
+        setCurrentPage(targetPage);
       }
-      return newFilters;
-    });
-  };
+    },
+    [filteredImages, itemsPerPage, searchParams, router]
+  );
 
-  const handleResetFilters = () => {
-    // Reset to first page when clearing filters
+  const handleFilterChange = useCallback(
+    (type: string, value: string) => {
+      if (!isMountedRef.current) return;
+      handlePageChange(0);
+
+      setFilters((prev: FilterState) => {
+        const newFilters = { ...prev };
+        if (value === newFilters[type as keyof FilterState]) {
+          delete newFilters[type as keyof FilterState];
+        } else {
+          newFilters[type as keyof FilterState] = value;
+        }
+        return newFilters;
+      });
+    },
+    [handlePageChange]
+  );
+
+  const handleResetFilters = useCallback(() => {
+    if (!isMountedRef.current) return;
     handlePageChange(0);
     setFilters({});
-  };
+  }, [handlePageChange]);
 
-  // URL update helpers
-  const updateUrl = (updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams?.toString() || "");
+  const updateUrl = useCallback(
+    (updates: Record<string, string | null>) => {
+      if (!isMountedRef.current) return;
+      const params = new URLSearchParams(searchParams?.toString() || "");
 
-    // First, remove any irrelevant parameters
-    const irrelevantParams = ["page", "pageSize", "view", "edit", "search"];
-    irrelevantParams.forEach((param) => params.delete(param));
+      const irrelevantParams = ["page", "pageSize", "view", "edit", "search"];
+      irrelevantParams.forEach((param) => params.delete(param));
 
-    // Then update with our gallery-specific parameters
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null) {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
 
-    // Only include the query string if we have parameters
-    const queryString = params.toString();
-    const newUrl = queryString ? `?${queryString}` : window.location.pathname;
+      const queryString = params.toString();
+      const newUrl = queryString ? `?${queryString}` : window.location.pathname;
 
-    router.replace(newUrl, { scroll: false });
-  };
+      router.replace(newUrl, { scroll: false });
+    },
+    [searchParams, router]
+  );
 
-  const toggleEditMode = () => {
-    console.log(
-      `Toggling mode from ${isEditMode ? "edit" : "view"} to ${
-        isEditMode ? "view" : "edit"
-      }`
-    );
-
-    // Update the URL to change the mode
+  const toggleEditMode = useCallback(() => {
+    if (!isMountedRef.current) return;
     updateUrl({ mode: isEditMode ? null : "edit" });
-  };
+  }, [isEditMode, updateUrl]);
 
-  // Add a helper function for showing toasts at the top of the file
-  const showToast = (
-    toast: any,
-    title: string,
-    description: string,
-    duration = 2000,
-    variant?: "default" | "destructive"
-  ) => {
-    toast({
-      title,
-      description,
-      duration,
-      variant,
-    });
-  };
+  // Toast helper
+  const showToast = useCallback(
+    (
+      toast: any,
+      title: string,
+      description: string,
+      duration = 2000,
+      variant?: "default" | "destructive"
+    ) => {
+      if (!isMountedRef.current) return;
+      toast({
+        title,
+        description,
+        duration,
+        variant,
+      });
+    },
+    []
+  );
 
   // Handle delete selection using React Query mutation
-  const handleDeleteSelected = async () => {
-    // Convert Set to Array if needed
+  const handleDeleteSelected = useCallback(async () => {
+    if (!isMountedRef.current) return;
     const selectedArray = Array.from(selectedImages);
 
     if (selectedArray.length === 0) {
-      toast({
-        title: "Error",
-        description: "No images selected for deletion",
-        variant: "destructive",
-      });
+      showToast(toast, "Error", "No images selected", 2000, "destructive");
       return;
     }
 
-    // Create a unique toast ID for this operation
-    const toastId = `delete-${Date.now()}`;
-
     try {
-      // Show loading toast
-      showToast(
-        toast,
-        "Deleting images",
-        `Deleting ${selectedArray.length} image${
-          selectedArray.length > 1 ? "s" : ""
-        }`
-      );
-
-      console.log("Selected images:", selectedArray);
-      console.log("All images data:", images);
-
-      // For each selected image ID (which are cloudflareIds), find the full image object
-      const selectedImageObjects = selectedArray
-        .map((cloudflareId: string) => {
-          // Try to find the image by cloudflareId
-          return images.find(
-            (img: ExtendedImageType) =>
-              img.cloudflareId === cloudflareId || img.id === cloudflareId
-          );
-        })
-        .filter(Boolean); // Filter out any undefined values
-
-      console.log("Selected image objects:", selectedImageObjects);
-
-      if (selectedImageObjects.length === 0) {
+      await deleteMutation.mutateAsync({
+        imageIds: selectedArray,
+        deleteFromStorage: true,
+      });
+      if (isMountedRef.current) {
+        setSelectedImages(new Set());
+        showToast(toast, "Success", "Images deleted successfully");
+      }
+    } catch (error) {
+      console.error("Error deleting images:", error);
+      if (isMountedRef.current) {
         showToast(
           toast,
           "Error",
-          "Could not find selected image data",
-          undefined,
+          "Failed to delete images",
+          2000,
           "destructive"
         );
-        return;
       }
-
-      // Extract both MongoDB IDs and Cloudflare IDs for deletion
-      const mongoIds = selectedImageObjects
-        .map((img: any) => img._id)
-        .filter(Boolean);
-
-      const cloudflareIds = selectedImageObjects
-        .map((img: any) => img.cloudflareId)
-        .filter(Boolean);
-
-      console.log("MongoDB IDs for deletion:", mongoIds);
-      console.log("Cloudflare IDs for deletion:", cloudflareIds);
-
-      // Maximum number of retry attempts
-      const maxRetries = 2;
-      let attempt = 0;
-      let success = false;
-
-      while (attempt <= maxRetries && !success) {
-        try {
-          if (attempt > 0) {
-            console.log(`Retry attempt ${attempt} of ${maxRetries}`);
-            // Wait longer for each retry attempt (exponential backoff)
-            const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-            await new Promise((resolve) => setTimeout(resolve, waitTime));
-
-            showToast(
-              toast,
-              "Retrying deletion",
-              `Retry ${attempt}/${maxRetries}: Deleting ${
-                selectedArray.length
-              } image${selectedArray.length > 1 ? "s" : ""}...`
-            );
-          }
-
-          // Call mutation with both ID types
-          const result = await deleteMutation.mutateAsync({
-            imageIds: mongoIds,
-            cloudflareIds: cloudflareIds,
-          });
-
-          console.log("Delete result:", result);
-          success = true;
-
-          // Update toast with success message
-          showToast(
-            toast,
-            "Success",
-            `Successfully deleted ${selectedArray.length} image${
-              selectedArray.length > 1 ? "s" : ""
-            }`,
-            undefined,
-            "default"
-          );
-
-          // Clear selected images after successful deletion
-          setSelectedImages(new Set());
-
-          // If the currently displayed image was deleted, switch to another one
-          if (currentImageId && selectedImages.has(currentImageId)) {
-            const remainingImages = images.filter(
-              (img: ExtendedImageType) =>
-                !selectedImages.has(img.id) &&
-                (img.cloudflareId
-                  ? !selectedImages.has(img.cloudflareId)
-                  : true)
-            );
-
-            if (remainingImages.length > 0) {
-              console.log(
-                "Current image was deleted, switching to:",
-                remainingImages[0].id
-              );
-
-              // Safely select the first available image
-              const params = new URLSearchParams(
-                searchParams?.toString() || ""
-              );
-              params.set("image", remainingImages[0].id);
-              params.set("page", "1"); // Reset to first page
-              router.replace(`?${params.toString()}`, { scroll: false });
-            }
-          }
-        } catch (error) {
-          console.error(`Error during deletion attempt ${attempt}:`, error);
-          attempt++;
-
-          if (attempt > maxRetries) {
-            console.error("Maximum retry attempts reached. Giving up.");
-            showToast(
-              toast,
-              "Error",
-              `Failed to delete images after ${maxRetries} attempts. Please try again later.`,
-              undefined,
-              "destructive"
-            );
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error in handleDeleteSelected:", error);
-      showToast(
-        toast,
-        "Error",
-        "Failed to delete selected images",
-        undefined,
-        "destructive"
-      );
     }
-  };
+  }, [selectedImages, deleteMutation, toast, showToast]);
 
-  // Image selection handler
-  const handleImageSelect = (imageId: string) => {
-    setSelectedImages((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(imageId)) {
-        newSet.delete(imageId);
-      } else {
-        newSet.add(imageId);
-      }
-      return newSet;
-    });
-  };
-
-  // Image loading handler
-  const handleImageLoad = (imageId: string) => {
+  // Handle image loading
+  const handleImageLoad = useCallback((imageId: string) => {
+    if (!isMountedRef.current) return;
     setLoadedImages((prev) => new Set([...prev, imageId]));
-  };
+  }, []);
+
+  // Handle image selection
+  const toggleImageSelection = useCallback((imageId: string) => {
+    if (!isMountedRef.current) return;
+    setSelectedImages((prev) => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(imageId)) {
+        newSelection.delete(imageId);
+      } else {
+        newSelection.add(imageId);
+      }
+      return newSelection;
+    });
+  }, []);
 
   // Handle copy to clipboard
-  const handleCopy = (text: string, field: "filename" | "url") => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000); // Reset after 2 seconds
-    toast({
-      title: "Copied!",
-      description: "Image URL copied to clipboard",
-      duration: 2000,
-    });
-  };
+  const handleCopy = useCallback(
+    (text: string, field: "filename" | "url") => {
+      if (!isMountedRef.current) return;
+      navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setCopiedField(null);
+        }
+      }, 2000);
+      showToast(toast, "Copied!", "Image URL copied to clipboard");
+    },
+    [toast, showToast]
+  );
 
-  // Image upload handler with React Query
-  const handleImageUpload = async (files: FileList) => {
-    if (!files.length) return;
+  // Handle file upload
+  const handleFileUpload = useCallback(
+    async (files: FileList) => {
+      if (!isMountedRef.current || !files.length) return;
 
-    console.log(`Starting upload of ${files.length} files`);
+      try {
+        if (onUploadStarted) onUploadStarted();
+        setShowUploadProgress(true);
 
-    // Initialize progress tracking with the correct type
-    const initialProgress: ImageProgress[] = Array.from(files).map((file) => ({
-      fileName: file.name,
-      progress: 0,
-      status: "uploading",
-      currentStep: "Preparing to upload...",
-      stepProgress: {
-        cloudflare: {
-          status: "uploading",
-          progress: 0,
-          message: "Starting upload to Cloudflare...",
-        },
-        openai: {
-          status: "pending",
-          progress: 0,
-          message: "Waiting for upload to complete",
-        },
-      },
-    }));
+        await uploadMutation.mutateAsync({
+          files: Array.from(files),
+          onProgress: (progress) => {
+            if (isMountedRef.current) {
+              setUploadProgress(progress);
+            }
+          },
+        });
 
-    // CRITICAL: Set these flags BEFORE starting the actual upload
-    // This ensures the modal is shown immediately
-    setShowUploadProgress(true);
-    setUploadProgress(initialProgress);
-
-    // Force a synchronous DOM update with a no-op state update
-    // This helps ensure the modal renders before upload processing begins
-    setShowUploadProgress(true);
-
-    // Explicitly wait a moment for React to render the notification
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    console.log("Upload notification should now be visible");
-
-    // Notify parent component that upload has started
-    if (onUploadStarted) {
-      onUploadStarted();
-    }
-
-    try {
-      // Execute the upload mutation with progress tracking
-      await uploadMutation.mutateAsync({
-        files: Array.from(files),
-        onProgress: (progress: ImageProgress[]) => {
-          console.log(
-            "Upload progress update:",
-            progress.map((p) => p.progress)
+        // Don't call refetch here, the cache is already updated
+        if (isMountedRef.current) {
+          setUploadProgress([]);
+          setShowUploadProgress(false);
+          if (onUploadEnded) onUploadEnded();
+          showToast(toast, "Success", "Images uploaded successfully");
+        }
+      } catch (error) {
+        console.error("Error uploading files:", error);
+        if (isMountedRef.current) {
+          setUploadProgress([]);
+          setShowUploadProgress(false);
+          if (onUploadEnded) onUploadEnded();
+          showToast(
+            toast,
+            "Error",
+            "Failed to upload images",
+            2000,
+            "destructive"
           );
-          setUploadProgress(progress);
-        },
-      });
-
-      console.log("Upload complete");
-
-      // Keep showing the completed status for a moment
-      setTimeout(() => {
-        // Notify parent component that upload has ended
-        if (onUploadEnded) {
-          onUploadEnded();
         }
-      }, 1000);
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      // Update progress to show error
-      setUploadProgress((prev) =>
-        prev.map((item) => ({
-          ...item,
-          status: "error",
-          error: "Upload failed",
-        }))
-      );
+      }
+    },
+    [uploadMutation, onUploadStarted, onUploadEnded, toast, showToast]
+  );
 
-      // Keep showing the error status for a moment
-      setTimeout(() => {
-        // Notify parent component that upload has ended (even though it failed)
-        if (onUploadEnded) {
-          onUploadEnded();
+  // Handle file input change
+  const handleFileInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (!isMountedRef.current || !event.target.files?.length) return;
+      handleFileUpload(event.target.files);
+      event.target.value = "";
+    },
+    [handleFileUpload]
+  );
+
+  // Handle file drop
+  const handleFileDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!isMountedRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const files = event.dataTransfer.files;
+      if (files.length > 0) {
+        handleFileUpload(files);
+      }
+    },
+    [handleFileUpload]
+  );
+
+  // Handle drag over
+  const handleDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    []
+  );
+
+  // Handle set primary image
+  const handleSetPrimaryImage = useCallback(
+    async (imageId: string) => {
+      if (!isMountedRef.current) return;
+      try {
+        await setPrimaryMutation.mutateAsync(imageId);
+        if (isMountedRef.current) {
+          showToast(toast, "Success", "Primary image updated");
         }
-      }, 3000);
-    }
-  };
-
-  // Set primary image handler
-  const handleSetPrimaryImage = async (imageId: string) => {
-    try {
-      await setPrimaryMutation.mutateAsync(imageId);
-      toast({
-        title: "Primary image updated",
-        description: "The primary image has been set successfully",
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error("Error setting primary image:", error);
-      toast({
-        title: "Error setting primary image",
-        description:
-          error instanceof Error ? error.message : "Please try again",
-        variant: "destructive",
-      });
-    }
-  };
+      } catch (error) {
+        console.error("Error setting primary image:", error);
+        if (isMountedRef.current) {
+          showToast(
+            toast,
+            "Error",
+            "Failed to update primary image",
+            2000,
+            "destructive"
+          );
+        }
+      }
+    },
+    [setPrimaryMutation, toast, showToast]
+  );
 
   // Pagination
   const paginatedImages = useMemo(() => {
@@ -830,7 +759,7 @@ export function ImageGalleryWithQuery({
             if (e.target.files && e.target.files.length > 0) {
               // Set status visibility BEFORE calling the upload function
               setShowUploadProgress(true);
-              handleImageUpload(e.target.files);
+              handleFileUpload(e.target.files);
             }
           }}
         />
@@ -851,7 +780,6 @@ export function ImageGalleryWithQuery({
             if (!uploadMutation.isPending) {
               setUploadProgress([]);
               setShowUploadProgress(false);
-              refetch();
             }
           }}
         />
@@ -923,7 +851,7 @@ export function ImageGalleryWithQuery({
               }}
             >
               <Image
-                src={`${currentImage.url.replace(/\/public$/, "")}/public`}
+                src={currentImage.url}
                 alt={
                   currentImage.metadata?.description || `Image ${mainIndex + 1}`
                 }
@@ -937,7 +865,8 @@ export function ImageGalleryWithQuery({
                 )}
                 sizes="66vw"
                 priority
-                onLoadingComplete={() => handleImageLoad(currentImage.id)}
+                onLoad={() => handleImageLoad(currentImage.id)}
+                onError={() => handleImageError(currentImage.id)}
               />
             </div>
           )}
@@ -975,61 +904,6 @@ export function ImageGalleryWithQuery({
                 {currentImage.metadata.description}
               </div>
             )}
-
-            <table className="w-full border-separate border-spacing-y-2">
-              <tbody>
-                <tr>
-                  <td className="text-muted-foreground font-medium w-24">
-                    Filename:
-                  </td>
-                  <td className="flex justify-between">
-                    <span className="truncate">{currentImage.filename}</span>
-                    <button
-                      onClick={() =>
-                        handleCopy(currentImage.filename || "", "filename")
-                      }
-                      className="text-xs flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-muted hover:bg-muted/80"
-                    >
-                      {copiedField === "filename" ? (
-                        <>
-                          <Check className="h-3 w-3" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3 w-3" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </td>
-                </tr>
-                {currentImage.url && (
-                  <tr>
-                    <td className="text-muted-foreground font-medium">URL:</td>
-                    <td className="flex justify-between">
-                      <span className="truncate">{currentImage.url}</span>
-                      <button
-                        onClick={() => handleCopy(currentImage.url, "url")}
-                        className="text-xs flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-muted hover:bg-muted/80"
-                      >
-                        {copiedField === "url" ? (
-                          <>
-                            <Check className="h-3 w-3" />
-                            <span>Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         )}
       </div>
@@ -1225,7 +1099,7 @@ export function ImageGalleryWithQuery({
                               }
                             )}
                             sizes="(max-width: 768px) 100px, 120px"
-                            onLoadingComplete={() => handleImageLoad(image.id)}
+                            onLoad={() => handleImageLoad(image.id)}
                           />
                         )}
 
@@ -1267,7 +1141,7 @@ export function ImageGalleryWithQuery({
                               )}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleImageSelect(image.id);
+                                toggleImageSelection(image.id);
                               }}
                             >
                               <CheckCircle
@@ -1346,7 +1220,7 @@ export function ImageGalleryWithQuery({
         onChange={(e) => {
           const fileList = e.target.files;
           if (fileList && fileList.length > 0) {
-            handleImageUpload(fileList);
+            handleFileUpload(fileList);
           }
         }}
         className="hidden"

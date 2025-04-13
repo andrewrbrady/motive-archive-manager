@@ -18,7 +18,7 @@ interface CarsQueryParams {
 export function useCars(params: CarsQueryParams = {}) {
   const {
     page = 1,
-    limit = 20,
+    limit = 1000,
     sort = "updatedAt",
     sortDirection = "desc",
     status,
@@ -36,9 +36,8 @@ export function useCars(params: CarsQueryParams = {}) {
       // Construct query parameters
       const queryParams = new URLSearchParams();
       queryParams.set("page", page.toString());
-      queryParams.set("limit", limit.toString());
-      queryParams.set("sort", sort);
-      queryParams.set("sortDirection", sortDirection);
+      queryParams.set("pageSize", limit.toString());
+      queryParams.set("sort", `${sort}_${sortDirection}`);
 
       if (status && status !== "all") {
         queryParams.set("status", status);
@@ -56,7 +55,9 @@ export function useCars(params: CarsQueryParams = {}) {
         queryParams.set("model", model);
       }
 
-      const response = await fetch(`/api/cars?${queryParams.toString()}`);
+      const response = await fetch(
+        `/api/cars/simple?${queryParams.toString()}`
+      );
 
       if (!response.ok) {
         throw new Error("Failed to fetch cars");
@@ -66,11 +67,17 @@ export function useCars(params: CarsQueryParams = {}) {
 
       return {
         cars: data.cars as Car[],
-        total: data.total as number,
-        pages: Math.ceil(data.total / limit),
-        currentPage: page,
+        total: data.pagination.totalCount as number,
+        pages: data.pagination.totalPages,
+        currentPage: data.pagination.currentPage,
       };
     },
+    // Add caching configuration
+    staleTime: 1000 * 60 * 5, // Data stays fresh for 5 minutes
+    gcTime: 1000 * 60 * 30, // Cache persists for 30 minutes
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnMount: false, // Prevent refetch on component mount
+    retry: 2, // Only retry failed requests twice
   });
 }
 

@@ -3,7 +3,7 @@ import DocumentsClient from "./DocumentsClient";
 import { headers } from "next/headers";
 
 async function getDocuments(page = 1, limit = 10) {
-  const headersList = headers();
+  const headersList = await headers();
   const domain = headersList.get("host");
   const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
 
@@ -16,11 +16,8 @@ async function getDocuments(page = 1, limit = 10) {
   return res.json();
 }
 
-export default async function DocumentsPage({
-  searchParams,
-}: {
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
+export default async function DocumentsPage(props: any) {
+  const searchParams = props.searchParams || {};
   const page = Number(searchParams?.page) || 1;
   const limit = Number(searchParams?.limit) || 10;
   const { documents } = await getDocuments(page, limit);

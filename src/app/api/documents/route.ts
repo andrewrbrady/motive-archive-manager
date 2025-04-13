@@ -1,5 +1,7 @@
 // app/api/documents/[id]/route.ts
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import clientPromise from "@/lib/mongodb";
 import { ObjectId, UpdateFilter } from "mongodb";
 
@@ -9,20 +11,17 @@ interface CarDocument {
 }
 
 // Helper function to safely get ID
-const getDocumentId = async (params: { id: string }) => {
-  // This ensures params.id is properly handled
-  const segment = params.id;
-  if (!segment) throw new Error("Document ID is required");
-  return segment;
+const getDocumentId = (url: URL): string => {
+  const segments = url.pathname.split("/");
+  const id = segments[segments.length - 1];
+  if (!id) throw new Error("Document ID is required");
+  return id;
 };
 
-export async function GET(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
-    // Get ID safely
-    const documentId = await getDocumentId(context.params);
+    const url = new URL(request.url);
+    const documentId = getDocumentId(url);
 
     if (!ObjectId.isValid(documentId)) {
       return NextResponse.json(
@@ -38,8 +37,8 @@ export async function GET(
         { status: 500 }
       );
     }
-    const db = client.db("motive_archive");
 
+    const db = client.db("motive_archive");
     const document = await db
       .collection("documents")
       .findOne({ _id: new ObjectId(documentId) });
@@ -53,20 +52,21 @@ export async function GET(
 
     return NextResponse.json(document);
   } catch (error) {
-    console.error("Database error:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch document" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
-    const documentId = await getDocumentId(context.params);
+    const url = new URL(request.url);
+    const documentId = getDocumentId(url);
 
     if (!ObjectId.isValid(documentId)) {
       return NextResponse.json(
@@ -82,103 +82,93 @@ export async function PUT(
         { status: 500 }
       );
     }
-    const db = client.db("motive_archive");
-    const updateData = await request.json();
 
-    const result = await db
-      .collection("documents")
-      .findOneAndUpdate(
-        { _id: new ObjectId(documentId) },
-        { $set: updateData },
-        { returnDocument: "after" }
-      );
-
-    if (!result) {
-      return NextResponse.json(
-        { error: "Document not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error("Update failed:", error);
-    return NextResponse.json(
-      { error: "Failed to update document" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: Request,
-  context: { params: { id: string } }
-) {
-  try {
-    const documentId = await getDocumentId(context.params);
-
-    if (!ObjectId.isValid(documentId)) {
-      return NextResponse.json(
-        { error: "Invalid document ID format" },
-        { status: 400 }
-      );
-    }
-
-    const client = await clientPromise;
-    if (!client) {
-      return NextResponse.json(
-        { error: "Failed to connect to database" },
-        { status: 500 }
-      );
-    }
+    const data = await request.json();
     const db = client.db("motive_archive");
 
-    const body = await request.json();
-
-    // Find document
-    const document = await db
-      .collection("documents")
-      .findOne({ _id: new ObjectId(documentId) });
-
-    if (!document) {
-      return NextResponse.json(
-        { error: "Document not found" },
-        { status: 404 }
-      );
-    }
-
-    // Update car
-    const updateDoc: UpdateFilter<CarDocument> = {
-      $pull: {
-        documents: documentId,
+    const updateData = {
+      $set: {
+        ...data,
+        updatedAt: new Date(),
       },
     };
 
-    await db
-      .collection<CarDocument>("cars")
-      .updateOne({ _id: new ObjectId(body.carId) }, updateDoc);
+    const result = await db
+      .collection("documents")
+      .updateOne({ _id: new ObjectId(documentId) }, updateData);
 
-    // Delete document
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const documentId = getDocumentId(url);
+
+    if (!ObjectId.isValid(documentId)) {
+      return NextResponse.json(
+        { error: "Invalid document ID format" },
+        { status: 400 }
+      );
+    }
+
+    const client = await clientPromise;
+    if (!client) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
+
+    const db = client.db("motive_archive");
     const result = await db
       .collection("documents")
       .deleteOne({ _id: new ObjectId(documentId) });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(
-        { error: "Failed to delete document" },
-        { status: 500 }
+        { error: "Document not found" },
+        { status: 404 }
       );
     }
 
-    return NextResponse.json(
-      { message: "Document deleted successfully" },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete operation failed:", error);
+    console.error("Error:", error);
     return NextResponse.json(
-      { error: "Failed to delete document" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to process request",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

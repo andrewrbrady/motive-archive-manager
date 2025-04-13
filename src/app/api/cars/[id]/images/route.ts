@@ -5,6 +5,8 @@ import { getDatabase, getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 
+export const dynamic = "force-dynamic";
+
 interface ImageData {
   imageUrl: string;
   imageId: string;
@@ -41,20 +43,25 @@ async function getCloudflareAuth() {
 }
 
 // GET images for a car
-export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
-    const { id } = context.params;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+
     console.log(`GET images for car with ID: ${id}`);
 
     // Parse query parameters
-    const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
     const category = url.searchParams.get("category");
+    const search = url.searchParams.get("search");
+    const angle = url.searchParams.get("angle");
+    const movement = url.searchParams.get("movement");
+    const timeOfDay = url.searchParams.get("timeOfDay");
+    const view = url.searchParams.get("view");
+    const side = url.searchParams.get("side");
 
     if (!ObjectId.isValid(id)) {
       console.log(`Invalid car ID format: ${id}`);
@@ -65,16 +72,28 @@ export async function GET(
     }
 
     console.log("Getting MongoDB database directly using getDatabase...");
-    // Use getDatabase instead of getMongoClient for more reliable connection
     const db = await getDatabase();
     console.log("Successfully connected to database");
 
     const carObjectId = new ObjectId(id);
 
-    // Build query for category filtering
+    // Build query for filtering
     const query: any = { carId: carObjectId };
-    if (category) {
-      query["metadata.category"] = category;
+
+    // Add metadata filters
+    if (category) query["metadata.category"] = category;
+    if (angle) query["metadata.angle"] = angle;
+    if (movement) query["metadata.movement"] = movement;
+    if (timeOfDay) query["metadata.tod"] = timeOfDay;
+    if (view) query["metadata.view"] = view;
+    if (side) query["metadata.side"] = side;
+
+    // Add search filter
+    if (search) {
+      query.$or = [
+        { filename: { $regex: search, $options: "i" } },
+        { "metadata.description": { $regex: search, $options: "i" } },
+      ];
     }
 
     // First, check if the car exists and if it has imageIds
@@ -232,12 +251,12 @@ export async function GET(
 }
 
 // POST handler for adding images to a car
-export async function POST(
-  request: NextRequest,
-  context: { params: { id: Promise<string> } }
-) {
+export async function POST(request: Request) {
   try {
-    const id = await context.params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+
     console.log("Processing request for car ID:", id);
 
     const formData = await request.formData();
@@ -345,32 +364,26 @@ export async function POST(
 
     return NextResponse.json(updatedCar);
   } catch (error) {
-    console.error("Error in POST /api/cars/[id]/images:", error);
+    console.error("Error processing image upload:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error },
+      {
+        error: `Failed to process image upload: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: Promise<string> } }
-) {
-  console.log("======== DELETE IMAGE API CALLED ========");
-
-  // Log the request URL and headers for debugging
-  const url = new URL(request.url);
-  console.log("Request URL:", url.toString());
-  console.log("Request method:", request.method);
-  console.log(
-    "Request headers:",
-    Object.fromEntries([...request.headers.entries()])
-  );
-
+// DELETE handler for removing an image
+export async function DELETE(request: Request) {
   try {
-    const id = await context.params.id;
-    console.log("Car ID:", id);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+
+    console.log("Processing image deletion for car ID:", id);
 
     // Parse the request data
     const requestData = await request.json().catch((e) => {
@@ -612,18 +625,26 @@ export async function DELETE(
         console.log("MongoDB session ended");
       }
     }
-  } catch (error: unknown) {
-    console.error("Error in DELETE image endpoint:", error);
-
-    // Ensure we return a proper error response
+  } catch (error) {
+    console.error("Error deleting image:", error);
     return NextResponse.json(
       {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : String(error),
+        error: `Failed to delete image: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       },
       { status: 500 }
     );
-  } finally {
-    console.log("======== DELETE IMAGE API COMPLETED ========");
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

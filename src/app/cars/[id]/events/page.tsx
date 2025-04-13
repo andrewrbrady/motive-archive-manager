@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export default function EventsPage({ params }: { params: { id: string } }) {
+export default function EventsPage({ params }: any) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBatchManager, setShowBatchManager] = useState(false);

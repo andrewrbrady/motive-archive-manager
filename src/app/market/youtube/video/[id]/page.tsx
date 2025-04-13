@@ -5,16 +5,8 @@ import { dbConnect } from "@/lib/mongodb";
 import { YoutubeVideo } from "@/models/youtube_video";
 import { IYoutubeVideo } from "@/models/youtube_video";
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-}
-
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { id } = params;
+export async function generateMetadata(props: any): Promise<Metadata> {
+  const { id } = props.params;
 
   try {
     await dbConnect();
@@ -40,8 +32,8 @@ export async function generateMetadata({
   }
 }
 
-export default async function YoutubeVideoPage({ params }: PageProps) {
-  const { id } = params;
+export default async function YoutubeVideoPage(props: any) {
+  const { id } = props.params;
 
   try {
     await dbConnect();

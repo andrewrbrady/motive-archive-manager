@@ -8,13 +8,16 @@ interface Car {
   deliverableIds: ObjectId[];
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/deliverables
+
     const db = await getDatabase();
-    const carId = new ObjectId(params.id);
+    const carId = new ObjectId(id);
 
     // Get the car's deliverable references
     const car = await db.collection<Car>("cars").findOne({ _id: carId });
@@ -33,19 +36,25 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching deliverables:", error);
     return NextResponse.json(
-      { error: "Failed to fetch deliverables" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch deliverables",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/deliverables
+
     const db = await getDatabase();
-    const carId = new ObjectId(params.id);
+    const carId = new ObjectId(id);
     const data = await request.json();
 
     const deliverable: Partial<Deliverable> = {
@@ -72,19 +81,21 @@ export async function POST(
   } catch (error) {
     console.error("Error creating deliverable:", error);
     return NextResponse.json(
-      { error: "Failed to create deliverable" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create deliverable",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
-    const db = await getDatabase();
-    const pathParts = request.url.split("/");
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split("/");
     const deliverableId = pathParts[pathParts.length - 1];
 
     if (!deliverableId) {
@@ -94,6 +105,7 @@ export async function PUT(
       );
     }
 
+    const db = await getDatabase();
     const data = await request.json();
     const { _id, car_id, ...updateData } = data;
 
@@ -117,21 +129,27 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating deliverable:", error);
     return NextResponse.json(
-      { error: "Failed to update deliverable" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update deliverable",
+      },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
-    const db = await getDatabase();
-    const carId = new ObjectId(params.id);
-    const pathParts = request.url.split("/");
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/deliverables
+    const pathParts = url.pathname.split("/");
     const deliverableId = pathParts[pathParts.length - 1];
+
+    const db = await getDatabase();
+    const carId = new ObjectId(id);
 
     if (!deliverableId) {
       return NextResponse.json(
@@ -165,8 +183,24 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting deliverable:", error);
     return NextResponse.json(
-      { error: "Failed to delete deliverable" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete deliverable",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

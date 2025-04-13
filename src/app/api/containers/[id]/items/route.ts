@@ -1,34 +1,51 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-// GET all items in a specific container
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
-    const client = await clientPromise;
-    if (!client) {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // /containers/[id]/items
+
+    const db = await getDatabase();
+
+    // Validate container ID format
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json(
-        { error: "Failed to connect to database" },
-        { status: 500 }
+        { error: "Invalid container ID format" },
+        { status: 400 }
       );
     }
-    const db = client.db("motive_archive");
 
-    // Fetch all items with the matching container_id
-    const items = await db
-      .collection("studio_inventory")
-      .find({ container_id: params.id })
-      .toArray();
+    // Check if container exists
+    const containerExists = await db.collection("containers").findOne({
+      _id: new ObjectId(id),
+    });
 
-    // If no items are found, return an empty array
-    if (!items || items.length === 0) {
-      return NextResponse.json([]);
+    if (!containerExists) {
+      return NextResponse.json(
+        { error: "Container not found" },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json(items);
+    // Get items in this container
+    const items = await db
+      .collection("containerItems")
+      .find({ containerId: new ObjectId(id) })
+      .toArray();
+
+    // Return items with string IDs
+    return NextResponse.json(
+      items.map((item) => ({
+        ...item,
+        id: item._id.toString(),
+        containerId: item.containerId.toString(),
+      }))
+    );
   } catch (error) {
     console.error("Error fetching items in container:", error);
     return NextResponse.json(
@@ -36,4 +53,15 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

@@ -1,6 +1,8 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
@@ -19,14 +21,13 @@ async function getMongoClient() {
 }
 
 // GET documents for a car
-export async function GET(
-  request: Request,
-  context: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   let client;
   try {
-    // Get and validate ID first, before any other operations
-    const { id } = await Promise.resolve(context.params);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/documents
+
     console.log(`Fetching documents for car ID: ${id}`);
 
     if (!ObjectId.isValid(id)) {
@@ -87,15 +88,33 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching car documents:", error);
     return NextResponse.json(
-      { error: "Failed to fetch car documents" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch car documents",
+      },
       { status: 500 }
     );
   } finally {
     if (client) {
-      console.log(
-        `Closing MongoDB connection for car documents ${context.params.id}`
-      );
+      // Safe access to segments in finally block
+      const id = request.url
+        ? new URL(request.url).pathname.split("/").at(-2)
+        : "unknown";
+      console.log(`Closing MongoDB connection for car documents ${id}`);
       await client.close();
     }
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

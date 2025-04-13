@@ -5,13 +5,13 @@ import { ObjectId } from "mongodb";
 
 export type { MeasurementValue };
 
-interface Power {
+export interface Power {
   hp: number;
   kW: number;
   ps: number;
 }
 
-interface Torque {
+export interface Torque {
   "lb-ft": number;
   Nm: number;
 }

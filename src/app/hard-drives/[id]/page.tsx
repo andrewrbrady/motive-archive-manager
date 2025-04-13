@@ -93,7 +93,7 @@ interface RawAsset {
   dateImported?: string;
 }
 
-export default function HardDriveDetails({ params }: HardDriveDetailsProps) {
+export default function HardDriveDetails({ params }: any) {
   const router = useRouter();
   const driveId = params.id;
 

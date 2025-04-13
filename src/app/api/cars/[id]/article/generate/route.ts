@@ -1,41 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import type { ModelType } from "@/components/ModelSelector";
 
-interface OutlinePoint {
-  id: string;
-  title: string;
-  subpoints: string[];
-  content: string;
-  status: "pending" | "in_progress" | "completed";
-  parentId?: string;
-  order: number;
-  depth: number;
-}
+export const dynamic = "force-dynamic";
 
-interface ArticleState {
-  _id?: ObjectId;
-  carId: string;
-  outline: OutlinePoint[];
-  workingDraft: string;
-  currentPoint: string; // ID of current outline point
-  stage: "outlining" | "expanding" | "revising";
-  detailLevel: string;
-  focus?: string;
-  lastUpdated: Date;
-}
-
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { model, focus, stage, pointId } = body;
-    const carId = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3]; // -3 because path is /cars/[id]/article/generate
 
-    if (!carId) {
+    const { model = "gpt-4o", style, outline, sections } = await request.json();
+
+    if (!id) {
       return NextResponse.json(
         { error: "Car ID is required" },
         { status: 400 }
@@ -46,393 +23,153 @@ export async function POST(
     const db = await getDatabase();
 
     // Get car details
-    const car = await db
-      .collection("cars")
-      .findOne({ _id: new ObjectId(carId) });
+    const car = await db.collection("cars").findOne({ _id: new ObjectId(id) });
+
     if (!car) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Get all research files for this car
-    const researchFiles = await db
-      .collection("research_files")
-      .find({ carId })
-      .toArray();
+    const carInfo = {
+      _id: car._id,
+      make: car.make,
+      model: car.model,
+      year: car.year,
+      trim: car.manufacturing?.trim,
+      engine: car.engine,
+      color: car.color,
+      vin: car.vin,
+    };
 
-    // Extract content from research files
-    const researchContent = researchFiles
-      .map((file) => file.content)
-      .filter(Boolean)
-      .join("\n\n");
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    };
 
-    // Calculate appropriate detail level based on research content
-    const contentLength = researchContent.length;
-    const detailLevel =
-      contentLength > 10000
-        ? "very detailed"
-        : contentLength > 5000
-        ? "detailed"
-        : "standard";
+    let promptContent = "";
+    let systemPrompt = "";
 
-    // Get or create article state
-    const articleStates = db.collection<ArticleState>("article_states");
-    let articleState = await articleStates.findOne({ carId });
+    // Decide on content generation strategy
+    if (style === "outline" && outline) {
+      // Generate from outline
+      promptContent = `Generate an article about this car using the following outline:\n\n${outline}\n\nInclude all the points from the outline and expand on them appropriately.`;
+      systemPrompt = `You are a professional automotive writer. Write an engaging and informative article about a ${car.year} ${car.make} ${car.model}. 
+      Format your response in markdown. Do not include a title or introduction - start with the first section heading.
+      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
+    } else if (style === "sections" && sections) {
+      // Generate from sections
+      promptContent = `Generate an article about this car with the following sections:\n\n${(
+        sections as string[]
+      )
+        .map((section: string) => `- ${section}`)
+        .join(
+          "\n"
+        )}\n\nCreate content for each section that is informative and engaging.`;
+      systemPrompt = `You are a professional automotive writer. Write an engaging and informative article about a ${car.year} ${car.make} ${car.model}.
+      Format your response in markdown with the requested sections as headings.
+      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
+    } else if (style === "point-by-point" && outline) {
+      // Generate one section at a time
+      const outlinePoints = outline
+        .split("\n")
+        .filter((point: string) => point.trim());
+      const point = outlinePoints[0];
 
-    if (!articleState) {
-      // Start with outline generation
-      const outlinePrompt = `Create a detailed, hierarchical outline for an in-depth article about the ${
-        car.year
-      } ${car.make} ${car.model}.
+      if (!point) {
+        return NextResponse.json(
+          { error: "Invalid outline point" },
+          { status: 400 }
+        );
+      }
+
+      promptContent = `Generate content for this section of an article about a ${car.year} ${car.make} ${car.model}:\n\n${point}\n\nCreate approximately 1-2 paragraphs of engaging content.`;
+      systemPrompt = `You are a professional automotive writer. Write an engaging and informative section for an article about a ${car.year} ${car.make} ${car.model}.
+      Format your response in markdown.
+      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
+    } else {
+      // Default to general article
+      promptContent = `Write a comprehensive article about this ${car.year} ${car.make} ${car.model}.`;
+      systemPrompt = `You are a professional automotive writer. Write an engaging and informative article about a ${car.year} ${car.make} ${car.model}.
+      Format your response in markdown with appropriate sections. Include:
+      - A section about performance and driving experience
+      - A section about design and aesthetics
+      - A section about technology and features
+      - A section about the car's place in automotive history or its market segment
       
-IMPORTANT INSTRUCTIONS:
-- Create a comprehensive outline that will support a very detailed article
-- Include specific technical aspects, historical details, and performance characteristics
-- Break down each major section into detailed subsections
-- Include specific points about measurements, specifications, and technical details
-- Create outline points that will each expand into multiple paragraphs
-${
-  focus
-    ? `\n- Ensure the outline thoroughly covers ${focus} while maintaining overall vehicle context`
-    : ""
-}
-
-Car Details:
-${JSON.stringify(car, null, 2)}
-
-Research Content:
-${researchContent}
-
-The outline should be extremely detailed and support an article of ${detailLevel} depth.`;
-
-      const outlineResponse = await generateContent(outlinePrompt, model, 8000);
-      const outline = parseOutlineToStructure(outlineResponse);
-
-      const newArticleState: Omit<ArticleState, "_id"> = {
-        carId,
-        outline,
-        workingDraft: "",
-        currentPoint: outline[0].id,
-        stage: "outlining",
-        detailLevel,
-        focus,
-        lastUpdated: new Date(),
-      };
-
-      const result = await articleStates.insertOne(newArticleState);
-      articleState = {
-        _id: result.insertedId,
-        ...newArticleState,
-      };
+      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
     }
 
-    // Handle different stages of article generation
-    switch (stage || articleState.stage) {
-      case "outlining":
-        return handleOutlineStage(articleState, db, carId);
-
-      case "expanding": {
-        const targetPoint = pointId || articleState.currentPoint;
-        const point = articleState.outline.find((p) => p.id === targetPoint);
-
-        if (!point) {
-          return NextResponse.json(
-            { error: "Invalid outline point" },
-            { status: 400 }
-          );
-        }
-
-        // Get context from parent points if they exist
-        const contextPoints = getContextPoints(articleState.outline, point);
-        const existingContent = contextPoints
-          .map((p) => p.content)
-          .join("\n\n");
-
-        const expansionPrompt = `Expand the following outline point into detailed, in-depth content for our article about the ${
-          car.year
-        } ${car.make} ${car.model}.
-
-Current outline point to expand: ${point.title}
-Subpoints to cover:
-${point.subpoints.map((sp) => `- ${sp}`).join("\n")}
-
-IMPORTANT CONTEXT:
-${existingContent ? `Previous relevant content:\n${existingContent}\n\n` : ""}
-
-IMPORTANT INSTRUCTIONS:
-- Write multiple detailed paragraphs expanding this outline point
-- Include specific technical details, measurements, and specifications
-- Use direct quotes from research material where relevant
-- Maintain ${detailLevel} depth throughout
-- Do not summarize - provide full, in-depth coverage
-- Write at least 1000 words for this section
-${focus ? `- Thoroughly explore how ${focus} relates to this aspect` : ""}
-
-Research Content:
-${researchContent}
-
-Car Details:
-${JSON.stringify(car, null, 2)}`;
-
-        const expandedContent = await generateContent(
-          expansionPrompt,
+    // Use OpenAI to generate the article
+    const generateResponse = await fetch(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
           model,
-          16000
-        );
-
-        // Update the point's content and status
-        point.content = expandedContent;
-        point.status = "completed";
-
-        // Update working draft
-        articleState.workingDraft = updateWorkingDraft(articleState.outline);
-
-        // Find next pending point
-        const nextPoint = findNextPendingPoint(articleState.outline, point.id);
-        articleState.currentPoint = nextPoint?.id || point.id;
-
-        // Check if all points are completed
-        if (!nextPoint) {
-          articleState.stage = "revising";
-        }
-
-        await articleStates.updateOne({ carId }, { $set: articleState });
-
-        return NextResponse.json({
-          point: {
-            id: point.id,
-            title: point.title,
-            content: point.content,
-            status: point.status,
-          },
-          nextPoint: nextPoint
-            ? {
-                id: nextPoint.id,
-                title: nextPoint.title,
-              }
-            : null,
-          workingDraft: articleState.workingDraft,
-          stage: articleState.stage,
-        });
-      }
-
-      case "revising": {
-        const revisionPrompt = `Review and revise the following article draft for the ${
-          car.year
-        } ${car.make} ${car.model} to ensure cohesion, flow, and depth.
-
-IMPORTANT INSTRUCTIONS:
-- Maintain all technical details and specifications
-- Ensure smooth transitions between sections
-- Identify and resolve any content overlap
-- Maintain consistent tone and style
-- Preserve the ${detailLevel} depth throughout
-${focus ? `- Ensure comprehensive coverage of ${focus} is maintained` : ""}
-
-Current Draft:
-${articleState.workingDraft}
-
-Research Content:
-${researchContent}`;
-
-        const revisedContent = await generateContent(
-          revisionPrompt,
-          model,
-          32000
-        );
-
-        // Save final version
-        await db.collection("car_articles").updateOne(
-          { carId },
-          {
-            $set: {
-              content: revisedContent,
-              model,
-              generatedAt: new Date(),
-              updatedAt: new Date(),
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt,
             },
-            $setOnInsert: {
-              createdAt: new Date(),
+            {
+              role: "user",
+              content: `${promptContent}\n\nHere are details about the specific car:\n${JSON.stringify(
+                carInfo,
+                null,
+                2
+              )}`,
             },
-          },
-          { upsert: true }
-        );
-
-        // Clean up article state
-        await articleStates.deleteOne({ carId });
-
-        return NextResponse.json({
-          article: revisedContent,
-          isComplete: true,
-        });
+          ],
+          temperature: 0.7,
+          top_p: 0.9,
+          frequency_penalty: 0.2,
+          presence_penalty: 0.1,
+        }),
       }
+    );
 
-      default:
-        return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
+    if (!generateResponse.ok) {
+      console.error(
+        "OpenAI API error:",
+        generateResponse.status,
+        await generateResponse.text()
+      );
+      return NextResponse.json(
+        { error: "Failed to generate article" },
+        { status: 500 }
+      );
     }
+
+    const data = await generateResponse.json();
+    const content = data.choices[0].message.content;
+
+    return NextResponse.json({
+      success: true,
+      content,
+      usage: data.usage,
+      style,
+      model,
+    });
   } catch (error) {
     console.error("Error generating article:", error);
     return NextResponse.json(
-      { error: "Failed to generate article" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to generate article",
+      },
       { status: 500 }
     );
   }
 }
 
-async function generateContent(
-  prompt: string,
-  model: ModelType,
-  maxTokens: number
-) {
-  const isDeepSeek = model.startsWith("deepseek");
-  const isClaude = model.startsWith("claude");
-
-  const apiConfig = {
-    url: isDeepSeek
-      ? process.env.DEEPSEEK_API_URL || "https://api.deepseek.com"
-      : isClaude
-      ? process.env.CLAUDE_API_URL || "https://api.anthropic.com"
-      : "https://api.openai.com/v1/chat/completions",
-    key: isDeepSeek
-      ? process.env.DEEPSEEK_API_KEY
-      : isClaude
-      ? process.env.ANTHROPIC_API_KEY
-      : process.env.OPENAI_API_KEY,
-  };
-
-  const endpoint = isClaude ? "/v1/messages" : "/v1/chat/completions";
-
-  const requestBody = isClaude
-    ? {
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: maxTokens,
-        system:
-          "You are a professional automotive journalist writing comprehensive, detailed articles about vehicles. Your articles should maintain the full depth and detail level of the source material, avoiding unnecessary summarization.",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }
-    : {
-        model: model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a professional automotive journalist writing in-depth articles about vehicles.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: maxTokens,
-      };
-
-  const response = await fetch(apiConfig.url + endpoint, {
-    method: "POST",
+// OPTIONS handler for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
     headers: {
-      "Content-Type": "application/json",
-      ...(isClaude
-        ? {
-            "x-api-key": process.env.ANTHROPIC_API_KEY || "",
-            "anthropic-version": "2023-06-01",
-          }
-        : {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY || ""}`,
-          }),
-    } as HeadersInit,
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to generate content: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return isClaude ? data.content[0].text : data.choices[0].message.content;
-}
-
-function parseOutlineToStructure(outlineText: string): OutlinePoint[] {
-  // Implementation to parse outline text into structured format
-  // This would parse the LLM's outline response into our OutlinePoint structure
-  // You'll need to implement the actual parsing logic based on the outline format
-  const outline: OutlinePoint[] = [];
-  // ... parsing logic ...
-  return outline;
-}
-
-function getContextPoints(
-  outline: OutlinePoint[],
-  currentPoint: OutlinePoint
-): OutlinePoint[] {
-  const context: OutlinePoint[] = [];
-  if (currentPoint.parentId) {
-    const parent = outline.find((p) => p.id === currentPoint.parentId);
-    if (parent) {
-      context.push(parent);
-      context.push(...getContextPoints(outline, parent));
-    }
-  }
-  return context;
-}
-
-function updateWorkingDraft(outline: OutlinePoint[]): string {
-  return outline
-    .filter((point) => point.status === "completed")
-    .sort((a, b) => a.order - b.order)
-    .map((point) => point.content)
-    .join("\n\n");
-}
-
-function findNextPendingPoint(
-  outline: OutlinePoint[],
-  currentId: string
-): OutlinePoint | null {
-  const current = outline.find((p) => p.id === currentId);
-  if (!current) return null;
-
-  // First try to find next point at same depth
-  const nextAtSameDepth = outline
-    .filter(
-      (p) =>
-        p.depth === current.depth &&
-        p.order > current.order &&
-        p.status === "pending"
-    )
-    .sort((a, b) => a.order - b.order)[0];
-
-  if (nextAtSameDepth) return nextAtSameDepth;
-
-  // Then try to find next point at any depth
-  return (
-    outline
-      .filter((p) => p.order > current.order && p.status === "pending")
-      .sort((a, b) => a.order - b.order)[0] || null
-  );
-}
-
-async function handleOutlineStage(
-  articleState: ArticleState,
-  db: any,
-  carId: string
-) {
-  // Validate outline and move to expansion stage
-  articleState.stage = "expanding";
-  articleState.currentPoint = articleState.outline[0].id;
-
-  await db
-    .collection("article_states")
-    .updateOne({ carId }, { $set: articleState });
-
-  return NextResponse.json({
-    outline: articleState.outline,
-    nextStage: "expanding",
-    firstPoint: {
-      id: articleState.outline[0].id,
-      title: articleState.outline[0].title,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }

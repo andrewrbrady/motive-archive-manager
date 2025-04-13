@@ -5,11 +5,12 @@ import { uploadFile } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 3];
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
@@ -18,12 +19,12 @@ export async function POST(
     }
 
     // Upload file to S3 with script_files type
-    const s3Result = await uploadFile(file, params.id, "script_files");
+    const s3Result = await uploadFile(file, id, "script_files");
 
     // Save file metadata to MongoDB
     const db = await getDatabase();
     const result = await db.collection("script_files").insertOne({
-      carId: new ObjectId(params.id),
+      carId: new ObjectId(id),
       filename: s3Result.filename,
       s3Key: s3Result.key,
       contentType: s3Result.contentType,
@@ -46,4 +47,15 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { User } from "@/models/User";
 import { auth } from "@/auth";
-import {
-  getUserWithAuth,
-  updateUserProfile,
-  updateUserRoles,
-} from "@/lib/firestore/users";
+import { getUserWithAuth, updateUserRoles } from "@/lib/firestore/users";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 interface IUser {
@@ -34,29 +32,25 @@ interface IUser {
  * GET user by ID
  * Requires admin role
  */
-async function getUser(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
     // Check admin access
     const session = await auth();
     console.log("Session for getUser:", session?.user);
 
-    // TEMPORARY BYPASS: Commenting out the admin check during debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("Unauthorized access attempt:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("Unauthorized access attempt:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for getting user"
-    );
+    // Extract user ID from URL
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const userId = segments[segments.length - 1];
 
-    const userId = context.params.id;
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
@@ -70,10 +64,12 @@ async function getUser(
     }
 
     return NextResponse.json(user);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching user:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to fetch user" },
+      {
+        error: error instanceof Error ? error.message : "Failed to fetch user",
+      },
       { status: 500 }
     );
   }
@@ -83,29 +79,25 @@ async function getUser(
  * UPDATE user by ID
  * Requires admin role
  */
-async function updateUser(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest) {
   try {
     // Check admin access
     const session = await auth();
     console.log("Session for updateUser:", session?.user);
 
-    // TEMPORARY BYPASS: Commenting out the admin check during debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("Unauthorized access attempt:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("Unauthorized access attempt:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for updating user"
-    );
+    // Extract user ID from URL
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const userId = segments[segments.length - 1];
 
-    const userId = context.params.id;
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
@@ -137,97 +129,36 @@ async function updateUser(
       }
 
       // Update user roles and permissions
-      const updatedUser = await updateUserRoles(
-        userId,
-        roles,
-        creativeRoles || [],
-        status || "active"
-      );
-
-      if (!updatedUser) {
-        return NextResponse.json(
-          { error: "Failed to update user roles" },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        message: "User roles updated successfully",
-        user: updatedUser,
-      });
-    } else {
+      const updatedUser = await updateUserRoles(userId, roles);
+      return NextResponse.json(updatedUser);
+    } else if (data.updateType === "profile") {
       // Handle profile update
-      const {
-        name,
-        email,
-        roles,
-        creativeRoles,
-        status,
-        accountType,
-        photoURL,
-        bio,
-      } = data;
-
-      // Basic validation
-      if (!name && !email && !roles && !status) {
+      const { profile } = data;
+      if (!profile) {
         return NextResponse.json(
-          { error: "No valid fields provided for update" },
+          { error: "Profile data is required" },
           { status: 400 }
         );
       }
 
-      // Create update object with only the fields that are provided
-      const updateData: Record<string, any> = {};
-      if (name) updateData.name = name;
-      if (email) updateData.email = email;
-      if (roles) updateData.roles = roles;
-      if (creativeRoles) updateData.creativeRoles = creativeRoles;
-      if (status) updateData.status = status;
-      if (accountType) updateData.accountType = accountType;
-      if (photoURL !== undefined) updateData.photoURL = photoURL;
-      if (bio !== undefined) updateData.bio = bio;
-      updateData.updatedAt = new Date();
+      // Update user profile in Firestore
+      await adminDb.collection("users").doc(userId).update({
+        profile,
+        updatedAt: new Date(),
+      });
 
-      try {
-        // Update in Firestore
-        await adminDb.collection("users").doc(userId).update(updateData);
-
-        // Update Firebase Auth claims if roles or status changed
-        if (roles || creativeRoles || status) {
-          try {
-            const userDoc = await adminDb.collection("users").doc(userId).get();
-            const userData = userDoc.data() || {};
-
-            await adminAuth.setCustomUserClaims(userId, {
-              roles: roles || userData.roles || ["user"],
-              creativeRoles: creativeRoles || userData.creativeRoles || [],
-              status: status || userData.status || "active",
-            });
-            console.log("Updated Firebase Auth claims for user:", userId);
-          } catch (claimsError) {
-            console.error("Error updating Firebase Auth claims:", claimsError);
-          }
-        }
-
-        // Get the updated user
-        const updatedUser = await getUserWithAuth(userId);
-
-        return NextResponse.json({
-          message: "User updated successfully",
-          user: updatedUser,
-        });
-      } catch (error) {
-        console.error("Error updating user in Firestore:", error);
-        return NextResponse.json(
-          { error: "Failed to update user" },
-          { status: 500 }
-        );
-      }
+      // Get the updated user
+      const updatedUser = await getUserWithAuth(userId);
+      return NextResponse.json(updatedUser);
     }
-  } catch (error: any) {
+
+    return NextResponse.json({ error: "Invalid update type" }, { status: 400 });
+  } catch (error) {
     console.error("Error updating user:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update user" },
+      {
+        error: error instanceof Error ? error.message : "Failed to update user",
+      },
       { status: 500 }
     );
   }
@@ -237,29 +168,22 @@ async function updateUser(
  * DELETE user by ID
  * Requires admin role
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest) {
   try {
     // Check admin access
     const session = await auth();
-    console.log("Session for deleteUser:", session?.user);
+    if (!session?.user?.roles?.includes("admin")) {
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
-    // TEMPORARY BYPASS: Commenting out the admin check during debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("Unauthorized access attempt:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
+    // Extract user ID from URL
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const userId = segments[segments.length - 1];
 
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for deleting user"
-    );
-
-    const userId = params.id;
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
@@ -267,37 +191,33 @@ export async function DELETE(
       );
     }
 
-    // First check if user exists in Firestore
-    const userDoc = await adminDb.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    // Delete user from Firebase Auth
+    await adminAuth.deleteUser(userId);
 
-    // Delete from Firestore
+    // Delete user document from Firestore
     await adminDb.collection("users").doc(userId).delete();
-    console.log("Deleted user from Firestore:", userId);
 
-    // Try to delete from Firebase Auth (might fail if it's an OAuth user)
-    try {
-      await adminAuth.deleteUser(userId);
-      console.log("Deleted user from Firebase Auth:", userId);
-    } catch (authError) {
-      console.error("Error deleting from Firebase Auth:", authError);
-      // Continue with the process even if Firebase Auth deletion fails
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "User deleted successfully",
-    });
-  } catch (error: any) {
+    return NextResponse.json({ message: "User deleted successfully" });
+  } catch (error) {
     console.error("Error deleting user:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to delete user" },
+      {
+        error: error instanceof Error ? error.message : "Failed to delete user",
+      },
       { status: 500 }
     );
   }
 }
 
-// Export the handler functions directly
-export { getUser as GET, updateUser as PUT };
+/**
+ * Handle OPTIONS requests
+ */
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}

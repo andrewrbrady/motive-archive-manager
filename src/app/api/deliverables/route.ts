@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || "";
     const platform = searchParams.get("platform") || "";
     const type = searchParams.get("type") || "";
-    const editor = searchParams.get("editor") || "";
+    const firebaseUid = searchParams.get("firebase_uid") || "";
     const carId = searchParams.get("car_id") || "";
     const creativeRole = searchParams.get("creative_role") || "";
     const sortField = searchParams.get("sortField") || "edit_deadline";
@@ -44,12 +44,22 @@ export async function GET(request: NextRequest) {
       searchQuery.type = type;
     }
 
-    if (editor && editor !== "all") {
-      searchQuery.editor = editor;
+    // Handle filtering by Firebase UID
+    if (firebaseUid) {
+      searchQuery.firebase_uid = firebaseUid;
+      console.log("Filtering by firebase_uid:", firebaseUid);
     }
 
     if (carId) {
-      searchQuery.car_id = new ObjectId(carId);
+      try {
+        searchQuery.car_id = new ObjectId(carId);
+      } catch (error) {
+        console.error("Invalid car_id:", carId);
+        return NextResponse.json(
+          { error: "Invalid car_id format" },
+          { status: 400 }
+        );
+      }
     }
 
     if (creativeRole && creativeRole !== "all") {
@@ -59,25 +69,14 @@ export async function GET(request: NextRequest) {
         .find({ creativeRoles: creativeRole, status: "active" })
         .toArray();
 
-      // Get their names for the editor field
-      const editorNames = users.map((user) => user.name);
+      // Get their Firebase UIDs
+      const userIds = users.map((user) => user.firebase_uid).filter(Boolean);
 
-      // Add editor names to the search query
-      if (editorNames.length > 0) {
-        // If an editor is already specified, we need to make sure it's in the list of valid editors
-        if (editor && editor !== "all") {
-          if (!editorNames.includes(editor)) {
-            // If the specified editor doesn't have the role, return no results
-            searchQuery.editor = null;
-          }
-          // Otherwise, keep the existing editor filter
-        } else {
-          // If no specific editor is selected, show deliverables from all editors with the role
-          searchQuery.editor = { $in: editorNames };
-        }
+      if (userIds.length > 0) {
+        searchQuery.firebase_uid = { $in: userIds };
       } else {
         // If no users found with this role, return no results
-        searchQuery.editor = null;
+        searchQuery.firebase_uid = null;
       }
     }
 
@@ -91,6 +90,9 @@ export async function GET(request: NextRequest) {
       [sortField]: sortDirection === "desc" ? -1 : 1,
     };
 
+    console.log("Search query:", searchQuery);
+    console.log("Sort object:", sortObject);
+
     // Get paginated, filtered, and sorted deliverables
     const deliverables = await db
       .collection<IDeliverable>("deliverables")
@@ -100,21 +102,58 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
+    console.log("Found deliverables:", deliverables.length);
+
     // Get car details for each deliverable
     const validCarIds = deliverables
-      .map((d) => d.car_id)
+      .map((d) => {
+        try {
+          return typeof d.car_id === "string"
+            ? new ObjectId(d.car_id)
+            : d.car_id;
+        } catch (error) {
+          console.error("Invalid car_id in deliverable:", d);
+          return null;
+        }
+      })
       .filter((id): id is ObjectId => id instanceof ObjectId);
+
+    console.log(
+      "Valid car IDs:",
+      validCarIds.map((id) => id.toString())
+    );
 
     const cars =
       validCarIds.length > 0
         ? await db
             .collection("cars")
             .find({ _id: { $in: validCarIds } })
-            .project({ _id: 1, make: 1, model: 1, year: 1 })
+            .project({
+              _id: 1,
+              make: 1,
+              model: 1,
+              year: 1,
+              primaryImageId: 1,
+            })
             .toArray()
         : [];
 
-    const carsMap = new Map(cars.map((car) => [car._id.toString(), car]));
+    console.log("Cars found:", cars.length);
+
+    // Convert ObjectId to string for primaryImageId to make comparison easier in frontend
+    const carsWithStringIds = cars.map((car) => {
+      if (car.primaryImageId && car.primaryImageId instanceof ObjectId) {
+        return {
+          ...car,
+          primaryImageId: car.primaryImageId.toString(),
+        };
+      }
+      return car;
+    });
+
+    const carsMap = new Map(
+      carsWithStringIds.map((car) => [car._id.toString(), car])
+    );
 
     // Combine deliverables with car details
     const deliverablesWithCars = deliverables.map((deliverable) => ({
@@ -148,8 +187,11 @@ export async function POST(request: Request) {
 
     const data = await request.json();
 
+    // Remove editor field if present
+    const { editor, ...deliverableData } = data;
+
     // Create new deliverable
-    const deliverable = new Deliverable(data);
+    const deliverable = new Deliverable(deliverableData);
     await deliverable.save();
 
     return NextResponse.json(deliverable.toPublicJSON(), { status: 201 });

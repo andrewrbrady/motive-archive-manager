@@ -4,13 +4,11 @@ import { MongoClient, ObjectId, Collection } from "mongodb";
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
+export const dynamic = "force-dynamic";
+
 if (!MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env");
 }
-
-type Props = {
-  params: Promise<{ id: string }>;
-};
 
 interface ImageMetadata {
   angle?: string;
@@ -38,10 +36,12 @@ async function getMongoClient() {
   return client;
 }
 
-export async function GET(request: NextRequest, { params }: Props) {
+export async function GET(request: NextRequest) {
   let client;
   try {
-    const { id } = await params;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1]; // -1 because URL is /cloudflare/metadata/[id]
 
     client = await getMongoClient();
     const db = client.db(DB_NAME);
@@ -80,10 +80,13 @@ export async function GET(request: NextRequest, { params }: Props) {
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: Props) {
+export async function PATCH(request: NextRequest) {
   let client;
   try {
-    const { id } = await params;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1]; // -1 because URL is /cloudflare/metadata/[id]
+
     const body = await request.json();
 
     client = await getMongoClient();
@@ -136,4 +139,15 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       await client.close();
     }
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

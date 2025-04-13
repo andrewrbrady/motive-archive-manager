@@ -21,19 +21,11 @@ import { Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Deliverable, Platform, DeliverableType } from "@/types/deliverable";
 import { format } from "date-fns";
+import UserSelector from "@/components/users/UserSelector";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
   onDeliverableUpdated: () => void;
-}
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  creativeRoles: string[];
-  status: string;
 }
 
 export default function EditDeliverableForm({
@@ -42,13 +34,15 @@ export default function EditDeliverableForm({
 }: EditDeliverableFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [creatives, setCreatives] = useState<User[]>([]);
   const [title, setTitle] = useState(deliverable.title);
   const [platform, setPlatform] = useState<Platform>(deliverable.platform);
   const [type, setType] = useState<DeliverableType>(deliverable.type);
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
-  const [editor, setEditor] = useState(deliverable.editor);
+  const [editorId, setEditorId] = useState<string | null>(
+    deliverable.firebase_uid || null
+  );
+  const [editorName, setEditorName] = useState(deliverable.editor || "");
 
   // Helper function to safely format dates
   const safeFormatDate = (date: any): string => {
@@ -69,55 +63,24 @@ export default function EditDeliverableForm({
     safeFormatDate(deliverable.release_date)
   );
 
+  // Reset form data when deliverable changes
   useEffect(() => {
-    const fetchCreatives = async () => {
-      try {
-        const response = await fetch("/api/users");
-        if (response.ok) {
-          const data = await response.json();
-
-          console.log(
-            "EditDeliverableForm - Fetched users:",
-            Array.isArray(data) ? data.length : "not an array"
-          );
-
-          // API returns an array directly
-          if (Array.isArray(data)) {
-            // Get all active users regardless of creative role
-            setCreatives(data.filter((user: User) => user.status === "active"));
-          } else {
-            console.error("Unexpected API response structure:", data);
-            toast.error("Invalid user data format received");
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching creatives:", error);
-      }
-    };
-
-    if (isOpen) {
-      fetchCreatives();
+    if (deliverable) {
+      setTitle(deliverable.title);
+      setPlatform(deliverable.platform);
+      setType(deliverable.type);
+      setDuration(deliverable.duration);
+      setAspectRatio(deliverable.aspect_ratio);
+      setEditorId(deliverable.firebase_uid || null);
+      setEditorName(deliverable.editor || "");
+      setEditDeadline(safeFormatDate(deliverable.edit_deadline));
+      setReleaseDate(safeFormatDate(deliverable.release_date));
     }
-  }, [isOpen]);
-
-  const getRelevantCreatives = (deliverableType: DeliverableType) => {
-    // Return all active users without filtering by creative role
-    // This ensures maximum flexibility in assigning users to deliverables
-    return creatives;
-  };
-
-  const relevantCreatives = getRelevantCreatives(type);
+  }, [deliverable]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !title ||
-      !platform ||
-      !type ||
-      !editor ||
-      !editDeadline ||
-      !releaseDate
-    ) {
+    if (!title || !platform || !type || !editDeadline || !releaseDate) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -137,7 +100,8 @@ export default function EditDeliverableForm({
             type,
             duration: type === "Photo Gallery" ? 0 : duration,
             aspect_ratio: aspectRatio,
-            editor,
+            editor: editorName,
+            firebase_uid: editorId,
             edit_deadline: new Date(editDeadline).toISOString(),
             release_date: new Date(releaseDate).toISOString(),
           }),
@@ -217,7 +181,6 @@ export default function EditDeliverableForm({
               value={type}
               onValueChange={(value: DeliverableType) => {
                 setType(value);
-                setEditor(""); // Reset editor when type changes
               }}
             >
               <SelectTrigger>
@@ -280,24 +243,21 @@ export default function EditDeliverableForm({
             <label htmlFor="editor" className="text-sm font-medium">
               Creative
             </label>
-            <Select
-              value={editor}
-              onValueChange={(value) => setEditor(value)}
-              disabled={!type}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={type ? "Select creative" : "Select type first"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {relevantCreatives.map((creative) => (
-                  <SelectItem key={creative._id} value={creative.name}>
-                    {creative.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UserSelector
+              value={editorId}
+              onChange={setEditorId}
+              onUserInfoRetrieved={(username) => {
+                if (username !== null) {
+                  setEditorName(username);
+                } else {
+                  setEditorName("");
+                }
+              }}
+              label={undefined} // Already have a label above
+              placeholder="Select creative"
+              disabled={isLoading}
+              editorName={editorName}
+            />
           </div>
 
           <div className="space-y-2">

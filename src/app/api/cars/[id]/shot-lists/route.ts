@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const { db } = await connectToDatabase();
     const shotLists = await db
       .collection("shotLists")
-      .find({ carId: params.id })
+      .find({ carId: id })
       .toArray();
 
     return NextResponse.json(
@@ -28,16 +31,17 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2];
+
     const { db } = await connectToDatabase();
     const data = await request.json();
 
     const result = await db.collection("shotLists").insertOne({
-      carId: params.id,
+      carId: id,
       name: data.name,
       description: data.description,
       shots: data.shots.map((shot: any) => ({
@@ -59,4 +63,15 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

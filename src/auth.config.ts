@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { FirebaseError } from "firebase/app";
@@ -34,6 +35,9 @@ console.log(
   "- GOOGLE_CLIENT_SECRET:",
   process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
 );
+console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
+console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
+console.log("- NODE_ENV:", process.env.NODE_ENV || "Not set");
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -45,6 +49,7 @@ export const authConfig: NextAuthConfig = {
           prompt: "select_account",
           access_type: "offline",
           response_type: "code",
+          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/google`,
         },
       },
     }),
@@ -126,57 +131,80 @@ export const authConfig: NextAuthConfig = {
   },
   callbacks: {
     async jwt({ token, user, account, trigger, session }) {
+      console.log("JWT callback - input data:", {
+        hasToken: !!token,
+        hasUser: !!user,
+        hasAccount: !!account,
+        trigger,
+        tokenData: token,
+        userData: user,
+        accountData: account,
+        sessionData: session,
+      });
+
       // Initial sign in
-      if (user) {
-        token.id = user.id || "";
-        token.roles = user.roles || ["user"];
-        token.creativeRoles = user.creativeRoles || [];
-        token.status = user.status || "active";
-
-        // If using Firebase credentials provider, fetch fresh claims directly
-        if (account?.provider === "credentials") {
+      if (account && user) {
+        // For Google sign-in, we need to get the Firebase user by email
+        if (account.provider === "google") {
           try {
-            console.log("Getting fresh Firebase claims for credentials login");
-            if (!user.id) {
-              console.warn(
-                "User ID is undefined, skipping Firebase claims fetch"
-              );
-            } else {
-              const firebaseUser = await adminAuth.getUser(user.id);
-              const claims = firebaseUser.customClaims || {};
+            const firebaseUser = await adminAuth.getUserByEmail(user.email!);
+            console.log("Found Firebase user for Google sign-in:", {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+            });
 
-              // Update token with fresh claims from Firebase
-              if (claims.roles) token.roles = claims.roles;
-              if (claims.creativeRoles)
-                token.creativeRoles = claims.creativeRoles;
-              if (claims.status) token.status = claims.status;
+            // Set the Firebase UID in the token
+            token.firebase_uid = firebaseUser.uid;
 
-              console.log("Fresh Firebase claims added to token:", {
-                uid: user.id,
-                roles: token.roles,
-                creativeRoles: token.creativeRoles,
-              });
-            }
-          } catch (error) {
-            console.error("Error getting Firebase custom claims:", error);
-          }
-        }
-      }
-
-      // Session update (manual refresh or role update)
-      if (trigger === "update" && session) {
-        if (session.refreshClaims === true) {
-          try {
-            console.log("Refreshing Firebase claims for user:", token.id);
-            const firebaseUser = await adminAuth.getUser(token.id as string);
+            // Get and set custom claims
             const claims = firebaseUser.customClaims || {};
-
-            // Update token with fresh claims
             token.roles = claims.roles || ["user"];
             token.creativeRoles = claims.creativeRoles || [];
             token.status = claims.status || "active";
 
-            console.log("Refreshed Firebase claims in token:", {
+            console.log("Updated token with Firebase data:", {
+              firebase_uid: token.firebase_uid,
+              roles: token.roles,
+              creativeRoles: token.creativeRoles,
+              status: token.status,
+            });
+          } catch (error) {
+            console.error(
+              "Error getting Firebase user in JWT callback:",
+              error
+            );
+            // Set default values
+            token.roles = ["user"];
+            token.creativeRoles = [];
+            token.status = "active";
+          }
+        }
+        // For credentials provider
+        else if (account.provider === "credentials") {
+          token.firebase_uid = user.id;
+          token.roles = user.roles || ["user"];
+          token.creativeRoles = user.creativeRoles || [];
+          token.status = user.status || "active";
+        }
+      }
+
+      // Session update
+      if (trigger === "update" && session) {
+        if (
+          session.refreshClaims === true &&
+          token.firebase_uid &&
+          typeof token.firebase_uid === "string"
+        ) {
+          try {
+            const firebaseUser = await adminAuth.getUser(token.firebase_uid);
+            const claims = firebaseUser.customClaims || {};
+
+            token.roles = claims.roles || ["user"];
+            token.creativeRoles = claims.creativeRoles || [];
+            token.status = claims.status || "active";
+
+            console.log("Refreshed claims in token:", {
+              firebase_uid: token.firebase_uid,
               roles: token.roles,
               creativeRoles: token.creativeRoles,
             });
@@ -184,7 +212,6 @@ export const authConfig: NextAuthConfig = {
             console.error("Error refreshing Firebase claims:", error);
           }
         } else if (session.roles || session.creativeRoles || session.status) {
-          // Update with provided values from session
           if (session.roles) token.roles = session.roles;
           if (session.creativeRoles)
             token.creativeRoles = session.creativeRoles;
@@ -194,150 +221,164 @@ export const authConfig: NextAuthConfig = {
 
       return token;
     },
-    async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.id as string;
-        session.user.roles = (token.roles as string[]) || ["user"];
-        session.user.creativeRoles = (token.creativeRoles as string[]) || [];
-        session.user.status = (token.status as string) || "active";
-
-        // Add a function reference for refreshing claims
-        // This gets serialized away but is useful for TypeScript types
-        (session as any).refreshClaims = function () {
-          return true;
-        };
+    async session({ session, token }: { session: any; token: JWT }) {
+      // Add error handling for undefined token or session
+      if (!session || !session.user) {
+        console.error(
+          "Session or session.user is undefined in session callback",
+          JSON.stringify({ session, token })
+        );
+        return session;
       }
+
+      console.log("Session callback - input data:", {
+        hasSession: !!session,
+        hasToken: !!token,
+        tokenData: token,
+        sessionData: session,
+      });
+
+      // Pass Firebase custom claims from token to session
+      if (token) {
+        // Use the firebase_uid from token
+        session.user.id = token.firebase_uid || token.sub;
+        session.user.roles = token.roles || ["user"];
+        session.user.creativeRoles = token.creativeRoles || [];
+        session.user.status = token.status || "active";
+
+        console.log("Session callback - updated session:", {
+          userId: session.user.id,
+          roles: session.user.roles,
+          creativeRoles: session.user.creativeRoles,
+          status: session.user.status,
+        });
+      } else {
+        console.warn("Token is undefined in session callback, using defaults", {
+          session,
+          token,
+        });
+        // Set default values
+        session.user.roles = ["user"];
+        session.user.creativeRoles = [];
+        session.user.status = "active";
+      }
+
       return session;
     },
     async signIn({ user, account }) {
       try {
         // Only process OAuth sign-ins (like Google)
         if (account?.provider === "google") {
-          // IMPORTANT: Use the providerAccountId (Google's user ID) instead of NextAuth's user.id
-          const uid = account.providerAccountId;
           const email = user.email;
 
-          if (!uid || !email) return false;
-
-          let firebaseUid = uid;
-
-          // Try to find existing user by email first
-          try {
-            const existingUser = await adminAuth.getUserByEmail(email);
-            console.log(`User ${email} found with UID: ${existingUser.uid}`);
-
-            // If the user exists but with a different UID, we'll use the existing UID
-            if (existingUser.uid !== uid) {
-              console.log(
-                `User exists with different UID (${existingUser.uid} vs ${uid}). Using existing UID.`
-              );
-              firebaseUid = existingUser.uid;
-            }
-
-            // Set or update custom claims
-            await adminAuth.setCustomUserClaims(firebaseUid, {
-              roles: ["user"],
-              creativeRoles: [],
-              status: "active",
-            });
-            console.log(`Updated claims for existing user: ${firebaseUid}`);
-          } catch (error) {
-            // User doesn't exist by email, continue with normal flow to create them
-            console.log(
-              `User ${email} not found by email, attempting to create with ID: ${uid}`
-            );
-
-            // Attempt to create the user in Firebase Auth if they don't exist yet
-            try {
-              await adminAuth.getUser(uid);
-              console.log(
-                `User ${email} with ID ${uid} already exists in Firebase Auth`
-              );
-            } catch (authError) {
-              // User doesn't exist in Firebase Auth, create them
-              try {
-                // Create the user using our import endpoint that properly sets the provider
-                const importResponse = await fetch(
-                  `${process.env.NEXTAUTH_URL}/api/auth/import-google-user`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      uid: uid,
-                      email: email,
-                      displayName: user.name || email.split("@")[0],
-                      photoURL: user.image || "",
-                    }),
-                  }
-                );
-
-                const importResult = await importResponse.json();
-
-                if (!importResponse.ok) {
-                  throw new Error(
-                    importResult.error || "Failed to import user"
-                  );
-                }
-
-                console.log(
-                  `Successfully imported Firebase Auth user for ${email} with Google provider`
-                );
-
-                // Custom claims are set by the import endpoint
-                console.log(`Claims already set by import endpoint`);
-              } catch (createError) {
-                console.error(
-                  `Error creating Firebase Auth user for ${email}:`,
-                  createError
-                );
-                // Don't fail the sign-in - we'll let the user in anyway
-                // but log the error for debugging
-              }
-            }
+          if (!email) {
+            console.error("No email provided for Google sign-in");
+            return false;
           }
 
-          // Check if this user already exists in Firestore
-          const userDoc = await adminDb
-            .collection("users")
-            .doc(firebaseUid)
-            .get();
+          console.log(`Processing Google sign-in for email: ${email}`);
 
-          // First-time Google sign-in or missing Firestore document - create user in Firestore
-          if (!userDoc.exists) {
-            console.log(
-              `Creating new user document for ${email} with ID: ${firebaseUid}`
-            );
+          // First try to find existing user by email
+          try {
+            const existingUser = await adminAuth.getUserByEmail(email);
+            console.log(`Found existing Firebase user with email ${email}:`, {
+              uid: existingUser.uid,
+              providerData: existingUser.providerData,
+            });
 
-            // Create a user document in Firestore with standard user permissions
-            await adminDb
-              .collection("users")
-              .doc(firebaseUid)
-              .set({
-                name: user.name || email.split("@")[0],
-                email: email,
-                image: user.image || "",
+            // Update custom claims if needed
+            const claims = existingUser.customClaims || {};
+            if (!claims.roles) {
+              await adminAuth.setCustomUserClaims(existingUser.uid, {
                 roles: ["user"],
                 creativeRoles: [],
                 status: "active",
-                accountType: "personal",
-                createdAt: new Date(),
               });
-          } else {
-            // Existing user - only check if they're not suspended
-            const userData = userDoc.data();
-            if (userData?.status === "suspended") {
-              console.log(`Sign-in attempt from suspended user: ${email}`);
-              return false; // Prevent suspended users from signing in
+              console.log(
+                `Updated claims for existing user: ${existingUser.uid}`
+              );
             }
+
+            // Ensure Firestore document exists
+            const userDoc = await adminDb
+              .collection("users")
+              .doc(existingUser.uid)
+              .get();
+            if (!userDoc.exists) {
+              await adminDb
+                .collection("users")
+                .doc(existingUser.uid)
+                .set({
+                  uid: existingUser.uid,
+                  name: user.name || email.split("@")[0],
+                  email: email,
+                  image: user.image || "",
+                  roles: ["user"],
+                  creativeRoles: [],
+                  status: "active",
+                  accountType: "personal",
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                });
+              console.log(
+                `Created Firestore document for existing user: ${existingUser.uid}`
+              );
+            }
+
+            return true;
+          } catch (error: any) {
+            // User doesn't exist in Firebase Auth
+            if (error.code === "auth/user-not-found") {
+              console.log(`Creating new Firebase user for email: ${email}`);
+
+              // Create new Firebase Auth user
+              const newUser = await adminAuth.createUser({
+                email: email,
+                emailVerified: true,
+                displayName: user.name || email.split("@")[0],
+                photoURL: user.image || "",
+                disabled: false,
+              });
+
+              // Set custom claims
+              await adminAuth.setCustomUserClaims(newUser.uid, {
+                roles: ["user"],
+                creativeRoles: [],
+                status: "active",
+              });
+
+              // Create Firestore document
+              await adminDb
+                .collection("users")
+                .doc(newUser.uid)
+                .set({
+                  uid: newUser.uid,
+                  name: user.name || email.split("@")[0],
+                  email: email,
+                  image: user.image || "",
+                  roles: ["user"],
+                  creativeRoles: [],
+                  status: "active",
+                  accountType: "personal",
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                });
+
+              console.log(`Successfully created new user: ${newUser.uid}`);
+              return true;
+            }
+
+            // For any other error, log it but allow sign in
+            console.error("Error in Firebase Auth operations:", error);
+            return true;
           }
         }
 
+        // For non-Google providers
         return true;
       } catch (error) {
         console.error("Error in signIn callback:", error);
-        // Still allow sign-in even if there was an error with Firestore
+        // Still allow sign-in even if there was an error
         // This prevents users from being locked out due to database issues
         return true;
       }

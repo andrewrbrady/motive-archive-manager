@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { hybridSearch } from "@/lib/hybridSearch";
 import { ModelType } from "@/components/ModelSelector";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/research/search
+
+    const { searchParams } = url;
     const query = searchParams.get("q");
     const model = (searchParams.get("model") as ModelType) || "gpt-4o-mini";
-    const carId = params.id;
 
     if (!query) {
       return NextResponse.json(
@@ -42,8 +44,24 @@ export async function GET(
   } catch (error) {
     console.error("Error in research search:", error);
     return NextResponse.json(
-      { error: "Failed to search research content" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to search research content",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

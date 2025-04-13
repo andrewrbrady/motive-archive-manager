@@ -1,34 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDatabase } from "@/lib/mongodb";
-import { User } from "@/models/User";
+import { listUsers } from "@/lib/firestore/users";
+import { logger } from "@/lib/logging";
+import { getUsers } from "@/lib/users/cache";
 
-interface IUser {
-  name: string;
-  email: string;
-  roles: string[];
-  status: string;
-  creativeRoles: string[];
-  created_at: Date;
-  updated_at: Date;
-  active: boolean;
-  permissions: string[];
-  last_login?: Date;
-  profile?: {
-    avatar_url?: string;
-    title?: string;
-    bio?: string;
-    specialties?: string[];
-    portfolio_url?: string;
-  };
-}
+// Define allowed methods
+const allowedMethods = ["GET", "POST"];
 
+/**
+ * GET /api/users
+ *
+ * Fetches users from Firestore with caching
+ */
 export async function GET(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+
   try {
-    const db = await getDatabase();
-    const users = await db.collection("users").find().toArray();
+    logger.info({
+      message: "Fetching users from cache/Firestore",
+      requestId,
+      route: "api/users",
+    });
+
+    // Use the caching utility to get users
+    const users = await getUsers();
+
+    logger.info({
+      message: "Successfully fetched users",
+      requestId,
+      count: users.length,
+    });
+
     return NextResponse.json(users);
   } catch (error) {
-    console.error("Error fetching users:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    logger.error({
+      message: "Error fetching users",
+      requestId,
+      error: errorMessage,
+    });
+
     return NextResponse.json(
       { error: "Failed to fetch users" },
       { status: 500 }
@@ -36,72 +47,48 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/users is now deprecated
+ * User creation should happen through Firebase Auth and Firestore directly
+ */
 export async function POST(request: NextRequest) {
-  try {
-    const db = await getDatabase();
-    const data = await request.json();
+  return NextResponse.json(
+    {
+      error:
+        "POST to /api/users is deprecated. User management should now be handled through Firebase.",
+    },
+    { status: 400 }
+  );
+}
 
-    // Validate required fields
-    if (!data.name || !data.email) {
-      return NextResponse.json(
-        { error: "Name and email are required" },
-        { status: 400 }
-      );
-    }
+// Handle OPTIONS requests for CORS
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      Allow: allowedMethods.join(", "),
+    },
+  });
+}
 
-    // Set default values and timestamps
-    const now = new Date();
-    const userData = {
-      ...data,
-      roles: data.roles || ["viewer"],
-      status: data.status || "active",
-      creativeRoles: data.creativeRoles || [],
-      active: true,
-      permissions: data.permissions || ["read"],
-      profile: {
-        ...data.profile,
-        specialties: data.profile?.specialties || [],
-      },
-      created_at: now,
-      updated_at: now,
-      createdAt: now,
-      updatedAt: now,
-    };
+// Handle all other methods
+export async function PUT(request: NextRequest) {
+  return methodNotAllowed();
+}
 
-    console.log("Creating user with data:", userData);
-    const result = await db.collection("users").insertOne(userData);
+export async function DELETE(request: NextRequest) {
+  return methodNotAllowed();
+}
 
-    const user = await db
-      .collection("users")
-      .findOne({ _id: result.insertedId });
-    console.log("User created successfully:", user);
+export async function PATCH(request: NextRequest) {
+  return methodNotAllowed();
+}
 
-    return NextResponse.json(user);
-  } catch (error: any) {
-    console.error("Error creating user:", error);
-
-    // Handle MongoDB duplicate key error
-    if (error.code === 11000) {
-      return NextResponse.json(
-        { error: "Email already exists" },
-        { status: 400 }
-      );
-    }
-
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return NextResponse.json(
-        { error: validationErrors.join(", ") },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Failed to create user" },
-      { status: 500 }
-    );
-  }
+function methodNotAllowed() {
+  return new NextResponse(null, {
+    status: 405,
+    headers: {
+      Allow: allowedMethods.join(", "),
+    },
+  });
 }

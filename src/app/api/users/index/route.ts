@@ -39,83 +39,25 @@ async function getUsers(request: NextRequest) {
       email: session?.user?.email,
       roles: session?.user?.roles,
       allUserData: session?.user,
+      rawSession: session,
     });
 
-    // Check Firestore for user roles directly
-    let hasAdminInFirestore = false;
-
-    if (session?.user?.id) {
-      try {
-        const userDoc = await adminDb
-          .collection("users")
-          .doc(session.user.id)
-          .get();
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          console.log("Firestore user data:", {
-            uid: userDoc.id,
-            roles: userData?.roles,
-            creativeRoles: userData?.creativeRoles,
-          });
-
-          // Check if user has admin role in Firestore
-          if (userData?.roles?.includes("admin")) {
-            console.log("User has admin role in Firestore");
-            hasAdminInFirestore = true;
-          } else {
-            console.log("User does not have admin role in Firestore");
-          }
-        } else {
-          console.log("User document not found in Firestore");
-        }
-      } catch (error) {
-        console.error("Error checking Firestore user roles:", error);
-      }
+    // Check if user has admin role
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("Access denied: User does not have admin role in any system");
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
     }
 
-    // Verify admin access through multiple methods
-    const hasAdminInSession = session?.user?.roles?.includes("admin");
+    // Get users from Firestore
+    const usersSnapshot = await adminDb.collection("users").get();
+    const users = usersSnapshot.docs.map((doc) => ({
+      uid: doc.id,
+      ...doc.data(),
+    }));
 
-    // TEMPORARY BYPASS: Commenting out the admin check to allow access during debugging
-    // if (!hasAdminInSession && !hasAdminInFirestore) {
-    //   console.log("Access denied: User does not have admin role in any system");
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log("TEMPORARY DEBUG MODE: Bypassing admin role check");
-
-    console.log("Fetching all users from Firestore");
-
-    // Continue with fetching users
-    const usersSnapshot = await adminDb
-      .collection("users")
-      .orderBy("name")
-      .get();
-    const users: FirestoreUser[] = [];
-
-    usersSnapshot.forEach((doc) => {
-      const data = doc.data();
-      users.push({
-        uid: doc.id,
-        email: data.email || "",
-        name: data.name || "",
-        roles: data.roles || ["user"],
-        creativeRoles: data.creativeRoles || [],
-        status: data.status || "active",
-        accountType: data.accountType,
-        photoURL: data.photoURL,
-        bio: data.bio,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        lastSignInTime: data.lastSignInTime?.toDate(),
-        mongoId: data.mongoId,
-      });
-    });
-
-    console.log(`Found ${users.length} users in Firestore`);
     return NextResponse.json(users);
   } catch (error: any) {
     console.error("Error fetching users:", error);
@@ -142,17 +84,12 @@ async function createUser(
       roles: session?.user?.roles,
     });
 
-    // TEMPORARY BYPASS: Commenting out the admin check for debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for user creation"
-    );
+    if (!session?.user?.roles?.includes("admin")) {
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
     const data = await request.json();
 

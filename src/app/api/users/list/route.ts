@@ -40,43 +40,36 @@ export async function GET(
       roles: session?.user?.roles,
     });
 
-    // TEMPORARY BYPASS: Commenting out the admin check for debugging
-    // if (!session?.user?.roles?.includes("admin")) {
-    //   console.log("User does not have admin role:", session?.user);
-    //   return NextResponse.json(
-    //     { error: "Unauthorized access" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    console.log(
-      "TEMPORARY DEBUG MODE: Bypassing admin role check for user listing"
-    );
+    if (!session?.user?.roles?.includes("admin")) {
+      console.log("User does not have admin role:", session?.user);
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 }
+      );
+    }
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
     const startAfter = searchParams.get("startAfter") || undefined;
-    const filterBy = searchParams.get("filterBy") || undefined;
-    const filterValue = searchParams.get("filterValue") || undefined;
 
     console.log(
-      `Fetching users with params: limit=${limit}, startAfter=${startAfter}, filterBy=${filterBy}, filterValue=${filterValue}`
+      `Fetching users with params: limit=${limit}, startAfter=${startAfter}`
     );
 
     // Get users from Firestore
-    const result = await listUsers(limit, startAfter, filterBy, filterValue);
+    const result = await listUsers(limit, startAfter);
 
     console.log(
-      `Found ${result.users.length} users, hasMore: ${!!result.lastId}`
+      `Found ${result.users.length} users, hasMore: ${!!result.lastDoc}`
     );
 
     // Return users with pagination info
     return NextResponse.json({
       users: result.users,
       pagination: {
-        lastId: result.lastId,
-        hasMore: !!result.lastId && result.users.length === limit,
+        lastId: result.lastDoc?.id,
+        hasMore: !!result.lastDoc && result.users.length === limit,
         limit,
       },
     });

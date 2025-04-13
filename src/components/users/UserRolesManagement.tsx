@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { useSession } from "next-auth/react";
 
 interface UserRolesProps {
   userId: string;
@@ -43,12 +44,37 @@ export default function UserRolesManagement({
   initialStatus,
   onUpdate,
 }: UserRolesProps) {
+  const { data: session } = useSession();
   const [roles, setRoles] = useState<string[]>(initialRoles || ["user"]);
   const [creativeRoles, setCreativeRoles] = useState<string[]>(
     initialCreativeRoles || []
   );
   const [status, setStatus] = useState<string>(initialStatus || "active");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Check if current user has admin privileges
+  const isAdmin = session?.user?.roles?.includes("admin");
+  // Check if user is trying to modify their own roles
+  const isSelfModification = session?.user?.id === userId;
+
+  // Prevent non-admin users from accessing this component
+  if (!isAdmin) {
+    return (
+      <div className="p-4 bg-red-50 text-red-600 rounded-md">
+        You do not have permission to manage user roles.
+      </div>
+    );
+  }
+
+  // Prevent users from modifying their own roles
+  if (isSelfModification) {
+    return (
+      <div className="p-4 bg-yellow-50 text-yellow-600 rounded-md">
+        For security reasons, you cannot modify your own roles. Please ask
+        another administrator to make any necessary changes.
+      </div>
+    );
+  }
 
   // Handle role checkbox changes
   const handleRoleChange = (role: string, checked: boolean) => {

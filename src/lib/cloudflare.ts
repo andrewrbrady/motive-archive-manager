@@ -228,17 +228,76 @@ export function getFormattedImageUrl(
     return ""; // Return empty string for null/undefined URLs
   }
 
-  // Clean any existing variants
-  const baseUrl = url.replace(/\/(public|thumbnail|avatar)$/, "");
+  try {
+    // Check if it's a Cloudflare Images URL
+    if (!url.includes("imagedelivery.net")) {
+      return url; // Return as-is if not a Cloudflare URL
+    }
 
-  // Ensure the URL is properly formed for Cloudflare Images
-  if (!baseUrl.includes("imagedelivery.net")) {
-    console.warn("Non-Cloudflare image URL detected:", url);
-    return url; // Return as-is if not a Cloudflare URL
+    // Remove any existing variant and trailing slashes
+    const baseUrl = url.replace(
+      /\/(public|thumbnail|avatar|medium|large)(\/)?$/,
+      ""
+    );
+
+    // Ensure the URL is properly formed
+    if (!baseUrl.match(/^https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+$/)) {
+      console.error("[Cloudflare] Malformed image URL:", url);
+      return url;
+    }
+
+    // Add the requested variant
+    return `${baseUrl}/${variant}`;
+  } catch (error) {
+    console.error("[Cloudflare] Error formatting image URL:", error);
+    return url;
   }
+}
 
-  // Return URL with specified variant
-  return `${baseUrl}/${variant}`;
+/**
+ * Get a car's thumbnail URL from its data
+ * This provides a consistent way to get a car's thumbnail across the application
+ * @param car The car object containing primaryImageId and images
+ * @returns The formatted URL for the car's thumbnail
+ */
+export function getCarThumbnailUrl(car: any): string {
+  try {
+    if (!car) {
+      console.warn("No car data provided to getCarThumbnailUrl");
+      return "";
+    }
+
+    // 1. Check if car has both primaryImageId and images array
+    if (car.primaryImageId && car.images && car.images.length > 0) {
+      // Find the primary image by comparing string representations of IDs
+      const primaryImage = car.images.find((img: any) => {
+        const imgId =
+          typeof img._id === "string" ? img._id : img._id?.toString();
+        const primaryId =
+          typeof car.primaryImageId === "string"
+            ? car.primaryImageId
+            : car.primaryImageId?.toString();
+
+        return imgId === primaryId;
+      });
+
+      // If primary image found and has a URL, return it
+      if (primaryImage?.url) {
+        return getFormattedImageUrl(primaryImage.url, "public");
+      }
+    }
+
+    // 2. Fall back to first image in the images array if available
+    if (car.images && car.images.length > 0 && car.images[0]?.url) {
+      return getFormattedImageUrl(car.images[0].url, "public");
+    }
+
+    // 3. Return empty string if no valid images found
+    return "";
+  } catch (error) {
+    console.error("Error getting car thumbnail URL:", error);
+    return "";
+  }
 }
 
 /**
@@ -249,4 +308,39 @@ export function getPlaceholderImageUrl(imageId: string): string {
   // Return a placeholder image URL that shows the image is loading
   // The format is deliberately compatible with getFormattedImageUrl
   return `https://placehold.co/800x600/d1d5db/6b7280?text=Loading...`;
+}
+
+/**
+ * Fetch an image directly from the images collection by ID
+ * @param imageId The ID of the image to fetch
+ * @returns Promise that resolves to the image URL
+ */
+export async function fetchImageById(imageId: string): Promise<string> {
+  try {
+    // If no imageId provided, return empty string
+    if (!imageId) {
+      return "";
+    }
+
+    // Make API call to get image by ID
+    const response = await fetch(`/api/images/${imageId}`);
+
+    if (!response.ok) {
+      console.error(`Failed to fetch image ${imageId}:`, response.statusText);
+      return "";
+    }
+
+    const data = await response.json();
+
+    // The API already returns a formatted URL
+    if (data && data.url) {
+      return data.url;
+    }
+
+    console.error("Invalid image data returned:", data);
+    return "";
+  } catch (error) {
+    console.error(`Error fetching image ${imageId}:`, error);
+    return "";
+  }
 }

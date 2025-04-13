@@ -94,7 +94,7 @@ interface RawAssetDetailsProps {
   };
 }
 
-export default function RawAssetDetails({ params }: RawAssetDetailsProps) {
+export default function RawAssetDetails({ params }: any) {
   const router = useRouter();
   const [asset, setAsset] = useState<RawAsset | null>(null);
   const [loading, setLoading] = useState(true);

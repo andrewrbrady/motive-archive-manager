@@ -61,22 +61,22 @@ export function EnrichmentProgress({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg shadow-lg overflow-hidden">
+    <div className="fixed bottom-4 right-4 w-96 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden z-50">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] flex items-center justify-between">
-        <h3 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-background">
+        <h3 className="text-sm font-medium text-foreground">
           Enriching Vehicle Data
         </h3>
         <button
           onClick={onClose}
-          className="text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Content */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-3 bg-background">
         {status === "error" ? (
           <div className="flex items-start gap-3 text-destructive-600 dark:text-destructive-400">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />

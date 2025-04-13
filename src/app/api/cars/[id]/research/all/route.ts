@@ -4,13 +4,14 @@ import { deleteFile } from "@/lib/s3";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
-    const carId = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/research/all
+
     const db = await getDatabase();
 
     // Get all research files for this car
@@ -37,8 +38,22 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting all files:", error);
     return NextResponse.json(
-      { error: "Failed to delete all files" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete all files",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

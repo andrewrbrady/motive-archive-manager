@@ -13,4 +13,3 @@ When working with AI models in this project:
 2. API Integration:
    - Always implement proper error handling
    - Use environment variables for API keys
-   - Implement rate limiting where appropriate

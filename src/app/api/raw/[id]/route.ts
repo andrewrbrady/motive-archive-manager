@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { RawAsset } from "@/models/raw_assets";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const db = await getDatabase();
     const rawCollection = db.collection("raw_assets");
 
     const rawAsset = await rawCollection.findOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (!rawAsset) {
@@ -32,17 +35,18 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const updates = await request.json();
     const db = await getDatabase();
     const rawCollection = db.collection("raw_assets");
 
     // Validate ID format
-    if (!ObjectId.isValid(params.id)) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid asset ID format" },
         { status: 400 }
@@ -72,149 +76,105 @@ export async function PUT(
       updatedAt: new Date(),
     };
 
-    // Convert IDs if present
-    if (Array.isArray(updateData.hardDriveIds)) {
-      try {
-        updateData.hardDriveIds = updateData.hardDriveIds.map(
-          (id: string | any) => {
-            // Handle different input formats
-            if (typeof id === "object" && id !== null) {
-              // If it's already an ObjectId or similar object with toString
-              return id.toString ? new ObjectId(id.toString()) : id;
-            } else if (typeof id === "string") {
-              // If it's a string
-              return ObjectId.isValid(id) ? new ObjectId(id) : id;
-            }
-            // Return as is if we can't handle it
-            return id;
-          }
-        );
-      } catch (error) {
-        console.error("Error converting hardDriveIds:", error);
-        return NextResponse.json(
-          { error: "Invalid hard drive ID format" },
-          { status: 400 }
-        );
-      }
-    }
+    // Check if the asset exists
+    const existingAsset = await rawCollection.findOne({
+      _id: new ObjectId(id),
+    });
 
-    if (Array.isArray(updateData.carIds)) {
-      try {
-        updateData.carIds = updateData.carIds.map((id: string) =>
-          ObjectId.isValid(id) ? new ObjectId(id) : id
-        );
-      } catch (error) {
-        console.error("Error converting carIds:", error);
-        return NextResponse.json(
-          { error: "Invalid car ID format" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Attempt to update the document
-    const result = await rawCollection.findOneAndUpdate(
-      { _id: new ObjectId(params.id) },
-      { $set: updateData },
-      { returnDocument: "after" }
-    );
-
-    if (!result) {
+    if (!existingAsset) {
       return NextResponse.json(
         { error: "Raw asset not found" },
         { status: 404 }
       );
     }
 
-    // Format the response
-    const formattedResult = {
-      ...result,
-      _id: result._id.toString(),
-      hardDriveIds: result.hardDriveIds?.map((id: any) => id.toString()) || [],
-      carIds: result.carIds?.map((id: any) => id.toString()) || [],
-      createdAt: result.createdAt
-        ? typeof result.createdAt === "string"
-          ? result.createdAt
-          : result.createdAt instanceof Date
-          ? result.createdAt.toISOString()
-          : result.createdAt
-        : null,
-      updatedAt: result.updatedAt
-        ? typeof result.updatedAt === "string"
-          ? result.updatedAt
-          : result.updatedAt instanceof Date
-          ? result.updatedAt.toISOString()
-          : result.updatedAt
-        : null,
-    };
+    // Perform the update
+    const result = await rawCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
 
-    return NextResponse.json(formattedResult);
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: "Raw asset not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get the updated document
+    const updatedAsset = await rawCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    return NextResponse.json(updatedAsset);
   } catch (error) {
     console.error("Error updating raw asset:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      {
-        error: "Failed to update raw asset",
-        details: errorMessage,
-      },
+      { error: "Failed to update raw asset" },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
     const db = await getDatabase();
     const rawCollection = db.collection("raw_assets");
 
     // Validate ID format
-    if (!ObjectId.isValid(params.id)) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid asset ID format" },
         { status: 400 }
       );
     }
 
-    // Check if the asset exists before trying to delete
-    const asset = await rawCollection.findOne({ _id: new ObjectId(params.id) });
-    if (!asset) {
+    // Check if the asset exists
+    const existingAsset = await rawCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!existingAsset) {
       return NextResponse.json(
         { error: "Raw asset not found" },
         { status: 404 }
       );
     }
 
-    // Attempt to delete the asset
+    // Delete the asset
     const result = await rawCollection.deleteOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
     });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(
-        { error: "Failed to delete asset" },
+        { error: "Failed to delete raw asset" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Asset deleted successfully",
-      deletedId: params.id,
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting raw asset:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      {
-        error: "Failed to delete raw asset",
-        details: errorMessage,
-      },
+      { error: "Failed to delete raw asset" },
       { status: 500 }
     );
   }
+}
+
+// OPTIONS for CORS
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }

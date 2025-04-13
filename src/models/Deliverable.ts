@@ -23,8 +23,8 @@ export interface IDeliverable extends Document {
   duration: number;
   actual_duration?: number;
   aspect_ratio: string;
-  editor: string;
-  firebase_uid?: string; // Firebase User ID for assignment
+  firebase_uid: string; // Required field for user association
+  editor: string; // Editor name
   status: DeliverableStatus;
   edit_dates: Date[];
   edit_deadline: Date;
@@ -99,19 +99,22 @@ const deliverableSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    firebase_uid: {
+      type: String,
+      required: true,
+      index: true,
+    },
     editor: {
       type: String,
       required: true,
-    },
-    firebase_uid: {
-      type: String,
-      index: true,
+      default: "Unassigned",
     },
     status: {
       type: String,
       enum: ["not_started", "in_progress", "done"],
       default: "not_started",
       required: true,
+      index: true,
     },
     edit_dates: [
       {
@@ -121,10 +124,12 @@ const deliverableSchema = new mongoose.Schema(
     edit_deadline: {
       type: Date,
       required: true,
+      index: true,
     },
     release_date: {
       type: Date,
       required: true,
+      index: true,
     },
     target_audience: String,
     music_track: String,
@@ -160,19 +165,10 @@ const deliverableSchema = new mongoose.Schema(
 deliverableSchema.index({ status: 1 });
 deliverableSchema.index({ platform: 1 });
 deliverableSchema.index({ type: 1 });
-deliverableSchema.index({ editor: 1 });
-deliverableSchema.index({ edit_deadline: 1 });
+deliverableSchema.index({ firebase_uid: 1, status: 1 });
+deliverableSchema.index({ car_id: 1, status: 1 });
 deliverableSchema.index({ release_date: 1 });
 deliverableSchema.index({ created_at: 1 });
-deliverableSchema.index({ car_id: 1, status: 1 });
-deliverableSchema.index({ car_id: 1, platform: 1 });
-
-// Add instance methods
-deliverableSchema.methods.toPublicJSON = function () {
-  const obj = this.toObject();
-  delete obj.__v;
-  return obj;
-};
 
 // Add virtual properties
 deliverableSchema.virtual("isOverdue").get(function () {
@@ -185,6 +181,13 @@ deliverableSchema.virtual("daysUntilDeadline").get(function () {
   const diffTime = deadline.getTime() - now.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
+
+// Method to create a public deliverable object (without sensitive data)
+deliverableSchema.methods.toPublicJSON = function () {
+  const obj = this.toObject();
+  delete obj.__v;
+  return obj;
+};
 
 // Create and export the model
 const Deliverable = mongoose.model<IDeliverable>(

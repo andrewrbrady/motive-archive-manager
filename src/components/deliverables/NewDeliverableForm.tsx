@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +21,22 @@ import { Plus } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Platform, DeliverableType } from "@/types/deliverable";
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  creativeRoles: string[];
+  status: string;
+}
+
+interface Car {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
+}
+
 interface NewDeliverableFormProps {
   carId?: string;
   onDeliverableCreated: () => void;
@@ -40,6 +56,55 @@ export default function NewDeliverableForm({
   const [editor, setEditor] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [cars, setCars] = useState<Car[]>([]);
+  const [selectedCarId, setSelectedCarId] = useState(carId || "");
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users");
+        if (!response.ok) {
+          throw new Error("Failed to fetch users");
+        }
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+          const activeUsers = data.filter(
+            (user: User) => user.status === "active"
+          );
+          setUsers(activeUsers);
+        } else {
+          console.error("Unexpected API response structure:", data);
+          toast.error("Failed to load users properly");
+        }
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
+      }
+    };
+
+    fetchUsers();
+
+    // Only fetch cars if no carId was provided
+    if (!carId) {
+      const fetchCars = async () => {
+        try {
+          const response = await fetch("/api/cars");
+          if (!response.ok) {
+            throw new Error("Failed to fetch cars");
+          }
+          const data = await response.json();
+          setCars(data.cars || []);
+        } catch (error) {
+          console.error("Error fetching cars:", error);
+          toast.error("Failed to fetch cars");
+        }
+      };
+
+      fetchCars();
+    }
+  }, [carId]);
 
   const resetForm = () => {
     setTitle("");
@@ -50,6 +115,9 @@ export default function NewDeliverableForm({
     setEditor("");
     setEditDeadline("");
     setReleaseDate("");
+    if (!carId) {
+      setSelectedCarId("");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,25 +134,36 @@ export default function NewDeliverableForm({
       return;
     }
 
+    // If no carId was provided and no car was selected, show error
+    if (!carId && !selectedCarId) {
+      toast.error("Please select a car");
+      return;
+    }
+
+    const deliverableCarId = carId || selectedCarId;
+
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/cars/${carId}/deliverables`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title,
-          platform,
-          type,
-          duration,
-          aspect_ratio: aspectRatio,
-          editor,
-          edit_deadline: new Date(editDeadline),
-          release_date: new Date(releaseDate),
-          car_id: carId,
-        }),
-      });
+      const response = await fetch(
+        `/api/cars/${deliverableCarId}/deliverables`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title,
+            platform,
+            type,
+            duration,
+            aspect_ratio: aspectRatio,
+            editor,
+            edit_deadline: new Date(editDeadline),
+            release_date: new Date(releaseDate),
+            car_id: deliverableCarId,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to create deliverable");
@@ -110,7 +189,7 @@ export default function NewDeliverableForm({
           New Deliverable
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Create New Deliverable</DialogTitle>
         </DialogHeader>
@@ -128,6 +207,29 @@ export default function NewDeliverableForm({
             />
           </div>
 
+          {!carId && (
+            <div className="space-y-2">
+              <label htmlFor="car" className="text-sm font-medium">
+                Car
+              </label>
+              <Select
+                value={selectedCarId}
+                onValueChange={(value) => setSelectedCarId(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select car" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cars.map((car) => (
+                    <SelectItem key={car._id} value={car._id.toString()}>
+                      {car.year} {car.make} {car.model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label htmlFor="platform" className="text-sm font-medium">
               Platform
@@ -140,13 +242,27 @@ export default function NewDeliverableForm({
                 <SelectValue placeholder="Select platform" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
-                <SelectItem value="YouTube">YouTube</SelectItem>
-                <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
-                <SelectItem value="TikTok">TikTok</SelectItem>
-                <SelectItem value="Facebook">Facebook</SelectItem>
-                <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
+                <SelectItem key="instagram-reels" value="Instagram Reels">
+                  Instagram Reels
+                </SelectItem>
+                <SelectItem key="youtube" value="YouTube">
+                  YouTube
+                </SelectItem>
+                <SelectItem key="youtube-shorts" value="YouTube Shorts">
+                  YouTube Shorts
+                </SelectItem>
+                <SelectItem key="tiktok" value="TikTok">
+                  TikTok
+                </SelectItem>
+                <SelectItem key="facebook" value="Facebook">
+                  Facebook
+                </SelectItem>
+                <SelectItem key="bring-a-trailer" value="Bring a Trailer">
+                  Bring a Trailer
+                </SelectItem>
+                <SelectItem key="other" value="Other">
+                  Other
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -163,15 +279,33 @@ export default function NewDeliverableForm({
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="feature">Feature</SelectItem>
-                <SelectItem value="promo">Promo</SelectItem>
-                <SelectItem value="review">Review</SelectItem>
-                <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                <SelectItem value="highlights">Highlights</SelectItem>
-                <SelectItem value="photo_gallery">Photo Gallery</SelectItem>
-                <SelectItem value="Marketing Email">Marketing Email</SelectItem>
-                <SelectItem value="Blog">Blog</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem key="feature" value="feature">
+                  Feature
+                </SelectItem>
+                <SelectItem key="promo" value="promo">
+                  Promo
+                </SelectItem>
+                <SelectItem key="review" value="review">
+                  Review
+                </SelectItem>
+                <SelectItem key="walkthrough" value="walkthrough">
+                  Walkthrough
+                </SelectItem>
+                <SelectItem key="highlights" value="highlights">
+                  Highlights
+                </SelectItem>
+                <SelectItem key="photo_gallery" value="photo_gallery">
+                  Photo Gallery
+                </SelectItem>
+                <SelectItem key="marketing-email" value="Marketing Email">
+                  Marketing Email
+                </SelectItem>
+                <SelectItem key="blog" value="Blog">
+                  Blog
+                </SelectItem>
+                <SelectItem key="other-type" value="other">
+                  Other
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -199,10 +333,18 @@ export default function NewDeliverableForm({
                 <SelectValue placeholder="Select aspect ratio" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="16:9">16:9</SelectItem>
-                <SelectItem value="9:16">9:16</SelectItem>
-                <SelectItem value="1:1">1:1</SelectItem>
-                <SelectItem value="4:3">4:3</SelectItem>
+                <SelectItem key="16:9" value="16:9">
+                  16:9
+                </SelectItem>
+                <SelectItem key="9:16" value="9:16">
+                  9:16
+                </SelectItem>
+                <SelectItem key="1:1" value="1:1">
+                  1:1
+                </SelectItem>
+                <SelectItem key="4:3" value="4:3">
+                  4:3
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -211,13 +353,18 @@ export default function NewDeliverableForm({
             <label htmlFor="editor" className="text-sm font-medium">
               Editor
             </label>
-            <Input
-              id="editor"
-              value={editor}
-              onChange={(e) => setEditor(e.target.value)}
-              placeholder="Enter editor name"
-              required
-            />
+            <Select value={editor} onValueChange={(value) => setEditor(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select editor" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user._id} value={user._id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -251,7 +398,6 @@ export default function NewDeliverableForm({
               type="button"
               variant="outline"
               onClick={() => setIsOpen(false)}
-              disabled={isLoading}
             >
               Cancel
             </Button>

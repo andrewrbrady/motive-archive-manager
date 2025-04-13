@@ -4,13 +4,14 @@ import { getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 
-export async function POST(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export const dynamic = "force-dynamic";
+
+export async function POST(request: Request) {
   let client;
   try {
-    const { id } = context.params;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/image-sync
 
     console.log(`Image sync request for car ID: ${id}`);
 
@@ -153,4 +154,15 @@ export async function POST(
       await client.close();
     }
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

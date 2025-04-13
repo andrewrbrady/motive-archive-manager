@@ -21,17 +21,17 @@ import UserDetailModal from "./UserDetailModal";
 // Shared User interface to be consistent across components
 export interface User {
   uid: string;
-  _id?: string;
-  name: string;
   email: string;
+  name: string;
   roles: string[];
   creativeRoles: string[];
   status: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  accountType?: string;
   photoURL?: string;
+  image?: string;
+  accountType?: string;
   bio?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export default function UserManagement() {
@@ -123,6 +123,8 @@ export default function UserManagement() {
               roles: ["user"],
               creativeRoles: [],
               status: "active",
+              createdAt: new Date(),
+              updatedAt: new Date(),
             },
           ]);
           setFilteredUsers([
@@ -133,6 +135,8 @@ export default function UserManagement() {
               roles: ["user"],
               creativeRoles: [],
               status: "active",
+              createdAt: new Date(),
+              updatedAt: new Date(),
             },
           ]);
 
@@ -163,7 +167,12 @@ export default function UserManagement() {
       });
 
       // Process the response (might be different format for the non-paginated endpoint)
-      const users = Array.isArray(data) ? data : data.users || [];
+      const users = (Array.isArray(data) ? data : data.users || []).map(
+        (user: any) => ({
+          ...user,
+          uid: user.uid || user.id, // Handle both uid and id fields
+        })
+      );
       const hasMoreData = data.pagination?.hasMore || false;
       const lastUserId = data.pagination?.lastId || undefined;
 
@@ -190,6 +199,8 @@ export default function UserManagement() {
           roles: ["user"],
           creativeRoles: [],
           status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]);
       setFilteredUsers([
@@ -200,6 +211,8 @@ export default function UserManagement() {
           roles: ["user"],
           creativeRoles: [],
           status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]);
 
@@ -226,6 +239,16 @@ export default function UserManagement() {
   };
 
   const handleEditUser = (user: User) => {
+    // Ensure we have a valid uid
+    if (!user.uid) {
+      console.error("Cannot edit user without uid:", user);
+      toast({
+        title: "Error",
+        description: "Invalid user data. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedUser(user);
     setIsUserModalOpen(true);
   };
@@ -261,37 +284,61 @@ export default function UserManagement() {
   };
 
   const handleUserUpdated = (updatedUser: User) => {
-    setIsUserModalOpen(false);
-    fetchUsers(); // Refresh the user list
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.uid === updatedUser.uid ? updatedUser : user
+      )
+    );
   };
 
-  const syncSession = async () => {
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue) return "N/A";
     try {
-      setIsLoading(true);
+      // Handle Firestore timestamp format
+      if (dateValue._seconds) {
+        const date = new Date(dateValue._seconds * 1000);
+        return date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
 
-      // Refresh the session from Firebase Auth
-      const refreshResponse = await fetch("/api/auth/refresh-session");
-      const refreshData = await refreshResponse.json();
-
-      console.log("Session refresh result:", refreshData);
-
-      // Now fetch users with the refreshed session
-      await fetchUsers();
-
-      toast({
-        title: "Success",
-        description: "User data refreshed successfully",
+      // Handle regular date strings/objects
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     } catch (error) {
-      console.error("Error refreshing session:", error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh user data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      console.error("Error formatting date:", error);
+      return "N/A";
     }
+  };
+
+  const syncUserProfile = async (userId: string) => {
+    try {
+      const response = await fetch("/api/users/sync-profile", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync user profile");
+      }
+
+      // Refresh user list after sync
+      fetchUsers();
+    } catch (error) {
+      console.error("Error syncing user profile:", error);
+      // Handle error appropriately
+    }
+  };
+
+  const getDisplayImage = (user: User) => {
+    // Use photoURL from Google Auth if available, fallback to image field
+    return user.photoURL || user.image || "/default-avatar.png";
   };
 
   return (
@@ -306,14 +353,6 @@ export default function UserManagement() {
           />
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={() => syncSession()}
-            variant="outline"
-            disabled={isLoading}
-            className="border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]"
-          >
-            Refresh Users
-          </Button>
           <Button
             onClick={handleCreateUser}
             variant="outline"
@@ -340,107 +379,118 @@ export default function UserManagement() {
           </TableHeader>
           <TableBody>
             {isLoading && users.length === 0 ? (
-              <TableRow>
+              <TableRow key="loading">
                 <TableCell colSpan={7} className="text-center py-4">
                   <LoadingSpinner size="sm" />
                 </TableCell>
               </TableRow>
             ) : filteredUsers.length === 0 ? (
-              <TableRow>
+              <TableRow key="no-users">
                 <TableCell colSpan={7} className="text-center py-4">
                   <span className="text-muted-foreground">No users found</span>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers.map((user) => (
-                <TableRow
-                  key={user.uid}
-                  className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
-                >
-                  <TableCell className="font-medium">
-                    <a
-                      href={`/admin/users/${user.uid}`}
-                      className="text-primary hover:underline cursor-pointer"
-                    >
-                      {user.name}
-                    </a>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map((role) => (
-                        <span
-                          key={role}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+              filteredUsers.map((user: User) => {
+                // Ensure we have a valid uid for the key
+                const rowKey = user.uid || `temp-${user.email}`;
+                return (
+                  <TableRow
+                    key={rowKey}
+                    className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
+                  >
+                    <TableCell className="font-medium">
+                      {user.uid ? (
+                        <a
+                          href={`/admin/users/${user.uid}`}
+                          className="text-primary hover:underline cursor-pointer"
                         >
-                          {role.charAt(0).toUpperCase() + role.slice(1)}
-                        </span>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.creativeRoles.length > 0 ? (
-                        user.creativeRoles.map((role) => (
+                          {user.name}
+                        </a>
+                      ) : (
+                        <span>{user.name}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles.map((role: string, index: number) => (
                           <span
-                            key={role}
+                            key={`${rowKey}-role-${index}`}
                             className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
                           >
-                            {role
-                              .split("_")
-                              .map(
-                                (word) =>
-                                  word.charAt(0).toUpperCase() + word.slice(1)
-                              )
-                              .join(" ")}
+                            {role.charAt(0).toUpperCase() + role.slice(1)}
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          None
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.status === "active"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-destructive/10 text-destructive"
-                      }`}
-                    >
-                      {user.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.createdAt
-                      ? user.createdAt instanceof Date
-                        ? user.createdAt.toLocaleDateString()
-                        : new Date(user.createdAt).toLocaleDateString()
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() => handleEditUser(user)}
-                        variant="ghost"
-                        size="sm"
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.creativeRoles.length > 0 ? (
+                          user.creativeRoles.map(
+                            (role: string, index: number) => (
+                              <span
+                                key={`${rowKey}-creative-role-${index}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+                              >
+                                {role
+                                  .split("_")
+                                  .map(
+                                    (word: string) =>
+                                      word.charAt(0).toUpperCase() +
+                                      word.slice(1)
+                                  )
+                                  .join(" ")}
+                              </span>
+                            )
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            None
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.status === "active"
+                            ? "bg-primary/10 text-primary"
+                            : "bg-destructive/10 text-destructive"
+                        }`}
                       >
-                        Edit
-                      </Button>
-                      <Button
-                        onClick={() => handleDeleteUser(user.uid)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {user.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(user.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {user.uid && (
+                          <>
+                            <Button
+                              onClick={() => handleEditUser(user)}
+                              variant="ghost"
+                              size="sm"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteUser(user.uid)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -466,6 +516,59 @@ export default function UserManagement() {
         user={selectedUser}
         onUserUpdated={handleUserUpdated}
       />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {users.map((user) => {
+          const rowKey = user.uid || `temp-${user.email}`;
+          return (
+            <div
+              key={rowKey}
+              className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
+            >
+              <div className="flex-shrink-0">
+                <img
+                  className="h-10 w-10 rounded-full"
+                  src={getDisplayImage(user)}
+                  alt={user.name}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {user.roles.map((role) => (
+                    <span
+                      key={role}
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <button
+                  onClick={() => syncUserProfile(user.uid)}
+                  className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

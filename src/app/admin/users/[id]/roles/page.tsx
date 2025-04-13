@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { AdminGuard } from "@/components/auth/AuthGuard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +10,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
-
-interface UserRolesPageProps {
-  params: {
-    id: string;
-  };
-}
 
 interface UserRolesData {
   uid: string;
@@ -27,10 +21,17 @@ interface UserRolesData {
   status: string;
 }
 
-export default function UserRolesPage({ params }: UserRolesPageProps) {
+export default function UserRolesPage() {
+  const params = useParams();
+  const id = params?.id?.toString();
+
+  if (!id) {
+    return null;
+  }
+
   return (
     <AdminGuard>
-      <UserRolesContent userId={params.id} />
+      <UserRolesContent userId={id} />
     </AdminGuard>
   );
 }

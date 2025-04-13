@@ -12,6 +12,7 @@ import { getDatabase } from "@/lib/mongodb";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 interface RouteContext {
   params: {
@@ -25,12 +26,12 @@ interface Car {
 }
 
 // GET research files for a car
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
-    const carId = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 2]; // -2 because URL is /cars/[id]/research
+
     const db = await getDatabase();
 
     // Get all research files for this car, handling both string and ObjectId carIds
@@ -50,7 +51,12 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching research files:", error);
     return NextResponse.json(
-      { error: "Failed to fetch research files" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch research files",
+      },
       { status: 500 }
     );
   }
@@ -116,12 +122,12 @@ async function generateSignedUrls(files: any[]) {
 }
 
 // POST new research file
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request) {
   try {
-    const carId = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 2]; // -2 because URL is /cars/[id]/research
+
     const { content, filename } = await request.json();
 
     if (!content || !filename) {
@@ -158,19 +164,25 @@ export async function POST(
   } catch (error) {
     console.error("Error creating research file:", error);
     return NextResponse.json(
-      { error: "Failed to create research file" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create research file",
+      },
       { status: 500 }
     );
   }
 }
 
 // DELETE research file
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 2]; // -2 because URL is /cars/[id]/research
+
+    const { searchParams } = url;
     const fileId = searchParams.get("fileId");
 
     if (!fileId) {
@@ -204,14 +216,30 @@ export async function DELETE(
 
     await db
       .collection<Car>("cars")
-      .updateOne({ _id: new ObjectId(params.id) }, updateFilter);
+      .updateOne({ _id: new ObjectId(carId) }, updateFilter);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting research file:", error);
     return NextResponse.json(
-      { error: "Failed to delete research file" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete research file",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

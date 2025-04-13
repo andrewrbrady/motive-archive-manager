@@ -264,12 +264,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: Request) {
   try {
-    const carId = params.id;
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/research/content
+
     const { fileId, content } = await request.json();
 
     if (!fileId || !carId || content === undefined) {
@@ -318,8 +318,24 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating file content:", error);
     return NextResponse.json(
-      { error: "Failed to update file content" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update file content",
+      },
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

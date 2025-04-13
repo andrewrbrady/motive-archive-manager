@@ -8,15 +8,15 @@ if (!process.env.MONGODB_URI) {
 
 const uri = process.env.MONGODB_URI;
 const options: MongoClientOptions = {
-  maxPoolSize: 50, // Increased from 10 for better performance with low user count
-  minPoolSize: 10, // Increased from 1 to maintain more persistent connections
-  maxIdleTimeMS: 60000, // Increased from 45000 to keep connections alive longer
-  connectTimeoutMS: 30000, // Connection timeout increased to 30 seconds (up from 10000)
-  socketTimeoutMS: 60000, // Socket timeout increased to 60 seconds (up from 45000)
-  serverSelectionTimeoutMS: 30000, // Server selection timeout added (30 seconds)
-  waitQueueTimeoutMS: 10000, // Wait queue timeout added
-  retryWrites: true, // Enable retry for write operations
-  retryReads: true, // Enable retry for read operations
+  maxPoolSize: 10, // Reduced from 50 to prevent connection overload
+  minPoolSize: 1, // Reduced from 10 to minimize idle connections
+  maxIdleTimeMS: 60000,
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 60000,
+  serverSelectionTimeoutMS: 30000,
+  waitQueueTimeoutMS: 10000,
+  retryWrites: true,
+  retryReads: true,
 };
 
 // Detect if running on Vercel
@@ -24,15 +24,14 @@ const isVercel = process.env.VERCEL === "1";
 
 // Adjust options for Vercel environment - optimized for better reliability
 if (isVercel) {
-  // More aggressive settings for serverless functions
   options.maxPoolSize = 5;
-  options.minPoolSize = 0; // No persistent connections
-  options.serverSelectionTimeoutMS = 15000; // Shorter timeout for faster failures (down from 30000)
-  options.connectTimeoutMS = 15000; // Shorter connection timeout (down from 30000)
-  options.socketTimeoutMS = 30000; // Shorter socket timeout (down from 60000)
-  options.waitQueueTimeoutMS = 5000; // Shorter wait queue timeout (down from 10000)
-  options.heartbeatFrequencyMS = 15000; // More frequent heartbeats (default 10000)
-  options.family = 4; // Force IPv4 (can help with some connectivity issues)
+  options.minPoolSize = 0;
+  options.serverSelectionTimeoutMS = 15000;
+  options.connectTimeoutMS = 15000;
+  options.socketTimeoutMS = 30000;
+  options.waitQueueTimeoutMS = 5000;
+  options.heartbeatFrequencyMS = 15000;
+  options.family = 4;
   console.log(
     "Detected Vercel environment, using optimized MongoDB connection settings"
   );
@@ -113,40 +112,51 @@ function shouldForceNewConnection(): boolean {
 
 // For Mongoose ORM connection (used by models)
 export async function dbConnect() {
-  if (cached.conn && !shouldForceNewConnection()) {
-    console.log("Using cached Mongoose connection");
-    return cached.conn;
-  }
+  // Set max listeners on the Mongoose connection
+  mongoose.connection.setMaxListeners(15);
 
-  if (!cached.promise || shouldForceNewConnection()) {
-    const opts = {
-      ...options,
-      bufferCommands: false,
-    };
-
-    const mongooseUri = `${uri}/${DB_NAME}`;
-    console.log("Creating new Mongoose connection to database:", DB_NAME);
-    cached.promise = mongoose
-      .connect(mongooseUri, opts as any)
-      .then((mongoose) => {
-        global._lastConnectionTime = Date.now();
-        console.log(
-          "New Mongoose connection established with pool size:",
-          options.maxPoolSize
-        );
-        return mongoose;
-      });
+  if (mongoose.connection.readyState === 1) {
+    return mongoose;
   }
 
   try {
-    cached.conn = await cached.promise;
+    const mongooseUri = `${uri}/${DB_NAME}`;
+    console.log("Creating new Mongoose connection to database:", DB_NAME);
+
+    await mongoose.connect(mongooseUri, {
+      maxPoolSize: options.maxPoolSize,
+      minPoolSize: options.minPoolSize,
+      connectTimeoutMS: options.connectTimeoutMS,
+      socketTimeoutMS: options.socketTimeoutMS,
+      serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
+      retryWrites: options.retryWrites,
+      retryReads: options.retryReads,
+    } as any);
+
+    // Handle connection events
+    mongoose.connection.on("connected", () => {
+      console.log("Mongoose connected to database");
+    });
+
+    mongoose.connection.on("error", (err) => {
+      console.error("Mongoose connection error:", err);
+    });
+
+    mongoose.connection.on("disconnected", () => {
+      console.log("Mongoose disconnected");
+    });
+
+    // Clean up connections when the process exits
+    process.on("SIGINT", async () => {
+      await mongoose.connection.close();
+      process.exit(0);
+    });
+
+    return mongoose;
   } catch (e) {
-    cached.promise = null;
     console.error("MongoDB connection error:", e);
     throw e;
   }
-
-  return cached.conn;
 }
 
 // For native MongoDB driver connection (used by API routes)

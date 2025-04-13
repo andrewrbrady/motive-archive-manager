@@ -20,13 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
-interface ClientDetailsProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function ClientDetailsPage({ params }: ClientDetailsProps) {
+export default function ClientDetailsPage({ params }: any) {
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

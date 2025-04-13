@@ -13,11 +13,12 @@ export interface FirestoreUser {
   status: "active" | "inactive" | "suspended";
   accountType?: string;
   photoURL?: string;
+  image?: string;
+  profileImage?: string;
   bio?: string;
   createdAt: Date;
   updatedAt: Date;
   lastSignInTime?: Date;
-  mongoId?: string; // Original MongoDB ID (for reference during migration)
 }
 
 /**
@@ -43,29 +44,34 @@ export interface UserWithAuth extends FirestoreUser {
  */
 export async function getUserById(uid: string): Promise<FirestoreUser | null> {
   try {
+    console.log(`Looking up user with ID: ${uid}`);
+
     const userDoc = await adminDb.collection("users").doc(uid).get();
 
-    if (!userDoc.exists) {
-      return null;
+    if (userDoc.exists) {
+      console.log(`Found user with UID: ${uid}`);
+      const userData = userDoc.data()!;
+
+      return {
+        uid: userDoc.id,
+        email: userData.email || "",
+        name: userData.name || "",
+        roles: userData.roles || ["user"],
+        creativeRoles: userData.creativeRoles || [],
+        status: userData.status || "active",
+        accountType: userData.accountType,
+        photoURL: userData.photoURL,
+        image: userData.image,
+        profileImage: userData.profileImage,
+        bio: userData.bio,
+        createdAt: userData.createdAt?.toDate() || new Date(),
+        updatedAt: userData.updatedAt?.toDate() || new Date(),
+        lastSignInTime: userData.lastSignInTime?.toDate(),
+      };
     }
 
-    const userData = userDoc.data()!;
-
-    return {
-      uid: userDoc.id,
-      email: userData.email || "",
-      name: userData.name || "",
-      roles: userData.roles || ["user"],
-      creativeRoles: userData.creativeRoles || [],
-      status: userData.status || "active",
-      accountType: userData.accountType,
-      photoURL: userData.photoURL,
-      bio: userData.bio,
-      createdAt: userData.createdAt?.toDate() || new Date(),
-      updatedAt: userData.updatedAt?.toDate() || new Date(),
-      lastSignInTime: userData.lastSignInTime?.toDate(),
-      mongoId: userData.mongoId,
-    };
+    console.log(`No user found with ID: ${uid}`);
+    return null;
   } catch (error) {
     console.error("Error getting user by ID:", error);
     return null;
@@ -103,11 +109,12 @@ export async function getUserByEmail(
       status: userData.status || "active",
       accountType: userData.accountType,
       photoURL: userData.photoURL,
+      image: userData.image,
+      profileImage: userData.profileImage,
       bio: userData.bio,
       createdAt: userData.createdAt?.toDate() || new Date(),
       updatedAt: userData.updatedAt?.toDate() || new Date(),
       lastSignInTime: userData.lastSignInTime?.toDate(),
-      mongoId: userData.mongoId,
     };
   } catch (error) {
     console.error("Error getting user by email:", error);
@@ -116,7 +123,116 @@ export async function getUserByEmail(
 }
 
 /**
- * Get user with both Firestore and Auth information
+ * List users from Firestore with optional filtering and pagination
+ * @param limit Maximum number of users to return
+ * @param startAfter Document to start after for pagination
+ * @returns Object containing users array and last document for pagination
+ */
+export async function listUsers(
+  limit: number = 20,
+  startAfter?: any
+): Promise<{ users: FirestoreUser[]; lastDoc: any }> {
+  try {
+    console.log("Listing users from Firestore");
+
+    // Build query
+    let query = adminDb.collection("users").orderBy("name", "asc");
+
+    // Apply pagination if startAfter is provided
+    if (startAfter) {
+      query = query.startAfter(startAfter);
+    }
+
+    // Apply limit
+    query = query.limit(limit);
+
+    // Execute query
+    const snapshot = await query.get();
+
+    // Convert to FirestoreUser array
+    const users: FirestoreUser[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      users.push({
+        uid: doc.id,
+        email: data.email || "",
+        name: data.name || "",
+        roles: data.roles || ["user"],
+        creativeRoles: data.creativeRoles || [],
+        status: data.status || "active",
+        accountType: data.accountType,
+        photoURL: data.photoURL,
+        image: data.image,
+        profileImage: data.profileImage,
+        bio: data.bio,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        lastSignInTime: data.lastSignInTime?.toDate(),
+      });
+    });
+
+    console.log(`Found ${users.length} users`);
+
+    return {
+      users,
+      lastDoc: snapshot.docs[snapshot.docs.length - 1],
+    };
+  } catch (error) {
+    console.error("Error listing users:", error);
+    return { users: [], lastDoc: null };
+  }
+}
+
+/**
+ * Update a user's Firestore document
+ * @param uid User ID
+ * @param data Data to update
+ * @returns Updated user data or null if update fails
+ */
+export async function updateUser(
+  uid: string,
+  data: Partial<FirestoreUser>
+): Promise<FirestoreUser | null> {
+  try {
+    const userRef = adminDb.collection("users").doc(uid);
+
+    // Update the document
+    await userRef.update({
+      ...data,
+      updatedAt: new Date(),
+    });
+
+    // Get the updated document
+    const updatedDoc = await userRef.get();
+    if (!updatedDoc.exists) {
+      return null;
+    }
+
+    const userData = updatedDoc.data()!;
+    return {
+      uid: updatedDoc.id,
+      email: userData.email || "",
+      name: userData.name || "",
+      roles: userData.roles || ["user"],
+      creativeRoles: userData.creativeRoles || [],
+      status: userData.status || "active",
+      accountType: userData.accountType,
+      photoURL: userData.photoURL,
+      image: userData.image,
+      profileImage: userData.profileImage,
+      bio: userData.bio,
+      createdAt: userData.createdAt?.toDate() || new Date(),
+      updatedAt: userData.updatedAt?.toDate() || new Date(),
+      lastSignInTime: userData.lastSignInTime?.toDate(),
+    };
+  } catch (error) {
+    console.error("Error updating user:", error);
+    return null;
+  }
+}
+
+/**
+ * Get user with both Firestore and Auth data
  * @param uid User ID
  * @returns UserWithAuth data or null if not found
  */
@@ -124,24 +240,20 @@ export async function getUserWithAuth(
   uid: string
 ): Promise<UserWithAuth | null> {
   try {
-    // Get Firestore user data
+    // Get Firestore data
     const firestoreUser = await getUserById(uid);
-
     if (!firestoreUser) {
       return null;
     }
 
-    // Get Firebase Auth user data
+    // Get Auth data
     const authUser = await adminAuth.getUser(uid);
 
     // Combine data
     return {
       ...firestoreUser,
       emailVerified: authUser.emailVerified,
-      providerData: authUser.providerData.map((provider) => ({
-        providerId: provider.providerId,
-        uid: provider.uid,
-      })),
+      providerData: authUser.providerData,
       disabled: authUser.disabled,
       metadata: {
         creationTime: authUser.metadata.creationTime,
@@ -155,141 +267,14 @@ export async function getUserWithAuth(
 }
 
 /**
- * Update user profile in Firestore
+ * Update a user's roles
  * @param uid User ID
- * @param data User data to update
- * @returns Updated user data or null if update failed
- */
-export async function updateUserProfile(
-  uid: string,
-  data: Partial<FirestoreUser>
-): Promise<FirestoreUser | null> {
-  try {
-    // Don't allow updating sensitive fields
-    const { roles, creativeRoles, status, uid: _, ...updateData } = data;
-
-    // Add updated timestamp
-    const updates = {
-      ...updateData,
-      updatedAt: new Date(),
-    };
-
-    // Update Firestore
-    await adminDb.collection("users").doc(uid).update(updates);
-
-    // Get and return updated user
-    return await getUserById(uid);
-  } catch (error) {
-    console.error("Error updating user profile:", error);
-    return null;
-  }
-}
-
-/**
- * Update user roles and permissions
- * @param uid User ID
- * @param roles Array of role names
- * @param creativeRoles Array of creative role names
- * @param status User status
- * @returns Updated user data or null if update failed
+ * @param roles New roles array
+ * @returns Updated user data or null if update fails
  */
 export async function updateUserRoles(
   uid: string,
-  roles: string[] = [],
-  creativeRoles: string[] = [],
-  status: "active" | "inactive" | "suspended" = "active"
-): Promise<UserWithAuth | null> {
-  try {
-    // Update custom claims in Firebase Auth
-    await adminAuth.setCustomUserClaims(uid, {
-      roles,
-      creativeRoles,
-      status,
-    });
-
-    // Update in Firestore
-    await adminDb.collection("users").doc(uid).update({
-      roles,
-      creativeRoles,
-      status,
-      updatedAt: new Date(),
-    });
-
-    // Get and return updated user
-    return await getUserWithAuth(uid);
-  } catch (error) {
-    console.error("Error updating user roles:", error);
-    return null;
-  }
-}
-
-/**
- * List users with pagination
- * @param limit Maximum number of users to return
- * @param startAfter User ID to start after (for pagination)
- * @param filterBy Optional field to filter by
- * @param filterValue Optional value to filter for
- * @returns Array of FirestoreUser objects
- */
-export async function listUsers(
-  limit: number = 20,
-  startAfter?: string,
-  filterBy?: string,
-  filterValue?: string
-): Promise<{ users: FirestoreUser[]; lastId?: string }> {
-  try {
-    let query = adminDb.collection("users").orderBy("name");
-
-    // Apply filter if provided
-    if (filterBy && filterValue) {
-      query = query.where(filterBy, "==", filterValue);
-    }
-
-    // Apply pagination starting point
-    if (startAfter) {
-      const startDoc = await adminDb.collection("users").doc(startAfter).get();
-      if (startDoc.exists) {
-        query = query.startAfter(startDoc);
-      }
-    }
-
-    // Apply limit
-    query = query.limit(limit);
-
-    // Execute query
-    const snapshot = await query.get();
-
-    // Parse results
-    const users: FirestoreUser[] = [];
-    let lastId: string | undefined;
-
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      users.push({
-        uid: doc.id,
-        email: data.email || "",
-        name: data.name || "",
-        roles: data.roles || ["user"],
-        creativeRoles: data.creativeRoles || [],
-        status: data.status || "active",
-        accountType: data.accountType,
-        photoURL: data.photoURL,
-        bio: data.bio,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        lastSignInTime: data.lastSignInTime?.toDate(),
-        mongoId: data.mongoId,
-      });
-
-      lastId = doc.id;
-    });
-
-    return {
-      users,
-      lastId: snapshot.size > 0 ? lastId : undefined,
-    };
-  } catch (error) {
-    console.error("Error listing users:", error);
-    return { users: [] };
-  }
+  roles: string[]
+): Promise<FirestoreUser | null> {
+  return updateUser(uid, { roles });
 }
