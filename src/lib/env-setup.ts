@@ -9,9 +9,12 @@ const baseUrl = (() => {
   }
 
   // For Vercel deployments
-  if (process.env.VERCEL_URL) {
-    // Ensure we use https for all Vercel deployments
-    return `https://${process.env.VERCEL_URL}`;
+  if (process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
+    const url = process.env.VERCEL_URL;
+    // Remove any protocol prefix if present
+    const cleanUrl = url.replace(/^https?:\/\//, "");
+    // Always use https for Vercel deployments
+    return `https://${cleanUrl}`;
   }
 
   // If NEXTAUTH_URL is explicitly set, use that
@@ -31,6 +34,11 @@ console.log("Environment Configuration:", {
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
   computed_baseUrl: baseUrl,
 });
+
+// Set NEXTAUTH_URL if it's not already set
+if (!process.env.NEXTAUTH_URL && baseUrl) {
+  process.env.NEXTAUTH_URL = baseUrl;
+}
 
 // Type-safe environment variables
 export const env = {

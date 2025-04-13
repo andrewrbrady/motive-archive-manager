@@ -1,3 +1,6 @@
+// Import environment setup (this must be first)
+import "@/lib/env-setup";
+
 import type { NextAuthConfig } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import Google from "next-auth/providers/google";
@@ -7,9 +10,6 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { env } from "@/lib/env-setup";
-
-// Import environment setup (this must be first)
-import "@/lib/env-setup";
 
 // Check required environment variables
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
