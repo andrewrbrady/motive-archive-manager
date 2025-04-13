@@ -120,6 +120,7 @@ export function useGallery(id: string) {
     async (optimisticData?: Gallery) => {
       if (optimisticData) {
         setData(optimisticData);
+        return; // Don't fetch if we have optimistic data
       }
       await fetchGallery();
     },

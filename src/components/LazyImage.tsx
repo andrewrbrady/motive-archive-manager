@@ -56,7 +56,6 @@ const LazyImage: React.FC<LazyImageProps> = ({
   const handleError = () => {
     setError(true);
     setLoading(false);
-    // Don't set a placeholder image URL here, render a fallback component instead
   };
 
   if (error || !imgSrc) {
@@ -66,7 +65,11 @@ const LazyImage: React.FC<LazyImageProps> = ({
           "flex items-center justify-center bg-muted rounded-md",
           className
         )}
-        style={{ width, height }}
+        style={{
+          aspectRatio: `${width}/${height}`,
+          width: "100%",
+          height: "auto",
+        }}
         onClick={onClick}
       >
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -77,16 +80,23 @@ const LazyImage: React.FC<LazyImageProps> = ({
     );
   }
 
+  const containerStyle = {
+    aspectRatio: `${width}/${height}`,
+    width: "100%",
+    height: "auto",
+    position: "relative" as const,
+  };
+
   return (
     <div
-      className={cn("relative", className)}
-      style={{ width, height }}
+      className={cn("relative overflow-hidden rounded-md", className)}
+      style={containerStyle}
       onClick={onClick}
     >
       {loadingVariant === "skeleton" && loading && (
         <Skeleton
           className={cn(
-            "absolute inset-0 rounded-md",
+            "absolute inset-0",
             loading ? "opacity-100" : "opacity-0"
           )}
         />
@@ -94,14 +104,14 @@ const LazyImage: React.FC<LazyImageProps> = ({
       <Image
         src={imgSrc}
         alt={alt}
-        width={width}
-        height={height}
+        fill
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         quality={quality}
         priority={priority}
         onLoad={handleLoad}
         onError={handleError}
         className={cn(
-          "rounded-md transition-opacity duration-300",
+          "transition-opacity duration-300",
           loading ? "opacity-0" : "opacity-100",
           objectFit === "contain" ? "object-contain" : "object-cover"
         )}

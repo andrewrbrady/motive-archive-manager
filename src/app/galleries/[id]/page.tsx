@@ -6,6 +6,8 @@ import {
   useGallery,
   updateGallery,
   deleteGallery,
+  Gallery,
+  updateGalleryImageOrder,
 } from "@/lib/hooks/query/useGalleries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,6 +158,28 @@ export default function GalleryPage() {
     setIsAddingImages(false);
     // Just clear URL search params without triggering additional refreshes
     router.push(`/galleries/${id}`, { scroll: false });
+  };
+
+  const handleOrderChange = async (updatedGallery: Gallery) => {
+    if (!gallery) return;
+
+    try {
+      // Update UI optimistically first
+      mutate(updatedGallery);
+
+      // Make the API call
+      await updateGalleryImageOrder(id, updatedGallery.orderedImages || []);
+
+      // No need to mutate again on success since we already have the correct state
+    } catch (error) {
+      // Only refetch on error to get the correct state
+      mutate();
+      toast({
+        title: "Error",
+        description: "Failed to update image order",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -475,7 +499,7 @@ ${gallery.images
             ) : gallery.images && gallery.images.length > 0 ? (
               <DraggableGalleryGrid
                 gallery={gallery}
-                onOrderChange={() => mutate()}
+                onOrderChange={handleOrderChange}
                 onImageSelect={handleImageSelect}
               />
             ) : (

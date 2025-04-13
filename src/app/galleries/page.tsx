@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useGalleries, createGallery } from "@/lib/hooks/query/useGalleries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, ImageIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -163,27 +163,36 @@ export default function GalleriesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {data?.galleries.map((gallery) => (
+              {data?.galleries.map((gallery, index) => (
                 <div
                   key={gallery._id}
                   className="group relative bg-card rounded-lg border p-6 hover:border-primary/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/galleries/${gallery._id}`)}
                 >
-                  {gallery.thumbnailImage ? (
-                    <div className="aspect-[4/3] mb-4 overflow-hidden rounded-md">
+                  <div className="relative aspect-[16/9] mb-4 overflow-hidden rounded-md bg-muted">
+                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-1 rounded-md bg-background/80 backdrop-blur-sm border border-border text-foreground shadow-sm">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <span className="text-xs font-medium">
+                        {gallery.imageIds.length}
+                      </span>
+                    </div>
+
+                    {gallery.thumbnailImage ? (
                       <LazyImage
                         src={gallery.thumbnailImage.url}
                         alt={gallery.name}
-                        width={400}
-                        height={300}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        width={1600}
+                        height={900}
+                        className="w-full h-full"
+                        priority={index < 3}
+                        objectFit="cover"
                       />
-                    </div>
-                  ) : (
-                    <div className="aspect-[4/3] mb-4 bg-muted flex items-center justify-center rounded-md">
-                      <div className="text-muted-foreground">No images</div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <div className="text-muted-foreground">No images</div>
+                      </div>
+                    )}
+                  </div>
                   <div className="space-y-2">
                     <h2 className="text-xl font-semibold tracking-tight">
                       {gallery.name}
@@ -193,9 +202,6 @@ export default function GalleriesPage() {
                         {gallery.description}
                       </p>
                     )}
-                    <p className="text-sm text-muted-foreground">
-                      {gallery.imageIds.length} images
-                    </p>
                   </div>
                 </div>
               ))}
