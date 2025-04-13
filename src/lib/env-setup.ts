@@ -1,53 +1,11 @@
 // This file validates and exports environment variables for type safety
 // It runs on the server side only
 
-// Log environment configuration
-const baseUrl = (() => {
-  // For development environment
-  if (process.env.NODE_ENV === "development") {
-    return "http://localhost:3000";
-  }
-
-  // For Vercel deployments
-  if (process.env.VERCEL_URL) {
-    // Always use https for Vercel deployments
-    return `https://${process.env.VERCEL_URL}`;
-  }
-
-  // If NEXTAUTH_URL is explicitly set, use that
-  if (process.env.NEXTAUTH_URL) {
-    return process.env.NEXTAUTH_URL;
-  }
-
-  // Fallback for other environments
-  return undefined;
-})();
-
-// Log all relevant environment variables for debugging
-console.log("Environment Configuration:", {
-  NODE_ENV: process.env.NODE_ENV,
-  VERCEL_ENV: process.env.VERCEL_ENV,
-  VERCEL_URL: process.env.VERCEL_URL,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-  computed_baseUrl: baseUrl,
-});
-
-// Set NEXTAUTH_URL if it's not already set
-if (!process.env.NEXTAUTH_URL && baseUrl) {
-  process.env.NEXTAUTH_URL = baseUrl;
-}
-
-// Validate critical auth configuration
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error("NEXTAUTH_SECRET must be set");
-}
-
 // Type-safe environment variables
 export const env = {
   firebase: {
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
   },
-  baseUrl,
 } as const;
 
 // Server-side environment validation
