@@ -50,7 +50,9 @@ export const authConfig: NextAuthConfig = {
           prompt: "select_account",
           access_type: "offline",
           response_type: "code",
-          redirect_uri: `${env.baseUrl}/api/auth/callback/google`,
+          redirect_uri: env.baseUrl
+            ? `${env.baseUrl}/api/auth/callback/google`
+            : undefined,
         },
       },
     }),

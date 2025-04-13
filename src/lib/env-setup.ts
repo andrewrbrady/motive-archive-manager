@@ -2,14 +2,28 @@
 // It runs on the server side only
 
 // Log environment configuration
-const baseUrl =
-  process.env.NEXTAUTH_URL ||
-  (process.env.NODE_ENV === "development"
-    ? "http://localhost:3000"
-    : process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : undefined);
+const baseUrl = (() => {
+  // For development environment
+  if (process.env.NODE_ENV === "development") {
+    return "http://localhost:3000";
+  }
 
+  // For Vercel deployments
+  if (process.env.VERCEL_URL) {
+    // Ensure we use https for all Vercel deployments
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  // If NEXTAUTH_URL is explicitly set, use that
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+
+  // Fallback for other environments
+  return undefined;
+})();
+
+// Log all relevant environment variables for debugging
 console.log("Environment Configuration:", {
   NODE_ENV: process.env.NODE_ENV,
   VERCEL_ENV: process.env.VERCEL_ENV,
