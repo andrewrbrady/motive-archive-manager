@@ -50,9 +50,6 @@ export const authConfig: NextAuthConfig = {
           prompt: "select_account",
           access_type: "offline",
           response_type: "code",
-          redirect_uri: env.baseUrl
-            ? `${env.baseUrl}/api/auth/callback/google`
-            : undefined,
         },
       },
     }),
@@ -387,7 +384,18 @@ export const authConfig: NextAuthConfig = {
       }
     },
   },
-  debug: process.env.NODE_ENV === "development",
+  debug: true,
+  logger: {
+    error: (code, ...message) => {
+      console.error(code, ...message);
+    },
+    warn: (code, ...message) => {
+      console.warn(code, ...message);
+    },
+    debug: (code, ...message) => {
+      console.log(code, ...message);
+    },
+  },
   trustHost: true,
   basePath: "/api/auth",
 };

@@ -13,6 +13,7 @@ function logOAuthConfig() {
     NEXTAUTH_SECRET_SET: !!process.env.NEXTAUTH_SECRET,
     VERCEL_ENV: process.env.VERCEL_ENV,
     NODE_ENV: process.env.NODE_ENV,
+    baseUrl: process.env.NEXTAUTH_URL,
   });
 }
 
@@ -21,7 +22,21 @@ export async function GET(req: NextRequest) {
   try {
     console.log("NextAuth GET handler called:", req.url);
     logOAuthConfig();
-    return await handlers.GET(req);
+
+    // Validate required environment variables
+    if (!process.env.NEXTAUTH_URL) {
+      throw new Error("NEXTAUTH_URL is not set");
+    }
+    if (!process.env.NEXTAUTH_SECRET) {
+      throw new Error("NEXTAUTH_SECRET is not set");
+    }
+
+    const response = await handlers.GET(req);
+    console.log("NextAuth GET handler response:", {
+      status: response.status,
+      ok: response.ok,
+    });
+    return response;
   } catch (error: any) {
     console.error("Error in NextAuth GET handler:", {
       message: error?.message,
@@ -30,7 +45,7 @@ export async function GET(req: NextRequest) {
       stack: process.env.NODE_ENV === "development" ? error?.stack : undefined,
     });
     return NextResponse.json(
-      { error: "Authentication error" },
+      { error: "Authentication error", details: error?.message },
       { status: 500 }
     );
   }
@@ -40,7 +55,21 @@ export async function POST(req: NextRequest) {
   try {
     console.log("NextAuth POST handler called:", req.url);
     logOAuthConfig();
-    return await handlers.POST(req);
+
+    // Validate required environment variables
+    if (!process.env.NEXTAUTH_URL) {
+      throw new Error("NEXTAUTH_URL is not set");
+    }
+    if (!process.env.NEXTAUTH_SECRET) {
+      throw new Error("NEXTAUTH_SECRET is not set");
+    }
+
+    const response = await handlers.POST(req);
+    console.log("NextAuth POST handler response:", {
+      status: response.status,
+      ok: response.ok,
+    });
+    return response;
   } catch (error: any) {
     console.error("Error in NextAuth POST handler:", {
       message: error?.message,
@@ -49,7 +78,7 @@ export async function POST(req: NextRequest) {
       stack: process.env.NODE_ENV === "development" ? error?.stack : undefined,
     });
     return NextResponse.json(
-      { error: "Authentication error" },
+      { error: "Authentication error", details: error?.message },
       { status: 500 }
     );
   }
