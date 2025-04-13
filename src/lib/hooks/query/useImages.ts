@@ -161,35 +161,11 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
           },
         });
 
-        // Call onProgress callback
         if (onProgress) {
           onProgress([...progress]);
         }
 
         try {
-          // Update to show progress at 25% during Cloudflare upload
-          progress[i] = {
-            ...progress[i],
-            progress: 25,
-            stepProgress: {
-              cloudflare: {
-                status: "uploading",
-                progress: 50,
-                message: "Uploading to Cloudflare...",
-              },
-              openai: {
-                status: "pending",
-                progress: 0,
-                message: "Waiting for Cloudflare upload to complete",
-              },
-            },
-          };
-
-          // Call onProgress callback
-          if (onProgress) {
-            onProgress([...progress]);
-          }
-
           const response = await fetch(`/api/cloudflare/images`, {
             method: "POST",
             body: formData,
@@ -199,256 +175,51 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
             throw new Error(`Upload failed: ${response.status}`);
           }
 
-          // Parse the initial response
           const result = await response.json();
 
-          // Update progress to show Cloudflare completed and OpenAI starting
+          // Add the new image to our uploadedImages array
+          uploadedImages.push(result.image);
+
           progress[i] = {
             ...progress[i],
-            progress: 50,
-            currentStep: "Analyzing image with OpenAI...",
-            stepProgress: {
-              cloudflare: {
-                status: "complete",
-                progress: 100,
-                message: "Cloudflare upload complete",
-              },
-              openai: {
-                status: "analyzing" as const,
-                progress: 0,
-                message: "Starting AI analysis...",
-              },
-            },
+            progress: 100,
+            status: "complete",
+            imageUrl: result.image.url,
+            metadata: result.image.metadata,
           };
 
-          // Call onProgress callback
           if (onProgress) {
             onProgress([...progress]);
           }
-
-          // Start polling for status
-          const imageId =
-            result.result?.id || result.imageId || result.cloudflareId;
-          if (imageId) {
-            let isProcessComplete = false;
-            let iterations = 0;
-            const maxIterations = 20; // Max attempts to avoid infinite loops
-
-            while (!isProcessComplete && iterations < maxIterations) {
-              // Wait 1 second between polls
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              iterations++;
-
-              // Update OpenAI progress based on iterations (approximate)
-              const openAiProgress = Math.min(
-                iterations * 15, // 15% per iteration
-                90 // Cap at 90% until we get "complete" signal
-              );
-
-              progress[i] = {
-                ...progress[i],
-                progress: 50 + openAiProgress / 2, // Map 0-100 to 50-100
-                stepProgress: {
-                  cloudflare: {
-                    status: "complete",
-                    progress: 100,
-                    message: "Cloudflare upload complete",
-                  },
-                  openai: {
-                    status: "analyzing" as const,
-                    progress: openAiProgress,
-                    message: `Analyzing image (step ${iterations})...`,
-                  },
-                },
-              };
-
-              // Call onProgress callback
-              if (onProgress) {
-                onProgress([...progress]);
-              }
-
-              // Check status
-              try {
-                console.log(
-                  `Checking status for image ${imageId}, iteration ${iterations}`
-                );
-                const statusResponse = await fetch(
-                  `/api/cloudflare/images/status`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ id: imageId }),
-                  }
-                );
-
-                if (statusResponse.ok) {
-                  // Parse status response
-                  const statusResult = await statusResponse.json();
-                  console.log("Status result:", statusResult);
-
-                  // If status is "processing", update the progress message
-                  if (statusResult.status === "processing") {
-                    progress[i] = {
-                      ...progress[i],
-                      progress: 50 + openAiProgress / 2, // Map 0-100 to 50-100
-                      currentStep: "OpenAI analysis in progress...",
-                      stepProgress: {
-                        cloudflare: {
-                          status: "complete",
-                          progress: 100,
-                          message: "Cloudflare upload complete",
-                        },
-                        openai: {
-                          status: "analyzing" as const,
-                          progress: openAiProgress,
-                          message: `AI analysis in progress (${Math.min(
-                            openAiProgress,
-                            90
-                          )}%)...`,
-                        },
-                      },
-                    };
-
-                    // Call onProgress callback
-                    if (onProgress) {
-                      onProgress([...progress]);
-                    }
-                  }
-
-                  // If image has metadata from AI or has flags, consider it complete
-                  if (
-                    statusResult.ready ||
-                    statusResult.status === "complete" ||
-                    (statusResult.metadata &&
-                      (statusResult.metadata.aiAnalysis?.angle ||
-                        statusResult.metadata.aiAnalysis?.description ||
-                        statusResult.metadata.angle ||
-                        statusResult.metadata.description))
-                  ) {
-                    isProcessComplete = true;
-
-                    // Push the uploaded image to our results
-                    uploadedImages.push({
-                      id: imageId,
-                      url:
-                        result.result?.variants?.[0] ||
-                        result.imageUrl ||
-                        result.success?.variants?.[0],
-                      filename: file.name,
-                      metadata: statusResult.metadata || {},
-                      variants:
-                        result.result?.variants ||
-                        result.success?.variants ||
-                        {},
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                    });
-
-                    // Update progress to complete
-                    progress[i] = {
-                      ...progress[i],
-                      progress: 100,
-                      status: "complete",
-                      currentStep: "Upload and analysis complete",
-                      stepProgress: {
-                        cloudflare: {
-                          status: "complete",
-                          progress: 100,
-                          message: "Upload to Cloudflare complete",
-                        },
-                        openai: {
-                          status: "complete",
-                          progress: 100,
-                          message: "AI analysis complete",
-                        },
-                      },
-                    };
-
-                    // Call onProgress callback
-                    if (onProgress) {
-                      onProgress([...progress]);
-                    }
-                  }
-                }
-              } catch (e) {
-                console.error("Error checking status:", e);
-              }
-            }
-
-            // If we hit max iterations without completion, still mark as completed
-            // but indicate that analysis might not be complete
-            if (!isProcessComplete) {
-              console.log("Hit max iterations, marking as complete anyway");
-              progress[i] = {
-                ...progress[i],
-                progress: 100,
-                status: "complete",
-                currentStep:
-                  "Upload complete, analysis may still be processing",
-                stepProgress: {
-                  cloudflare: {
-                    status: "complete",
-                    progress: 100,
-                    message: "Upload to Cloudflare complete",
-                  },
-                  openai: {
-                    status: "complete",
-                    progress: 100,
-                    message: "Analysis timeout, but image is uploaded",
-                  },
-                },
-              };
-
-              // Call onProgress callback with a slight delay to ensure UI updates
-              if (onProgress) {
-                // First update immediately
-                onProgress([...progress]);
-
-                // Then update again after a slight delay for UI consistency
-                setTimeout(() => {
-                  onProgress([...progress]);
-                }, 500);
-              }
-            }
-          }
         } catch (error) {
-          console.error(`Error uploading image ${file.name}:`, error);
-          // Update progress to show error
+          console.error(`Error uploading ${file.name}:`, error);
           progress[i] = {
             ...progress[i],
             status: "error",
-            progress: 0,
-            error: error instanceof Error ? error.message : "Unknown error",
-            stepProgress: {
-              cloudflare: {
-                status: "error",
-                progress: 0,
-                message: "Upload failed",
-              },
-              openai: {
-                status: "pending",
-                progress: 0,
-                message: "Upload failed before analysis could begin",
-              },
-            },
+            error: error instanceof Error ? error.message : "Upload failed",
           };
-
-          // Call onProgress callback
           if (onProgress) {
             onProgress([...progress]);
           }
+          throw error;
         }
       }
 
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["carImages", carId] });
-
-      return {
-        uploadedImages,
-        progress,
-      };
+      return uploadedImages;
+    },
+    onSuccess: (newImages) => {
+      // Update the cache with the new images
+      queryClient.setQueryData(
+        ["carImages", carId],
+        (old: ImageType[] = []) => {
+          // Filter out any duplicates and merge with existing images
+          const existingIds = new Set(old.map((img) => img.id));
+          const uniqueNewImages = newImages.filter(
+            (img) => !existingIds.has(img.id)
+          );
+          return [...old, ...uniqueNewImages];
+        }
+      );
     },
   });
 }

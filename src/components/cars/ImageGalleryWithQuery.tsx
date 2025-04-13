@@ -527,63 +527,16 @@ export function ImageGalleryWithQuery({
         if (onUploadStarted) onUploadStarted();
         setShowUploadProgress(true);
 
-        const uploadPromises = Array.from(files).map(async (file) => {
-          if (!isMountedRef.current) return;
-
-          try {
-            await uploadMutation.mutateAsync({
-              files: [file],
-              onProgress: (progress) => {
-                if (!isMountedRef.current) return;
-                setUploadProgress((prev) => {
-                  const existing = prev.find((p) => p.fileName === file.name);
-                  if (existing) {
-                    return prev.map((p) =>
-                      p.fileName === file.name
-                        ? { ...p, progress: progress[0].progress }
-                        : p
-                    );
-                  }
-                  return [
-                    ...prev,
-                    {
-                      fileName: file.name,
-                      progress: progress[0].progress,
-                      status: "uploading",
-                      currentStep: "Uploading...",
-                      stepProgress: {
-                        cloudflare: {
-                          status: "uploading",
-                          progress: progress[0].progress,
-                          message: "Uploading to Cloudflare...",
-                        },
-                        openai: {
-                          status: "pending",
-                          progress: 0,
-                          message: "Waiting for upload to complete",
-                        },
-                      },
-                    },
-                  ];
-                });
-              },
-            });
-          } catch (error) {
-            console.error(`Error uploading ${file.name}:`, error);
+        await uploadMutation.mutateAsync({
+          files: Array.from(files),
+          onProgress: (progress) => {
             if (isMountedRef.current) {
-              showToast(
-                toast,
-                "Error",
-                `Failed to upload ${file.name}`,
-                2000,
-                "destructive"
-              );
+              setUploadProgress(progress);
             }
-          }
+          },
         });
 
-        await Promise.all(uploadPromises);
-
+        // Don't call refetch here, the cache is already updated
         if (isMountedRef.current) {
           setUploadProgress([]);
           setShowUploadProgress(false);
@@ -606,15 +559,7 @@ export function ImageGalleryWithQuery({
         }
       }
     },
-    [
-      carId,
-      vehicleInfo,
-      uploadMutation,
-      onUploadStarted,
-      onUploadEnded,
-      toast,
-      showToast,
-    ]
+    [uploadMutation, onUploadStarted, onUploadEnded, toast, showToast]
   );
 
   // Handle file input change
@@ -835,7 +780,6 @@ export function ImageGalleryWithQuery({
             if (!uploadMutation.isPending) {
               setUploadProgress([]);
               setShowUploadProgress(false);
-              refetch();
             }
           }}
         />

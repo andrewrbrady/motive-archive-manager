@@ -33,10 +33,17 @@ const LazyImage: React.FC<LazyImageProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [imgSrc, setImgSrc] = useState(src || placeholderSrc || "");
+  const [imgSrc, setImgSrc] = useState<string | undefined>(
+    src || placeholderSrc
+  );
 
   useEffect(() => {
-    setImgSrc(src || placeholderSrc || "");
+    if (!src && !placeholderSrc) {
+      setError(true);
+      setLoading(false);
+      return;
+    }
+    setImgSrc(src || placeholderSrc);
     setLoading(true);
     setError(false);
   }, [src, placeholderSrc]);
@@ -52,7 +59,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
     // Don't set a placeholder image URL here, render a fallback component instead
   };
 
-  if (error) {
+  if (error || !imgSrc) {
     return (
       <div
         className={cn(

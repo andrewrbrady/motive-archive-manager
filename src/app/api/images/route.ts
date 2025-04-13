@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const angle = searchParams.get("angle");
     const movement = searchParams.get("movement");
-    const timeOfDay = searchParams.get("timeOfDay");
+    const tod = searchParams.get("tod");
     const view = searchParams.get("view");
     const carId = searchParams.get("carId");
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       page,
       limit,
       search,
-      filters: { angle, movement, timeOfDay, view, carId },
+      filters: { angle, movement, tod, view, carId },
     });
 
     const skip = (page - 1) * limit;
@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
     // Add metadata filters
     if (angle) query["metadata.angle"] = angle;
     if (movement) query["metadata.movement"] = movement;
-    if (timeOfDay) query["metadata.tod"] = timeOfDay;
+    if (tod) query["metadata.tod"] = tod;
     if (view) query["metadata.view"] = view;
-    if (carId) {
+    if (carId && carId !== "all") {
       try {
         query.carId = new ObjectId(carId);
       } catch (err) {

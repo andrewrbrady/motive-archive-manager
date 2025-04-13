@@ -25,6 +25,15 @@ export default function Navbar({ className }: NavbarProps) {
   const { theme, toggleTheme } = useTheme();
   const { data: session } = useSession();
 
+  // Find the navigation items array and add the galleries link
+  const navigationItems = [
+    { name: "Cars", href: "/cars" },
+    { name: "Images", href: "/images" },
+    { name: "Galleries", href: "/galleries" },
+    { name: "Documents", href: "/documents" },
+    { name: "Inventory", href: "/inventory" },
+  ];
+
   return (
     <>
       {/* Spacer div to prevent content from going under navbar */}

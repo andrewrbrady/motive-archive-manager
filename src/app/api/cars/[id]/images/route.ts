@@ -56,6 +56,12 @@ export async function GET(request: Request) {
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const skip = (page - 1) * limit;
     const category = url.searchParams.get("category");
+    const search = url.searchParams.get("search");
+    const angle = url.searchParams.get("angle");
+    const movement = url.searchParams.get("movement");
+    const timeOfDay = url.searchParams.get("timeOfDay");
+    const view = url.searchParams.get("view");
+    const side = url.searchParams.get("side");
 
     if (!ObjectId.isValid(id)) {
       console.log(`Invalid car ID format: ${id}`);
@@ -66,16 +72,28 @@ export async function GET(request: Request) {
     }
 
     console.log("Getting MongoDB database directly using getDatabase...");
-    // Use getDatabase instead of getMongoClient for more reliable connection
     const db = await getDatabase();
     console.log("Successfully connected to database");
 
     const carObjectId = new ObjectId(id);
 
-    // Build query for category filtering
+    // Build query for filtering
     const query: any = { carId: carObjectId };
-    if (category) {
-      query["metadata.category"] = category;
+
+    // Add metadata filters
+    if (category) query["metadata.category"] = category;
+    if (angle) query["metadata.angle"] = angle;
+    if (movement) query["metadata.movement"] = movement;
+    if (timeOfDay) query["metadata.tod"] = timeOfDay;
+    if (view) query["metadata.view"] = view;
+    if (side) query["metadata.side"] = side;
+
+    // Add search filter
+    if (search) {
+      query.$or = [
+        { filename: { $regex: search, $options: "i" } },
+        { "metadata.description": { $regex: search, $options: "i" } },
+      ];
     }
 
     // First, check if the car exists and if it has imageIds
