@@ -6,6 +6,7 @@ import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { env } from "@/lib/env-setup";
 
 // Import environment setup (this must be first)
 import "@/lib/env-setup";
@@ -49,7 +50,7 @@ export const authConfig: NextAuthConfig = {
           prompt: "select_account",
           access_type: "offline",
           response_type: "code",
-          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/google`,
+          redirect_uri: `${env.baseUrl}/api/auth/callback/google`,
         },
       },
     }),

@@ -33,11 +33,11 @@ const nextConfig = {
   },
   // Set server port
   serverRuntimeConfig: {
-    port: 3001,
+    port: 3000,
   },
   // Set public runtime config
   publicRuntimeConfig: {
-    port: 3001,
+    port: 3000,
   },
 };
 
