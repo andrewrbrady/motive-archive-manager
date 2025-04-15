@@ -10,20 +10,58 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2]; // -2 because the url is /cars/[id]/article/saved
+    const id = segments[segments.length - 3]; // -3 because the url is /cars/[id]/article/saved
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
 
     const db = await getDatabase();
+    if (!db) {
+      console.error("Failed to get database instance");
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 }
+      );
+    }
 
     // Find all saved articles for this car
     const savedArticles = await db
       .collection("saved_articles")
-      .find({ carId: new ObjectId(id) })
+      .find({
+        $or: [
+          { carId: new ObjectId(id) },
+          { "metadata.carId": new ObjectId(id) },
+        ],
+      })
       .sort({ updatedAt: -1 })
       .toArray();
 
+    // Transform the articles to ensure consistent format
+    const processedArticles = savedArticles.map((article) => ({
+      _id: article._id.toString(),
+      content: article.content,
+      name: article.name || "Untitled Draft",
+      description: article.description || "",
+      metadata: {
+        carId: (article.carId || article.metadata?.carId).toString(),
+        sessionId:
+          article.sessionId ||
+          article.metadata?.sessionId ||
+          new ObjectId().toString(),
+        model: article.model || article.metadata?.model || "manual",
+        focus: article.focus || article.metadata?.focus,
+      },
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+    }));
+
     return NextResponse.json({
-      savedArticles,
-      count: savedArticles.length,
+      savedArticles: processedArticles,
+      count: processedArticles.length,
     });
   } catch (error) {
     console.error("Error fetching saved articles:", error);
@@ -44,7 +82,14 @@ export async function POST(request: Request) {
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2]; // -2 because the url is /cars/[id]/article/saved
+    const id = segments[segments.length - 3]; // -3 because the url is /cars/[id]/article/saved
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
 
     const { content, name, description } = await request.json();
 
@@ -62,20 +107,25 @@ export async function POST(request: Request) {
     // Create a new saved article
     const result = await db.collection("saved_articles").insertOne({
       carId: new ObjectId(id),
-      sessionId,
       content,
       name: name || "Untitled Draft",
       description: description || "",
+      metadata: {
+        carId: new ObjectId(id),
+        sessionId,
+        model: "manual",
+      },
       createdAt: now,
       updatedAt: now,
     });
 
     return NextResponse.json({
       success: true,
+      _id: result.insertedId.toString(),
       sessionId,
       name: name || "Untitled Draft",
       createdAt: now,
-      id: result.insertedId,
+      updatedAt: now,
     });
   } catch (error) {
     console.error("Error creating saved article:", error);
@@ -96,14 +146,23 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
-    const id = segments[segments.length - 3]; // -3 because the url is /cars/[id]/article/saved/[sessionId]
-    const sessionId = segments[segments.length - 1]; // -1 for the sessionId
+    const id = segments[segments.length - 3]; // -3 because the url is /cars/[id]/article/saved
+    const sessionId = segments[segments.length - 1];
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
+    }
 
     const db = await getDatabase();
 
     const result = await db.collection("saved_articles").deleteOne({
-      "metadata.carId": id,
-      "metadata.sessionId": sessionId,
+      $or: [
+        { carId: new ObjectId(id), sessionId },
+        { "metadata.carId": new ObjectId(id), "metadata.sessionId": sessionId },
+      ],
     });
 
     if (result.deletedCount === 0) {
@@ -133,7 +192,7 @@ export async function OPTIONS(request: Request) {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Allow-Origin": "*",
     },

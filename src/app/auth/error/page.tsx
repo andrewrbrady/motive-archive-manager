@@ -57,6 +57,26 @@ export default function ErrorPage() {
       case "SessionRequired":
         detailedMessage = "You must be signed in to access this page.";
         break;
+      case "InvalidToken":
+        detailedMessage =
+          "Your session is invalid or expired. Please sign in again.";
+        break;
+      case "ServerError":
+        detailedMessage =
+          "An unexpected server error occurred. Please try again later.";
+        break;
+      case "TokenError":
+        detailedMessage =
+          "There was a problem with your authentication token. Please sign in again.";
+        break;
+      case "AccountSuspended":
+        detailedMessage =
+          "Your account has been suspended. Please contact support for assistance.";
+        break;
+      case "InvalidSession":
+        detailedMessage =
+          "Your session is no longer valid. Please sign in again.";
+        break;
       default:
         detailedMessage = "An unknown error occurred during authentication.";
     }
@@ -89,6 +109,23 @@ export default function ErrorPage() {
                 .
               </p>
             )}
+
+            {errorCode === "OAuthAccountNotLinked" && (
+              <p className="mt-4 text-sm">
+                Please sign in using the same method you used when creating your
+                account.
+              </p>
+            )}
+
+            {errorCode === "AccountSuspended" && (
+              <p className="mt-4 text-sm">
+                Please contact{" "}
+                <Link href="/support" className="text-blue-600 hover:underline">
+                  support
+                </Link>{" "}
+                for assistance with your account.
+              </p>
+            )}
           </div>
         </div>
 
@@ -99,6 +136,11 @@ export default function ErrorPage() {
           <Button asChild variant="outline" className="w-full">
             <Link href="/">Return to Home</Link>
           </Button>
+          {errorCode === "Configuration" && (
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/support">Contact Support</Link>
+            </Button>
+          )}
         </div>
       </div>
     </div>

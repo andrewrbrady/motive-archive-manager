@@ -1,23 +1,28 @@
 import { ObjectId } from "mongodb";
 export const dynamic = "force-dynamic";
+export const revalidate = 3600; // Revalidate every hour
 
 import { NextResponse } from "next/server";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { createStaticResponse } from "@/lib/cache-utils";
-import { getMongoClient } from "@/lib/mongodb";
+import { getMongoClient, getDatabase } from "@/lib/mongodb";
 
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
 // GET image by ID
 export async function GET(request: Request) {
   let client;
+  let id = ""; // Define id at the top level so it's accessible in catch block
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
-    const id = segments[segments.length - 1];
+    id = segments[segments.length - 1];
+
+    console.log(`[Image API] GET request for image ID: ${id}`);
 
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {
+      console.warn(`[Image API] Invalid image ID format: ${id}`);
       return NextResponse.json(
         { error: "Invalid image ID format" },
         { status: 400 }
@@ -26,26 +31,121 @@ export async function GET(request: Request) {
 
     const objectId = new ObjectId(id);
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    // Try to use getDatabase first for pool connection
+    let db;
+    try {
+      console.log(`[Image API] Connecting to database using getDatabase()`);
+      db = await getDatabase();
+    } catch (dbError) {
+      console.error(
+        `[Image API] getDatabase failed, falling back to getMongoClient: ${dbError}`
+      );
+      client = await getMongoClient();
+      db = client.db(DB_NAME);
+    }
 
-    console.log(`Fetching image with ID: ${id}`);
+    console.log(`[Image API] Fetching image with ID: ${id}`);
 
     // Find the image in the database
     const image = await db.collection("images").findOne({ _id: objectId });
 
     if (!image) {
-      console.log(`Image not found: ${id}`);
-      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+      console.log(`[Image API] Image not found with ID: ${id}`);
+
+      // Try finding by cloudflareId as fallback
+      console.log(`[Image API] Trying to find image by cloudflareId: ${id}`);
+      const imageByCloudflareId = await db.collection("images").findOne({
+        cloudflareId: id,
+      });
+
+      if (imageByCloudflareId) {
+        console.log(`[Image API] Found image by cloudflareId: ${id}`);
+
+        // Format the image URL with appropriate variant based on metadata
+        const variant = determineImageVariant(imageByCloudflareId);
+        const imageUrl = getFormattedImageUrl(imageByCloudflareId.url, variant);
+
+        // Return the formatted response with cache headers
+        return createStaticResponse({
+          id: imageByCloudflareId._id.toString(),
+          _id: imageByCloudflareId._id.toString(),
+          cloudflareId: imageByCloudflareId.cloudflareId,
+          url: imageUrl,
+          filename: imageByCloudflareId.filename,
+          metadata: imageByCloudflareId.metadata || {},
+          carId: imageByCloudflareId.carId.toString(),
+          createdAt: imageByCloudflareId.createdAt,
+          updatedAt: imageByCloudflareId.updatedAt,
+          category: determineImageCategory(imageByCloudflareId),
+          variant,
+        });
+      }
+
+      // If ID is a valid cloudflare format (GUID-like string), generate a direct URL
+      if (id.match(/^[a-f0-9-]{36}$/i)) {
+        console.log(
+          `[Image API] Creating synthetic image record for cloudflare ID: ${id}`
+        );
+        const now = new Date().toISOString();
+        const syntheticImage = {
+          _id: objectId.toString(),
+          id: objectId.toString(),
+          cloudflareId: id,
+          url: `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${id}/public`,
+          filename: `Image ${id.substring(0, 8)}`,
+          metadata: {},
+          createdAt: now,
+          updatedAt: now,
+          category: "unknown",
+          variant: "public",
+        };
+
+        return NextResponse.json(syntheticImage);
+      }
+
+      return NextResponse.json(
+        {
+          error: "Image not found",
+          id: id,
+          _id: id,
+        },
+        { status: 404 }
+      );
     }
 
     // Format the image URL with appropriate variant based on metadata
     const variant = determineImageVariant(image);
-    const imageUrl = getFormattedImageUrl(image.url, variant);
+    let imageUrl;
+
+    try {
+      imageUrl = getFormattedImageUrl(image.url, variant);
+      console.log(`[Image API] Formatted URL for image ${id}: ${imageUrl}`);
+    } catch (urlError) {
+      console.error(`[Image API] Error formatting URL: ${urlError}`);
+      imageUrl =
+        image.url ||
+        `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${
+          image.cloudflareId || id
+        }/public`;
+    }
+
+    if (!imageUrl || imageUrl === "") {
+      console.error(
+        `[Image API] Empty URL for image ${id}, reconstructing from cloudflareId`
+      );
+      // If URL is empty, try to reconstruct it from cloudflareId
+      if (image.cloudflareId) {
+        imageUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${image.cloudflareId}/public`;
+      } else {
+        // Last resort fallback
+        imageUrl = "https://placehold.co/600x400?text=Image+Not+Available";
+      }
+    }
 
     // Return the formatted response with cache headers
-    return createStaticResponse({
+    const response = {
       id: image._id.toString(),
+      _id: image._id.toString(),
       cloudflareId: image.cloudflareId,
       url: imageUrl,
       filename: image.filename,
@@ -55,19 +155,28 @@ export async function GET(request: Request) {
       updatedAt: image.updatedAt,
       category: determineImageCategory(image),
       variant,
-    });
+    };
+
+    console.log(`[Image API] Successfully returning image data for ${id}`);
+    return createStaticResponse(response);
   } catch (error) {
-    console.error("Error:", error);
+    console.error(`[Image API] Error processing image ${id}:`, error);
     return NextResponse.json(
       {
         error:
           error instanceof Error ? error.message : "Failed to process request",
+        errorType: error?.constructor?.name,
+        id: id,
       },
       { status: 500 }
     );
   } finally {
     if (client) {
-      await client.close();
+      try {
+        await client.close();
+      } catch (closeError) {
+        console.error(`[Image API] Error closing client:`, closeError);
+      }
     }
   }
 }
@@ -94,51 +203,25 @@ function determineImageVariant(image: any): string {
 
 /**
  * Helper function to determine image category from metadata
- * Used for backward compatibility with older image data
  */
 function determineImageCategory(image: any): string {
   const metadata = image.metadata || {};
 
-  // Check for explicit view fields
-  if (metadata.view === "exterior" || metadata.angle) {
-    return "exterior";
+  if (metadata.category) {
+    return metadata.category;
   }
 
-  if (metadata.view === "interior") {
+  // Try to infer category from other metadata
+  if (metadata.view === "interior" || metadata.side === "interior") {
     return "interior";
   }
 
-  if (metadata.view === "engine" || metadata.angle === "engine bay") {
-    return "engine";
+  if (metadata.movement === "driving" || metadata.movement === "moving") {
+    return "action";
   }
 
-  if (
-    metadata.view === "damage" ||
-    metadata.description?.toLowerCase().includes("damage")
-  ) {
-    return "damage";
-  }
-
-  if (
-    metadata.view === "documents" ||
-    metadata.description?.toLowerCase().includes("document") ||
-    image.filename?.toLowerCase().includes("document")
-  ) {
-    return "documents";
-  }
-
-  // Check filename patterns as last resort
-  const filename = image.filename?.toLowerCase() || "";
-
-  if (filename.includes("interior")) return "interior";
-  if (filename.includes("engine")) return "engine";
-  if (filename.includes("damage")) return "damage";
-  if (filename.includes("doc")) return "documents";
-  if (filename.includes("ext") || filename.match(/front|rear|side|profile/))
-    return "exterior";
-
-  // Default to 'other' if we can't determine
-  return "other";
+  // Default to exterior
+  return "exterior";
 }
 
 export async function OPTIONS(request: Request) {

@@ -187,3 +187,41 @@ export function generateS3Key(carId: string, filename: string) {
   const timestamp = Date.now();
   return `cars/${carId}/${timestamp}-${cleanFilename}`;
 }
+
+export async function uploadMDXFile(
+  filename: string,
+  content: string
+): Promise<string> {
+  const timestamp = Date.now();
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "-");
+  const key = `mdx/${sanitizedFilename.replace(
+    /\.([^.]+)$/,
+    `-${timestamp}.$1`
+  )}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: content,
+    ContentType: "text/markdown",
+  });
+
+  await s3Client.send(command);
+  return key;
+}
+
+export async function getMDXFile(s3Key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: s3Key,
+  });
+
+  const response = await s3Client.send(command);
+  const content = await response.Body?.transformToString();
+
+  if (!content) {
+    throw new Error(`Failed to get content for file: ${s3Key}`);
+  }
+
+  return content;
+}

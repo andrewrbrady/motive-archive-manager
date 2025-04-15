@@ -17,6 +17,9 @@ const options: MongoClientOptions = {
   waitQueueTimeoutMS: 10000,
   retryWrites: true,
   retryReads: true,
+  w: 1,
+  wtimeoutMS: 2500,
+  journal: true,
 };
 
 // Detect if running on Vercel
@@ -131,6 +134,9 @@ export async function dbConnect() {
       serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
       retryWrites: options.retryWrites,
       retryReads: options.retryReads,
+      w: 1,
+      wtimeoutMS: 2500,
+      journal: true,
     } as any);
 
     // Handle connection events

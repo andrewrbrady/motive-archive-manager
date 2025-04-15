@@ -8,7 +8,14 @@ import { signIn } from "next-auth/react";
 export default function SignIn() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams?.get("callbackUrl") || "/admin";
+  const callbackUrl = (() => {
+    const url = searchParams?.get("callbackUrl") || "/admin";
+    // Ensure callback URL is internal and safe
+    if (url.startsWith("/") && !url.startsWith("//")) {
+      return url;
+    }
+    return "/admin";
+  })();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,13 +51,28 @@ export default function SignIn() {
         redirect: false,
       });
 
-      if (result?.error) {
+      if (!result) {
+        throw new Error("Authentication failed");
+      }
+
+      if (result.error) {
         throw new Error(result.error);
       }
 
-      // Manually redirect to the callback URL
-      router.push(callbackUrl);
-      router.refresh();
+      if (result.url) {
+        // Use router.push for client-side navigation if same origin
+        const url = new URL(result.url, window.location.origin);
+        if (url.origin === window.location.origin) {
+          router.push(url.pathname + url.search);
+          router.refresh();
+        } else {
+          window.location.href = result.url;
+        }
+      } else {
+        // Fallback to default redirect
+        router.push(callbackUrl);
+        router.refresh();
+      }
     } catch (error: any) {
       console.error("Sign-in error:", error);
 
@@ -72,10 +94,29 @@ export default function SignIn() {
 
     try {
       // Use NextAuth's signIn method with Google provider
-      await signIn("google", {
+      const result = await signIn("google", {
         callbackUrl,
+        redirect: false,
       });
-      // No need to manually redirect, NextAuth handles it
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (result?.url) {
+        // Use router.push for client-side navigation if same origin
+        const url = new URL(result.url, window.location.origin);
+        if (url.origin === window.location.origin) {
+          router.push(url.pathname + url.search);
+          router.refresh();
+        } else {
+          window.location.href = result.url;
+        }
+      } else {
+        // Fallback to default redirect
+        router.push(callbackUrl);
+        router.refresh();
+      }
     } catch (error: any) {
       console.error("Google sign-in error:", error);
       setError("Failed to sign in with Google. Please try again.");

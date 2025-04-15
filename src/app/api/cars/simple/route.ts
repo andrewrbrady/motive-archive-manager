@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
@@ -21,15 +21,15 @@ export async function GET(request: NextRequest) {
 
     console.log("Simple cars API request:", { page, pageSize });
 
-    // Connect to MongoDB
-    const client = await clientPromise;
-    if (!client) {
+    // Get database instance using the utility function
+    const db = await getDatabase();
+    if (!db) {
+      console.error("Failed to get database instance");
       return NextResponse.json(
         { error: "Failed to connect to database" },
         { status: 500 }
       );
     }
-    const db = client.db(process.env.MONGODB_DB || "motive_archive");
 
     // Build query with filters
     const query: Record<string, any> = {};
@@ -61,7 +61,15 @@ export async function GET(request: NextRequest) {
     // Handle client filter
     const clientId = searchParams.get("clientId");
     if (clientId) {
-      query.client = new ObjectId(clientId);
+      try {
+        query.client = new ObjectId(clientId);
+      } catch (error) {
+        console.error("Invalid clientId format:", clientId);
+        return NextResponse.json(
+          { error: "Invalid clientId format" },
+          { status: 400 }
+        );
+      }
     }
 
     // Handle search query with optimized implementation
@@ -82,8 +90,7 @@ export async function GET(request: NextRequest) {
           // Escape special regex characters to prevent errors
           const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-          // Create more efficient regex pattern - this is more precise and less expensive
-          // Allow for small typos at word boundaries but not permissive fuzzy matching
+          // Create more efficient regex pattern
           const searchRegex = new RegExp(escapedTerm, "i");
 
           // Prioritize exact matches for performance
@@ -95,12 +102,12 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // Apply search to primary fields first (these are most important)
+          // Apply search to primary fields first
           primaryFields.forEach((field) => {
             query.$or.push({ [field]: searchRegex });
           });
 
-          // Only search secondary fields for longer terms (3+ chars) to reduce false positives
+          // Only search secondary fields for longer terms
           if (term.length >= 3) {
             secondaryFields.forEach((field) => {
               query.$or.push({ [field]: searchRegex });
@@ -123,81 +130,89 @@ export async function GET(request: NextRequest) {
 
     console.log("Query filters:", JSON.stringify(query, null, 2));
 
-    // Count total cars for pagination
-    const totalCount = await db.collection("cars").countDocuments(query);
-    const totalPages = Math.ceil(totalCount / pageSize);
+    try {
+      // Count total cars for pagination
+      const totalCount = await db.collection("cars").countDocuments(query);
+      const totalPages = Math.ceil(totalCount / pageSize);
 
-    // Handle sort parameter
-    let sortField = "createdAt";
-    let sortDirection = -1;
+      // Handle sort parameter
+      let sortField = "createdAt";
+      let sortDirection = -1;
 
-    const sort = searchParams.get("sort");
-    if (sort) {
-      const [field, direction] = sort.split("_");
-      sortField = field || "createdAt";
-      sortDirection = direction === "asc" ? 1 : -1;
-    }
+      const sort = searchParams.get("sort");
+      if (sort) {
+        const [field, direction] = sort.split("_");
+        sortField = field || "createdAt";
+        sortDirection = direction === "asc" ? 1 : -1;
+      }
 
-    // Simple consistent pipeline
-    const pipeline = [
-      { $match: query },
-      { $sort: { [sortField]: sortDirection } },
-      { $skip: (page - 1) * pageSize },
-      { $limit: pageSize },
-      // Look up images from imageIds
-      {
-        $lookup: {
-          from: "images",
-          let: { imageIds: { $ifNull: ["$imageIds", []] } },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $in: [{ $toString: "$_id" }, "$$imageIds"],
+      // Simple consistent pipeline
+      const pipeline = [
+        { $match: query },
+        { $sort: { [sortField]: sortDirection } },
+        { $skip: (page - 1) * pageSize },
+        { $limit: pageSize },
+        // Look up images from imageIds
+        {
+          $lookup: {
+            from: "images",
+            let: { imageIds: { $ifNull: ["$imageIds", []] } },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $in: [{ $toString: "$_id" }, "$$imageIds"],
+                  },
                 },
               },
-            },
-            { $limit: 10 }, // Only get first 10 images for performance
-          ],
-          as: "images",
+              { $limit: 10 }, // Only get first 10 images for performance
+            ],
+            as: "images",
+          },
         },
-      },
-    ];
+      ];
 
-    // Execute query
-    const cars = await db.collection("cars").aggregate(pipeline).toArray();
+      // Execute query
+      const cars = await db.collection("cars").aggregate(pipeline).toArray();
 
-    // Process data for client
-    const processedCars = cars.map((car) => ({
-      ...car,
-      _id: car._id.toString(),
-      images: (car.images || []).map((img: any) => ({
-        ...img,
-        _id: img._id.toString(),
-        url: img.url.endsWith("/public") ? img.url : `${img.url}/public`,
-      })),
-      client: car.client?.toString(),
-      eventIds: (car.eventIds || []).map((id: ObjectId) => id.toString()),
-      deliverableIds: (car.deliverableIds || []).map((id: ObjectId) =>
-        id.toString()
-      ),
-      documentationIds: (car.documentationIds || []).map((id: ObjectId) =>
-        id.toString()
-      ),
-    }));
+      // Process data for client
+      const processedCars = cars.map((car) => ({
+        ...car,
+        _id: car._id.toString(),
+        images: (car.images || []).map((img: any) => ({
+          ...img,
+          _id: img._id.toString(),
+          url: img.url.endsWith("/public") ? img.url : `${img.url}/public`,
+        })),
+        client: car.client?.toString(),
+        eventIds: (car.eventIds || []).map((id: ObjectId) => id.toString()),
+        deliverableIds: (car.deliverableIds || []).map((id: ObjectId) =>
+          id.toString()
+        ),
+        documentationIds: (car.documentationIds || []).map((id: ObjectId) =>
+          id.toString()
+        ),
+      }));
 
-    // Log what we're sending back
-    console.log(`Returning ${processedCars.length} cars with images`);
+      // Log what we're sending back
+      console.log(`Returning ${processedCars.length} cars with images`);
 
-    return NextResponse.json({
-      cars: processedCars,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalCount,
-        pageSize,
-      },
-    });
+      return NextResponse.json({
+        cars: processedCars,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          pageSize,
+        },
+      });
+    } catch (dbError) {
+      console.error("Database operation error:", dbError);
+      return NextResponse.json(
+        { error: "Database operation failed" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error in simple cars API:", error);
     return NextResponse.json(

@@ -58,7 +58,7 @@ import FullCalendarTab from "@/components/cars/FullCalendarTab";
 import ShotList from "@/components/cars/ShotList";
 import Scripts from "@/components/cars/Scripts";
 import PhotoShoots from "@/components/cars/PhotoShoots";
-import { ImageGalleryWithQuery } from "@/components/cars/ImageGalleryWithQuery";
+import { GalleryContainer } from "@/components/cars/GalleryContainer";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import {
@@ -122,20 +122,6 @@ export default function CarPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isPending, startTransition] = useReactTransition();
-  const [activeFilters, setActiveFilters] = useState<{
-    angle?: string;
-    view?: string;
-    movement?: string;
-    tod?: string;
-    side?: string;
-  }>({});
-  const [filterOptions, setFilterOptions] = useState<{
-    angles: string[];
-    views: string[];
-    movements: string[];
-    tods: string[];
-    sides: string[];
-  }>({ angles: [], views: [], movements: [], tods: [], sides: [] });
   const [uploadedImages, setUploadedImages] = useState<UploadedImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
@@ -242,28 +228,6 @@ export default function CarPage() {
   }
 
   // Define all handler functions after hooks and early return
-  const handleFilterOptionsChange = (options: Record<string, string[]>) => {
-    setFilterOptions({
-      angles: options.angles || [],
-      views: options.views || [],
-      movements: options.movements || [],
-      tods: options.tods || [],
-      sides: options.sides || [],
-    });
-  };
-
-  const handleFilterChange = (filterType: string, value: string) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      [filterType]:
-        value === prev[filterType as keyof typeof prev] ? undefined : value,
-    }));
-  };
-
-  const handleResetFilters = () => {
-    setActiveFilters({});
-  };
-
   const handleImageUpload = async (files: FileList) => {
     if (!files.length) return;
     try {
@@ -279,21 +243,6 @@ export default function CarPage() {
     } finally {
       setUploadingImages(false);
     }
-  };
-
-  const notifyUploadStarted = () => {
-    toast({
-      title: "Upload Started",
-      description: "Your images are being uploaded...",
-    });
-  };
-
-  const notifyUploadEnded = () => {
-    toast({
-      title: "Upload Complete",
-      description: "Your images have been uploaded successfully.",
-    });
-    refreshCarData();
   };
 
   const handleSpecsEdit = async (editedSpecs: ExtendedCar) => {
@@ -435,18 +384,15 @@ export default function CarPage() {
                     content: (
                       <div className="space-y-4">
                         <div className="image-gallery-wrapper">
-                          <ImageGalleryWithQuery
-                            carId={params.id as string}
-                            vehicleInfo={{
+                          <GalleryContainer
+                            carId={id}
+                            car={{
+                              _id: id,
+                              year: car?.year || 0,
                               make: car?.make || "",
                               model: car?.model || "",
-                              year: car?.year || 0,
-                              color: car?.color || "",
+                              primaryImageId: car?.primaryImageId,
                             }}
-                            onFilterOptionsChange={handleFilterOptionsChange}
-                            showFilters={true}
-                            onUploadStarted={notifyUploadStarted}
-                            onUploadEnded={notifyUploadEnded}
                           />
                         </div>
                       </div>

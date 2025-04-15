@@ -6,6 +6,7 @@ import ArticleGenerator from "@/app/copywriting/components/ArticleGenerator";
 import EmailMarketing from "@/app/copywriting/components/EmailMarketing";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import MDXTab from "@/components/copywriting/MDXTab";
 
 export default function CopywritingPage() {
   // Define tab items
@@ -19,6 +20,11 @@ export default function CopywritingPage() {
       value: "email",
       label: "Email Marketing",
       content: <EmailMarketing />,
+    },
+    {
+      value: "mdx",
+      label: "MDX",
+      content: <MDXTab />,
     },
   ];
 

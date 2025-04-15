@@ -2,8 +2,14 @@
 
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
 import Navbar from "@/components/layout/navbar";
+import { useImages } from "@/hooks/use-images";
 
 export default function ImagesPage() {
+  const { data, isLoading, error } = useImages({
+    carId: "all",
+    limit: 20,
+  });
+
   return (
     <>
       <Navbar />
@@ -17,7 +23,11 @@ export default function ImagesPage() {
               Browse and manage your car images
             </p>
           </div>
-          <SimpleImageGallery />
+          <SimpleImageGallery
+            data={data?.images}
+            isLoading={isLoading}
+            error={error || undefined}
+          />
         </div>
       </main>
     </>

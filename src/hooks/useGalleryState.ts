@@ -101,7 +101,7 @@ export const useGalleryState = (carId: string) => {
 
   const normalizeImageData = useCallback((image: any): NormalizedImage => {
     return {
-      id: image.id,
+      id: image.id || image._id,
       url: image.url,
       filename: image.filename,
       metadata: {
@@ -131,7 +131,7 @@ export const useGalleryState = (carId: string) => {
 
       setState((prev) => ({
         ...prev,
-        images: data.images.map(normalizeImageData),
+        images: (data.images || []).map(normalizeImageData),
         isLoading: false,
         isSyncing: false,
         error: null,
@@ -158,9 +158,7 @@ export const useGalleryState = (carId: string) => {
       }
 
       setState((prev) => ({ ...prev, mode: targetMode }));
-      if (targetMode === "viewing") {
-        await synchronizeGalleryState();
-      }
+      await synchronizeGalleryState();
     },
     [state.pendingChanges, synchronizeGalleryState]
   );

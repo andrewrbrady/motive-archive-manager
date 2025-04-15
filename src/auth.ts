@@ -1,197 +1,155 @@
 import NextAuth from "next-auth";
-import type { Session } from "next-auth";
+import type { Session, User, Account, Profile } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import authConfig from "@/auth.config";
 import { adminAuth } from "@/lib/firebase-admin";
+
+// Cache for Firebase claims to prevent excessive calls
+const claimsCache = new Map<string, { claims: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Helper to get Firebase claims with caching
+async function getFirebaseClaims(userId: string) {
+  const now = Date.now();
+  const cached = claimsCache.get(userId);
+
+  if (cached && now - cached.timestamp < CACHE_TTL) {
+    return cached.claims;
+  }
+
+  try {
+    const firebaseUser = await adminAuth.getUser(userId);
+    const claims = firebaseUser.customClaims || {};
+    claimsCache.set(userId, { claims, timestamp: now });
+    return claims;
+  } catch (error) {
+    console.error("Error fetching Firebase claims:", error);
+    return null;
+  }
+}
 
 // Extend authConfig with additional callbacks
 const extendedAuthConfig = {
   ...authConfig,
   callbacks: {
-    async session({ session, token }: { session: any; token: JWT }) {
-      // Add error handling for undefined token or session
-      if (!session || !session.user) {
-        console.error(
-          "Session or session.user is undefined in session callback",
-          { session, token }
-        );
+    async session({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT;
+    }): Promise<Session> {
+      if (!session?.user) {
+        console.error("Invalid session state:", { session, token });
         return session;
       }
 
-      // Pass Firebase custom claims from token to session
-      if (token) {
-        // For Google users, use the firebase_uid if available
-        session.user.id = token.firebase_uid || (token.sub as string);
-        session.user.roles = token.roles || ["user"];
-        session.user.creativeRoles = token.creativeRoles || [];
-        session.user.status = token.status || "active";
+      try {
+        // Ensure consistent user ID
+        const userId = (token.firebase_uid as string | undefined) || token.sub;
+        if (!userId) {
+          throw new Error("No valid user ID found in token");
+        }
+        session.user.id = userId;
 
-        console.log("Session callback - token data:", {
-          tokenExists: !!token,
-          tokenRoles: token.roles,
-          tokenFirebaseUid: token.firebase_uid,
-          tokenSub: token.sub,
-          allTokenData: token,
-        });
+        // Get latest claims if available
+        const claims = await getFirebaseClaims(userId);
+        if (claims) {
+          session.user.roles = claims.roles || ["user"];
+          session.user.creativeRoles = claims.creativeRoles || [];
+          session.user.status = claims.status || "active";
+        } else {
+          // Fallback to token data if claims fetch fails
+          session.user.roles = (token.roles as string[]) || ["user"];
+          session.user.creativeRoles = (token.creativeRoles as string[]) || [];
+          session.user.status = (token.status as string) || "active";
+        }
 
-        console.log("Session callback - updated session:", {
+        console.log("Session updated with latest claims:", {
           userId: session.user.id,
           roles: session.user.roles,
-          provider: token.provider,
-          allSessionData: session,
+          status: session.user.status,
         });
-      } else {
-        console.warn("Token is undefined in session callback, using defaults", {
-          session,
-          token,
-        });
-        // Set default values
-        session.user.roles = ["user"];
-        session.user.creativeRoles = [];
-        session.user.status = "active";
+      } catch (error) {
+        console.error("Error updating session:", error);
+        // Ensure session has minimum required data
+        session.user.roles = session.user.roles || ["user"];
+        session.user.creativeRoles = session.user.creativeRoles || [];
+        session.user.status = session.user.status || "active";
       }
+
       return session;
     },
+
     async jwt({
       token,
       user,
       account,
-      profile,
       trigger,
-      session,
     }: {
       token: JWT;
-      user?: any;
-      account?: any;
-      profile?: any;
-      trigger?: string;
-      session?: any;
-    }) {
-      // Add error handling for undefined token
-      if (!token) {
-        console.error("Token is undefined in jwt callback", {
-          user,
-          account,
-          trigger,
-          session,
-        });
-        return {
-          sub: "",
-          roles: ["user"],
-          creativeRoles: [],
-          status: "active",
-        } as JWT;
-      }
-
-      console.log("JWT callback - input data:", {
-        hasToken: !!token,
-        hasUser: !!user,
-        hasAccount: !!account,
-        trigger,
-        tokenData: token,
-        userData: user,
-        accountData: account,
-        sessionData: session,
-      });
-
-      // If signing in
-      if (account && user) {
-        // If Firebase account
-        if (account.provider === "credentials") {
-          try {
-            // Get Firebase custom claims
-            const firebaseUser = await adminAuth.getUser(user.id);
-            const claims = firebaseUser.customClaims || {};
-
-            console.log("JWT callback - Firebase claims:", {
-              userId: user.id,
-              claims,
-              firebaseUser,
-            });
-
-            // Add claims to token
-            token.roles = claims.roles || ["user"];
-            token.creativeRoles = claims.creativeRoles || [];
-            token.status = claims.status || "active";
-
-            console.log("JWT callback - updated token:", {
-              userId: user.id,
-              roles: token.roles,
-              creativeRoles: token.creativeRoles,
-              allTokenData: token,
-            });
-          } catch (error) {
-            console.error("Error getting Firebase custom claims:", error);
-            // Set default values on error
-            token.roles = ["user"];
-            token.creativeRoles = [];
-            token.status = "active";
+      user?: User;
+      account?: Account | null;
+      trigger?: "signIn" | "signUp" | "update";
+    }): Promise<JWT> {
+      try {
+        // Initial sign in
+        if (account && user) {
+          if (account.provider === "credentials" && user.id) {
+            token.firebase_uid = user.id;
+            const claims = await getFirebaseClaims(user.id);
+            if (claims) {
+              token.roles = claims.roles;
+              token.creativeRoles = claims.creativeRoles;
+              token.status = claims.status;
+            }
+          } else if (account.provider === "google" && user.email) {
+            // For Google sign-in, we need to get the Firebase user
+            try {
+              const firebaseUser = await adminAuth.getUserByEmail(user.email);
+              token.firebase_uid = firebaseUser.uid;
+              const claims = await getFirebaseClaims(firebaseUser.uid);
+              if (claims) {
+                token.roles = claims.roles;
+                token.creativeRoles = claims.creativeRoles;
+                token.status = claims.status;
+              }
+            } catch (error) {
+              console.error("Error getting Firebase user:", error);
+              // Set default values
+              token.roles = ["user"];
+              token.creativeRoles = [];
+              token.status = "active";
+            }
           }
         }
-        // If Google account
-        else if (account.provider === "google") {
-          try {
-            // Check if user exists in Firebase
-            let firebaseUser;
-            try {
-              firebaseUser = await adminAuth.getUserByEmail(user.email!);
-            } catch (error) {
-              // User doesn't exist in Firebase, create them
-              firebaseUser = await adminAuth.createUser({
-                email: user.email!,
-                displayName: user.name || user.email?.split("@")[0],
-                photoURL: user.image || undefined,
-              });
-              // Set default claims
-              await adminAuth.setCustomUserClaims(firebaseUser.uid, {
-                roles: ["user"],
-                creativeRoles: [],
-                status: "active",
-              });
-            }
 
-            // Get or set default claims
-            const claims = firebaseUser.customClaims || {
-              roles: ["user"],
-              creativeRoles: [],
-              status: "active",
-            };
-
-            // Add claims and Firebase UID to token
+        // Token refresh - update claims if needed
+        if (trigger === "update" && token.firebase_uid) {
+          const firebaseUid = token.firebase_uid as string;
+          const claims = await getFirebaseClaims(firebaseUid);
+          if (claims) {
             token.roles = claims.roles;
             token.creativeRoles = claims.creativeRoles;
             token.status = claims.status;
-            token.firebase_uid = firebaseUser.uid;
-
-            console.log("Added Google user claims to token:", {
-              email: user.email,
-              firebaseUid: firebaseUser.uid,
-              roles: token.roles,
-            });
-          } catch (error) {
-            console.error("Error handling Google sign-in:", error);
-            // Set default values on error
-            token.roles = ["user"];
-            token.creativeRoles = [];
-            token.status = "active";
           }
         }
-      }
 
-      // Check for session update (after updating user in Firestore)
-      if (trigger === "update" && session?.user) {
-        // Update token with session data
-        token.roles = session.user.roles;
-        token.creativeRoles = session.user.creativeRoles;
-        token.status = session.user.status;
+        return token;
+      } catch (error) {
+        console.error("Error in JWT callback:", error);
+        // Ensure token has minimum required data
+        return {
+          ...token,
+          roles: token.roles || ["user"],
+          creativeRoles: token.creativeRoles || [],
+          status: token.status || "active",
+        };
       }
-
-      return token;
     },
   },
 };
 
-// Create and export NextAuth instance
 export const { auth, handlers } = NextAuth(extendedAuthConfig);
 
 // Direct export for compatibility with App Router

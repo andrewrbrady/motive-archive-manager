@@ -224,33 +224,128 @@ export function getFormattedImageUrl(
   url: string | null | undefined,
   variant: string = "public"
 ): string {
+  // Default placeholder for missing images
+  const PLACEHOLDER_IMAGE = "https://placehold.co/600x400?text=No+Image";
+
   if (!url) {
-    return ""; // Return empty string for null/undefined URLs
+    console.warn("getFormattedImageUrl received null/undefined URL");
+    return PLACEHOLDER_IMAGE;
+  }
+
+  // Handle empty string
+  if (url.trim() === "") {
+    console.warn("getFormattedImageUrl received empty string URL");
+    return PLACEHOLDER_IMAGE;
+  }
+
+  // Log original URL for debugging only in development
+  if (process.env.NODE_ENV === "development") {
+    console.log(`Formatting image URL: ${url} with variant: ${variant}`);
   }
 
   try {
-    // Check if it's a Cloudflare Images URL
-    if (!url.includes("imagedelivery.net")) {
-      return url; // Return as-is if not a Cloudflare URL
+    // Handle relative URLs by returning them as-is
+    if (url.startsWith("/")) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`Detected relative URL: ${url}, returning as-is`);
+      }
+      return url;
     }
 
-    // Remove any existing variant and trailing slashes
-    const baseUrl = url.replace(
-      /\/(public|thumbnail|avatar|medium|large)(\/)?$/,
+    // Handle placeholder URLs
+    if (url.includes("placehold.co")) {
+      return url; // Return placeholder URLs as-is
+    }
+
+    // Check if it's a Cloudflare Images URL
+    if (!url.includes("imagedelivery.net")) {
+      // If it's already a complete URL but not from Cloudflare, return as-is
+      if (url.startsWith("http")) {
+        if (process.env.NODE_ENV === "development") {
+          console.log(`Non-Cloudflare URL detected (kept as-is): ${url}`);
+        }
+        return url;
+      }
+
+      // Check if it might be just a Cloudflare ID (UUID format)
+      if (url.match(/^[a-f0-9-]{36}$/i)) {
+        const cloudflareUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${url}/${variant}`;
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            `Converting Cloudflare ID to URL: ${url} -> ${cloudflareUrl}`
+          );
+        }
+        return cloudflareUrl;
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`Unrecognized URL format: ${url}`);
+      }
+      return url; // Return as-is if format is unrecognized
+    }
+
+    // For Cloudflare URLs, remove any existing variant and trailing slashes
+    let baseUrl = url.replace(
+      /\/(public|thumbnail|avatar|medium|large|webp|preview|original)(\/)?$/,
       ""
     );
 
+    // Remove any query parameters
+    baseUrl = baseUrl.split("?")[0];
+
     // Ensure the URL is properly formed
-    if (!baseUrl.match(/^https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+$/)) {
-      console.error("[Cloudflare] Malformed image URL:", url);
+    const urlPattern = /^https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)$/;
+    if (!baseUrl.match(urlPattern)) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[Cloudflare] Malformed image URL: ${url}`);
+      }
+
+      // Try to fix malformed URL if possible
+      const matches = url.match(
+        /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)/
+      );
+      if (matches && matches.length >= 3) {
+        const accountHash = matches[1];
+        const imageId = matches[2].split("/")[0]; // Get the image ID, removing any variants
+
+        const fixedUrl = `https://imagedelivery.net/${accountHash}/${imageId}/${variant}`;
+        if (process.env.NODE_ENV === "development") {
+          console.log(`Fixed malformed URL: ${url} -> ${fixedUrl}`);
+        }
+        return fixedUrl;
+      }
+
+      // If we can't fix it, return the original URL
       return url;
     }
 
     // Add the requested variant
-    return `${baseUrl}/${variant}`;
+    const formattedUrl = `${baseUrl}/${variant}`;
+
+    // IMPORTANT: Check if the URL was already formatted correctly before it reached us
+    // If the originalUrl was already in the correct format, return it as-is
+    // This prevents double processing in components that might transform URLs themselves
+    const alreadyFormatted = url.match(new RegExp(`^${baseUrl}/${variant}$`));
+    if (alreadyFormatted) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`URL already correctly formatted: ${url}`);
+      }
+      return url;
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(`Formatted image URL: ${url} -> ${formattedUrl}`);
+    }
+    return formattedUrl;
   } catch (error) {
-    console.error("[Cloudflare] Error formatting image URL:", error);
-    return url;
+    console.error(
+      "[Cloudflare] Error formatting image URL:",
+      error,
+      "Original URL:",
+      url
+    );
+    // Return the original URL if we encounter any errors, or the placeholder if that fails
+    return url || PLACEHOLDER_IMAGE;
   }
 }
 

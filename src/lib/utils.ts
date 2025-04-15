@@ -47,14 +47,16 @@ export function getBaseUrl(): string {
     process.env.VERCEL_ENV === "development" ||
     process.env.NODE_ENV === "development"
   ) {
-    return "http://localhost:3001";
+    const port = process.env.PORT || process.env.NEXT_PUBLIC_PORT || 3000;
+    return `http://localhost:${port}`;
   }
   // Fallback to NEXT_PUBLIC_BASE_URL if available
   if (process.env.NEXT_PUBLIC_BASE_URL) {
     return process.env.NEXT_PUBLIC_BASE_URL;
   }
-  // Final fallback
-  return "http://localhost:3001";
+  // Final fallback to default development URL
+  const defaultPort = process.env.PORT || 3000;
+  return `http://localhost:${defaultPort}`;
 }
 
 export function getApiUrl(path: string): string {
@@ -153,4 +155,18 @@ export function hasPermission(
   return userPermissions.some((permission) =>
     permissionsToCheck.includes(permission)
   );
+}
+
+/**
+ * Converts a string into a URL-friendly slug
+ * @param text The text to convert to a slug
+ * @returns URL-friendly slug string
+ */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // Remove non-word chars (except spaces and dashes)
+    .replace(/[\s_-]+/g, "-") // Replace spaces and _ with -
+    .replace(/^-+|-+$/g, ""); // Remove leading/trailing -
 }

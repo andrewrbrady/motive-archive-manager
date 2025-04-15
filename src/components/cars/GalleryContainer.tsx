@@ -1,58 +1,90 @@
-import React, { useCallback } from "react";
-import { useGalleryState, FilterOptions } from "@/hooks/useGalleryState";
-import { ImageGalleryWithQuery } from "./ImageGalleryWithQuery";
-import ImageUploadWithContext from "@/components/ImageUploadWithContext";
-import { Check, Pencil } from "lucide-react";
-import { ImageFilterButton } from "./ImageGalleryWithQuery";
-import { toast } from "react-hot-toast";
+import React from "react";
+import { useGalleryState } from "@/hooks/useGalleryState";
+import { CarImageGalleryV2 } from "./CarImageGalleryV2";
+import { Check, Pencil, Upload, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ImageData } from "@/lib/imageLoader";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import * as FileUpload from "@/components/ui/file-upload";
 
 interface GalleryContainerProps {
   carId: string;
-  car: {
-    _id: string;
-    year: number;
-    make: string;
-    model: string;
-    primaryImageId?: string;
+}
+
+interface UploadProgress {
+  id: string;
+  filename: string;
+  progress: number;
+  status: "uploading" | "analyzing" | "complete" | "error";
+  currentStep: string;
+  error?: string;
+}
+
+interface CarsClientContext {
+  uploadImages: (
+    carId: string,
+    files: File[],
+    setProgress: (
+      progress:
+        | UploadProgress[]
+        | ((prev: UploadProgress[]) => UploadProgress[])
+    ) => void
+  ) => Promise<void>;
+  deleteImage: (
+    carId: string,
+    imageId: string,
+    setStatus: (status: any) => void
+  ) => Promise<void>;
+}
+
+interface NormalizedImage {
+  id: string;
+  url: string;
+  filename?: string;
+  metadata?: {
+    category?: string;
+    description?: string;
+    isPrimary?: boolean;
+    [key: string]: any;
   };
 }
 
 export const GalleryContainer: React.FC<GalleryContainerProps> = ({
   carId,
-  car,
 }) => {
   const { state, actions } = useGalleryState(carId);
+  const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
+  const [status, setStatus] = React.useState<{ status: string }>({
+    status: "idle",
+  });
 
-  const handleModeToggle = async () => {
-    const targetMode = state.mode === "editing" ? "viewing" : "editing";
-    await actions.handleModeTransition(targetMode);
-  };
-
-  const handleImageUpload = useCallback(
-    async (files: FileList) => {
+  const handleImageUpload = React.useCallback(
+    async (files: File[]) => {
       try {
-        // Create FormData for each file
-        const uploadPromises = Array.from(files).map((file) => {
-          const formData = new FormData();
+        const formData = new FormData();
+        files.forEach((file) => {
           formData.append("file", file);
-          formData.append("carId", carId);
+        });
+        formData.append("carId", carId);
 
-          return fetch("/api/cloudflare/images", {
-            method: "POST",
-            body: formData,
-          }).then((res) => res.json());
+        const response = await fetch("/api/cloudflare/images", {
+          method: "POST",
+          body: formData,
         });
 
-        // Upload files in batches of 3
-        const results = [];
-        for (let i = 0; i < uploadPromises.length; i += 3) {
-          const batch = uploadPromises.slice(i, i + 3);
-          const batchResults = await Promise.all(batch);
-          results.push(...batchResults);
+        if (!response.ok) {
+          throw new Error("Failed to upload images");
         }
 
-        // Update gallery state
         await actions.synchronizeGalleryState();
+        setUploadModalOpen(false);
         toast.success("Images uploaded successfully");
       } catch (error) {
         console.error("Error uploading images:", error);
@@ -62,43 +94,40 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
     [carId, actions]
   );
 
-  const handleRemoveImage = useCallback(
-    async (indices: number[], deleteFromStorage = false) => {
+  const handleRemoveImage = React.useCallback(
+    async (image: NormalizedImage) => {
       try {
-        if (deleteFromStorage) {
-          const response = await fetch(`/api/cars/${carId}/images/batch`, {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              indices,
-              deleteFromStorage,
-            }),
-          });
+        const response = await fetch(`/api/cars/${carId}/images/batch`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageIds: [image.id],
+            deleteFromStorage: true,
+          }),
+        });
 
-          if (!response.ok) {
-            throw new Error("Failed to delete images");
-          }
+        if (!response.ok) {
+          throw new Error("Failed to delete images");
         }
 
-        // Update gallery state
+        actions.addPendingChange("deletedImageId", image.id);
         await actions.synchronizeGalleryState();
-        toast.success("Images removed successfully");
+        toast.success("Image removed successfully");
       } catch (error) {
-        console.error("Error removing images:", error);
-        toast.error("Failed to remove images");
+        console.error("Error removing image:", error);
+        toast.error("Failed to remove image");
       }
     },
     [carId, actions]
   );
 
-  const handlePrimaryImageChange = useCallback(
+  const handlePrimaryImageChange = React.useCallback(
     async (imageId: string) => {
       try {
         console.log(`Setting primary image ID to: ${imageId} for car ${carId}`);
 
-        // Let the API handle the conversion to ObjectId
         const response = await fetch(`/api/cars/${carId}/thumbnail`, {
           method: "PUT",
           headers: {
@@ -114,7 +143,6 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
           throw new Error(errorData.error || "Failed to update primary image");
         }
 
-        // Update the local state with the string ID (UI doesn't need ObjectId)
         actions.addPendingChange("primaryImageId", imageId);
         await actions.synchronizeGalleryState();
         toast.success("Primary image updated successfully");
@@ -130,23 +158,18 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
     [carId, actions]
   );
 
-  const carsClientContext = {
+  const carsClientContext: CarsClientContext = {
     uploadImages: async (
       carId: string,
       files: File[],
-      setProgress: (progress: any[]) => void
+      setProgress: (
+        progress:
+          | UploadProgress[]
+          | ((prev: UploadProgress[]) => UploadProgress[])
+      ) => void
     ) => {
       try {
-        setProgress(
-          files.map((file) => ({
-            fileName: file.name,
-            progress: 0,
-            status: "pending" as const,
-            currentStep: "Starting upload...",
-          }))
-        );
-
-        await handleImageUpload(files as unknown as FileList);
+        await handleImageUpload(files);
       } catch (error) {
         console.error("Error in uploadImages:", error);
       }
@@ -158,10 +181,16 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
     ) => {
       try {
         setStatus({ status: "deleting" });
-        await handleRemoveImage(
-          [state.images.findIndex((img) => img.id === imageId)],
-          true
-        );
+        const image = state.images.find((img) => img.id === imageId);
+        if (image) {
+          const normalizedImage = {
+            id: image.id,
+            url: image.url,
+            filename: image.filename,
+            metadata: image.metadata,
+          };
+          await handleRemoveImage(normalizedImage);
+        }
         setStatus({ status: "complete" });
       } catch (error) {
         console.error("Error in deleteImage:", error);
@@ -170,61 +199,41 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
     },
   };
 
-  const handleFilterChange = useCallback(
-    (filterType: string, value: string) => {
-      const newFilters = { ...state.filterState.activeFilters };
-      if (newFilters[filterType] === value) {
-        delete newFilters[filterType];
-      } else {
-        newFilters[filterType] = value;
-      }
-      actions.updateFilters(newFilters);
-    },
-    [state.filterState.activeFilters, actions]
-  );
-
-  // Helper function to generate car title that handles null values
-  const generateCarTitle = () => {
-    return [
-      car.year ? car.year : null,
-      car.make ? car.make : null,
-      car.model ? car.model : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          {state.mode === "viewing" && (
-            <ImageFilterButton
-              activeFilters={state.filterState.activeFilters}
-              filterOptions={state.filterState.filterOptions}
-              onFilterChange={handleFilterChange}
-              onResetFilters={() => actions.updateFilters({})}
-            />
-          )}
-        </div>
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={handleModeToggle}
-            disabled={state.isSyncing}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--background))] bg-opacity-50 text-[hsl(var(--foreground-subtle))]"
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              actions.handleModeTransition(
+                state.mode === "editing" ? "viewing" : "editing"
+              )
+            }
           >
             {state.mode === "editing" ? (
               <>
-                <Check className="w-4 h-4" />
-                Done
+                <Check className="h-4 w-4 mr-2" />
+                Done Editing
               </>
             ) : (
               <>
-                <Pencil className="w-4 h-4" />
+                <Pencil className="h-4 w-4 mr-2" />
                 Edit Gallery
               </>
             )}
-          </button>
+          </Button>
+          {state.mode === "editing" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUploadModalOpen(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Images
+            </Button>
+          )}
         </div>
       </div>
 
@@ -234,48 +243,73 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
             state.isSyncing ? "opacity-60" : "opacity-100"
           }`}
         >
-          {state.mode === "editing" ? (
-            <ImageUploadWithContext
-              carId={carId}
-              images={state.images}
-              primaryImageId={car.primaryImageId}
-              onPrimaryImageChange={handlePrimaryImageChange}
-              isEditMode={true}
-              onRemoveImage={handleRemoveImage}
-              onImagesChange={handleImageUpload}
-              uploading={state.isSyncing}
-              uploadProgress={[]}
-              showMetadata={true}
-              showFilters={true}
-              title={generateCarTitle()}
-              context={carsClientContext}
-              onContextChange={() => {}}
-              refreshImages={actions.synchronizeGalleryState}
-            />
-          ) : (
-            <ImageGalleryWithQuery
-              carId={carId}
-              showFilters={true}
-              vehicleInfo={{
-                make: car.make || "",
-                model: car.model || "",
-                year: car.year || null,
-              }}
-              onFilterOptionsChange={(options: Record<string, string[]>) => {
-                // Convert the Record to FilterOptions
-                const filterOptions: FilterOptions = {
-                  angles: options.angles || [],
-                  movements: options.movements || [],
-                  tods: options.tods || [],
-                  views: options.views || [],
-                  sides: options.sides || [],
-                };
-                actions.addPendingChange("filterOptions", filterOptions);
-              }}
-            />
-          )}
+          <CarImageGalleryV2
+            images={state.images.map((img) => ({
+              _id: img.id,
+              url: img.url,
+              metadata: img.metadata,
+              filename: img.filename,
+            }))}
+            showCategoryTabs={true}
+            isLoading={state.isSyncing}
+            isEditing={state.mode === "editing"}
+            onDelete={async (image) => {
+              const normalizedImage = {
+                id: image._id,
+                url: image.url,
+                filename: image.filename,
+                metadata: image.metadata,
+              };
+              await handleRemoveImage(normalizedImage);
+            }}
+            onOpenUploadModal={() => setUploadModalOpen(true)}
+          />
         </div>
       </div>
+
+      <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Images</DialogTitle>
+            <DialogDescription>
+              Upload images for this car. You can upload multiple images at
+              once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-hidden">
+            <FileUpload.Root
+              maxFiles={10}
+              maxSize={1024 * 1024 * 5} // 5MB
+              accept="image/*"
+              onUpload={async (files, { onProgress, onSuccess, onError }) => {
+                try {
+                  await handleImageUpload(files);
+                  files.forEach((file) => onSuccess(file));
+                } catch (error) {
+                  files.forEach((file) => onError(file, error as Error));
+                }
+              }}
+              className="w-full"
+            >
+              <FileUpload.Dropzone className="h-[120px]">
+                <div className="flex flex-col items-center justify-center gap-2 text-center">
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <div className="text-sm">
+                    <span className="font-medium">Click to upload</span> or drag
+                    and drop
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Images up to 5MB each
+                  </div>
+                </div>
+              </FileUpload.Dropzone>
+              <div className="max-h-[200px] overflow-y-auto">
+                <FileUpload.List />
+              </div>
+            </FileUpload.Root>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

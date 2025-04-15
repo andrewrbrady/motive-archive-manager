@@ -23,6 +23,7 @@ import {
   UploadIcon,
   RefreshCcw,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { transformImageUrl } from "@/lib/imageTransform";
@@ -129,13 +130,41 @@ export function ImageGalleryWithQuery({
     (imageId: string) => {
       if (!isMountedRef.current) return;
       console.error(`Failed to load image: ${imageId}`);
+
+      // Try to get the current image data to log the URL
+      const imageData = images.find(
+        (img: ExtendedImageType) => img.id === imageId || img._id === imageId
+      );
+      if (imageData) {
+        console.error(
+          `Image URL that failed: ${
+            imageData.url
+          }, formatted URL: ${getFormattedImageUrl(imageData.url)}`
+        );
+      }
+
+      // Add to loaded images anyway to prevent infinite loading state
       setLoadedImages((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(imageId);
+        newSet.add(imageId); // Mark as loaded even on error
         return newSet;
       });
+
+      // Update the query data with a placeholder
+      queryClient.setQueryData(["carImages", carId], (oldData: any[] = []) => {
+        if (!Array.isArray(oldData)) return oldData;
+        return oldData.map((img) =>
+          img._id === imageId || img.id === imageId
+            ? {
+                ...img,
+                url: "https://placehold.co/600x400?text=Image+Error",
+                loadError: true,
+              }
+            : img
+        );
+      });
     },
-    [isMountedRef]
+    [carId, queryClient, images]
   );
 
   // Memoized values
@@ -165,13 +194,29 @@ export function ImageGalleryWithQuery({
       try {
         isLoadingRef.current = true;
         setLoadingImageIds((prev) => new Set([...prev, imageId]));
+        console.log(`Fetching image details for ${imageId}`);
 
         const response = await fetch(`/api/images/${imageId}`);
         if (!isMountedRef.current) return;
 
         if (response.ok) {
           const imageData = await response.json();
+          console.log(
+            `Successfully loaded image data for ${imageId}:`,
+            imageData
+          );
+
           if (!isMountedRef.current) return;
+
+          // More robust URL checking
+          if (!imageData.url || imageData.url.trim() === "") {
+            console.error(`Image data for ${imageId} is missing URL`);
+            throw new Error(`Image data is missing URL for image ${imageId}`);
+          }
+
+          // Ensure the URL is properly formatted before updating the cache
+          const formattedUrl = getFormattedImageUrl(imageData.url);
+          console.log(`Formatted URL for ${imageId}: ${formattedUrl}`);
 
           // Update the query data without triggering a refetch
           queryClient.setQueryData(
@@ -183,7 +228,7 @@ export function ImageGalleryWithQuery({
                   ? {
                       ...img,
                       ...imageData,
-                      url: getFormattedImageUrl(imageData.url),
+                      url: formattedUrl, // Use the formatted URL
                       id: imageData.id || imageData._id,
                       _id: imageData._id || imageData.id,
                     }
@@ -194,9 +239,44 @@ export function ImageGalleryWithQuery({
 
           // Mark this image as having its details loaded
           loadedImageDetailsRef.current.add(imageId);
+        } else {
+          console.error(
+            `Failed to load image ${imageId}: ${response.status} ${response.statusText}`
+          );
+          const errorText = await response.text();
+          console.error(`Response body: ${errorText}`);
+          throw new Error(`Failed to load image: ${response.status}`);
         }
       } catch (error) {
         console.error(`Failed to load image details for ${imageId}:`, error);
+
+        // Remove from loading IDs to allow future retry attempts
+        if (isMountedRef.current) {
+          setLoadingImageIds((prev) => {
+            const newSet = new Set([...prev]);
+            newSet.delete(imageId);
+            return newSet;
+          });
+        }
+
+        // Add placeholder or fallback URL to prevent eternal loading
+        queryClient.setQueryData(
+          ["carImages", carId],
+          (oldData: any[] = []) => {
+            if (!Array.isArray(oldData)) return oldData;
+            return oldData.map((img) =>
+              img._id === imageId || img.id === imageId
+                ? {
+                    ...img,
+                    url: "https://placehold.co/600x400?text=Image+Error",
+                    id: img.id || img._id,
+                    _id: img._id || img.id,
+                    loadError: true,
+                  }
+                : img
+            );
+          }
+        );
       } finally {
         if (isMountedRef.current) {
           isLoadingRef.current = false;
@@ -208,7 +288,7 @@ export function ImageGalleryWithQuery({
         }
       }
     },
-    [carId, queryClient]
+    [carId, queryClient, isMountedRef, loadingImageIds]
   );
 
   // Load initial images
@@ -224,6 +304,10 @@ export function ImageGalleryWithQuery({
       )
       .slice(0, 5);
 
+    console.log(
+      `Loading ${imagesToLoad.length} initial images for car ${carId}`
+    );
+
     // Use Promise.all to load images in parallel and prevent multiple state updates
     Promise.all(
       imagesToLoad.map((img: ExtendedImageType) => {
@@ -232,7 +316,7 @@ export function ImageGalleryWithQuery({
         }
       })
     ).catch(console.error);
-  }, [images, loadImageDetails]);
+  }, [images, loadImageDetails, carId]);
 
   // Load current image if needed
   useEffect(() => {
@@ -249,6 +333,7 @@ export function ImageGalleryWithQuery({
       isMountedRef.current &&
       !loadedImageDetailsRef.current.has(currentImageId)
     ) {
+      console.log(`Loading current image: ${currentImageId}`);
       loadImageDetails(currentImageId);
     }
   }, [currentImageId, images, loadImageDetails]);
@@ -316,6 +401,21 @@ export function ImageGalleryWithQuery({
     );
     return index >= 0 ? index : 0;
   }, [filteredImages, currentImageId]);
+
+  // Ensure current image has a properly formatted URL
+  const currentImageWithFormattedUrl = useMemo(() => {
+    if (!filteredImages[mainIndex]) return null;
+
+    const image = filteredImages[mainIndex];
+    // Make sure URL is properly formatted
+    if (image.url) {
+      return {
+        ...image,
+        url: getFormattedImageUrl(image.url),
+      };
+    }
+    return image;
+  }, [filteredImages, mainIndex]);
 
   // Memoized handlers
   const handlePageChange = useCallback(
@@ -485,6 +585,7 @@ export function ImageGalleryWithQuery({
   // Handle image loading
   const handleImageLoad = useCallback((imageId: string) => {
     if (!isMountedRef.current) return;
+    console.log(`Image loaded successfully: ${imageId}`);
     setLoadedImages((prev) => new Set([...prev, imageId]));
   }, []);
 
@@ -625,8 +726,20 @@ export function ImageGalleryWithQuery({
   const paginatedImages = useMemo(() => {
     const startIndex = currentPage * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return filteredImages.slice(startIndex, endIndex);
-  }, [filteredImages, currentPage]);
+
+    // Ensure all images have properly formatted URLs
+    return filteredImages
+      .slice(startIndex, endIndex)
+      .map((image: ExtendedImageType) => {
+        if (image.url) {
+          return {
+            ...image,
+            url: getFormattedImageUrl(image.url),
+          };
+        }
+        return image;
+      });
+  }, [filteredImages, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
 
@@ -799,7 +912,8 @@ export function ImageGalleryWithQuery({
     }
 
     // Get current image
-    const currentImage = filteredImages[mainIndex];
+    const currentImage =
+      currentImageWithFormattedUrl || filteredImages[mainIndex];
     if (!currentImage) {
       return (
         <div className="relative h-64 w-full bg-muted flex items-center justify-center">
@@ -810,6 +924,16 @@ export function ImageGalleryWithQuery({
 
     const isLoading =
       isLoadingImageDetails(currentImage.id) || !currentImage.url;
+    const hasLoaded = loadedImages.has(currentImage.id);
+    const hasError = currentImage.loadError;
+
+    console.log(
+      `Current image: ${
+        currentImage.id
+      }, loaded: ${hasLoaded}, loading: ${isLoading}, error: ${hasError}, URL: ${
+        currentImage.url
+      }, formatted: ${getFormattedImageUrl(currentImage.url)}`
+    );
 
     return (
       <div
@@ -832,9 +956,19 @@ export function ImageGalleryWithQuery({
           }}
         >
           {/* Loading state */}
-          {(isLoading || !loadedImages.has(currentImage.id)) && (
+          {isLoading && !hasLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {/* Error state */}
+          {hasError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted z-10">
+              <AlertCircle className="w-8 h-8 text-destructive mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Failed to load image
+              </p>
             </div>
           )}
 
@@ -851,7 +985,7 @@ export function ImageGalleryWithQuery({
               }}
             >
               <Image
-                src={currentImage.url}
+                src={getFormattedImageUrl(currentImage.url)}
                 alt={
                   currentImage.metadata?.description || `Image ${mainIndex + 1}`
                 }
@@ -859,8 +993,8 @@ export function ImageGalleryWithQuery({
                 className={cn(
                   "object-contain transition-opacity duration-300",
                   {
-                    "opacity-0": !loadedImages.has(currentImage.id),
-                    "opacity-100": loadedImages.has(currentImage.id),
+                    "opacity-0": !hasLoaded && !hasError,
+                    "opacity-100": hasLoaded || hasError,
                   }
                 )}
                 sizes="66vw"
@@ -912,9 +1046,12 @@ export function ImageGalleryWithQuery({
 
   // Add modal for fullscreen view
   const renderFullscreenModal = () => {
-    if (!isModalOpen || !filteredImages[mainIndex]) return null;
+    if (!isModalOpen) return null;
 
-    const currentImage = filteredImages[mainIndex];
+    // Use the memoized image with formatted URL
+    const currentImage =
+      currentImageWithFormattedUrl || filteredImages[mainIndex];
+    if (!currentImage) return null;
 
     return (
       <div className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center animate-in fade-in-0">
@@ -942,12 +1079,13 @@ export function ImageGalleryWithQuery({
               <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
             ) : (
               <img
-                src={`${currentImage.url.replace(/\/public$/, "")}/public`}
+                src={currentImage.url} // URL is already formatted in currentImageWithFormattedUrl
                 alt={
                   currentImage.metadata?.description || `Image ${mainIndex + 1}`
                 }
                 className="max-w-full max-h-full object-contain"
                 onLoad={() => handleImageLoad(currentImage.id)}
+                onError={() => handleImageError(currentImage.id)}
               />
             )}
 
@@ -1088,7 +1226,7 @@ export function ImageGalleryWithQuery({
                         {/* Image */}
                         {image.url && (
                           <Image
-                            src={`${image.url.replace(/\/public$/, "")}/public`}
+                            src={getFormattedImageUrl(image.url)}
                             alt={image.metadata?.description || `Thumbnail`}
                             fill
                             className={cn(
@@ -1100,6 +1238,7 @@ export function ImageGalleryWithQuery({
                             )}
                             sizes="(max-width: 768px) 100px, 120px"
                             onLoad={() => handleImageLoad(image.id)}
+                            onError={() => handleImageError(image.id)}
                           />
                         )}
 

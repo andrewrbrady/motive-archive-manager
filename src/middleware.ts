@@ -45,90 +45,76 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Get the token from the session
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+  try {
+    // Get the token from the session
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-  // Check if the current path is a public route
-  const isPublicRoute = pathStartsWith(pathname, publicRoutes);
+    // Check if the current path is a public route
+    const isPublicRoute = pathStartsWith(pathname, publicRoutes);
 
-  // If not a public route and no token, redirect to signin
-  if (!isPublicRoute && !token) {
-    const signInUrl = new URL("/auth/signin", request.url);
-    signInUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // If public route, allow access
-  if (isPublicRoute) {
-    return NextResponse.next();
-  }
-
-  // At this point, we know it's not a public route and we have a token
-  // Ensure the token has been properly initialized with roles
-  if (!token || !token.roles || !Array.isArray(token.roles)) {
-    console.error("Token missing or invalid roles:", token);
-    const signInUrl = new URL("/auth/signin", request.url);
-    signInUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // Check admin routes - verify user has admin role
-  if (
-    pathStartsWith(pathname, adminRoutes) ||
-    pathMatchesPattern(pathname, adminPatterns)
-  ) {
-    if (!hasRequiredRole(token.roles as string[], ["admin"])) {
-      return NextResponse.redirect(new URL("/unauthorized", request.url));
+    // If not a public route and no token, redirect to signin
+    if (!isPublicRoute && !token) {
+      const signInUrl = new URL("/auth/signin", request.url);
+      signInUrl.searchParams.set("callbackUrl", encodeURIComponent(pathname));
+      signInUrl.searchParams.set("error", "SessionRequired");
+      return NextResponse.redirect(signInUrl);
     }
-  }
 
-  // Check editor routes - verify user has editor or admin role
-  if (pathMatchesPattern(pathname, editorPatterns)) {
-    if (!hasRequiredRole(token.roles as string[], ["admin", "editor"])) {
-      return NextResponse.redirect(new URL("/unauthorized", request.url));
-    }
-  }
-
-  // Account suspension check
-  if (isUserSuspended(token.status as string)) {
-    // Allow access to signout
-    if (pathname === "/auth/signout") {
+    // If public route, allow access
+    if (isPublicRoute) {
       return NextResponse.next();
     }
-    // Redirect suspended users to the suspension page
-    return NextResponse.redirect(new URL("/account-suspended", request.url));
+
+    // At this point, we know it's not a public route and we have a token
+    // Ensure the token has been properly initialized with roles
+    if (!token || !token.roles || !Array.isArray(token.roles)) {
+      console.error("Token missing or invalid roles:", token);
+      const signInUrl = new URL("/auth/signin", request.url);
+      signInUrl.searchParams.set("callbackUrl", encodeURIComponent(pathname));
+      signInUrl.searchParams.set("error", "InvalidToken");
+      return NextResponse.redirect(signInUrl);
+    }
+
+    // Check if user account is active
+    if (token.status !== "active") {
+      return NextResponse.redirect(
+        new URL("/unauthorized?reason=inactive", request.url)
+      );
+    }
+
+    // Check admin routes - verify user has admin role
+    if (
+      pathStartsWith(pathname, adminRoutes) ||
+      pathMatchesPattern(pathname, adminPatterns)
+    ) {
+      if (!hasRequiredRole(token.roles as string[], ["admin"])) {
+        return NextResponse.redirect(
+          new URL("/unauthorized?reason=adminRequired", request.url)
+        );
+      }
+    }
+
+    // Check editor routes - verify user has editor or admin role
+    if (pathMatchesPattern(pathname, editorPatterns)) {
+      if (!hasRequiredRole(token.roles as string[], ["admin", "editor"])) {
+        return NextResponse.redirect(
+          new URL("/unauthorized?reason=editorRequired", request.url)
+        );
+      }
+    }
+
+    // All checks passed, proceed with the request
+    return NextResponse.next();
+  } catch (error) {
+    console.error("Middleware error:", error);
+    // On error, redirect to error page with details
+    const errorUrl = new URL("/auth/error", request.url);
+    errorUrl.searchParams.set("error", "ServerError");
+    return NextResponse.redirect(errorUrl);
   }
-
-  // Handle CORS
-  const origin = request.headers.get("origin") || "*";
-
-  if (request.method === "OPTIONS") {
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "GET,OPTIONS,POST,PUT,DELETE",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Max-Age": "86400",
-      },
-    });
-  }
-
-  const response = NextResponse.next();
-  response.headers.set("Access-Control-Allow-Origin", origin);
-  response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET,OPTIONS,POST,PUT,DELETE"
-  );
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  return response;
 }
 
 export const config = {
