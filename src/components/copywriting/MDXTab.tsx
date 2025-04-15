@@ -282,53 +282,58 @@ cover: ""
         onGenerate={handleGenerateArticle}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 min-h-0 flex">
-        {/* File List */}
-        <div className="w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--background))] flex flex-col">
-          <div className="flex-none p-2 border-b border-[hsl(var(--border))]">
-            <h3 className="text-sm font-medium">Files</h3>
+      {/* Content Container with Height Constraint */}
+      <div className="h-[calc(90vh-16rem)] overflow-hidden">
+        {/* Main Content */}
+        <div className="h-full flex">
+          {/* File List */}
+          <div className="w-64 flex-none border-r border-[hsl(var(--border))] bg-[hsl(var(--background))] flex flex-col">
+            <div className="flex-none p-2 border-b border-[hsl(var(--border))]">
+              <h3 className="text-sm font-medium">Files</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#111111] [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+              {files.length === 0 ? (
+                <div className="p-4 text-sm text-[hsl(var(--foreground-muted))]">
+                  No files yet
+                </div>
+              ) : (
+                <div className="py-2">
+                  {files.map((file) => (
+                    <button
+                      key={file._id || file.filename}
+                      onClick={() => setSelectedFile(file)}
+                      className={cn(
+                        "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-[hsl(var(--background-subtle))]",
+                        selectedFile?.filename === file.filename &&
+                          "bg-[hsl(var(--background-subtle))]"
+                      )}
+                    >
+                      <File className="h-4 w-4 text-[hsl(var(--foreground-muted))]" />
+                      <span className="truncate">{file.filename}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {files.length === 0 ? (
-              <div className="p-4 text-sm text-[hsl(var(--foreground-muted))]">
-                No files yet
+
+          {/* Editor Container */}
+          <div className="flex-1 overflow-hidden">
+            {selectedFile ? (
+              <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                <MDXEditor
+                  value={selectedFile.content}
+                  onChange={handleFileChange}
+                />
               </div>
             ) : (
-              <div className="py-2">
-                {files.map((file) => (
-                  <button
-                    key={file._id || file.filename}
-                    onClick={() => setSelectedFile(file)}
-                    className={cn(
-                      "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-[hsl(var(--background-subtle))]",
-                      selectedFile?.filename === file.filename &&
-                        "bg-[hsl(var(--background-subtle))]"
-                    )}
-                  >
-                    <File className="h-4 w-4 text-[hsl(var(--foreground-muted))]" />
-                    <span className="truncate">{file.filename}</span>
-                  </button>
-                ))}
+              <div className="h-full flex items-center justify-center text-[hsl(var(--foreground-muted))]">
+                {files.length === 0
+                  ? "Create a new MDX file to get started"
+                  : "Select a file to edit"}
               </div>
             )}
           </div>
-        </div>
-
-        {/* Editor/Preview */}
-        <div className="flex-1 min-w-0">
-          {selectedFile ? (
-            <MDXEditor
-              value={selectedFile.content}
-              onChange={handleFileChange}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center text-[hsl(var(--foreground-muted))]">
-              {files.length === 0
-                ? "Create a new MDX file to get started"
-                : "Select a file to edit"}
-            </div>
-          )}
         </div>
       </div>
     </div>

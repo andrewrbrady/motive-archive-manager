@@ -214,9 +214,9 @@ export function MediaSelector({ onSelect }: MediaSelectorProps) {
   const handleSelect = (image: Image) => {
     // Handle both Image and ImageData formats
     const imgId = "id" in image ? image.id : (image as any)._id;
-    const htmlCode = `<img src="${image.url}" alt="${
-      image.metadata?.description || image.filename
-    }" className="w-full h-full object-cover rounded-lg cursor-pointer transition-opacity hover:opacity-90" />`;
+    const htmlCode = `<div className="relative w-full aspect-[16/9] overflow-hidden rounded-lg">
+  <img src="${image.url}" alt="${image.metadata?.description || image.filename}" className="w-full h-full object-cover rounded-lg" />
+</div>`;
     onSelect(htmlCode);
     setOpen(false);
 

@@ -14,6 +14,10 @@ import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/components/ThemeProvider";
 import { MediaSelector } from "./mdx/MediaSelector";
+import prettier from "prettier/standalone";
+import * as monacoEditor from "monaco-editor";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // Dynamically import Monaco Editor
 const Editor = dynamic(() => import("@monaco-editor/react"), {
@@ -79,6 +83,7 @@ interface MDXFrontmatter {
   cover?: string;
   author?: string;
   tags?: string[];
+  slug?: string;
   [key: string]: any;
 }
 
@@ -94,12 +99,17 @@ interface MDXComponentProps {
 
 const components = {
   img: ({ src, alt, className = "" }: MDXComponentProps) => (
-    <div className="my-6">
-      <img
-        src={src}
-        alt={alt}
-        className={cn("w-full h-full object-cover rounded-lg", className)}
-      />
+    <div className="my-8 max-w-3xl mx-auto">
+      <div className="aspect-video relative overflow-hidden rounded-lg">
+        <img
+          src={src}
+          alt={alt}
+          className={cn(
+            "absolute inset-0 w-full h-full object-cover",
+            className
+          )}
+        />
+      </div>
     </div>
   ),
   div: ({ className = "", children, ...props }: MDXComponentProps) => (
@@ -244,6 +254,57 @@ export default function MDXEditor({
   const { frontmatter, content } = parseFrontmatter(value);
   const { theme } = useTheme();
 
+  // Format the current editor content
+  const formatDocument = async () => {
+    if (!editorRef.current) return;
+
+    try {
+      const unformatted = editorRef.current.getValue();
+      const formatted = await prettier.format(unformatted, {
+        parser: "markdown",
+        printWidth: 80,
+        tabWidth: 2,
+        useTabs: false,
+        semi: true,
+        singleQuote: true,
+        trailingComma: "es5",
+        bracketSpacing: true,
+        proseWrap: "always",
+      });
+
+      // Get the current cursor position
+      const position = editorRef.current.getPosition();
+
+      // Update the editor value
+      editorRef.current.setValue(formatted);
+
+      // Restore cursor position
+      if (position) {
+        editorRef.current.setPosition(position);
+        editorRef.current.revealPositionInCenter(position);
+      }
+    } catch (error) {
+      console.error("Error formatting document:", error);
+    }
+  };
+
+  // Add keyboard shortcut for formatting
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const editor = editorRef.current;
+    const disposable = editor.addAction({
+      id: "format-document",
+      label: "Format Document",
+      keybindings: [monacoEditor.KeyMod.CtrlCmd | monacoEditor.KeyCode.KeyS],
+      run: formatDocument,
+    });
+
+    return () => {
+      disposable.dispose();
+    };
+  }, []);
+
   // Define Monaco editor before mount handler
   const handleEditorBeforeMount = (monaco: typeof import("monaco-editor")) => {
     monaco.editor.defineTheme("motive-dark", darkTheme);
@@ -308,9 +369,27 @@ export default function MDXEditor({
   ) => {
     editorRef.current = editor;
 
-    // Set editor theme to dark mode
+    // Set editor theme and options
     editor.updateOptions({
       theme: "motive-dark",
+      scrollbar: {
+        vertical: "visible",
+        horizontal: "visible",
+        useShadows: false,
+        verticalScrollbarSize: 10,
+        horizontalScrollbarSize: 10,
+      },
+      revealHorizontalRightPadding: 30,
+    });
+
+    // Add format command to the editor's context menu
+    editor.addAction({
+      id: "format-document",
+      label: "Format Document",
+      keybindings: [monacoEditor.KeyMod.CtrlCmd | monacoEditor.KeyCode.KeyS],
+      contextMenuGroupId: "1_modification",
+      contextMenuOrder: 1.5,
+      run: formatDocument,
     });
 
     if (isVimMode && statusBarRef.current) {
@@ -337,44 +416,76 @@ export default function MDXEditor({
     }
   };
 
+  const handleDownload = () => {
+    const content = editorRef.current?.getValue() || value;
+    const blob = new Blob([content], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const filename = frontmatter.slug
+      ? `${frontmatter.slug}.mdx`
+      : frontmatter.title
+        ? `${frontmatter.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.mdx`
+        : "untitled.mdx";
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex h-full">
       {/* Preview */}
-      <div className="w-1/2 h-full overflow-y-auto border-r border-[hsl(var(--border))] bg-[hsl(var(--background))]">
-        {frontmatter.cover && (
-          <div className="w-full h-64 relative">
-            <img
-              src={frontmatter.cover}
-              alt={frontmatter.title || "Cover image"}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
-        <div className="p-8 min-h-[calc(100vh-16rem)]">
-          {frontmatter.title && (
-            <h1 className="text-4xl font-bold mb-4">{frontmatter.title}</h1>
+      <div className="w-1/2 border-r border-[hsl(var(--border))] bg-[hsl(var(--background))] overflow-hidden">
+        <div className="h-full overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#111111] [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          {frontmatter.cover && (
+            <div className="w-full h-64 relative">
+              <img
+                src={frontmatter.cover}
+                alt={frontmatter.title || "Cover image"}
+                className="w-full h-full object-cover"
+              />
+            </div>
           )}
-          {frontmatter.subtitle && (
-            <h2 className="text-xl text-[hsl(var(--foreground-muted))] mb-8">
-              {frontmatter.subtitle}
-            </h2>
-          )}
-          <div className="prose prose-invert max-w-none">
-            {mdxSource && (
-              <MDXRemote {...mdxSource} components={components} jsx={"true"} />
+          <div className="p-8">
+            {frontmatter.title && (
+              <h1 className="text-4xl font-bold mb-4">{frontmatter.title}</h1>
             )}
+            {frontmatter.subtitle && (
+              <h2 className="text-xl text-[hsl(var(--foreground-muted))] mb-8">
+                {frontmatter.subtitle}
+              </h2>
+            )}
+            <div className="prose prose-invert max-w-none">
+              {mdxSource && (
+                <MDXRemote
+                  {...mdxSource}
+                  components={components}
+                  jsx={"true"}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Editor */}
-      <div className="w-1/2 h-screen sticky top-0 flex flex-col">
-        {!readOnly && (
-          <div className="p-2 border-b border-[hsl(var(--border))]">
-            <MediaSelector onSelect={handleMediaSelect} />
-          </div>
-        )}
-        <div className="flex-1 relative bg-[#111111]">
+      <div className="w-1/2 flex flex-col">
+        <div className="flex-none p-2 border-b border-[hsl(var(--border))] flex items-center justify-between">
+          <MediaSelector onSelect={handleMediaSelect} />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDownload}
+            className="h-8"
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Download
+          </Button>
+        </div>
+        <div className="flex-1 bg-[#111111]">
           <div
             ref={statusBarRef}
             className="absolute top-0 right-0 z-10 p-1 text-xs text-[hsl(var(--foreground-muted))]"
@@ -403,8 +514,17 @@ export default function MDXEditor({
               scrollBeyondLastLine: false,
               smoothScrolling: true,
               contextmenu: false,
+              fixedOverflowWidgets: true,
+              scrollbar: {
+                vertical: "visible",
+                horizontal: "visible",
+                useShadows: false,
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10,
+              },
             }}
             onMount={handleEditorDidMount}
+            saveViewState={true}
           />
         </div>
       </div>
