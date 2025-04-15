@@ -16,6 +16,13 @@ import * as FileUpload from "@/components/ui/file-upload";
 
 interface GalleryContainerProps {
   carId: string;
+  car?: {
+    _id: string;
+    year: number;
+    make: string;
+    model: string;
+    primaryImageId?: string;
+  };
 }
 
 interface UploadProgress {
@@ -58,6 +65,7 @@ interface NormalizedImage {
 
 export const GalleryContainer: React.FC<GalleryContainerProps> = ({
   carId,
+  car,
 }) => {
   const { state, actions } = useGalleryState(carId);
   const [uploadModalOpen, setUploadModalOpen] = React.useState(false);

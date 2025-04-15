@@ -202,10 +202,11 @@ export function GalleryImageSelector({
   });
 
   // Handle search with debounce
-  const [debouncedSetSearch] = useDebounce(
-    (value: string) => setFilter("search", value || null),
-    500
-  );
+  const [debouncedSetSearch] = useDebounce((value: string) => {
+    if (setFilter) {
+      setFilter("search", value || null);
+    }
+  }, 500);
 
   // Handle search input
   const handleSearchInput = useCallback(
@@ -496,20 +497,37 @@ export function GalleryImageSelector({
         <div className="space-y-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {data.images.map((image) => {
-              const isSelected = selectedImageIds.includes(image._id);
+              // Convert Image type to ImageData if needed
+              const imageData =
+                "id" in image
+                  ? {
+                      _id: image.id,
+                      cloudflareId: image.id,
+                      url: image.url,
+                      filename: image.filename,
+                      width: 0,
+                      height: 0,
+                      metadata: image.metadata || {},
+                      carId: "",
+                      createdAt: image.createdAt,
+                      updatedAt: image.updatedAt,
+                    }
+                  : image;
+
+              const isSelected = selectedImageIds.includes(imageData._id);
               return (
                 <div
-                  key={image._id}
+                  key={imageData._id}
                   className={cn(
                     "group relative rounded-md overflow-hidden bg-muted cursor-pointer min-h-[200px] flex flex-col",
                     isSelected && "ring-2 ring-primary"
                   )}
-                  onClick={() => handleImageSelection(image)}
+                  onClick={() => handleImageSelection(imageData)}
                 >
                   <div className="relative flex-1 flex items-center justify-center bg-background">
                     <img
-                      src={image.url}
-                      alt={image.filename}
+                      src={imageData.url}
+                      alt={imageData.filename}
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                       loading="lazy"
                     />
@@ -521,11 +539,11 @@ export function GalleryImageSelector({
                   </div>
                   <div className="w-full p-2 bg-muted/80 backdrop-blur-sm text-xs border-t border-border">
                     <div className="truncate text-muted-foreground">
-                      {image.metadata?.angle && (
-                        <span className="mr-2">{image.metadata.angle}</span>
+                      {imageData.metadata?.angle && (
+                        <span className="mr-2">{imageData.metadata.angle}</span>
                       )}
-                      {image.metadata?.view && (
-                        <span>{image.metadata.view}</span>
+                      {imageData.metadata?.view && (
+                        <span>{imageData.metadata.view}</span>
                       )}
                     </div>
                   </div>
