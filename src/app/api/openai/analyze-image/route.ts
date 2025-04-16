@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
-import { getBaseUrl } from "@/lib/utils";
+import { getBaseUrl } from "@/lib/url-utils";
 
 // Set maximum execution time to 60 seconds
 export const maxDuration = 60;

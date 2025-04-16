@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Clock, MapPin } from "lucide-react";
-import { getTimeRemaining } from "@/lib/utils";
+import { getTimeRemaining } from "@/lib/date-utils";
 import { CardImage } from "./CardImage";
 import { MeasurementValue } from "@/types/car";
 import { cn } from "@/lib/utils";
@@ -72,8 +72,8 @@ export function VehicleCard({
       variant === "car"
         ? `/cars/${(vehicle as Car)._id}${currentSearchParams || ""}`
         : variant === "inventory"
-        ? (vehicle as InventoryItem).url
-        : (vehicle as Auction).link,
+          ? (vehicle as InventoryItem).url
+          : (vehicle as Auction).link,
     target: variant === "car" ? undefined : "_blank",
   };
 
@@ -81,10 +81,10 @@ export function VehicleCard({
   const imageUrl = auction
     ? auction.images?.[0]
     : variant === "inventory"
-    ? inventory?.images?.[0] || null
-    : car?.images?.[0]?.url
-    ? `${car.images[0].url}/public`
-    : null;
+      ? inventory?.images?.[0] || null
+      : car?.images?.[0]?.url
+        ? `${car.images[0].url}/public`
+        : null;
 
   const labelClasses =
     "text-[10px] uppercase tracking-wider text-text-secondary font-medium p-2";

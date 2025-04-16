@@ -21,27 +21,11 @@ import { KeyMod, KeyCode } from "monaco-editor";
 import { parseFrontmatter } from "@/lib/mdx";
 import { components as mdxComponents } from "@/components/mdx";
 import Image from "next/image";
-import { initVimMode } from "monaco-vim";
-
-// Extend the Window interface to include Monaco's vim extension
-declare global {
-  interface Window {
-    MonacoVim: {
-      initVimMode: (
-        editor: monaco.editor.IStandaloneCodeEditor,
-        statusBarElement: HTMLElement
-      ) => {
-        dispose: () => void;
-      };
-    };
-  }
-}
 
 // Dynamically import Monaco Editor with no SSR
-const MonacoEditor = dynamic(
-  () => import("@monaco-editor/react").then((mod) => mod.Editor),
-  { ssr: false }
-);
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+});
 
 // Custom components for MDX preview
 const previewComponents = {
@@ -304,6 +288,7 @@ const darkTheme = {
   },
 };
 
+// Add proper types for the editor props
 interface MDXEditorProps {
   value: string;
   onChange: (value: string | undefined) => void;
@@ -321,19 +306,52 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
   const statusBarRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
   const vimModeRef = useRef<{ dispose: () => void } | null>(null);
+  const [isEditorReady, setIsEditorReady] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+
+    // Simple cleanup function
     return () => {
       if (vimModeRef.current) {
         vimModeRef.current.dispose();
       }
-      if (editorRef.current) {
-        editorRef.current.dispose();
-        editorRef.current = null;
-      }
     };
   }, []);
+
+  // Wait for the editor to be mounted, then initialize vim mode
+  useEffect(() => {
+    if (!isEditorReady || !editorRef.current || !statusBarRef.current) return;
+
+    const loadVim = async () => {
+      try {
+        console.log("Loading vim mode...");
+        // Import monaco-vim dynamically
+        // @ts-ignore - We have type declarations in global.d.ts
+        const vim = await import("monaco-vim");
+
+        // Initialize vim mode
+        const vimMode = vim.initVimMode(
+          editorRef.current,
+          statusBarRef.current
+        );
+        vimModeRef.current = vimMode;
+
+        console.log("Vim mode initialized successfully");
+      } catch (error) {
+        console.error("Error initializing vim mode:", error);
+      }
+    };
+
+    loadVim();
+
+    return () => {
+      if (vimModeRef.current) {
+        vimModeRef.current.dispose();
+        vimModeRef.current = null;
+      }
+    };
+  }, [isEditorReady]);
 
   useEffect(() => {
     const compileMdx = async () => {
@@ -385,52 +403,35 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
     editorRef.current.executeEdits("insert-text", [op]);
   };
 
-  // Add Vim mode configuration
-  useEffect(() => {
-    if (!editorRef.current || !statusBarRef.current) return;
+  // Function to download the MDX file
+  const handleDownload = () => {
+    try {
+      // Parse frontmatter to get the slug
+      const { frontmatter, content } = parseFrontmatter(value);
 
-    // Initialize Vim mode
-    vimModeRef.current = initVimMode(editorRef.current, statusBarRef.current);
+      // Use slug as filename, fallback to "document" if slug doesn't exist
+      const filename = frontmatter.slug
+        ? `${frontmatter.slug}.mdx`
+        : "document.mdx";
 
-    // Configure the editor
-    editorRef.current.updateOptions({
-      lineNumbers: "on",
-      wordWrap: "on",
-      scrollBeyondLastLine: false,
-      minimap: { enabled: false },
-      fontSize: 14,
-      automaticLayout: true,
-    });
+      // Create blob with the content
+      const blob = new Blob([value], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
 
-    // Add custom Vim commands
-    const addAction = editorRef.current.addAction.bind(editorRef.current);
+      // Create download link and trigger click
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
 
-    addAction({
-      id: "vim-save",
-      label: "Save",
-      keybindings: [],
-      run: () => {
-        if (onSave) {
-          onSave();
-          if (statusBarRef.current) {
-            statusBarRef.current.textContent = "Saved";
-            setTimeout(() => {
-              if (statusBarRef.current) {
-                statusBarRef.current.textContent = "";
-              }
-            }, 2000);
-          }
-        }
-        return null;
-      },
-    });
-
-    return () => {
-      if (vimModeRef.current) {
-        vimModeRef.current.dispose();
-      }
-    };
-  }, [theme, onSave]);
+      // Cleanup
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
+  };
 
   if (!mounted) {
     return (
@@ -454,6 +455,15 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
               insertAtCursor(mdxCode);
             }}
           />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            onClick={handleDownload}
+            title="Download MDX File"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
         </div>
         <div className="flex-1 relative">
           <MonacoEditor
@@ -464,14 +474,15 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
             onChange={onChange}
             onMount={(editor) => {
               editorRef.current = editor;
+              setIsEditorReady(true);
             }}
             options={{
+              lineNumbers: "on",
+              wordWrap: "on",
               minimap: { enabled: false },
               fontSize: 14,
-              wordWrap: "on",
-              lineNumbers: "on",
               scrollBeyondLastLine: false,
-              automaticLayout: true,
+              contextmenu: false,
             }}
           />
           <div

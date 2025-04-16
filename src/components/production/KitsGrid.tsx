@@ -16,7 +16,7 @@ import {
   LogOut,
   Info,
 } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 
 // Extend the Kit type for our local needs
 interface KitWithDetails extends Kit {

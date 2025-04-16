@@ -100,19 +100,19 @@
 }
 
 .in-progress-event.deadline-event {
-  @apply border-warning/60 dark:border-warning/50;
+  @apply border-amber-500/60 dark:border-amber-500/50;
 }
 
 .in-progress-event.release-event {
-  @apply border-warning/40 dark:border-warning/30;
+  @apply border-amber-500/40 dark:border-amber-500/30;
 }
 
 .done-event.deadline-event {
-  @apply border-success/60 dark:border-success/50;
+  @apply border-green-500/60 dark:border-green-500/50;
 }
 
 .done-event.release-event {
-  @apply border-success/40 dark:border-success/30;
+  @apply border-green-500/40 dark:border-green-500/30;
 }
 
 /* Toolbar styles */

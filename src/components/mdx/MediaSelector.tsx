@@ -223,8 +223,11 @@ export function MediaSelector({ onSelect }: MediaSelectorProps) {
   });
 
   const handleSelect = (image: Image) => {
-    // For single images, use Markdown syntax
-    const htmlCode = `![${image.metadata?.description || image.filename}](${image.url})`;
+    // Use the simpler image format
+    const htmlCode = `<div className="relative w-full overflow-hidden rounded-lg">
+  <img src="${image.url}" alt="${image.metadata?.description || image.filename}" className="w-full h-full object-cover rounded-lg cursor-pointer transition-opacity hover:opacity-90" />
+</div>`;
+
     onSelect(htmlCode);
     setOpen(false);
 

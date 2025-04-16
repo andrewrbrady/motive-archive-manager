@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, Copy, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 
 interface ImageLightboxProps {
   isOpen: boolean;

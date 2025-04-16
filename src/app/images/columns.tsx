@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 
 export type ImageData = {
   _id: string;

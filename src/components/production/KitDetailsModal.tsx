@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 import { Kit } from "@/types/inventory";
 import { Package, Calendar, User, Clock } from "lucide-react";
 import {
@@ -40,8 +40,8 @@ export default function KitDetailsModal({
                 kit.status.toLowerCase() === "available"
                   ? "bg-green-100 text-green-800"
                   : kit.status.toLowerCase() === "checked-out"
-                  ? "bg-orange-100 text-orange-800"
-                  : "bg-blue-100 text-blue-800"
+                    ? "bg-orange-100 text-orange-800"
+                    : "bg-blue-100 text-blue-800"
               }
             >
               {kit.status}

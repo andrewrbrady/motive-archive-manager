@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { Kit, FormattedKitItem } from "@/types/inventory";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 
 // Extend the Kit type for our local needs
 interface KitWithDetails extends Kit {

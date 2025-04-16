@@ -7,7 +7,7 @@ import { Client } from "@/types/contact";
 import CarsPageClient from "./CarsPageClient";
 import { headers } from "next/headers";
 import { Make } from "@/lib/fetchMakes";
-import { getBaseUrl } from "@/lib/utils";
+import { getBaseUrl } from "@/lib/url-utils";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export const dynamic = "force-dynamic";

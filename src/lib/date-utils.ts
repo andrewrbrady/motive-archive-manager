@@ -4,10 +4,25 @@ import { DateFormat, DateOptions, DateTimeFormat } from "./types";
  * Formats a date according to the specified options
  */
 export function formatDate(
-  date: Date | string | number,
+  date: Date | string | number | undefined,
   options: DateOptions = {}
 ): string {
+  if (!date) return "N/A";
+
   const dateObj = new Date(date);
+
+  // Check if date is valid
+  if (isNaN(dateObj.getTime())) return "Invalid date";
+
+  // Use simple format if no options specified
+  if (Object.keys(options).length === 0) {
+    return dateObj.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   const { format = "medium", type = "date", timezone } = options;
 
   const formatOptions: Intl.DateTimeFormatOptions = {
@@ -214,5 +229,36 @@ export function endOf(
       return new Date(dateObj.setMilliseconds(999));
     default:
       return dateObj;
+  }
+}
+
+/**
+ * Calculate time remaining from a date string until now
+ */
+export function getTimeRemaining(endDateStr: string | undefined): string {
+  if (!endDateStr) return "N/A";
+
+  const endDate = new Date(endDateStr);
+  const now = new Date();
+
+  // Check if date is valid
+  if (isNaN(endDate.getTime())) return "Invalid date";
+
+  // If the date has passed
+  if (endDate <= now) {
+    return "Auction ended";
+  }
+
+  const diffMs = endDate.getTime() - now.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(
+    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+  );
+
+  if (diffDays > 0) {
+    return `${diffDays}d ${diffHours}h`;
+  } else {
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${diffHours}h ${diffMinutes}m`;
   }
 }

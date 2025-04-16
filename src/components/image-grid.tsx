@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ImageGridProps {
