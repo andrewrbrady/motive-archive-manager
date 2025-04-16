@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import MDXEditor from "@/components/MDXEditor";
+import { MDXEditor } from "@/components/MDXEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,14 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Save, Plus, File, Loader2, Wand2 } from "lucide-react";
+import { Save, Plus, File, Loader2, Wand2, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import GenerateArticleModal from "@/components/mdx/GenerateArticleModal";
+import { useGalleries } from "@/lib/hooks/query/useGalleries";
+import Gallery from "@/components/mdx/Gallery";
 
 interface MDXFile {
   _id?: string;
@@ -31,15 +34,53 @@ interface MDXFile {
   };
 }
 
+interface GalleryImage {
+  _id: string;
+  url: string;
+  filename?: string;
+  metadata?: {
+    description?: string;
+    [key: string]: any;
+  };
+}
+
+interface Gallery {
+  _id: string;
+  name: string;
+  description?: string;
+  imageIds: string[];
+  orderedImages?: {
+    id: string;
+    order: number;
+  }[];
+  images?: GalleryImage[];
+  thumbnailImage?: {
+    _id: string;
+    url: string;
+    filename?: string;
+    metadata?: {
+      description?: string;
+      [key: string]: any;
+    };
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function MDXTab() {
   const [files, setFiles] = useState<MDXFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<MDXFile | null>(null);
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [isGeneratingArticle, setIsGeneratingArticle] = useState(false);
+  const [isSelectingGallery, setIsSelectingGallery] = useState(false);
+  const [gallerySearch, setGallerySearch] = useState("");
   const [newFilename, setNewFilename] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { data: galleriesData, isLoading: isLoadingGalleries } = useGalleries({
+    search: gallerySearch,
+  });
 
   // Load saved files on component mount
   useEffect(() => {
@@ -152,8 +193,8 @@ cover: ""
     }
   };
 
-  const handleFileChange = (content: string) => {
-    if (!selectedFile) return;
+  const handleFileChange = (content: string | undefined) => {
+    if (!selectedFile || !content) return;
 
     setSelectedFile({ ...selectedFile, content });
     setFiles((prev) =>
@@ -198,6 +239,118 @@ cover: ""
         variant: "destructive",
       });
     }
+  };
+
+  const handleInsertGallery = (gallery: Gallery) => {
+    if (!selectedFile || !gallery.images) return;
+
+    const galleryImages = gallery.images.map((image, index) => ({
+      id: `lightbox${index + 1}`,
+      src: image.url || "",
+      alt: image.filename || `Gallery Image ${index + 1}`,
+    }));
+
+    const galleryCode = `<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {(() => {
+    const openModal = (id) => {
+      const dialog = document.getElementById(id);
+      dialog.showModal();
+
+      const handleKeyPress = (e) => {
+        if (e.key === 'ArrowRight') {
+          navigateModal(id, 'next');
+        } else if (e.key === 'ArrowLeft') {
+          navigateModal(id, 'prev');
+        }
+      };
+
+      dialog.addEventListener('keydown', handleKeyPress);
+      dialog.addEventListener('close', () => {
+        window.removeEventListener('keydown', handleKeyPress);
+      });
+    };
+
+    const closeModal = (e) => {
+      if (e.target.tagName.toLowerCase() === 'dialog' || e.target.classList.contains('close-btn')) {
+        const dialog = e.target.closest('dialog');
+        if (dialog) dialog.close();
+      }
+    };
+
+    const images = ${JSON.stringify(galleryImages, null, 2)};
+
+    const navigateModal = (currentId, direction) => {
+      const currentIndex = images.findIndex(img => img.id === currentId);
+      let nextIndex;
+
+      if (direction === 'next') {
+        nextIndex = (currentIndex + 1) % images.length;
+      } else {
+        nextIndex = (currentIndex - 1 + images.length) % images.length;
+      }
+
+      document.getElementById(currentId).close();
+      document.getElementById(images[nextIndex].id).showModal();
+    };
+
+    return (
+      <>
+        {images.map((image) => (
+          <div key={image.id} className="aspect-w-16 aspect-h-12">
+            <img
+              src={image.src}
+              alt={image.alt}
+              className="w-full h-full object-cover rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+              onClick={() => openModal(image.id)}
+            />
+            <dialog
+              id={image.id}
+              className="fixed inset-0 w-full h-full p-0 bg-transparent"
+              onClick={closeModal}
+            >
+              <div className="flex items-center justify-center min-h-screen p-4">
+                <div className="relative max-w-7xl mx-auto">
+                  <button
+                    className="close-btn absolute -top-12 right-0 text-white text-xl font-bold p-4 z-50"
+                    onClick={closeModal}
+                  >
+                    ×
+                  </button>
+                  <button
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 text-white text-4xl font-bold p-4 z-50 hover:bg-black/20 rounded-full"
+                    onClick={() => navigateModal(image.id, 'prev')}
+                  >
+                    ‹
+                  </button>
+                  <img
+                    src={image.src}
+                    alt={image.alt}
+                    className="max-h-[85vh] max-w-[85vw] w-auto h-auto object-contain"
+                  />
+                  <button
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 text-white text-4xl font-bold p-4 z-50 hover:bg-black/20 rounded-full"
+                    onClick={() => navigateModal(image.id, 'next')}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            </dialog>
+          </div>
+        ))}
+      </>
+    );
+  })()}
+</div>`;
+
+    // Insert the gallery code at the current cursor position or at the end
+    const newContent = selectedFile.content + "\n\n" + galleryCode;
+    handleFileChange(newContent);
+    setIsSelectingGallery(false);
+    toast({
+      title: "Success",
+      description: "Gallery inserted successfully",
+    });
   };
 
   if (isLoading) {
@@ -324,6 +477,7 @@ cover: ""
                 <MDXEditor
                   value={selectedFile.content}
                   onChange={handleFileChange}
+                  onSave={handleSaveFile}
                 />
               </div>
             ) : (

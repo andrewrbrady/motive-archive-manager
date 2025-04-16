@@ -1,14 +1,16 @@
 import "./globals.css";
-import { Metadata } from "next";
-import { Toaster } from "@/components/ui/toaster";
+import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "./providers";
+import Script from "next/script";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Motive Archive",
-  description: "The Collector's Resource for Premium Automobiles",
+  title: "Motive Archive Manager",
+  description: "A modern archive management system",
 };
 
 // Configure options for Next.js prefetching behavior
@@ -25,11 +27,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script
+          src="https://unpkg.com/monaco-vim/dist/monaco-vim.js"
+          strategy="beforeInteractive"
+        />
+      </head>
       <body
-        className={`min-h-screen bg-background antialiased ${inter.className}`}
+        className={cn(
+          inter.className,
+          "min-h-screen bg-background text-foreground"
+        )}
       >
-        <Providers>{children}</Providers>
-        <Toaster />
+        <Providers>
+          {children}
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );

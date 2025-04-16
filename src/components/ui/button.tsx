@@ -55,22 +55,3 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export { Button, buttonVariants };
-
-export interface ButtonGroupProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-export const ButtonGroup = ({ children, className }: ButtonGroupProps) => {
-  return (
-    <div
-      className={cn(
-        "inline-flex rounded-md shadow-sm [&>button]:rounded-none [&>button:first-child]:rounded-l-md [&>button:last-child]:rounded-r-md [&>button:not(:first-child)]:-ml-px",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-};
-ButtonGroup.displayName = "ButtonGroup";

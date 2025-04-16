@@ -16,6 +16,16 @@
     "migrate:cars": "tsx scripts/migrate-to-atlas.ts",
     "migrate:car-images": "tsx src/scripts/migrate-car-images.ts",
     "migrate:primary-image-ids": "tsx scripts/migrate-primary-image-ids.ts",
+<<<<<<< Updated upstream
+=======
+    "migrate:deliverable-editors": "tsx src/scripts/standalone-migration.ts",
+    "migrate:deliverable-editors-direct": "tsx src/scripts/migrate-deliverable-editors.ts",
+    "migrate:deliverable-editors-simple": "node src/scripts/run-simple.mjs",
+    "migrate:deliverable-editors-node": "node --loader ts-node/esm src/scripts/migrate-deliverable-editors.ts",
+    "migrate:deliverable-editors-sh": "bash src/scripts/migrate.sh",
+    "migrate:deliverable-editors-direct-run": "node src/scripts/direct-run.cjs",
+    "migrate:deliverable-editors-bash": "bash src/scripts/migrate-deliverable-editors.sh",
+>>>>>>> Stashed changes
     "init-batch-templates": "tsx src/scripts/init-batch-templates.ts",
     "migrate-event-assignees": "tsx src/scripts/migrate-event-assignees.ts",
     "create-template": "tsx scripts/create-motive-studio-template.ts",
@@ -31,7 +41,13 @@
     "migrate:raw-locations": "tsx src/scripts/migrate-raw-locations.ts",
     "reconcile-raw-assets": "tsx src/scripts/reconcile-raw-assets-hard-drives.ts",
     "migrate:created-at": "tsx src/scripts/migrate-created-at.ts",
+<<<<<<< Updated upstream
     "update:user-claims": "tsx src/scripts/update-user-claims.ts"
+=======
+    "update:user-claims": "tsx src/scripts/update-user-claims.ts",
+    "migrate:oauth-users": "node src/scripts/migrate-oauth-users.cjs",
+    "cleanup-users": "tsx src/scripts/cleanup-mongodb-refs.ts"
+>>>>>>> Stashed changes
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.36.3",
@@ -102,7 +118,7 @@
     "framer-motion": "^11.18.2",
     "fullcalendar": "^6.1.15",
     "fuse.js": "^7.0.0",
-    "katex": "^0.16.21",
+    "katex": "0.16.22",
     "langchain": "^0.3.15",
     "limiter": "^3.0.0",
     "lodash": "^4.17.21",
@@ -128,17 +144,25 @@
     "react-syntax-highlighter": "^15.6.1",
     "react-window": "^1.8.11",
     "react-window-infinite-loader": "^1.0.10",
-    "rehype-katex": "^7.0.1",
-    "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0",
+    "rehype-katex": "7.0.1",
+    "remark-gfm": "4.0.1",
+    "remark-math": "6.0.0",
     "request": "^2.88.2",
     "sharp": "^0.33.5",
     "sonner": "^1.7.4",
+<<<<<<< Updated upstream
+=======
+    "swr": "^2.3.3",
+>>>>>>> Stashed changes
     "tailwind-merge": "^2.6.0",
     "uuid": "^11.1.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+<<<<<<< Updated upstream
+=======
+    "@babel/plugin-transform-runtime": "^7.26.10",
+>>>>>>> Stashed changes
     "@tailwindcss/typography": "^0.5.16",
     "@types/bcrypt": "^5.0.2",
     "@types/eslint": "^9.6.1",
