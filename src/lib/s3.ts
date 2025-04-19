@@ -5,25 +5,48 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import * as dotenv from "dotenv";
 
-if (
-  !process.env.AWS_ACCESS_KEY_ID ||
-  !process.env.AWS_SECRET_ACCESS_KEY ||
-  !process.env.AWS_REGION ||
-  !process.env.AWS_BUCKET_NAME
-) {
-  throw new Error("AWS credentials not set in environment variables");
+// Load environment variables from .env.local
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config({ path: ".env.local" });
 }
 
-export const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
+// Validate AWS credentials
+const requiredEnvVars = [
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_REGION",
+  "AWS_BUCKET_NAME",
+];
+
+const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error("Missing required AWS environment variables:", missingVars);
+  throw new Error(
+    `Missing required AWS environment variables: ${missingVars.join(", ")}`
+  );
+}
+
+// Initialize S3 client with credentials
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION!,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+  maxAttempts: 3,
 });
 
 const BUCKET_NAME = process.env.AWS_BUCKET_NAME;
+
+// Log S3 configuration (without sensitive data)
+console.log("S3 Configuration:", {
+  region: process.env.AWS_REGION,
+  bucketName: BUCKET_NAME,
+  hasAccessKeyId: !!process.env.AWS_ACCESS_KEY_ID,
+  hasSecretAccessKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+});
 
 export interface S3UploadResult {
   key: string;
@@ -188,40 +211,59 @@ export function generateS3Key(carId: string, filename: string) {
   return `cars/${carId}/${timestamp}-${cleanFilename}`;
 }
 
+export async function getMDXFile(s3Key: string): Promise<string> {
+  try {
+    console.log("S3 - Fetching MDX file:", { s3Key, bucket: BUCKET_NAME });
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+    });
+
+    const response = await s3Client.send(command);
+    if (!response.Body) {
+      throw new Error("S3 response body is empty");
+    }
+
+    const content = await response.Body.transformToString();
+    console.log("S3 - Successfully fetched MDX file content");
+    return content;
+  } catch (error) {
+    console.error("S3 - Error fetching MDX file:", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      s3Key,
+      bucket: BUCKET_NAME,
+    });
+    throw error;
+  }
+}
+
 export async function uploadMDXFile(
   filename: string,
   content: string
 ): Promise<string> {
-  const timestamp = Date.now();
-  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "-");
-  const key = `mdx/${sanitizedFilename.replace(
-    /\.([^.]+)$/,
-    `-${timestamp}.$1`
-  )}`;
+  try {
+    console.log("S3 - Uploading MDX file:", { filename });
+    const timestamp = Date.now();
+    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "-");
+    const key = `mdx/${sanitizedFilename.replace(/\.([^.]+)$/, `-${timestamp}.$1`)}`;
 
-  const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: key,
-    Body: content,
-    ContentType: "text/markdown",
-  });
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: content,
+      ContentType: "text/markdown",
+    });
 
-  await s3Client.send(command);
-  return key;
-}
-
-export async function getMDXFile(s3Key: string): Promise<string> {
-  const command = new GetObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: s3Key,
-  });
-
-  const response = await s3Client.send(command);
-  const content = await response.Body?.transformToString();
-
-  if (!content) {
-    throw new Error(`Failed to get content for file: ${s3Key}`);
+    await s3Client.send(command);
+    console.log("S3 - Successfully uploaded MDX file:", { key });
+    return key;
+  } catch (error) {
+    console.error("S3 - Error uploading MDX file:", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      filename,
+    });
+    throw error;
   }
-
-  return content;
 }

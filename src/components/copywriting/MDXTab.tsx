@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { MDXEditor } from "@/components/MDXEditor";
+import * as React from "react";
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +13,38 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Save, Plus, File, Loader2, Wand2, Images } from "lucide-react";
+import { Save, Plus, File, Loader2, Wand2, Images, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import GenerateArticleModal from "@/components/mdx/GenerateArticleModal";
 import { useGalleries } from "@/lib/hooks/query/useGalleries";
 import Gallery from "@/components/mdx/Gallery";
+
+// Dynamically import MDXEditor with no SSR
+const MDXEditor = dynamic(
+  () => {
+    console.log("Dynamically importing MDXEditor in MDXTab");
+    return import("@/components/MDXEditor").then((mod) => {
+      console.log("MDXEditor module loaded in MDXTab:", mod);
+      if (!mod.default) {
+        console.error(
+          "MDXEditor default export is undefined in the module:",
+          mod
+        );
+        throw new Error("MDXEditor component is undefined");
+      }
+      return mod.default;
+    });
+  },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--foreground-muted))]" />
+      </div>
+    ),
+  }
+);
 
 interface MDXFile {
   _id?: string;
@@ -81,6 +108,8 @@ export default function MDXTab() {
   const { data: galleriesData, isLoading: isLoadingGalleries } = useGalleries({
     search: gallerySearch,
   });
+  const [fileToDelete, setFileToDelete] = useState<MDXFile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load saved files on component mount
   useEffect(() => {
@@ -94,7 +123,19 @@ export default function MDXTab() {
           throw new Error(data.error || "Failed to load MDX files");
         }
 
-        setFiles(data.files);
+        console.log("MDXTab - Received files from API:", data.files);
+
+        // Ensure each file has the required properties
+        const processedFiles = data.files.map((file: any) => ({
+          _id: file._id,
+          filename: file.filename,
+          content: file.content || "",
+          s3Key: file.s3Key,
+          frontmatter: file.frontmatter || {},
+        }));
+
+        console.log("MDXTab - Processed files:", processedFiles);
+        setFiles(processedFiles);
       } catch (error) {
         console.error("Error loading MDX files:", error);
         toast({
@@ -207,15 +248,21 @@ cover: ""
   const handleGenerateArticle = async (data: {
     title: string;
     filename: string;
+    content: string;
     carId?: string;
   }) => {
     try {
-      const response = await fetch("/api/mdx/generate", {
+      const response = await fetch("/api/mdx", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          filename: data.filename.endsWith(".mdx")
+            ? data.filename
+            : `${data.filename}.mdx`,
+          content: data.content,
+        }),
       });
 
       if (!response.ok) {
@@ -244,11 +291,28 @@ cover: ""
   const handleInsertGallery = (gallery: Gallery) => {
     if (!selectedFile || !gallery.images) return;
 
-    const galleryImages = gallery.images.map((image, index) => ({
-      id: `lightbox${index + 1}`,
-      src: image.url || "",
-      alt: image.filename || `Gallery Image ${index + 1}`,
-    }));
+    // Create a map of images by their ID for quick lookup
+    const imageMap = new Map(gallery.images.map((image) => [image._id, image]));
+
+    // Get ordered images array, falling back to default order if not available
+    const orderedImageIds = gallery.orderedImages?.length
+      ? gallery.orderedImages
+          .sort((a, b) => a.order - b.order)
+          .map((item) => item.id)
+      : gallery.imageIds;
+
+    // Map the ordered IDs to their corresponding images
+    const galleryImages = orderedImageIds
+      .map((id, index) => {
+        const image = imageMap.get(id);
+        if (!image) return null;
+        return {
+          id: `lightbox${index + 1}`,
+          src: image.url || "",
+          alt: image.filename || `Gallery Image ${index + 1}`,
+        };
+      })
+      .filter(Boolean); // Remove any null entries
 
     const galleryCode = `<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
   {(() => {
@@ -353,6 +417,48 @@ cover: ""
     });
   };
 
+  // Add delete file handler
+  const handleDeleteFile = async () => {
+    if (!fileToDelete || !fileToDelete._id) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/mdx?id=${fileToDelete._id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete MDX file");
+      }
+
+      // Remove the file from the files list
+      setFiles((prev) => prev.filter((file) => file._id !== fileToDelete._id));
+
+      // If the deleted file was selected, clear the selection
+      if (selectedFile && selectedFile._id === fileToDelete._id) {
+        setSelectedFile(null);
+      }
+
+      setFileToDelete(null);
+
+      toast({
+        title: "Success",
+        description: "File deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting MDX file:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to delete file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -435,6 +541,45 @@ cover: ""
         onGenerate={handleGenerateArticle}
       />
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!fileToDelete}
+        onOpenChange={(open) => !open && setFileToDelete(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete MDX File</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{fileToDelete?.filename}"? This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setFileToDelete(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteFile}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Content Container with Height Constraint */}
       <div className="h-[calc(90vh-16rem)] overflow-hidden">
         {/* Main Content */}
@@ -451,20 +596,48 @@ cover: ""
                 </div>
               ) : (
                 <div className="py-2">
-                  {files.map((file) => (
-                    <button
-                      key={file._id || file.filename}
-                      onClick={() => setSelectedFile(file)}
-                      className={cn(
-                        "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-[hsl(var(--background-subtle))]",
-                        selectedFile?.filename === file.filename &&
-                          "bg-[hsl(var(--background-subtle))]"
-                      )}
-                    >
-                      <File className="h-4 w-4 text-[hsl(var(--foreground-muted))]" />
-                      <span className="truncate">{file.filename}</span>
-                    </button>
-                  ))}
+                  {/* Debug info */}
+                  <div className="px-3 py-2 text-xs text-[hsl(var(--foreground-muted))]">
+                    Found {files.length} files
+                  </div>
+
+                  {files.map((file) => {
+                    console.log("Rendering file:", file);
+                    return (
+                      <div
+                        key={file._id || file.filename}
+                        className={cn(
+                          "group relative w-full px-3 py-2 text-sm hover:bg-[hsl(var(--background-subtle))]",
+                          selectedFile?.filename === file.filename &&
+                            "bg-[hsl(var(--background-subtle))]"
+                        )}
+                      >
+                        <button
+                          onClick={() => {
+                            console.log("Selecting file:", file);
+                            setSelectedFile(file);
+                          }}
+                          className="w-full text-left flex items-center gap-2"
+                        >
+                          <File className="h-4 w-4 text-[hsl(var(--foreground-muted))]" />
+                          <span className="truncate">{file.filename}</span>
+                        </button>
+
+                        {file._id && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFileToDelete(file);
+                            }}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-[hsl(var(--destructive)/0.2)] rounded-sm"
+                            title="Delete file"
+                          >
+                            <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

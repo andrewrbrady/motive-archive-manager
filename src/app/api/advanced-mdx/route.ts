@@ -1,70 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect, connectToDatabase } from "@/lib/mongodb";
 import { uploadMDXFile, getMDXFile } from "@/lib/s3";
-import { MDXFile } from "@/models/MDXFile";
+import { AdvancedMDXFile, IAdvancedMDXFile } from "@/models/AdvancedMDXFile";
 import { WithId, Document, ObjectId } from "mongodb";
+import matter from "gray-matter";
 
-interface MDXDocument {
+interface AdvancedMDXDocument extends WithId<Document> {
   _id: ObjectId;
   filename: string;
   s3Key: string;
+  frontmatter?: {
+    title?: string;
+    subtitle?: string;
+    type?: string;
+    slug?: string;
+    author?: string;
+    tags?: string[];
+    cover?: string;
+    specs?: {
+      [key: string]: string;
+    };
+  };
   createdAt: Date;
   updatedAt: Date;
 }
 
-// GET /api/mdx - Get all MDX files
+// GET /api/advanced-mdx - Get all advanced MDX files
 export async function GET() {
   try {
-    console.log("MDX API - Connecting to MongoDB...");
+    console.log("Advanced MDX API - Connecting to MongoDB...");
     const { db } = await connectToDatabase();
-    console.log("MDX API - MongoDB connected, fetching files...");
+    console.log("Advanced MDX API - MongoDB connected, fetching files...");
 
     // Get files directly from MongoDB collection
     const files = await db
-      .collection<MDXDocument>("mdx_files")
+      .collection<AdvancedMDXDocument>("advanced_mdx_files")
       .find({})
       .sort({ updatedAt: -1 })
       .toArray();
 
-    console.log(`MDX API - Found ${files.length} files in MongoDB:`, {
-      files: files.map((f) => ({
-        _id: f._id.toString(),
-        filename: f.filename,
-        s3Key: f.s3Key,
-        createdAt: f.createdAt,
-        updatedAt: f.updatedAt,
-      })),
-    });
+    console.log(`Advanced MDX API - Found ${files.length} files in MongoDB`);
 
     // Get content for each file from S3
-    console.log("MDX API - Fetching content from S3...");
+    console.log("Advanced MDX API - Fetching content from S3...");
     const filesWithContent = await Promise.all(
       files.map(async (file) => {
         try {
           console.log(
-            `MDX API - Fetching content for file: ${file.filename} (S3 Key: ${file.s3Key})`
+            `Advanced MDX API - Fetching content for file: ${file.filename}`
           );
           const content = await getMDXFile(file.s3Key);
+
+          // Parse frontmatter
+          const { data: frontmatter } = matter(content);
+
           console.log(
-            `MDX API - Successfully fetched content for: ${file.filename}`
+            `Advanced MDX API - Successfully fetched content for: ${file.filename}`
           );
           return {
-            _id: file._id.toString(), // Convert ObjectId to string
+            _id: file._id.toString(),
             filename: file.filename,
             content,
+            frontmatter,
             s3Key: file.s3Key,
             createdAt: file.createdAt,
             updatedAt: file.updatedAt,
           };
         } catch (error) {
           console.error(
-            `MDX API - Error fetching content for file ${file.filename}:`,
+            `Advanced MDX API - Error fetching content for file ${file.filename}:`,
             error instanceof Error ? error.message : "Unknown error"
           );
           return {
-            _id: file._id.toString(), // Convert ObjectId to string
+            _id: file._id.toString(),
             filename: file.filename,
             content: "",
+            frontmatter: file.frontmatter || {},
             s3Key: file.s3Key,
             createdAt: file.createdAt,
             updatedAt: file.updatedAt,
@@ -77,30 +88,20 @@ export async function GET() {
       })
     );
 
-    console.log("MDX API - Successfully processed all files:", {
-      count: filesWithContent.length,
-      files: filesWithContent.map((f) => ({
-        _id: f._id,
-        filename: f.filename,
-        hasContent: !!f.content,
-        hasError: !!f.error,
-      })),
-    });
-
     return NextResponse.json({ files: filesWithContent });
   } catch (error: any) {
-    console.error("MDX API - Error:", {
+    console.error("Advanced MDX API - Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      { error: error.message || "Failed to fetch MDX files" },
+      { error: error.message || "Failed to fetch advanced MDX files" },
       { status: 500 }
     );
   }
 }
 
-// POST /api/mdx - Create a new MDX file
+// POST /api/advanced-mdx - Create a new advanced MDX file
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
@@ -113,22 +114,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if file with same name already exists
-    const existingFile = await MDXFile.findOne({ filename });
-    if (existingFile) {
-      return NextResponse.json(
-        { error: "File with this name already exists" },
-        { status: 400 }
-      );
-    }
+    // Parse frontmatter from content
+    const { data: frontmatter } = matter(content);
 
-    // Upload to S3 first
+    // Immediately upload to S3
     const s3Key = await uploadMDXFile(filename, content);
 
-    // Create MongoDB record with filename and s3Key
-    const mdxFile = await MDXFile.create({
+    // Immediately create MongoDB record
+    const mdxFile = await AdvancedMDXFile.create({
       filename,
       s3Key,
+      frontmatter,
     });
 
     // Return the file with content
@@ -136,33 +132,38 @@ export async function POST(request: NextRequest) {
       file: {
         ...mdxFile.toObject(),
         content,
+        frontmatter,
       },
     });
   } catch (error: any) {
-    console.error("Error creating MDX file:", error);
+    console.error("Error creating advanced MDX file:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create MDX file" },
+      { error: error.message || "Failed to create advanced MDX file" },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/mdx - Update an existing MDX file
+// PUT /api/advanced-mdx - Update an existing advanced MDX file
 export async function PUT(request: NextRequest) {
   try {
     await dbConnect();
     const { id, content } = await request.json();
 
-    const existingFile = await MDXFile.findById(id);
+    const existingFile = await AdvancedMDXFile.findById(id);
     if (!existingFile) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
+    // Parse frontmatter from content
+    const { data: frontmatter } = matter(content);
+
     // Upload updated content to S3
     const s3Key = await uploadMDXFile(existingFile.filename, content);
 
-    // Update MongoDB record with new s3Key
+    // Update MongoDB record with new s3Key and frontmatter
     existingFile.s3Key = s3Key;
+    existingFile.frontmatter = frontmatter;
     await existingFile.save();
 
     // Return the file with content
@@ -170,18 +171,19 @@ export async function PUT(request: NextRequest) {
       file: {
         ...existingFile.toObject(),
         content,
+        frontmatter,
       },
     });
   } catch (error: any) {
-    console.error("Error updating MDX file:", error);
+    console.error("Error updating advanced MDX file:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to update MDX file" },
+      { error: error.message || "Failed to update advanced MDX file" },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/mdx - Delete an MDX file
+// DELETE /api/advanced-mdx - Delete an advanced MDX file
 export async function DELETE(request: NextRequest) {
   try {
     await dbConnect();
@@ -196,11 +198,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Find and delete the file from MongoDB
-    const mdxFile = await MDXFile.findByIdAndDelete(id);
+    const mdxFile = await AdvancedMDXFile.findByIdAndDelete(id);
 
     if (!mdxFile) {
       return NextResponse.json(
-        { error: "MDX file not found" },
+        { error: "Advanced MDX file not found" },
         { status: 404 }
       );
     }
@@ -210,9 +212,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting MDX file:", error);
+    console.error("Error deleting advanced MDX file:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to delete MDX file" },
+      { error: error.message || "Failed to delete advanced MDX file" },
       { status: 500 }
     );
   }

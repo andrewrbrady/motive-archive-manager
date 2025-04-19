@@ -1,0 +1,155 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Adding New MDX Preview Components
+
+## Component Location and Structure
+
+1. Create new components in the `src/components/mdx/` directory
+2. Export components as default exports from their individual files
+3. Import and register components in `src/components/MDXEditor.tsx`
+
+## Step-by-Step Instructions
+
+### 1. Create the Component File
+- Create a new file in `src/components/mdx/` (e.g., `MyComponent.tsx`)
+- Use default export for the component
+- Include TypeScript types for props
+
+Example structure:
+```tsx
+// src/components/mdx/MyComponent.tsx
+import React from 'react';
+
+interface MyComponentProps {
+  // Define your props here
+}
+
+const MyComponent: React.FC<MyComponentProps> = (props) => {
+  return (
+    // Your component JSX
+  );
+};
+
+export default MyComponent;
+```
+
+### 2. Update MDXEditor.tsx
+1. Import the component at the top with other MDX components:
+```tsx
+import MyComponent from './mdx/MyComponent';
+```
+
+2. Add the component to the `previewComponents` object:
+```tsx
+const previewComponents = {
+  // ... existing components ...
+  MyComponent: MyComponent,
+};
+```
+
+### 3. Usage in MDX Files
+After adding the component, you can use it in MDX files like this:
+```mdx
+<MyComponent prop1="value1" prop2="value2" />
+```
+
+## Important Guidelines
+
+1. **Naming Conventions**:
+   - Use PascalCase for component names
+   - Name the file the same as the component
+   - Keep names descriptive and specific
+
+2. **Props and Types**:
+   - Always define TypeScript interfaces for props
+   - Export prop interfaces if they're needed elsewhere
+   - Document complex props with JSDoc comments
+
+3. **Component Design**:
+   - Follow the project's styling guidelines
+   - Use Tailwind classes for styling
+   - Ensure components are responsive
+   - Include proper error handling for required props
+
+4. **Testing**:
+   - Test the component in the MDX preview
+   - Verify all props work as expected
+   - Check responsive behavior
+   - Test error states
+
+## Example Component Template
+
+```tsx
+// src/components/mdx/ExampleComponent.tsx
+import React from 'react';
+import { cn } from '@/lib/utils';
+
+interface ExampleComponentProps {
+  title: string;
+  description?: string;
+  className?: string;
+}
+
+const ExampleComponent: React.FC<ExampleComponentProps> = ({
+  title,
+  description,
+  className,
+}) => {
+  return (
+    <div className={cn(
+      "my-8 p-4 rounded-lg border border-border",
+      className
+    )}>
+      <h2 className="text-2xl font-bold">{title}</h2>
+      {description && (
+        <p className="mt-2 text-muted-foreground">{description}</p>
+      )}
+    </div>
+  );
+};
+
+export default ExampleComponent;
+```
+
+## Troubleshooting
+
+1. If the component isn't rendering:
+   - Verify the import path is correct
+   - Check that the component is properly added to `previewComponents`
+   - Ensure the component name in MDX matches exactly
+
+2. If props aren't working:
+   - Check prop types match the interface
+   - Verify prop names in MDX match component props
+   - Check for required props
+
+3. If styling isn't applying:
+   - Verify Tailwind classes are correct
+   - Check for proper className prop handling
+   - Ensure styles aren't being overridden
+
+## Best Practices
+
+1. **Modularity**:
+   - Keep components focused on a single responsibility
+   - Break down complex components into smaller pieces
+   - Reuse existing components when possible
+
+2. **Performance**:
+   - Avoid unnecessary re-renders
+   - Use proper React hooks
+   - Optimize images and media content
+
+3. **Accessibility**:
+   - Include proper ARIA attributes
+   - Ensure keyboard navigation works
+   - Maintain proper heading hierarchy
+   - Provide alt text for images
+
+4. **Documentation**:
+   - Add JSDoc comments for complex functions
+   - Document any required context or providers
+   - Include usage examples in comments

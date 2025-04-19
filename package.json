@@ -7,7 +7,7 @@
     "node": ">=18.17.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -44,7 +44,7 @@
     "cleanup-users": "tsx src/scripts/cleanup-mongodb-refs.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.36.3",
+    "@anthropic-ai/sdk": "0.36.3",
     "@auth/firebase-adapter": "^1.0.0",
     "@aws-sdk/client-s3": "^3.738.0",
     "@aws-sdk/s3-request-presigner": "^3.738.0",
@@ -115,12 +115,13 @@
     "framer-motion": "^11.18.2",
     "fullcalendar": "^6.1.15",
     "fuse.js": "^7.0.0",
+    "gray-matter": "^4.0.3",
     "katex": "^0.16.21",
     "langchain": "^0.3.15",
     "limiter": "^3.0.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.460.0",
-    "monaco-vim": "^0.4.2",
+    "monaco-vim": "0.4.0",
     "mongoose": "^8.8.3",
     "next": "^15.3.0",
     "next-auth": "^5.0.0-beta.25",

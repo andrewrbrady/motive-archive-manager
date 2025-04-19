@@ -10,7 +10,7 @@ import RecentProjectsSection from "@/components/sections/recent-projects";
 import ContactSection from "@/components/sections/contact";
 import Footer from "@/components/layout/footer";
 import ScrollIndicator from "@/components/navigation/ScrollIndicator";
-import { MDXEditor } from "@/components/MDXEditor";
+import MDXEditor from "@/components/MDXEditor";
 import { MediaSelector } from "@/components/MediaSelector";
 
 export default function Home() {

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { FileInfoDisplay } from "../ui/FileInfoDisplay";
 import {
   ChevronLeft,
   ChevronRight,
@@ -29,7 +30,12 @@ import {
   Info,
   Upload,
   Trash2,
+  Search,
+  Filter,
+  Copy,
+  Check,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 // Define the allowed values for each field
 const allowedValues = {
@@ -116,6 +122,12 @@ export function CarImageGalleryV2({
   const [mainImageLoaded, setMainImageLoaded] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedView, setSelectedView] = useState<string>("all");
+  const [selectedMovement, setSelectedMovement] = useState<string>("all");
+  const [selectedTod, setSelectedTod] = useState<string>("all");
+  const [selectedSide, setSelectedSide] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get current page and image from URL or default values
   const currentPage = Number(searchParams.get("page")) || 1;
@@ -176,8 +188,57 @@ export function CarImageGalleryV2({
       );
     }
 
+    // Apply view filter
+    if (selectedView !== "all") {
+      filtered = filtered.filter((img) => img.metadata?.view === selectedView);
+    }
+
+    // Apply movement filter
+    if (selectedMovement !== "all") {
+      filtered = filtered.filter(
+        (img) => img.metadata?.movement === selectedMovement
+      );
+    }
+
+    // Apply time of day filter
+    if (selectedTod !== "all") {
+      filtered = filtered.filter((img) => img.metadata?.tod === selectedTod);
+    }
+
+    // Apply side filter
+    if (selectedSide !== "all") {
+      filtered = filtered.filter((img) => img.metadata?.side === selectedSide);
+    }
+
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((img) => {
+        const metadata = img.metadata || {};
+        return (
+          img.filename?.toLowerCase().includes(query) ||
+          metadata.description?.toLowerCase().includes(query) ||
+          metadata.category?.toLowerCase().includes(query) ||
+          metadata.angle?.toLowerCase().includes(query) ||
+          metadata.view?.toLowerCase().includes(query) ||
+          metadata.movement?.toLowerCase().includes(query) ||
+          metadata.tod?.toLowerCase().includes(query) ||
+          metadata.side?.toLowerCase().includes(query)
+        );
+      });
+    }
+
     setFilteredImages(filtered);
-  }, [images, currentTab, selectedAngle]);
+  }, [
+    images,
+    currentTab,
+    selectedAngle,
+    selectedView,
+    selectedMovement,
+    selectedTod,
+    selectedSide,
+    searchQuery,
+  ]);
 
   // Separate effect for handling tab changes
   useEffect(() => {
@@ -418,6 +479,31 @@ export function CarImageGalleryV2({
     [onDelete]
   );
 
+  // Add copy to clipboard function
+  const copyToClipboard = useCallback(
+    async (text: string, buttonId: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        const button = document.getElementById(buttonId);
+        if (button) {
+          const icon = button.querySelector("svg");
+          const check = button.querySelector(".check-icon");
+          if (icon && check) {
+            icon.classList.add("hidden");
+            check.classList.remove("hidden");
+            setTimeout(() => {
+              icon.classList.remove("hidden");
+              check.classList.add("hidden");
+            }, 2000);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to copy text: ", err);
+      }
+    },
+    []
+  );
+
   if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -472,43 +558,122 @@ export function CarImageGalleryV2({
       aria-label="Image gallery"
       tabIndex={0}
     >
-      <div className="flex items-center justify-between gap-4">
-        {showCategoryTabs && categories.length > 1 && (
-          <Tabs
-            defaultValue="all"
-            value={currentTab}
-            onValueChange={setCurrentTab}
-            className="mb-4"
-          >
-            <TabsList>
-              {categories.map((category) => (
-                <TabsTrigger
-                  key={category}
-                  value={category}
-                  className="capitalize"
-                >
-                  {category}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          {showCategoryTabs && categories.length > 1 && (
+            <Tabs
+              defaultValue="all"
+              value={currentTab}
+              onValueChange={setCurrentTab}
+            >
+              <TabsList>
+                {categories.map((category) => (
+                  <TabsTrigger
+                    key={category}
+                    value={category}
+                    className="capitalize"
+                  >
+                    {category}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
 
-        <div className="flex items-center gap-4">
-          <Select value={selectedAngle} onValueChange={setSelectedAngle}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by angle" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All angles</SelectItem>
-              {allowedValues.angle.map((angle) => (
-                <SelectItem key={angle} value={angle}>
-                  {angle}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(showFilters && "bg-accent text-accent-foreground")}
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+            <Input
+              placeholder="Search images..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-[200px]"
+            />
+          </div>
         </div>
+
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-2 p-4 bg-muted/50 rounded-lg">
+            <Select value={selectedAngle} onValueChange={setSelectedAngle}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Angle" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All angles</SelectItem>
+                {allowedValues.angle.map((angle) => (
+                  <SelectItem key={angle} value={angle}>
+                    {angle}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedView} onValueChange={setSelectedView}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="View" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All views</SelectItem>
+                {allowedValues.view.map((view) => (
+                  <SelectItem key={view} value={view}>
+                    {view}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedMovement}
+              onValueChange={setSelectedMovement}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Movement" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All movement</SelectItem>
+                {allowedValues.movement.map((movement) => (
+                  <SelectItem key={movement} value={movement}>
+                    {movement}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedTod} onValueChange={setSelectedTod}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Time of Day" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All times</SelectItem>
+                {allowedValues.tod.map((tod) => (
+                  <SelectItem key={tod} value={tod}>
+                    {tod}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedSide} onValueChange={setSelectedSide}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Side" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All sides</SelectItem>
+                {allowedValues.side.map((side) => (
+                  <SelectItem key={side} value={side}>
+                    {side}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Upload Progress */}
@@ -568,8 +733,8 @@ export function CarImageGalleryV2({
                   "Car image"
                 }`
               : isEditing
-              ? "Click or drag files to upload images"
-              : "No image selected"
+                ? "Click or drag files to upload images"
+                : "No image selected"
           }
         >
           {selectedImage ? (
@@ -677,7 +842,7 @@ export function CarImageGalleryV2({
         {/* Thumbnails Grid with Pagination */}
         <div className="flex flex-col h-full">
           <div
-            className="grid grid-cols-3 gap-2 overflow-y-auto bg-muted rounded-lg p-2"
+            className="grid grid-cols-3 gap-2 overflow-y-auto bg-muted/50 rounded-lg p-3"
             style={{ maxHeight: "800px" }}
             role="listbox"
             aria-label="Image thumbnails"
@@ -686,10 +851,10 @@ export function CarImageGalleryV2({
               <div
                 key={image._id}
                 className={cn(
-                  "relative w-full pb-[75%] rounded-md overflow-hidden cursor-pointer group",
+                  "relative w-full pb-[75%] rounded-md overflow-hidden cursor-pointer group transition-all duration-200",
                   selectedImage?._id === image._id
                     ? "ring-2 ring-primary"
-                    : "opacity-50"
+                    : "opacity-80 hover:opacity-100"
                 )}
                 onClick={() => handleThumbnailClick(image)}
                 onKeyDown={(e) => {
@@ -707,10 +872,10 @@ export function CarImageGalleryV2({
               >
                 <div
                   className={cn(
-                    "absolute inset-0 transition-opacity duration-200",
+                    "absolute inset-0 transition-all duration-200",
                     selectedImage?._id === image._id
                       ? "opacity-100"
-                      : "hover:opacity-100"
+                      : "group-hover:opacity-100"
                   )}
                 >
                   <Image
@@ -781,6 +946,14 @@ export function CarImageGalleryV2({
         </div>
       </div>
 
+      {/* File Information Display */}
+      {selectedImage && (
+        <FileInfoDisplay
+          fileName={selectedImage.filename || "Untitled"}
+          fileUrl={selectedImage.url}
+        />
+      )}
+
       {/* Lightbox Dialog */}
       <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
         <DialogContent className="max-w-7xl w-full p-0">
@@ -830,19 +1003,73 @@ export function CarImageGalleryV2({
           </div>
 
           {selectedImage?.metadata && (
-            <div className="p-4 space-y-2">
-              <h3 className="font-semibold">Image Details</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {Object.entries(selectedImage.metadata)
-                  .filter(([key]) => key !== "isPrimary")
-                  .map(([key, value]) => (
-                    <div key={key} className="flex">
-                      <span className="font-medium capitalize mr-2">
-                        {key}:
-                      </span>
-                      <span>{String(value)}</span>
+            <div className="p-4 space-y-4">
+              {/* Image Details */}
+              <div className="space-y-2">
+                <h3 className="font-semibold">Image Details</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {Object.entries(selectedImage.metadata)
+                    .filter(([key]) => key !== "isPrimary")
+                    .map(([key, value]) => (
+                      <div key={key} className="flex">
+                        <span className="font-medium capitalize mr-2">
+                          {key}:
+                        </span>
+                        <span>{String(value)}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* File Information */}
+              <div className="space-y-2">
+                <h3 className="font-semibold">File Information</h3>
+                <div className="space-y-2">
+                  {/* Filename */}
+                  <div className="flex items-center justify-between bg-muted p-2 rounded-md">
+                    <div className="flex-1 mr-2">
+                      <div className="text-sm font-medium mb-1">Filename</div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        {selectedImage.filename || "Untitled"}
+                      </div>
                     </div>
-                  ))}
+                    <Button
+                      id="copy-filename-btn"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        copyToClipboard(
+                          selectedImage.filename || "",
+                          "copy-filename-btn"
+                        )
+                      }
+                    >
+                      <Copy className="h-4 w-4" />
+                      <Check className="h-4 w-4 check-icon hidden" />
+                    </Button>
+                  </div>
+
+                  {/* URL */}
+                  <div className="flex items-center justify-between bg-muted p-2 rounded-md">
+                    <div className="flex-1 mr-2">
+                      <div className="text-sm font-medium mb-1">Public URL</div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        {selectedImage.url}
+                      </div>
+                    </div>
+                    <Button
+                      id="copy-url-btn"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        copyToClipboard(selectedImage.url, "copy-url-btn")
+                      }
+                    >
+                      <Copy className="h-4 w-4" />
+                      <Check className="h-4 w-4 check-icon hidden" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

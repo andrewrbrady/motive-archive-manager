@@ -20,6 +20,7 @@ export function getBaseUrl(): string {
     return process.env.NEXT_PUBLIC_BASE_URL;
   }
 
-  // Default to localhost
+  // For local development, always use the same port as the app itself for API calls
+  // This ensures server-side rendering works correctly when calling internal APIs
   return "http://localhost:3000";
 }

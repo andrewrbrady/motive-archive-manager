@@ -199,13 +199,12 @@ export function GalleryImageSelector({
     tod: currentTod,
     view: currentView,
     page: currentPage,
+    search: currentSearch,
   });
 
   // Handle search with debounce
   const [debouncedSetSearch] = useDebounce((value: string) => {
-    if (setFilter) {
-      setFilter("search", value || null);
-    }
+    handleFilterChange("search", value || null);
   }, 500);
 
   // Handle search input
@@ -262,6 +261,21 @@ export function GalleryImageSelector({
     // Refetch data when selection state changes to ensure UI is in sync
     mutate();
   }, [selectedImageIds, mutate]);
+
+  // Effect to refresh data when filters change
+  useEffect(() => {
+    // Trigger a refetch when any filter changes
+    mutate();
+  }, [
+    currentSearch,
+    currentAngle,
+    currentMovement,
+    currentTod,
+    currentView,
+    currentCarId,
+    currentPage,
+    mutate,
+  ]);
 
   // Handle image selection with optimistic update
   const handleImageSelection = useCallback(
@@ -403,7 +417,7 @@ export function GalleryImageSelector({
 
           <Input
             placeholder="Search images..."
-            defaultValue={currentSearch}
+            value={currentSearch || ""}
             onChange={handleSearchInput}
             className="w-full md:w-[250px]"
           />

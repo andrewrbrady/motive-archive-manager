@@ -46,6 +46,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { StatusNotification } from "@/components/StatusNotification";
 import { ProgressItem } from "@/components/ui/UploadProgressTracking";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface FilterState {
   angle?: string;
@@ -112,6 +121,7 @@ export function ImageGalleryWithQuery({
   const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
   const [showUploadProgress, setShowUploadProgress] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -384,15 +394,30 @@ export function ImageGalleryWithQuery({
     }
   }, [images, onFilterOptionsChange]);
 
-  // Filter images based on selected filters
+  // Filter images based on selected filters and search query
   const filteredImages = useMemo(() => {
     return images.filter((image: ExtendedImageType) => {
-      return Object.entries(filters).every(([key, value]) => {
+      // Filter by metadata filters
+      const matchesFilters = Object.entries(filters).every(([key, value]) => {
         if (!value) return true;
         return image.metadata?.[key as keyof typeof image.metadata] === value;
       });
+
+      // Filter by search query
+      const matchesSearch =
+        !searchQuery ||
+        image.metadata?.description
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        image.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        image.metadata?.angle
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        image.metadata?.view?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesFilters && matchesSearch;
     });
-  }, [images, filters]);
+  }, [images, filters, searchQuery]);
 
   // Derived state
   const mainIndex = useMemo(() => {
@@ -483,7 +508,7 @@ export function ImageGalleryWithQuery({
 
       setFilters((prev: FilterState) => {
         const newFilters = { ...prev };
-        if (value === newFilters[type as keyof FilterState]) {
+        if (value === "") {
           delete newFilters[type as keyof FilterState];
         } else {
           newFilters[type as keyof FilterState] = value;
@@ -936,110 +961,297 @@ export function ImageGalleryWithQuery({
     );
 
     return (
-      <div
-        className="w-full"
-        style={{
-          marginLeft: 0,
-          marginRight: 0,
-          paddingLeft: 0,
-          paddingRight: 0,
-        }}
-      >
-        <div
-          className="relative w-full"
-          style={{
-            minHeight: "400px",
-            margin: 0,
-            padding: 0,
-            height: "calc(100vh - 400px)",
-            maxHeight: "700px",
-          }}
-        >
-          {/* Loading state */}
-          {isLoading && !hasLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {/* Error state */}
-          {hasError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted z-10">
-              <AlertCircle className="w-8 h-8 text-destructive mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Failed to load image
-              </p>
-            </div>
-          )}
-
-          {/* Image */}
-          {currentImage.url && (
-            <div
-              className="w-full h-full flex justify-center items-start"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-              }}
-            >
-              <Image
-                src={getFormattedImageUrl(currentImage.url)}
-                alt={
-                  currentImage.metadata?.description || `Image ${mainIndex + 1}`
-                }
-                fill
-                className={cn(
-                  "object-contain transition-opacity duration-300",
-                  {
-                    "opacity-0": !hasLoaded && !hasError,
-                    "opacity-100": hasLoaded || hasError,
-                  }
-                )}
-                sizes="66vw"
-                priority
-                onLoad={() => handleImageLoad(currentImage.id)}
-                onError={() => handleImageError(currentImage.id)}
-              />
-            </div>
-          )}
-
-          {/* Controls */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
-            aria-label="View full size"
+      <div className="flex gap-6">
+        {/* Main image on the left - 2/3 width */}
+        <div className="w-2/3 bg-background rounded-lg">
+          <div
+            className="relative w-full"
+            style={{
+              minHeight: "400px",
+              margin: 0,
+              padding: 0,
+              height: "calc(100vh - 400px)",
+              maxHeight: "700px",
+            }}
           >
-            <ZoomIn className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handlePrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
-            aria-label="Previous image"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
-            aria-label="Next image"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Image information */}
-        {currentImage && (
-          <div className="text-sm mt-4">
-            {/* Description (shown above filename/URL) */}
-            {currentImage.metadata?.description && (
-              <div className="mb-3 bg-muted/40 p-3 rounded text-muted-foreground">
-                {currentImage.metadata.description}
+            {/* Loading state */}
+            {isLoading && !hasLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
             )}
+
+            {/* Error state */}
+            {hasError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted z-10">
+                <AlertCircle className="w-8 h-8 text-destructive mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Failed to load image
+                </p>
+              </div>
+            )}
+
+            {/* Image */}
+            {currentImage.url && (
+              <div
+                className="w-full h-full flex justify-center items-start"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              >
+                <Image
+                  src={getFormattedImageUrl(currentImage.url)}
+                  alt={
+                    currentImage.metadata?.description ||
+                    `Image ${mainIndex + 1}`
+                  }
+                  fill
+                  className={cn(
+                    "object-contain transition-opacity duration-300",
+                    {
+                      "opacity-0": !hasLoaded && !hasError,
+                      "opacity-100": hasLoaded || hasError,
+                    }
+                  )}
+                  sizes="66vw"
+                  priority
+                  onLoad={() => handleImageLoad(currentImage.id)}
+                  onError={() => handleImageError(currentImage.id)}
+                />
+              </div>
+            )}
+
+            {/* Controls */}
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
+              aria-label="View full size"
+            >
+              <ZoomIn className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handlePrev}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
-        )}
+
+          {/* Image information */}
+          {currentImage && (
+            <div className="text-sm mt-4">
+              {/* Description (shown above filename/URL) */}
+              {currentImage.metadata?.description && (
+                <div className="mb-3 bg-muted/40 p-3 rounded text-muted-foreground">
+                  {currentImage.metadata.description}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Thumbnails on the right - 1/3 width */}
+        <div className="w-1/3">
+          <div className="bg-background rounded-lg p-4">
+            {/* Empty state if no images after filtering */}
+            {filteredImages.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                No images match your filter criteria
+              </div>
+            ) : (
+              <>
+                {/* Thumbnails Grid with Pagination */}
+                <div className="flex flex-col h-full">
+                  <div
+                    className="grid grid-cols-2 gap-4 overflow-y-auto"
+                    style={{ maxHeight: "800px" }}
+                    role="listbox"
+                    aria-label="Image thumbnails"
+                  >
+                    {paginatedImages.map((image: ExtendedImageType) => (
+                      <div
+                        key={image._id}
+                        className={cn(
+                          "relative aspect-square rounded-md overflow-hidden cursor-pointer group",
+                          selectedImages.has(image.id)
+                            ? "ring-2 ring-primary"
+                            : "hover:ring-2 hover:ring-primary/50"
+                        )}
+                        onClick={() => setMainImage(image.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setMainImage(image.id);
+                          }
+                        }}
+                        role="option"
+                        aria-selected={selectedImages.has(image.id)}
+                        tabIndex={0}
+                        aria-label={
+                          image.metadata?.description ||
+                          image.filename ||
+                          "Car image"
+                        }
+                      >
+                        {/* Loading state */}
+                        {(isLoadingImageDetails(image.id) || !image.url) && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+
+                        {/* Image */}
+                        {image.url && (
+                          <div className="relative w-full h-full">
+                            <Image
+                              src={getFormattedImageUrl(image.url)}
+                              alt={image.metadata?.description || `Thumbnail`}
+                              fill
+                              className={cn(
+                                "object-cover transition-all duration-200",
+                                {
+                                  "opacity-0": !loadedImages.has(image.id),
+                                  "opacity-100": loadedImages.has(image.id),
+                                  "group-hover:scale-105": !selectedImages.has(
+                                    image.id
+                                  ),
+                                }
+                              )}
+                              sizes="(max-width: 768px) 100px, 120px"
+                              onLoad={() => handleImageLoad(image.id)}
+                              onError={() => handleImageError(image.id)}
+                            />
+                          </div>
+                        )}
+
+                        {/* Metadata overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 text-white text-xs">
+                          {image.metadata?.angle && (
+                            <span className="block truncate">
+                              {image.metadata.angle}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Edit mode controls */}
+                        {isEditMode && (
+                          <>
+                            {/* Set primary button - small, in corner */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetPrimaryImage(image.id);
+                              }}
+                              className={cn(
+                                "absolute top-2 right-2 p-1 rounded-full z-20 transition-colors",
+                                selectedImages.has(image.id)
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-black/50 text-white hover:bg-black/70"
+                              )}
+                              title={
+                                selectedImages.has(image.id)
+                                  ? "Current primary image"
+                                  : "Set as primary image"
+                              }
+                            >
+                              <ImageIcon className="w-3 h-3" />
+                            </button>
+
+                            {/* Selection overlay for edit mode */}
+                            <div
+                              className={cn(
+                                "absolute inset-0 flex items-center justify-center transition-opacity",
+                                {
+                                  "opacity-100 bg-black/50": selectedImages.has(
+                                    image.id
+                                  ),
+                                  "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30":
+                                    !selectedImages.has(image.id),
+                                }
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleImageSelection(image.id);
+                              }}
+                            >
+                              <CheckCircle
+                                className={cn("w-6 h-6 text-white", {
+                                  "opacity-100": selectedImages.has(image.id),
+                                  "opacity-0 group-hover:opacity-100":
+                                    !selectedImages.has(image.id),
+                                })}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col items-center gap-2 mt-4">
+                      <div className="flex justify-center items-center gap-2">
+                        <Button
+                          onClick={() =>
+                            handlePageChange(Math.max(0, currentPage - 1))
+                          }
+                          variant="outline"
+                          size="sm"
+                          disabled={currentPage === 0}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-xs">
+                          {currentPage + 1}/{totalPages}
+                        </span>
+                        <Button
+                          onClick={() =>
+                            handlePageChange(
+                              Math.min(totalPages - 1, currentPage + 1)
+                            )
+                          }
+                          variant="outline"
+                          size="sm"
+                          disabled={currentPage === totalPages - 1}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {totalPages > 5 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Showing page {currentPage + 1} of {totalPages}
+                          <Button
+                            onClick={() => refetch()}
+                            variant="link"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                          >
+                            Refresh Images
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   };
@@ -1176,180 +1388,58 @@ export function ImageGalleryWithQuery({
   // Update the main component return
   return (
     <div className="space-y-4">
-      {renderTopButtons()}
-
-      <div className="flex">
-        {/* Main image on the left - 2/3 width with no margins */}
-        <div className="w-2/3" style={{ paddingRight: 0 }}>
-          {renderMainImage()}
+      {/* Search and Filter Controls */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 max-w-sm">
+          <Input
+            type="search"
+            placeholder="Search images..."
+            className="w-full"
+            value={searchQuery}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchQuery(value);
+              // TODO: Implement search functionality
+              console.log("Search query:", value);
+            }}
+          />
         </div>
-
-        {/* Thumbnails on the right - 1/3 width */}
-        <div className="w-1/3 pl-6">
-          <div className="bg-background rounded-lg p-2">
-            {/* Empty state if no images after filtering */}
-            {filteredImages.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground text-sm">
-                No images match your filter criteria
-              </div>
-            ) : (
-              <>
-                {/* 3x5 grid of thumbnails */}
-                <div className="grid grid-cols-3 gap-2">
-                  {paginatedImages.map((image: any) => {
-                    const isLoading =
-                      isLoadingImageDetails(image.id) || !image.url;
-                    const isActive = filteredImages[mainIndex]?.id === image.id;
-                    const isPrimary = image.id === primaryImageId;
-
-                    return (
-                      <div
-                        key={image.id}
-                        className={cn(
-                          "relative cursor-pointer rounded-md overflow-hidden aspect-[4/3] bg-muted group",
-                          {
-                            "ring-2 ring-primary ring-offset-1": isActive,
-                            "opacity-60": !isActive && !isEditMode, // Non-active thumbnails at 60% opacity
-                            "opacity-70":
-                              isEditMode && selectedImages.has(image.id), // Selected thumbnails in edit mode
-                          }
-                        )}
-                        onClick={() => setMainImage(image.id)}
-                      >
-                        {/* Loading state */}
-                        {(isLoading || !loadedImages.has(image.id)) && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
-                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                          </div>
-                        )}
-
-                        {/* Image */}
-                        {image.url && (
-                          <Image
-                            src={getFormattedImageUrl(image.url)}
-                            alt={image.metadata?.description || `Thumbnail`}
-                            fill
-                            className={cn(
-                              "object-cover transition-opacity duration-300",
-                              {
-                                "opacity-0": !loadedImages.has(image.id),
-                                "opacity-100": loadedImages.has(image.id),
-                              }
-                            )}
-                            sizes="(max-width: 768px) 100px, 120px"
-                            onLoad={() => handleImageLoad(image.id)}
-                            onError={() => handleImageError(image.id)}
-                          />
-                        )}
-
-                        {/* Edit mode controls */}
-                        {isEditMode && (
-                          <>
-                            {/* Set primary button - small, in corner */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSetPrimaryImage(image.id);
-                              }}
-                              className={cn(
-                                "absolute bottom-1 right-1 p-1 rounded-full z-20 transition-colors",
-                                isPrimary
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-black/50 text-white hover:bg-black/70"
-                              )}
-                              title={
-                                isPrimary
-                                  ? "Current primary image"
-                                  : "Set as primary image"
-                              }
-                            >
-                              <ImageIcon className="w-3 h-3" />
-                            </button>
-
-                            {/* Selection overlay for edit mode */}
-                            <div
-                              className={cn(
-                                "absolute inset-0 flex items-center justify-center transition-opacity",
-                                {
-                                  "opacity-100 bg-black/50": selectedImages.has(
-                                    image.id
-                                  ),
-                                  "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30":
-                                    !selectedImages.has(image.id),
-                                }
-                              )}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleImageSelection(image.id);
-                              }}
-                            >
-                              <CheckCircle
-                                className={cn("w-6 h-6 text-white", {
-                                  "opacity-100": selectedImages.has(image.id),
-                                  "opacity-0 group-hover:opacity-100":
-                                    !selectedImages.has(image.id),
-                                })}
-                              />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex flex-col items-center gap-2 mt-4">
-                    <div className="flex justify-center items-center gap-2">
-                      <Button
-                        onClick={() =>
-                          handlePageChange(Math.max(0, currentPage - 1))
-                        }
-                        variant="outline"
-                        size="sm"
-                        disabled={currentPage === 0}
-                        className="h-7 w-7 p-0"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      <span className="text-xs">
-                        {currentPage + 1}/{totalPages}
-                      </span>
-                      <Button
-                        onClick={() =>
-                          handlePageChange(
-                            Math.min(totalPages - 1, currentPage + 1)
-                          )
-                        }
-                        variant="outline"
-                        size="sm"
-                        disabled={currentPage === totalPages - 1}
-                        className="h-7 w-7 p-0"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    {totalPages > 5 && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Showing page {currentPage + 1} of {totalPages}
-                        <Button
-                          onClick={() => refetch()}
-                          variant="link"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                        >
-                          Refresh Images
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <Select
+            value={filters.angle || ""}
+            onValueChange={(value) => handleFilterChange("angle", value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by angle" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All angles</SelectItem>
+              <SelectItem value="front">Front</SelectItem>
+              <SelectItem value="front 3/4">Front 3/4</SelectItem>
+              <SelectItem value="side">Side</SelectItem>
+              <SelectItem value="rear 3/4">Rear 3/4</SelectItem>
+              <SelectItem value="rear">Rear</SelectItem>
+              <SelectItem value="overhead">Overhead</SelectItem>
+              <SelectItem value="under">Under</SelectItem>
+            </SelectContent>
+          </Select>
+          {Object.values(filters).some(Boolean) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFilters({})}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clear filters
+            </Button>
+          )}
         </div>
       </div>
+
+      {renderTopButtons()}
+
+      <div className="flex">{renderMainImage()}</div>
 
       <input
         ref={fileInputRef}

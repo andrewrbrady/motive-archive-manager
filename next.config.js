@@ -31,13 +31,13 @@ const nextConfig = {
     }
     return config;
   },
-  // Set server port
+  // Use environment variables for port configuration
   serverRuntimeConfig: {
-    port: 3001,
+    port: process.env.PORT || 3000,
   },
-  // Set public runtime config
+  // Use environment variables for port configuration
   publicRuntimeConfig: {
-    port: 3001,
+    port: process.env.PORT || 3000,
   },
 };
 

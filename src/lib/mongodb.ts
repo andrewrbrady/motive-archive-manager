@@ -115,53 +115,30 @@ function shouldForceNewConnection(): boolean {
 
 // For Mongoose ORM connection (used by models)
 export async function dbConnect() {
-  // Set max listeners on the Mongoose connection
-  mongoose.connection.setMaxListeners(15);
-
-  if (mongoose.connection.readyState === 1) {
-    return mongoose;
-  }
-
   try {
-    const mongooseUri = `${uri}/${DB_NAME}`;
-    console.log("Creating new Mongoose connection to database:", DB_NAME);
+    console.log("MongoDB - Attempting connection...");
+    if (mongoose.connection.readyState >= 1) {
+      console.log("MongoDB - Already connected");
+      return;
+    }
 
-    await mongoose.connect(mongooseUri, {
-      maxPoolSize: options.maxPoolSize,
-      minPoolSize: options.minPoolSize,
-      connectTimeoutMS: options.connectTimeoutMS,
-      socketTimeoutMS: options.socketTimeoutMS,
-      serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
-      retryWrites: options.retryWrites,
-      retryReads: options.retryReads,
-      w: 1,
-      wtimeoutMS: 2500,
-      journal: true,
-    } as any);
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MongoDB URI not found in environment variables");
+    }
 
-    // Handle connection events
-    mongoose.connection.on("connected", () => {
-      console.log("Mongoose connected to database");
+    await mongoose.connect(process.env.MONGODB_URI, {
+      dbName: process.env.MONGODB_DB || "motive_archive",
     });
-
-    mongoose.connection.on("error", (err) => {
-      console.error("Mongoose connection error:", err);
+    console.log(
+      "MongoDB - Successfully connected to database:",
+      process.env.MONGODB_DB || "motive_archive"
+    );
+  } catch (error) {
+    console.error("MongoDB - Connection error:", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
     });
-
-    mongoose.connection.on("disconnected", () => {
-      console.log("Mongoose disconnected");
-    });
-
-    // Clean up connections when the process exits
-    process.on("SIGINT", async () => {
-      await mongoose.connection.close();
-      process.exit(0);
-    });
-
-    return mongoose;
-  } catch (e) {
-    console.error("MongoDB connection error:", e);
-    throw e;
+    throw error;
   }
 }
 

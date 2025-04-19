@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, MouseEvent } from "react";
+import { useState, useCallback, useMemo, MouseEvent, useEffect } from "react";
 import { useDebounce } from "use-debounce";
 import { useImages } from "@/hooks/use-images";
 import { Image } from "@/types/upload";
@@ -197,7 +197,7 @@ export function MediaSelector({ onSelect }: MediaSelectorProps) {
     });
   }, [filteredCars]);
 
-  // Build query parameters
+  // Build query parameters with debounced search
   const queryParams: Record<string, any> = {
     search: debouncedSearch || undefined,
     limit: IMAGES_PER_PAGE,

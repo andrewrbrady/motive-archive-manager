@@ -89,6 +89,7 @@ import {
   generateCarTitle,
 } from "@/utils/car-helpers";
 import { CarAvatar } from "@/components/ui/CarAvatar";
+import { FileInfoDisplay } from "@/components/ui/FileInfoDisplay";
 
 interface PageParams {
   id: string;
@@ -347,10 +348,9 @@ export default function CarPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="flex flex-col min-h-screen bg-background">
         <Navbar />
-
-        <main className="container-wide px-4 py-8 min-h-[70vh]">
+        <main className="flex-grow container mx-auto px-4 py-8">
           {error ? (
             <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
               {error}
@@ -573,15 +573,10 @@ export default function CarPage() {
                 <h1 className="text-base font-semibold text-text-primary truncate">
                   {generateCarTitle(car)}
                 </h1>
-                <div className="ml-auto text-sm text-text-secondary">
-                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-                </div>
               </div>
             </div>
           </div>
         )}
-
-        <Footer />
       </div>
     </AuthGuard>
   );
