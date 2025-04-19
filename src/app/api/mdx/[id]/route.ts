@@ -3,13 +3,14 @@ import { dbConnect } from "@/lib/mongodb";
 import { MDXFile } from "@/models/MDXFile";
 
 // Delete an MDX file by ID
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request) {
   try {
     await dbConnect();
-    const { id } = params;
+
+    // Extract ID from the URL path
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
 
     if (!id) {
       return NextResponse.json(

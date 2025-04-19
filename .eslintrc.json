@@ -1,4 +1,7 @@
 {
   "extends": "next/core-web-vitals",
-  "ignorePatterns": ["src/components/MDXEditor.tsx"]
+  "ignorePatterns": ["src/components/MDXEditor.tsx"],
+  "rules": {
+    "react/no-unescaped-entities": ["error", { "forbid": [">", "}"] }]
+  }
 }

@@ -25,11 +25,13 @@ export default function ArticleIntro({
           <p className="text-xl text-gray-600">{subtitle}</p>
         </div>
         <div className="relative min-h-[50vh] lg:min-h-screen">
-          <img
-            src={coverImage}
-            alt={title}
-            className="w-full h-full object-cover inset-0"
-          />
+          {coverImage && (
+            <img
+              src={coverImage.url}
+              alt={coverImage.alt || title}
+              className="w-full h-full object-cover inset-0"
+            />
+          )}
         </div>
       </div>
     </section>

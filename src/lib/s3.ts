@@ -29,7 +29,7 @@ if (missingVars.length > 0) {
 }
 
 // Initialize S3 client with credentials
-const s3Client = new S3Client({
+export const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,

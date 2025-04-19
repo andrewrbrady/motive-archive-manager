@@ -17,3 +17,8 @@ export function slugify(text: string) {
     .replace(/^-+/, "") // Trim - from start of text
     .replace(/-+$/, ""); // Trim - from end of text
 }
+
+export function getApiUrl(path: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+}
