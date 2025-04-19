@@ -497,8 +497,8 @@ export default function HardDriveDetails({ params }: any) {
                         {location
                           ? location.name
                           : drive.location
-                          ? "Loading..."
-                          : "No location assigned"}
+                            ? "Loading..."
+                            : "No location assigned"}
                       </p>
                     </div>
 

@@ -10,8 +10,6 @@ import RecentProjectsSection from "@/components/sections/recent-projects";
 import ContactSection from "@/components/sections/contact";
 import Footer from "@/components/layout/footer";
 import ScrollIndicator from "@/components/navigation/ScrollIndicator";
-import MDXEditor from "@/components/MDXEditor";
-import { MediaSelector } from "@/components/MediaSelector";
 
 export default function Home() {
   const { status } = useSession();
@@ -23,12 +21,6 @@ export default function Home() {
       router.push("/dashboard");
     }
   }, [status, router]);
-
-  const handleEditorChange = (value: string | undefined) => {
-    if (value !== undefined) {
-      setContent(value);
-    }
-  };
 
   return (
     <>
@@ -59,32 +51,6 @@ export default function Home() {
           <Footer />
         </section>
       </div>
-      <main className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold mb-6">Motive Archive Manager</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Editor</h2>
-              <MediaSelector
-                onSelect={(mdxCode) => setContent(content + "\n" + mdxCode)}
-              />
-            </div>
-            <div className="border rounded-lg overflow-hidden">
-              <MDXEditor value={content} onChange={handleEditorChange} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Preview</h2>
-            <div className="prose dark:prose-invert max-w-none p-4 border rounded-lg">
-              {content || (
-                <p className="text-muted-foreground">
-                  Start writing to see the preview...
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
     </>
   );
 }
