@@ -82,7 +82,7 @@ export interface CarFormData {
   make: string;
   model: string;
   year: number;
-  price: {
+  price?: {
     listPrice: number | null;
     soldPrice?: number | null;
     priceHistory: Array<{
@@ -805,7 +805,7 @@ export default function CarEntryForm({
               <label className={labelClasses}>Price</label>
               <input
                 type="number"
-                value={formData.price.listPrice || ""}
+                value={formData.price?.listPrice || ""}
                 onChange={(e) =>
                   handleChange("price", {
                     ...formData.price,
@@ -813,7 +813,6 @@ export default function CarEntryForm({
                   })
                 }
                 className={inputClasses}
-                required
               />
             </div>
 

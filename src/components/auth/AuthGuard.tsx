@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { LoadingSpinner } from "@/components/ui/loading";
 
 interface AuthGuardProps {
@@ -35,8 +36,22 @@ interface AdminGuardProps {
 export function AdminGuard({ children }: AdminGuardProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const isChecking = status === "loading";
+  const isAdmin = session?.user?.roles?.includes("admin");
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status === "authenticated" && !isAdmin) {
+      console.log(
+        "AdminGuard: User is authenticated but not an admin. Redirecting to /"
+      );
+      router.push("/");
+    } else if (status === "unauthenticated") {
+      console.log("AdminGuard: User is unauthenticated. Redirecting to /");
+      router.push("/");
+    }
+  }, [status, isAdmin, router]);
+
+  if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -44,15 +59,11 @@ export function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  if (
-    status === "unauthenticated" ||
-    !session?.user?.roles?.includes("admin")
-  ) {
-    router.push("/");
-    return null;
+  if (status === "authenticated" && isAdmin) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  return null;
 }
 
 export default AuthGuard;

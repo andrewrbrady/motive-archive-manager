@@ -39,7 +39,7 @@ const FileUploadContext = React.createContext<FileUploadContextValue | null>(
 );
 
 export const Root: React.FC<FileUploadProps> = ({
-  maxFiles = 10,
+  maxFiles = Infinity,
   maxSize = 5 * 1024 * 1024, // 5MB default
   accept = "image/*",
   onUpload,
@@ -56,7 +56,11 @@ export const Root: React.FC<FileUploadProps> = ({
 
   const addFiles = React.useCallback(
     (acceptedFiles: File[]) => {
-      const newFiles = acceptedFiles.slice(0, maxFiles - files.length);
+      const totalFiles = files.length + acceptedFiles.length;
+      const newFiles =
+        maxFiles === Infinity
+          ? acceptedFiles
+          : acceptedFiles.slice(0, maxFiles - files.length);
       if (newFiles.length === 0) return;
       setPendingFiles((prev) => [...prev, ...newFiles]);
     },

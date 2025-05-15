@@ -35,71 +35,65 @@ export default function Navbar({ className }: NavbarProps) {
   ];
 
   return (
-    <>
-      {/* Spacer div to prevent content from going under navbar */}
-      <div className="h-20" />
-
-      {/* Navbar */}
-      <nav className={`${navClasses} ${className || ""}`}>
-        <div className="container-fluid flex justify-between items-center h-20">
-          <div className="flex items-center space-x-12">
-            <Link href="/" className="shrink-0">
-              <Image
-                src={logos.primary}
-                alt="Motive Archive"
-                width={96}
-                height={96}
-                className="w-12 h-12"
-              />
+    <nav className={`${navClasses} ${className || ""}`}>
+      <div className="container-fluid flex justify-between items-center h-20">
+        <div className="flex items-center space-x-12">
+          <Link href="/" className="shrink-0">
+            <Image
+              src={logos.primary}
+              alt="Motive Archive"
+              width={96}
+              height={96}
+              className="w-12 h-12"
+            />
+          </Link>
+          <div className="space-x-8">
+            <Link href="/" className={linkClasses}>
+              Home
             </Link>
-            <div className="space-x-8">
-              <Link href="/" className={linkClasses}>
-                Home
+            <Link href="/cars" className={linkClasses}>
+              Cars
+            </Link>
+            <Link href="/production" className={linkClasses}>
+              Production
+            </Link>
+            <Link href="/market" className={linkClasses}>
+              Market
+            </Link>
+            <Link href="/schedule" className={linkClasses}>
+              Schedule
+            </Link>
+            <Link href="/copywriting" className={linkClasses}>
+              Copywriting
+            </Link>
+            <AdminOnly>
+              <Link href="/admin" className={linkClasses}>
+                Admin
               </Link>
-              <Link href="/cars" className={linkClasses}>
-                Cars
-              </Link>
-              <Link href="/production" className={linkClasses}>
-                Production
-              </Link>
-              <Link href="/market" className={linkClasses}>
-                Market
-              </Link>
-              <Link href="/schedule" className={linkClasses}>
-                Schedule
-              </Link>
-              <Link href="/copywriting" className={linkClasses}>
-                Copywriting
-              </Link>
-              <AdminOnly>
-                <Link href="/admin" className={linkClasses}>
-                  Admin
-                </Link>
-              </AdminOnly>
-            </div>
-          </div>
-          <div className="flex items-center space-x-6">
-            <button
-              onClick={toggleTheme}
-              className={iconButtonClasses}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="w-5 h-5" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
-            </button>
-            <a href="#" className={iconButtonClasses} aria-label="Instagram">
-              <Instagram className="w-5 h-5" />
-            </a>
-            <a href="#" className={iconButtonClasses} aria-label="Email">
-              <Mail className="w-5 h-5" />
-            </a>
-            <UserMenu />
+            </AdminOnly>
           </div>
         </div>
-      </nav>
-    </>
+        <div className="flex items-center space-x-6">
+          <button
+            onClick={toggleTheme}
+            className={iconButtonClasses}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? (
+              <Sun className="w-5 h-5" />
+            ) : (
+              <Moon className="w-5 h-5" />
+            )}
+          </button>
+          <a href="#" className={iconButtonClasses} aria-label="Instagram">
+            <Instagram className="w-5 h-5" />
+          </a>
+          <a href="#" className={iconButtonClasses} aria-label="Email">
+            <Mail className="w-5 h-5" />
+          </a>
+          <UserMenu />
+        </div>
+      </div>
+    </nav>
   );
 }

@@ -202,165 +202,144 @@ export default function EventsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end items-center">
-        <div className="flex gap-2">
-          <EventBatchManager />
-          <EventBatchTemplates
-            carId={events[0]?.car_id || ""}
-            onEventsCreated={fetchEvents}
-          />
-        </div>
+      <div className="flex justify-end items-center gap-2">
+        <EventBatchManager />
+        <EventBatchTemplates
+          carId={events[0]?.car_id || ""}
+          onEventsCreated={fetchEvents}
+        />
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <div>
-          <Select
-            value={filters.status}
-            onValueChange={(value) => setFilters({ ...filters, status: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {Object.values(EventStatus).map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status
-                    .split("_")
-                    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(" ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Select
+          value={filters.status}
+          onValueChange={(value) => setFilters({ ...filters, status: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Statuses</SelectItem>
+            {Object.values(EventStatus).map((status) => (
+              <SelectItem key={status} value={status}>
+                {status
+                  .split("_")
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(" ")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div>
-          <Select
-            value={filters.type}
-            onValueChange={(value) => setFilters({ ...filters, type: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {Object.values(EventType).map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type.replace(/_/g, " ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          value={filters.type}
+          onValueChange={(value) => setFilters({ ...filters, type: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Types</SelectItem>
+            {Object.values(EventType).map((type) => (
+              <SelectItem key={type} value={type}>
+                {formatEventType(type)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <div>
-          <Input
-            type="date"
-            placeholder="From Date"
-            value={filters.from}
-            onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-          />
-        </div>
+        <Input
+          type="date"
+          placeholder="From Date"
+          value={filters.from}
+          onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+          className="bg-background"
+        />
 
-        <div>
-          <Input
-            type="date"
-            placeholder="To Date"
-            value={filters.to}
-            onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-          />
-        </div>
+        <Input
+          type="date"
+          placeholder="To Date"
+          value={filters.to}
+          onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+          className="bg-background"
+        />
       </div>
 
       {isLoading ? (
-        <div className="space-y-6 py-8">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <LoadingSpinner />
-            <p className="text-muted-foreground">Loading events data...</p>
-            <div className="text-xs text-muted-foreground">
-              This may take a moment as we fetch information about each car
-            </div>
-          </div>
-        </div>
+        <LoadingSpinner />
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-md border border-border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Car</TableHead>
-                <TableHead>Event Type</TableHead>
+                <TableHead>Car</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {events.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    No events found
+              {events.map((event) => (
+                <TableRow key={event._id}>
+                  <TableCell>
+                    {event.car ? (
+                      <Link
+                        href={`/cars/${getCarId(event._id || "")}`}
+                        className="hover:underline"
+                      >
+                        {event.car.year} {event.car.make} {event.car.model}
+                      </Link>
+                    ) : (
+                      "Unknown Car"
+                    )}
+                  </TableCell>
+                  <TableCell>{formatEventType(event.type)}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={event.status}
+                      onValueChange={(value) =>
+                        handleUpdateStatus(
+                          event._id,
+                          event.car_id,
+                          value as EventStatus
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(EventStatus).map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status
+                              .split("_")
+                              .map(
+                                (word) =>
+                                  word.charAt(0).toUpperCase() + word.slice(1)
+                              )
+                              .join(" ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>{formatDate(event.start_date)}</TableCell>
+                  <TableCell>{formatDate(event.end_date)}</TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/cars/${getCarId(event._id || "")}/events/${
+                        event._id
+                      }`}
+                    >
+                      <Button variant="ghost" size="sm">
+                        View
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
-              ) : (
-                events.map((event) => (
-                  <TableRow key={event._id}>
-                    <TableCell className="font-medium">
-                      {event.car ? (
-                        <Link href={`/cars/${event.car._id}`}>
-                          {event.car.year} {event.car.make} {event.car.model}
-                        </Link>
-                      ) : (
-                        "Unknown Car"
-                      )}
-                    </TableCell>
-                    <TableCell>{formatEventType(event.type)}</TableCell>
-                    <TableCell>{formatDate(event.start_date)}</TableCell>
-                    <TableCell>{formatDate(event.end_date)}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={event.status}
-                        onValueChange={(value) =>
-                          handleUpdateStatus(
-                            event._id,
-                            event.car_id,
-                            value as EventStatus
-                          )
-                        }
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.values(EventStatus).map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status
-                                .split("_")
-                                .map(
-                                  (word) =>
-                                    word.charAt(0).toUpperCase() + word.slice(1)
-                                )
-                                .join(" ")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/cars/${event.car_id || ""}/events/${
-                          event._id || ""
-                        }`}
-                      >
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </div>

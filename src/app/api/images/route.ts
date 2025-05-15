@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const processedImages = images.map((img) => ({
       ...img,
       _id: img._id.toString(),
-      carId: img.carId.toString(),
+      carId: img.carId ? img.carId.toString() : "",
       url: getFormattedImageUrl(img.url),
     }));
 

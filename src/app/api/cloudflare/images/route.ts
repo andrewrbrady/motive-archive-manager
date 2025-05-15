@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId, Collection } from "mongodb";
+import { getMongoClient } from "@/lib/mongodb";
+import { analyzeImage } from "@/lib/imageAnalyzer";
 
-// Set maximum execution time to 60 seconds
-export const maxDuration = 60;
+// Set maximum execution time to 300 seconds (5 minutes)
+export const maxDuration = 300;
 export const runtime = "nodejs";
 
 // Ensure environment variables are set
@@ -47,6 +49,13 @@ interface Car {
   _id: ObjectId;
   imageIds: ObjectId[];
   updatedAt: string;
+  make: string;
+  model: string;
+  year: string;
+  color: string;
+  engine: string;
+  condition: string;
+  description: string;
 }
 
 // Add type for MongoDB collections
@@ -55,12 +64,12 @@ interface Collections {
   cars: Collection<Car>;
 }
 
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(process.env.MONGODB_URI || "");
-  await client.connect();
-  return client;
-}
+// Batch size for MongoDB operations
+const BATCH_SIZE = 50;
+// Parallel upload configuration
+const CLOUDFLARE_UPLOAD_CONCURRENCY = 4;
+const ANALYSIS_RETRY_COUNT = 2;
+const ANALYSIS_CONCURRENCY = 4;
 
 export async function GET() {
   try {
@@ -98,175 +107,416 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  let mongoClient;
-  try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const metadata = formData.get("metadata");
-    const vehicleInfo = formData.get("vehicleInfo");
-    const carId = formData.get("carId") as string;
+  const encoder = new TextEncoder();
+  const customStream = new TransformStream();
+  const writer = customStream.writable.getWriter();
+  let mongoClient: MongoClient | undefined;
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  const sendProgress = async (data: any) => {
+    await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+  };
+
+  const initMongoConnection = async (): Promise<MongoClient> => {
+    while (retryCount < MAX_RETRIES) {
+      try {
+        const client = await getMongoClient();
+        // Test the connection
+        await client.db("admin").command({ ping: 1 });
+        console.log("MongoDB connection established successfully");
+        return client;
+      } catch (error) {
+        retryCount++;
+        console.error(
+          `MongoDB connection attempt ${retryCount} failed:`,
+          error
+        );
+        if (retryCount >= MAX_RETRIES) {
+          throw new Error(
+            "Failed to establish MongoDB connection after multiple attempts"
+          );
+        }
+        // Wait before retrying
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(1000 * Math.pow(2, retryCount), 5000))
+        );
+      }
     }
+    throw new Error("Failed to establish MongoDB connection");
+  };
 
-    if (!carId) {
-      return NextResponse.json(
-        { error: "No car ID provided" },
-        { status: 400 }
-      );
-    }
-
-    // Safely parse metadata and vehicleInfo
-    let parsedMetadata = {};
-    let parsedVehicleInfo = undefined;
-
+  // Helper function to process a single image
+  const processFile = async (
+    file: File,
+    i: number,
+    carId: string,
+    vehicleInfo: any,
+    collections: Collections,
+    now: string
+  ) => {
+    const fileId = `${i}-${file.name}`;
     try {
-      if (metadata) {
-        parsedMetadata = JSON.parse(metadata as string);
-      }
-    } catch (e) {
-      console.error("Error parsing metadata:", e);
-    }
-
-    try {
-      if (vehicleInfo) {
-        parsedVehicleInfo = JSON.parse(vehicleInfo as string);
-      }
-    } catch (e) {
-      console.error("Error parsing vehicleInfo:", e);
-    }
-
-    const uploadFormData = new FormData();
-    uploadFormData.append("file", file);
-    uploadFormData.append("requireSignedURLs", "false");
-
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
-        },
-        body: uploadFormData,
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Cloudflare API error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: errorText,
+      await sendProgress({
+        fileId,
+        fileName: file.name,
+        status: "uploading",
+        progress: 0,
+        currentStep: "Starting upload to Cloudflare",
       });
-      return NextResponse.json(
-        { error: `Failed to upload to Cloudflare: ${response.statusText}` },
-        { status: response.status }
+
+      // Upload to Cloudflare
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      uploadFormData.append("requireSignedURLs", "false");
+
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+          },
+          body: uploadFormData,
+        }
       );
-    }
 
-    const result = await response.json();
-
-    if (!result.success) {
-      console.error("Cloudflare API error:", result.errors);
-      return NextResponse.json(
-        { error: result.errors?.[0]?.message || "Unknown Cloudflare error" },
-        { status: 400 }
-      );
-    }
-
-    const imageUrl = result.result.variants[0].replace(/\/public$/, "");
-
-    // Analyze the image with OpenAI
-    const analysisResponse = await fetch(
-      `${request.nextUrl.origin}/api/openai/analyze-image`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl,
-          vehicleInfo: parsedVehicleInfo,
-        }),
+      if (!response.ok) {
+        throw new Error(
+          `Failed to upload to Cloudflare: ${response.statusText}`
+        );
       }
-    );
 
-    let combinedMetadata = {};
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(
+          `Cloudflare API error: ${result.errors[0]?.message || "Unknown error"}`
+        );
+      }
 
-    if (analysisResponse.ok) {
-      const analysisResult = await analysisResponse.json();
-      // Combine the original metadata with the AI analysis
-      combinedMetadata = {
-        ...parsedMetadata,
-        angle: analysisResult.analysis?.angle || "",
-        view: analysisResult.analysis?.view || "",
-        movement: analysisResult.analysis?.movement || "",
-        tod: analysisResult.analysis?.tod || "",
-        side: analysisResult.analysis?.side || "",
-        description: analysisResult.analysis?.description || "",
-        aiAnalysis: analysisResult.analysis,
+      const imageUrl = result.result.variants[0].replace(/\/public$/, "");
+
+      // Update progress for analysis phase
+      await sendProgress({
+        fileId,
+        fileName: file.name,
+        status: "analyzing",
+        progress: 75,
+        currentStep: "Analyzing image with AI",
+      });
+
+      // Try to analyze the image with retries
+      let imageAnalysis = null;
+      let analysisError = null;
+
+      for (let attempt = 0; attempt <= ANALYSIS_RETRY_COUNT; attempt++) {
+        try {
+          if (attempt > 0) {
+            await sendProgress({
+              fileId,
+              fileName: file.name,
+              status: "analyzing",
+              progress: 75,
+              currentStep: `Retry #${attempt}: Analyzing image with AI`,
+            });
+          }
+
+          const analysisResponse = await fetch(
+            `${request.nextUrl.origin}/api/openai/analyze-image`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                imageUrl,
+                vehicleInfo,
+              }),
+              // Adding a longer timeout for the analysis request
+              signal: AbortSignal.timeout(60000), // 60 seconds timeout
+            }
+          );
+
+          if (!analysisResponse.ok) {
+            throw new Error(`Analysis failed: ${analysisResponse.statusText}`);
+          }
+
+          const { analysis } = await analysisResponse.json();
+          imageAnalysis = analysis;
+          console.log(`Image analysis result for ${file.name}:`, imageAnalysis);
+          break; // Success, exit retry loop
+        } catch (error) {
+          analysisError = error;
+          console.error(
+            `OpenAI analysis attempt ${attempt + 1} failed:`,
+            error
+          );
+
+          if (attempt === ANALYSIS_RETRY_COUNT) {
+            console.warn(`All analysis attempts failed for image ${file.name}`);
+          } else {
+            // Wait before retry
+            await new Promise((resolve) =>
+              setTimeout(resolve, 2000 * (attempt + 1))
+            );
+          }
+        }
+      }
+
+      // Create image document
+      const imageDoc = {
+        _id: new ObjectId(),
+        cloudflareId: result.result.id,
+        url: imageUrl,
+        filename: file.name,
+        metadata: {
+          category: "exterior",
+          isPrimary: false,
+          vehicleInfo,
+          ...(imageAnalysis || {}),
+          aiAnalysis: imageAnalysis,
+          analysisStatus: imageAnalysis ? "success" : "failed",
+          analysisError: analysisError
+            ? analysisError instanceof Error
+              ? analysisError.message
+              : String(analysisError)
+            : null,
+        },
+        carId: new ObjectId(carId),
+        createdAt: now,
+        updatedAt: now,
       };
-    } else {
-      const errorText = await analysisResponse.text();
-      console.error("OpenAI analysis error:", {
-        status: analysisResponse.status,
-        statusText: analysisResponse.statusText,
-        body: errorText,
+
+      // Send complete progress
+      await sendProgress({
+        fileId,
+        fileName: file.name,
+        status: "complete",
+        progress: 100,
+        currentStep: imageAnalysis
+          ? "Upload and analysis complete"
+          : "Upload complete, analysis failed",
+        imageUrl,
+        metadata: imageDoc.metadata,
       });
-      combinedMetadata = parsedMetadata;
+
+      return imageDoc;
+    } catch (error) {
+      console.error(`Error processing file ${file.name}:`, error);
+      await sendProgress({
+        fileId,
+        fileName: file.name,
+        status: "error",
+        progress: 0,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
     }
+  };
 
-    // Store the image metadata in MongoDB
-    mongoClient = await getMongoClient();
-    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
-    const collections = {
-      images: db.collection("images"),
-      cars: db.collection("cars"),
-    } as Collections;
+  // Function to process batch of files in parallel
+  const processBatch = async (
+    batch: File[],
+    startIndex: number,
+    carId: string,
+    vehicleInfo: any,
+    collections: Collections,
+    now: string
+  ) => {
+    try {
+      console.log(
+        `Processing batch of ${batch.length} images (starting at index ${startIndex})`
+      );
 
-    const imageDoc = {
-      _id: new ObjectId(),
-      cloudflareId: result.result.id,
-      url: imageUrl,
-      filename: file.name,
-      metadata: combinedMetadata,
-      carId: new ObjectId(carId),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+      // Process each file in the batch concurrently
+      const imageDocPromises = batch.map((file, i) =>
+        processFile(file, startIndex + i, carId, vehicleInfo, collections, now)
+      );
 
-    // Insert the image document
-    await collections.images.insertOne(imageDoc);
+      // Await all promises, handle errors individually
+      const results = await Promise.allSettled(imageDocPromises);
 
-    // Update the car document with the new image ID
-    await collections.cars.updateOne(
-      { _id: new ObjectId(carId) },
-      {
-        $push: { imageIds: imageDoc._id },
-        $set: { updatedAt: new Date().toISOString() },
+      // Extract successful results
+      const successfulDocs = results
+        .filter(
+          (result): result is PromiseFulfilledResult<any> =>
+            result.status === "fulfilled"
+        )
+        .map((result) => result.value);
+
+      console.log(
+        `Successfully processed ${successfulDocs.length} of ${batch.length} images in batch`
+      );
+
+      if (successfulDocs.length > 0) {
+        // Insert successful images
+        const insertResult =
+          await collections.images.insertMany(successfulDocs);
+
+        if (!insertResult.acknowledged) {
+          throw new Error("Failed to insert images into database");
+        }
+
+        // Update car document with image IDs
+        const imageIds = successfulDocs.map((doc) => doc._id);
+        const updateResult = await collections.cars.updateOne(
+          { _id: new ObjectId(carId) },
+          {
+            $push: { imageIds: { $each: imageIds } },
+            $set: { updatedAt: now },
+          }
+        );
+
+        if (!updateResult.acknowledged) {
+          // If car update fails, try to rollback image insertions
+          console.error(
+            "Car update failed, attempting to rollback image insertions"
+          );
+          try {
+            await collections.images.deleteMany({
+              _id: { $in: imageIds },
+            });
+          } catch (rollbackError) {
+            console.error("Rollback failed:", rollbackError);
+          }
+          throw new Error("Failed to update car with new images");
+        }
+
+        return successfulDocs;
       }
-    );
 
-    // Return both the image ID, URL, and the metadata
-    return NextResponse.json({
-      success: true,
-      imageId: result.result.id,
-      imageUrl,
-      metadata: combinedMetadata,
-    });
-  } catch (error) {
-    console.error("Error uploading to Cloudflare Images:", error);
-    return NextResponse.json(
-      { error: "Failed to upload image" },
-      { status: 500 }
-    );
-  } finally {
-    if (mongoClient) {
-      await mongoClient.close();
+      return [];
+    } catch (error) {
+      console.error(
+        `Error processing batch starting at index ${startIndex}:`,
+        error
+      );
+      throw error;
     }
-  }
+  };
+
+  const processImages = async () => {
+    try {
+      console.log("Starting image upload process in API route");
+
+      const formData = await request.formData();
+      const fileCount = parseInt(formData.get("fileCount") as string) || 0;
+      const carId = formData.get("carId") as string;
+
+      console.log("Received upload request:", {
+        fileCount,
+        carId,
+        formDataKeys: Array.from(formData.keys()),
+      });
+
+      if (fileCount === 0) {
+        await sendProgress({ error: "No files provided" });
+        return;
+      }
+
+      if (!carId) {
+        await sendProgress({ error: "No car ID provided" });
+        return;
+      }
+
+      // Initialize MongoDB connection with retry logic
+      mongoClient = await initMongoConnection();
+      const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
+      const collections: Collections = {
+        images: db.collection("images"),
+        cars: db.collection("cars"),
+      };
+
+      // Fetch car information first
+      const car = await collections.cars.findOne({ _id: new ObjectId(carId) });
+      if (!car) {
+        throw new Error("Car not found");
+      }
+
+      // Extract vehicle info for analysis
+      const vehicleInfo = {
+        make: car.make,
+        model: car.model,
+        year: car.year,
+        color: car.color,
+        engine: car.engine,
+        condition: car.condition,
+        additionalContext: car.description,
+      };
+
+      // Collect all files into an array for better processing
+      const files: File[] = [];
+      for (let i = 0; i < fileCount; i++) {
+        const file = formData.get(`file${i}`) as File;
+        if (file) {
+          files.push(file);
+        } else {
+          console.log(`File ${i} not found in FormData`);
+        }
+      }
+
+      const now = new Date().toISOString();
+      const results = [];
+
+      // Process files in batches for parallel uploading
+      for (let i = 0; i < files.length; i += CLOUDFLARE_UPLOAD_CONCURRENCY) {
+        const batch = files.slice(i, i + CLOUDFLARE_UPLOAD_CONCURRENCY);
+        try {
+          const batchResults = await processBatch(
+            batch,
+            i,
+            carId,
+            vehicleInfo,
+            collections,
+            now
+          );
+          results.push(...batchResults);
+        } catch (error) {
+          console.error(
+            `Error in batch ${i / CLOUDFLARE_UPLOAD_CONCURRENCY + 1}:`,
+            error
+          );
+          // Continue with next batch even if this one failed
+        }
+      }
+
+      // Final status update
+      await sendProgress({
+        type: "complete",
+        success: true,
+        totalFiles: fileCount,
+        successfulUploads: results.length,
+        failedUploads: fileCount - results.length,
+      });
+    } catch (error) {
+      console.error("Error processing images:", error);
+      await sendProgress({
+        type: "error",
+        error:
+          error instanceof Error ? error.message : "Failed to process images",
+      });
+    } finally {
+      if (mongoClient) {
+        try {
+          await mongoClient.close();
+          console.log("MongoDB connection closed successfully");
+        } catch (error) {
+          console.error("Error closing MongoDB connection:", error);
+        }
+      }
+      await writer.close();
+    }
+  };
+
+  processImages();
+
+  return new Response(customStream.readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 export async function DELETE(request: NextRequest) {

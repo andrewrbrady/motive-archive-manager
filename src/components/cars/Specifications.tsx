@@ -386,9 +386,27 @@ const Specifications = ({
       try {
         const response = await fetch("/api/clients");
         if (!response.ok) {
-          throw new Error(`Failed to fetch clients: ${response.statusText}`);
+          // Get detailed error information from the response
+          let errorDetail = "";
+          try {
+            const errorData = await response.json();
+            errorDetail =
+              errorData.details || errorData.error || response.statusText;
+          } catch (parseError) {
+            errorDetail = response.statusText;
+          }
+          throw new Error(`Failed to fetch clients: ${errorDetail}`);
         }
+
+        // Ensure the response has the expected format before using it
         const data = await response.json();
+
+        if (!data || !Array.isArray(data.clients)) {
+          console.warn("Unexpected response format from /api/clients:", data);
+          setClients([]); // Set to empty array as fallback
+          return;
+        }
+
         setClients(data.clients || []); // Extract the clients array from the response
 
         // If we have a client ID but no clientInfo and we have clients data
@@ -410,6 +428,12 @@ const Specifications = ({
         }
       } catch (error) {
         console.error("Error fetching clients:", error);
+        // Set clients to empty array to prevent UI from waiting indefinitely
+        setClients([]);
+        // Don't crash the whole component on API error
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load client data"
+        );
       }
     };
     fetchClients();

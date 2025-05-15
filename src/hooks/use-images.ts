@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useMemo } from "react";
+import { useCallback, useRef, useMemo, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { ImageData } from "@/app/images/columns";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -115,13 +115,16 @@ export function useImages(options: UseImagesOptions = {}): UseImagesReturn {
     fetcher
   );
 
-  if (error) {
-    toast({
-      title: "Error loading images",
-      description: "Please try again later",
-      variant: "destructive",
-    });
-  }
+  // Use useEffect to show toast when error changes
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error loading images",
+        description: "Please try again later",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   return {
     data: data || null,

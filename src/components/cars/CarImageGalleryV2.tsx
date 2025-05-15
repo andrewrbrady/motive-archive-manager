@@ -34,6 +34,7 @@ import {
   Filter,
   Copy,
   Check,
+  Pin,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -389,6 +390,13 @@ export function CarImageGalleryV2({
       if (!onUpload || !event.target.files) return;
 
       const files = Array.from(event.target.files);
+
+      // Don't process empty file selection
+      if (files.length === 0) return;
+
+      console.log(`Starting upload of ${files.length} files`);
+
+      // Create initial progress tracking for all files
       const progressMap = new Map(
         files.map((file) => [
           file.name,
@@ -404,48 +412,19 @@ export function CarImageGalleryV2({
       setUploadProgress(Array.from(progressMap.values()));
       setOverallProgress(0);
 
-      // Create an array to track individual file progress
-      const progressArray = files.map(() => 0);
-      const updateProgress = (index: number, progress: number) => {
-        progressArray[index] = progress;
-        const overall =
-          progressArray.reduce((a, b) => a + b, 0) / progressArray.length;
-        setOverallProgress(overall);
-
-        setUploadProgress((prev) => {
-          const newProgress = [...prev];
-          const fileProgress = newProgress.find(
-            (p) => p.filename === files[index].name
-          );
-          if (fileProgress) {
-            fileProgress.progress = progress;
-            if (progress === 100) {
-              fileProgress.status = "complete";
-            }
-          }
-          return newProgress;
-        });
-      };
-
       try {
-        // Simulate progress updates (since we can't get real progress from the API)
-        files.forEach((_, index) => {
-          const interval = setInterval(() => {
-            const progress = progressArray[index];
-            if (progress < 90) {
-              updateProgress(index, progress + 10);
-            } else {
-              clearInterval(interval);
-            }
-          }, 500);
-        });
-
+        // Process all files in a single batch using the updated server API
         await onUpload(files);
 
         // Set all files to complete
-        files.forEach((_, index) => {
-          updateProgress(index, 100);
-        });
+        setUploadProgress((prev) =>
+          prev.map((p) => ({
+            ...p,
+            progress: 100,
+            status: "complete" as const,
+          }))
+        );
+        setOverallProgress(100);
 
         // Clear progress after a delay
         setTimeout(() => {
@@ -454,14 +433,18 @@ export function CarImageGalleryV2({
         }, 2000);
       } catch (error) {
         console.error("Upload failed:", error);
+
         // Update progress to show error state
         setUploadProgress((prev) =>
           prev.map((p) => ({
             ...p,
             status: "error" as const,
-            error: "Upload failed",
+            error: error instanceof Error ? error.message : "Upload failed",
           }))
         );
+      } finally {
+        // Clear the file input value
+        event.target.value = "";
       }
     },
     [onUpload]
@@ -535,11 +518,7 @@ export function CarImageGalleryV2({
                   multiple
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && onUpload) {
-                      onUpload(Array.from(e.target.files));
-                    }
-                  }}
+                  onChange={handleFileUpload}
                 />
               </Button>
             </div>
@@ -896,17 +875,34 @@ export function CarImageGalleryV2({
                     </div>
                   )}
                   {isEditing && (
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(image);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(image);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      {/* Set as Primary button, only if not already primary */}
+                      {!image.metadata?.isPrimary && onSetPrimary && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-primary text-primary hover:text-primary-foreground border border-primary h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSetPrimary(image);
+                          }}
+                          title="Set as primary image"
+                        >
+                          <Pin className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

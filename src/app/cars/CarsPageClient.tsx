@@ -95,14 +95,15 @@ export default function CarsPageClient({
     pageSize: pageSize.toString(),
     view: view,
     edit: isEditMode.toString(),
+    sort: filters.sort || "createdAt_desc",
     ...filters,
   }).toString();
 
   return (
     <div className="flex flex-col min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
       <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="space-y-6">
+      <main className="flex-grow container mx-auto px-4 py-4">
+        <div className="space-y-8">
           <PageTitle title="Cars Collection" count={totalCount}>
             <div className="flex items-center gap-4 ml-auto">
               <SortSelector currentSort={filters.sort || "createdAt_desc"} />

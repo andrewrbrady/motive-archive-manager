@@ -46,7 +46,6 @@ export default function CalendarContent() {
   }, []);
 
   const handleEventDrop = async (args: any) => {
-    // After the MotiveCalendar component handles the event drop, refresh the data
     const { event } = args;
     if (event.type === "event") {
       await fetchEvents();
@@ -56,7 +55,6 @@ export default function CalendarContent() {
   };
 
   const handleEventResize = async (args: any) => {
-    // After the MotiveCalendar component handles the event resize, refresh the data
     const { event } = args;
     if (event.type === "event") {
       await fetchEvents();
@@ -65,23 +63,21 @@ export default function CalendarContent() {
     }
   };
 
+  if (isLoading) {
+    return <LoadingContainer fullHeight />;
+  }
+
   return (
-    <div className="flex h-full w-full flex-col">
-      {isLoading ? (
-        <LoadingContainer fullHeight />
-      ) : (
-        <div className="flex h-full w-full flex-1 flex-col">
-          <MotiveCalendar
-            carId="" // Empty string for global calendar view
-            events={events}
-            deliverables={deliverables}
-            onEventDrop={handleEventDrop}
-            onEventResize={handleEventResize}
-            className="flex-1"
-            style={{ minHeight: "700px" }}
-          />
-        </div>
-      )}
+    <div className="h-[calc(100vh-16rem)] min-h-[700px] w-full rounded-md border border-border bg-background">
+      <MotiveCalendar
+        carId=""
+        events={events}
+        deliverables={deliverables}
+        onEventDrop={handleEventDrop}
+        onEventResize={handleEventResize}
+        showFilterControls
+        showVisibilityControls
+      />
     </div>
   );
 }

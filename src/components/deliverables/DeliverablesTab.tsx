@@ -70,13 +70,34 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const fetchDeliverables = useCallback(async () => {
     try {
       const id = Array.isArray(carId) ? carId[0] : carId;
+
+      // Check if carId is a valid MongoDB ObjectId before making the request
+      if (!id || typeof id !== "string" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error("Invalid carId format:", id);
+        setDeliverables([]);
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch(`/api/cars/${id}/deliverables`);
-      if (!response.ok) throw new Error("Failed to fetch deliverables");
+      if (!response.ok) {
+        console.error(`API returned status: ${response.status}`);
+        // Only show error for actual API errors, not empty results
+        if (response.status !== 404) {
+          throw new Error("Failed to fetch deliverables");
+        }
+        // If 404, just set empty array and don't show error
+        setDeliverables([]);
+        return;
+      }
+
       const data = await response.json();
-      setDeliverables(data);
+      // Handle both array responses and empty responses correctly
+      setDeliverables(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching deliverables:", error);
       toast.error("Failed to fetch deliverables");
+      setDeliverables([]);
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +155,21 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
     try {
       const id = Array.isArray(carId) ? carId[0] : carId;
+
+      // Validate carId
+      if (!id || typeof id !== "string" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error("Invalid carId format:", id);
+        toast.error("Cannot delete: Invalid car ID");
+        return;
+      }
+
+      // Validate deliverableId
+      if (!deliverableId || typeof deliverableId !== "string") {
+        console.error("Invalid deliverableId:", deliverableId);
+        toast.error("Cannot delete: Invalid deliverable ID");
+        return;
+      }
+
       const response = await fetch(
         `/api/cars/${id}/deliverables/${deliverableId}`,
         {
@@ -142,6 +178,12 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       );
 
       if (!response.ok) {
+        // If the deliverable was not found, don't show an error, just refresh the list
+        if (response.status === 404) {
+          console.log("Deliverable not found, refreshing list");
+          fetchDeliverables();
+          return;
+        }
         throw new Error("Failed to delete deliverable");
       }
 
@@ -182,15 +224,54 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     if (!confirmed) return;
 
     try {
-      await Promise.all(
-        selectedDeliverables.map((id) =>
-          fetch(`/api/cars/${carId}/deliverables/${id}`, {
-            method: "DELETE",
-          })
-        )
+      const id = Array.isArray(carId) ? carId[0] : carId;
+
+      // Validate carId
+      if (!id || typeof id !== "string" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error("Invalid carId format:", id);
+        toast.error("Cannot delete: Invalid car ID");
+        return;
+      }
+
+      // Filter out any invalid deliverable IDs
+      const validDeliverableIds = selectedDeliverables.filter(
+        (delId) => delId && typeof delId === "string"
       );
 
-      toast.success(`Deleted ${selectedDeliverables.length} deliverables`);
+      if (validDeliverableIds.length === 0) {
+        console.error("No valid deliverable IDs to delete");
+        toast.error("Cannot delete: No valid deliverables selected");
+        return;
+      }
+
+      // Track any deletion failures
+      let failureCount = 0;
+
+      await Promise.all(
+        validDeliverableIds.map(async (delId) => {
+          try {
+            const response = await fetch(
+              `/api/cars/${id}/deliverables/${delId}`,
+              {
+                method: "DELETE",
+              }
+            );
+
+            if (!response.ok && response.status !== 404) {
+              failureCount++;
+            }
+          } catch (err) {
+            console.error("Error deleting deliverable:", delId, err);
+            failureCount++;
+          }
+        })
+      );
+
+      if (failureCount > 0) {
+        toast.error(`Failed to delete ${failureCount} deliverables`);
+      } else {
+        toast.success(`Deleted ${validDeliverableIds.length} deliverables`);
+      }
 
       setSelectedDeliverables([]);
       setIsBatchMode(false);
@@ -222,6 +303,24 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
       const id = Array.isArray(carId) ? carId[0] : carId;
 
+      // Validate carId
+      if (!id || typeof id !== "string" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error("Invalid carId format:", id);
+        toast.error("Cannot update: Invalid car ID");
+        setEditingCell(null);
+        setEditValue("");
+        return;
+      }
+
+      // Validate deliverable._id
+      if (!editingCell.id || typeof editingCell.id !== "string") {
+        console.error("Invalid deliverable._id:", editingCell.id);
+        toast.error("Cannot update: Invalid deliverable");
+        setEditingCell(null);
+        setEditValue("");
+        return;
+      }
+
       // Process the value based on the field type
       const processedValue =
         editingCell.field === "duration" ? parseInt(editValue) : editValue;
@@ -241,6 +340,12 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.error("Deliverable not found");
+          toast.error("Deliverable not found");
+          fetchDeliverables();
+          return;
+        }
         throw new Error("Failed to update deliverable");
       }
 
@@ -284,11 +389,26 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     try {
       const id = Array.isArray(carId) ? carId[0] : carId;
 
+      // Validate carId
+      if (!id || typeof id !== "string" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error("Invalid carId format:", id);
+        toast.error("Cannot update: Invalid car ID");
+        return;
+      }
+
+      // Validate deliverable._id
+      const deliverableId = deliverable._id?.toString();
+      if (!deliverableId || typeof deliverableId !== "string") {
+        console.error("Invalid deliverable._id:", deliverable._id);
+        toast.error("Cannot update: Invalid deliverable");
+        return;
+      }
+
       // Convert duration to number
       const processedValue = field === "duration" ? parseInt(value) : value;
 
       const response = await fetch(
-        `/api/cars/${id}/deliverables/${deliverable._id}`,
+        `/api/cars/${id}/deliverables/${deliverableId}`,
         {
           method: "PUT",
           headers: {
@@ -302,9 +422,16 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       );
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.error("Deliverable not found");
+          toast.error("Deliverable not found");
+          fetchDeliverables();
+          return;
+        }
         throw new Error("Failed to update deliverable");
       }
 
+      // Only update the state if the API call was successful
       setDeliverables((prevDeliverables) =>
         prevDeliverables.map((d) =>
           d._id === deliverable._id ? { ...d, [field]: processedValue } : d
@@ -331,7 +458,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   ) => {
     const value = deliverable[field]?.toString() || "";
 
-    let options: { value: string; label: string }[] = [];
+    let options: { value: string; label: string; key?: string }[] = [];
     if (field === "platform") {
       options = [
         { value: "Instagram Reels", label: "Instagram Reels" },
@@ -363,6 +490,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       options = getRelevantUsers(deliverable.type).map((user) => ({
         value: user.name,
         label: user.name,
+        key: user._id || user.name,
       }));
     }
 
@@ -382,7 +510,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
+            <SelectItem key={option.key || option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}

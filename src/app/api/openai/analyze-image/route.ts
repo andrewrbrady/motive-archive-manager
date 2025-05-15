@@ -3,8 +3,8 @@ import OpenAI from "openai";
 import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
 import { getBaseUrl } from "@/lib/url-utils";
 
-// Set maximum execution time to 60 seconds
-export const maxDuration = 60;
+// Set maximum execution time to 90 seconds (increase from 60)
+export const maxDuration = 90;
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("OPENAI_API_KEY is not set in environment variables");
@@ -12,6 +12,7 @@ if (!process.env.OPENAI_API_KEY) {
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 60000, // 60 second timeout
 });
 
 interface ImageAnalysis {
@@ -184,14 +185,59 @@ async function validateColorWithSerper(
   }
 }
 
+// Utility function to attempt JSON parsing with error handling
+function safeJsonParse(text: string, defaultValue: any = {}): any {
+  try {
+    // First try to remove any markdown code block syntax if present
+    const cleanJson = text.replace(/```(json)?\n?|\n?```$/g, "").trim();
+    return JSON.parse(cleanJson);
+  } catch (error) {
+    console.error("JSON Parse Error:", error);
+    console.debug("Failed to parse text:", text);
+    return defaultValue;
+  }
+}
+
+// Retry function for OpenAI API calls
+async function retryOpenAICall<T>(
+  fn: () => Promise<T>,
+  maxRetries = 2,
+  delay = 1000
+): Promise<T> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`Retry attempt ${attempt} for OpenAI API call`);
+        // Exponential backoff
+        await new Promise((resolve) =>
+          setTimeout(resolve, delay * Math.pow(2, attempt - 1))
+        );
+      }
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `OpenAI API call failed (attempt ${attempt + 1}/${maxRetries + 1}):`,
+        error
+      );
+    }
+  }
+
+  throw lastError || new Error("All retry attempts failed");
+}
+
 export async function POST(request: NextRequest) {
+  console.time("analyze-image-total");
   try {
     const { imageUrl, vehicleInfo } = await request.json();
+    console.log("Analyzing image:", imageUrl);
     console.log(
-      "Analyzing image:",
-      imageUrl,
-      "with vehicle info:",
+      "Vehicle info:",
       vehicleInfo
+        ? JSON.stringify(vehicleInfo).substring(0, 200) + "..."
+        : "None provided"
     );
 
     if (!imageUrl) {
@@ -244,26 +290,38 @@ export async function POST(request: NextRequest) {
     prompt +=
       "Provide:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image, focusing on visible features)";
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: prompt,
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: publicImageUrl,
+    console.time("openai-api-call");
+
+    // Use lower-resource model and implement retry logic
+    const model = "gpt-4o-mini"; // Use mini model for faster response
+
+    const response = await retryOpenAICall(async () => {
+      console.log(`Making OpenAI API request with model: ${model}`);
+      return openai.chat.completions.create({
+        model: model,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt,
               },
-            },
-          ],
-        },
-      ],
+              {
+                type: "image_url",
+                image_url: {
+                  url: publicImageUrl,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 800, // Increase max tokens
+        temperature: 0.1, // Lower temperature for more consistent results
+      });
     });
+
+    console.timeEnd("openai-api-call");
 
     const analysisText = response.choices[0]?.message?.content;
     if (!analysisText) {
@@ -271,15 +329,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the JSON response, removing any markdown code block syntax
-    const cleanJson = analysisText.replace(/```json\n?|\n?```/g, "");
-    const analysis = JSON.parse(cleanJson) as ImageAnalysis;
+    const analysis = safeJsonParse(analysisText) as ImageAnalysis;
 
-    return NextResponse.json({ analysis });
-  } catch (error) {
-    console.error("Error analyzing image:", error);
-    return NextResponse.json(
-      { error: "Failed to analyze image" },
-      { status: 500 }
+    // Normalize the analysis values
+    const normalizedAnalysis = normalizeAnalysis(analysis);
+
+    console.timeEnd("analyze-image-total");
+    console.log(
+      "Analysis complete:",
+      JSON.stringify(normalizedAnalysis).substring(0, 200) + "..."
     );
+
+    return NextResponse.json({ analysis: normalizedAnalysis });
+  } catch (error) {
+    console.timeEnd("analyze-image-total");
+    console.error("Error analyzing image:", error);
+
+    // Create a structured error response
+    const errorResponse = {
+      error: "Failed to analyze image",
+      details: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    };
+
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }

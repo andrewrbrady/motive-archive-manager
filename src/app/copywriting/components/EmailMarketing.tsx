@@ -101,7 +101,7 @@ export default function EmailMarketing() {
           throw new Error("Failed to fetch cars");
         }
         const data = await response.json();
-        setCars(data || []);
+        setCars(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching cars:", error);
         setCars([]);
@@ -491,11 +491,17 @@ export default function EmailMarketing() {
                     </FormControl>
                     <SelectContent className="bg-[hsl(var(--background-card))] border-[hsl(var(--border))]">
                       <SelectItem value="none">No car selected</SelectItem>
-                      {cars.map((car) => (
-                        <SelectItem key={car._id} value={car._id}>
-                          {car.year} {car.make} {car.model}
+                      {Array.isArray(cars) ? (
+                        cars.map((car) => (
+                          <SelectItem key={car._id} value={car._id}>
+                            {car.year} {car.make} {car.model}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="error">
+                          Error loading cars
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                   {isLoadingCars && (

@@ -125,7 +125,8 @@ export async function GET(request: Request) {
     // Parse sort parameter
     const [sortField, sortOrder] = sort.split("_");
     const sortOptions = {
-      [sortField]: sortOrder === "desc" ? -1 : 1,
+      [sortField === "createdAt" ? "_id" : sortField]:
+        sortOrder === "desc" ? -1 : 1,
     } as const;
 
     const cars = await db

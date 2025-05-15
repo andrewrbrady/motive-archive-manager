@@ -5,5 +5,5 @@ export default function GalleriesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="h-screen flex flex-col">{children}</div>;
+  return <div className="min-h-screen flex flex-col pt-20">{children}</div>;
 }

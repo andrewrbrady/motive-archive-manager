@@ -119,24 +119,45 @@ export const useGalleryState = (carId: string) => {
   }, []);
 
   const synchronizeGalleryState = useCallback(async () => {
+    console.log("Starting gallery state synchronization", { carId });
     setState((prev) => ({ ...prev, isSyncing: true }));
     try {
-      const response = await fetch(
-        `/api/cars/${carId}?includeImages=true&t=${Date.now()}`
-      );
+      const url = `/api/cars/${carId}?includeImages=true&t=${Date.now()}`;
+      console.log("Fetching gallery data from:", url);
+
+      const response = await fetch(url);
+      console.log("Gallery data response:", {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText,
+      });
+
       if (!response.ok) {
         throw new Error("Failed to fetch gallery data");
       }
       const data = await response.json();
+      console.log("Received gallery data:", {
+        imagesCount: data.images?.length || 0,
+        hasImages: Boolean(data.images),
+        rawData: data,
+      });
+
+      const normalizedImages = (data.images || []).map(normalizeImageData);
+      console.log("Normalized images:", {
+        count: normalizedImages.length,
+        images: normalizedImages,
+      });
 
       setState((prev) => ({
         ...prev,
-        images: (data.images || []).map(normalizeImageData),
+        images: normalizedImages,
         isLoading: false,
         isSyncing: false,
         error: null,
       }));
+      console.log("Gallery state updated successfully");
     } catch (error) {
+      console.error("Error synchronizing gallery state:", error);
       setState((prev) => ({
         ...prev,
         isLoading: false,

@@ -8,8 +8,8 @@ if (!process.env.MONGODB_URI) {
 
 const uri = process.env.MONGODB_URI;
 const options: MongoClientOptions = {
-  maxPoolSize: 10, // Reduced from 50 to prevent connection overload
-  minPoolSize: 1, // Reduced from 10 to minimize idle connections
+  maxPoolSize: 10,
+  minPoolSize: 1,
   maxIdleTimeMS: 60000,
   connectTimeoutMS: 30000,
   socketTimeoutMS: 60000,
@@ -20,6 +20,16 @@ const options: MongoClientOptions = {
   w: 1,
   wtimeoutMS: 2500,
   journal: true,
+  ssl: true,
+  tls: true,
+  tlsAllowInvalidCertificates: false,
+  tlsAllowInvalidHostnames: false,
+  family: 4, // Force IPv4
+  serverApi: {
+    version: "1",
+    strict: true,
+    deprecationErrors: true,
+  },
 };
 
 // Detect if running on Vercel
@@ -37,6 +47,18 @@ if (isVercel) {
   options.family = 4;
   console.log(
     "Detected Vercel environment, using optimized MongoDB connection settings"
+  );
+}
+
+// Add development environment specific settings
+if (process.env.NODE_ENV === "development") {
+  // Use standard TLS settings for development
+  options.ssl = true;
+  options.tls = true;
+  options.tlsAllowInvalidCertificates = false;
+  options.family = 4; // Force IPv4 in development
+  console.log(
+    "Development environment detected, using development-specific MongoDB settings"
   );
 }
 

@@ -44,14 +44,14 @@ export default function FirestoreUserSelector({
   } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
-      console.log("Fetching users from Firestore");
       const response = await fetch("/api/users");
       if (!response.ok) {
         throw new Error("Failed to fetch users");
       }
       const data = await response.json();
-      console.log("Fetched users:", data);
-      return data;
+      return data.filter(
+        (user: FirestoreUser) => user && typeof user === "object"
+      );
     },
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep unused data in cache for 30 minutes
@@ -59,16 +59,21 @@ export default function FirestoreUserSelector({
 
   // Find the selected user
   const selectedUser = value
-    ? users.find((user: FirestoreUser) => user.uid === value)
+    ? users.find((user: FirestoreUser) => user?.uid === value)
     : null;
 
   // Get initials for avatar
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
+  const getInitials = (name: string | undefined | null) => {
+    if (!name || typeof name !== "string") return "U";
+    const parts = name.trim().split(" ");
+    if (parts.length === 0) return "U";
+    return (
+      parts
+        .map((n) => n[0])
+        .filter(Boolean)
+        .join("")
+        .toUpperCase() || "U"
+    );
   };
 
   // Handle value change
@@ -111,14 +116,14 @@ export default function FirestoreUserSelector({
                       src={
                         selectedUser.profileImage || selectedUser.image || ""
                       }
-                      alt={selectedUser.name}
+                      alt={selectedUser.name || "User"}
                     />
                     <AvatarFallback className="text-[10px]">
                       {getInitials(selectedUser.name)}
                     </AvatarFallback>
                   </Avatar>
                 )}
-                <span>{selectedUser.name}</span>
+                <span>{selectedUser.name || "Unnamed User"}</span>
               </div>
             ) : value === null && allowUnassign ? (
               <div className="flex items-center gap-2">
@@ -159,26 +164,28 @@ export default function FirestoreUserSelector({
                       {users.length} users available
                     </div>
 
-                    {users.map((user: FirestoreUser) => (
-                      <SelectItem key={user.uid} value={user.uid}>
-                        <div className="flex items-center gap-2">
-                          {showAvatar ? (
-                            <Avatar className="h-5 w-5">
-                              <AvatarImage
-                                src={user.profileImage || user.image || ""}
-                                alt={user.name}
-                              />
-                              <AvatarFallback className="text-[10px]">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ) : (
-                            <User className="h-4 w-4" />
-                          )}
-                          <span>{user.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {users.map((user: FirestoreUser) =>
+                      user && typeof user === "object" && user.uid ? (
+                        <SelectItem key={user.uid} value={user.uid}>
+                          <div className="flex items-center gap-2">
+                            {showAvatar ? (
+                              <Avatar className="h-5 w-5">
+                                <AvatarImage
+                                  src={user.profileImage || user.image || ""}
+                                  alt={user.name || "User"}
+                                />
+                                <AvatarFallback className="text-[10px]">
+                                  {getInitials(user.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : (
+                              <User className="h-4 w-4" />
+                            )}
+                            <span>{user.name || "Unnamed User"}</span>
+                          </div>
+                        </SelectItem>
+                      ) : null
+                    )}
                   </>
                 ) : (
                   <div className="px-2 py-1 text-xs text-muted-foreground">

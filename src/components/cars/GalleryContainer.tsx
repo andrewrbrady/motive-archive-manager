@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import * as FileUpload from "@/components/ui/file-upload";
+import { cn } from "@/lib/utils";
 
 interface GalleryContainerProps {
   carId: string;
@@ -32,6 +33,12 @@ interface UploadProgress {
   status: "uploading" | "analyzing" | "complete" | "error";
   currentStep: string;
   error?: string;
+}
+
+interface ProgressCallbacks {
+  onProgress: (file: File, progress: number) => void;
+  onSuccess: (file: File) => void;
+  onError: (file: File, error: Error) => void;
 }
 
 interface CarsClientContext {
@@ -69,37 +76,265 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
 }) => {
   const { state, actions } = useGalleryState(carId);
   const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<UploadProgress[]>(
+    []
+  );
   const [status, setStatus] = React.useState<{ status: string }>({
     status: "idle",
   });
 
-  const handleImageUpload = React.useCallback(
-    async (files: File[]) => {
+  const handleFileUploadProgress = React.useCallback(
+    async (
+      files: File[],
+      { onProgress, onSuccess, onError }: ProgressCallbacks
+    ) => {
+      console.log("FileUpload component triggered upload:", {
+        numberOfFiles: files.length,
+        fileNames: files.map((f) => f.name),
+      });
+
       try {
-        const formData = new FormData();
+        // Mark all files as starting upload
         files.forEach((file) => {
-          formData.append("file", file);
+          onProgress(file, 0);
         });
+
+        // Track progress for each file
+        const fileProgressMap = new Map(files.map((file) => [file.name, 0]));
+        const fileStatusMap = new Map(files.map((file) => [file.name, true])); // Track if file is still processing
+
+        // Create a single FormData object with all files
+        const formData = new FormData();
+
+        // Add all files to the formData
+        files.forEach((file, index) => {
+          formData.append(`file${index}`, file);
+        });
+
+        formData.append("fileCount", files.length.toString());
         formData.append("carId", carId);
 
+        // Update all files to 10% progress to show we're starting
+        files.forEach((file) => {
+          fileProgressMap.set(file.name, 10);
+          onProgress(file, 10);
+        });
+
+        // Send the request
         const response = await fetch("/api/cloudflare/images", {
           method: "POST",
           body: formData,
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to upload images");
+        if (!response.ok || !response.body) {
+          throw new Error("Upload failed");
         }
 
+        // Set up the reader for the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        // Process the streaming response
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n\n");
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+
+            try {
+              const data = JSON.parse(line.slice(5));
+
+              // Handle overall completion status
+              if (data.type === "complete") {
+                console.log("Upload complete:", data);
+                // Mark all remaining files as completed
+                files.forEach((file) => {
+                  if (fileProgressMap.get(file.name) < 100) {
+                    onProgress(file, 100);
+                    onSuccess(file);
+                  }
+                });
+                break;
+              }
+
+              // Handle file-specific updates
+              if (data.fileName) {
+                const file = files.find((f) => f.name === data.fileName);
+                if (!file) continue;
+
+                // Update progress based on status
+                if (data.status === "error") {
+                  fileStatusMap.set(data.fileName, false);
+                  onError(file, new Error(data.error || "Failed to upload"));
+                } else if (data.status === "complete") {
+                  fileProgressMap.set(data.fileName, 100);
+                  onProgress(file, 100);
+                  onSuccess(file);
+                } else if (data.progress) {
+                  const currentProgress = fileProgressMap.get(data.fileName);
+                  const newProgress = Math.max(
+                    currentProgress !== undefined ? currentProgress : 0,
+                    data.progress
+                  );
+                  fileProgressMap.set(data.fileName, newProgress);
+                  onProgress(file, newProgress);
+                }
+              }
+
+              // Handle error message
+              if (data.type === "error") {
+                console.error("Server reported error:", data.error);
+                throw new Error(data.error || "Unknown server error");
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e, "Raw data:", line);
+            }
+          }
+        }
+
+        // Handle any files that weren't explicitly completed or errored
+        files.forEach((file) => {
+          const status = fileStatusMap.get(file.name);
+          const progress = fileProgressMap.get(file.name);
+          if (status && progress !== undefined && progress < 100) {
+            onProgress(file, 100);
+            onSuccess(file);
+          }
+        });
+
+        // Sync gallery state to show the new images
         await actions.synchronizeGalleryState();
-        setUploadModalOpen(false);
-        toast.success("Images uploaded successfully");
+
+        // Count successful uploads
+        const successful = files.filter((file) => {
+          const progress = fileProgressMap.get(file.name);
+          return progress !== undefined && progress === 100;
+        }).length;
+        const total = files.length;
+
+        if (successful > 0) {
+          setUploadModalOpen(false);
+          toast.success("Upload Complete", {
+            description: `Successfully uploaded ${successful} of ${total} files`,
+          });
+        } else {
+          toast.error("Upload Failed", {
+            description: "Failed to upload any images",
+          });
+        }
       } catch (error) {
-        console.error("Error uploading images:", error);
-        toast.error("Failed to upload images");
+        console.error("Upload failed, calling onError for each file:", error);
+        files.forEach((file) => {
+          onError(
+            file,
+            error instanceof Error ? error : new Error("Upload failed")
+          );
+        });
       }
     },
     [carId, actions]
+  );
+
+  const handleImageUpload = React.useCallback(
+    async (files: File[]) => {
+      console.log("Starting image upload process:", {
+        numberOfFiles: files.length,
+        carId,
+        fileNames: files.map((f) => f.name),
+      });
+
+      try {
+        // Initialize progress tracking for each file
+        setUploadProgress(
+          files.map((file) => ({
+            id: Math.random().toString(36).substr(2, 9),
+            filename: file.name,
+            progress: 0,
+            status: "uploading" as const,
+            currentStep: "Starting upload",
+          }))
+        );
+
+        // Create a simple progress tracker for handleFileUploadProgress
+        const progressTracker = {
+          onProgress: (file: File, progress: number) => {
+            setUploadProgress((prev) =>
+              prev.map((p) =>
+                p.filename === file.name
+                  ? {
+                      ...p,
+                      progress,
+                      status:
+                        progress >= 100
+                          ? ("complete" as const)
+                          : ("uploading" as const),
+                      currentStep:
+                        progress >= 100
+                          ? "Complete"
+                          : `Uploading (${progress}%)`,
+                    }
+                  : p
+              )
+            );
+          },
+          onSuccess: (file: File) => {
+            setUploadProgress((prev) =>
+              prev.map((p) =>
+                p.filename === file.name
+                  ? {
+                      ...p,
+                      progress: 100,
+                      status: "complete" as const,
+                      currentStep: "Complete",
+                    }
+                  : p
+              )
+            );
+          },
+          onError: (file: File, error: Error) => {
+            setUploadProgress((prev) =>
+              prev.map((p) =>
+                p.filename === file.name
+                  ? {
+                      ...p,
+                      status: "error" as const,
+                      currentStep: "Failed",
+                      error: error.message,
+                    }
+                  : p
+              )
+            );
+          },
+        };
+
+        // Reuse our parallel upload implementation from handleFileUploadProgress
+        await handleFileUploadProgress(files, progressTracker);
+      } catch (error) {
+        console.error("Error in image upload process:", error);
+
+        setUploadProgress((prev) =>
+          prev.map((p) => ({
+            ...p,
+            status: "error",
+            currentStep: "Upload failed",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to upload images",
+          }))
+        );
+
+        toast.error("Upload Failed", {
+          description:
+            error instanceof Error ? error.message : "Failed to upload images",
+        });
+      }
+    },
+    [carId, handleFileUploadProgress]
   );
 
   const handleRemoveImage = React.useCallback(
@@ -137,7 +372,7 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
         console.log(`Setting primary image ID to: ${imageId} for car ${carId}`);
 
         const response = await fetch(`/api/cars/${carId}/thumbnail`, {
-          method: "PUT",
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json",
           },
@@ -271,6 +506,8 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
               await handleRemoveImage(normalizedImage);
             }}
             onOpenUploadModal={() => setUploadModalOpen(true)}
+            onSetPrimary={(image) => handlePrimaryImageChange(image._id)}
+            onUpload={handleImageUpload}
           />
         </div>
       </div>
@@ -286,17 +523,9 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
           </DialogHeader>
           <div className="overflow-hidden">
             <FileUpload.Root
-              maxFiles={10}
               maxSize={1024 * 1024 * 5} // 5MB
               accept="image/*"
-              onUpload={async (files, { onProgress, onSuccess, onError }) => {
-                try {
-                  await handleImageUpload(files);
-                  files.forEach((file) => onSuccess(file));
-                } catch (error) {
-                  files.forEach((file) => onError(file, error as Error));
-                }
-              }}
+              onUpload={handleFileUploadProgress}
               className="w-full"
             >
               <FileUpload.Dropzone className="h-[120px]">
@@ -311,8 +540,50 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
                   </div>
                 </div>
               </FileUpload.Dropzone>
-              <div className="max-h-[200px] overflow-y-auto">
-                <FileUpload.List />
+              <div className="max-h-[300px] overflow-y-auto space-y-2 mt-4">
+                {uploadProgress.length > 0 ? (
+                  uploadProgress.map((progress) => (
+                    <div key={progress.id} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="truncate flex-1">
+                          {progress.filename}
+                        </span>
+                        <span className="text-muted-foreground text-xs ml-2">
+                          {progress.status === "error" ? (
+                            <span className="text-destructive">Error</span>
+                          ) : progress.status === "complete" ? (
+                            <span className="text-success">Complete</span>
+                          ) : (
+                            `${Math.round(progress.progress)}%`
+                          )}
+                        </span>
+                      </div>
+                      <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full transition-all duration-200",
+                            progress.status === "error"
+                              ? "bg-destructive"
+                              : progress.status === "complete"
+                                ? "bg-success"
+                                : "bg-primary"
+                          )}
+                          style={{ width: `${progress.progress}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {progress.currentStep}
+                      </div>
+                      {progress.error && (
+                        <div className="text-xs text-destructive mt-1">
+                          {progress.error}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <FileUpload.List />
+                )}
               </div>
             </FileUpload.Root>
           </div>

@@ -144,6 +144,18 @@ export async function GET(request: NextRequest) {
         const [field, direction] = sort.split("_");
         sortField = field || "createdAt";
         sortDirection = direction === "asc" ? 1 : -1;
+
+        // Use _id for sorting when "createdAt_desc" is selected
+        // since MongoDB's ObjectId contains a creation timestamp
+        if (sort === "createdAt_desc") {
+          sortField = "_id";
+          sortDirection = -1;
+        }
+      } else {
+        // If no sort specified, default to sorting by _id in descending order
+        // for "recently added" items using MongoDB's ObjectId timestamp
+        sortField = "_id";
+        sortDirection = -1;
       }
 
       // Simple consistent pipeline
