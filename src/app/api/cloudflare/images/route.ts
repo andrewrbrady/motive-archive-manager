@@ -7,6 +7,9 @@ import { analyzeImage } from "@/lib/imageAnalyzer";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
+// Allow very large uploads (up to 2GB) to prevent 413 errors
+export const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
+
 // Ensure environment variables are set
 if (
   !process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID ||
