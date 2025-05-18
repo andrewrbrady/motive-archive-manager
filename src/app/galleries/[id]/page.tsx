@@ -24,11 +24,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import Navbar from "@/components/layout/navbar";
+// import Navbar from "@/components/layout/navbar";
 import { GalleryImageSelector } from "@/components/galleries/GalleryImageSelector";
 import { DraggableGalleryGrid } from "@/components/galleries/DraggableGalleryGrid";
 import { ImageData } from "@/app/images/columns";
 import { useQueryClient } from "@tanstack/react-query";
+import { PageTitle } from "@/components/ui/PageTitle";
+// import Footer from "@/components/layout/footer";
 
 export default function GalleryPage() {
   const params = useParams();
@@ -184,160 +186,151 @@ export default function GalleryPage() {
 
   if (isLoading) {
     return (
-      <>
-        <Navbar />
-        <main className="container mx-auto py-10">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </main>
-      </>
+      <div className="min-h-screen bg-background">
+        {/* <Navbar /> */}
+        <div className="container mx-auto px-4 py-8 flex justify-center items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
     );
   }
 
   if (error || !gallery) {
     return (
-      <>
-        <Navbar />
-        <main className="container mx-auto py-10">
+      <div className="min-h-screen bg-background">
+        {/* <Navbar /> */}
+        <div className="container mx-auto px-4 py-8">
           <div className="text-center text-destructive">
             Error loading gallery
           </div>
-        </main>
-      </>
+        </div>
+      </div>
     );
   }
 
   return (
-    <>
-      <Navbar />
-      <main className="flex-1 overflow-y-auto h-[calc(100vh-4rem)]">
-        <div className="container mx-auto py-10">
-          <div className="space-y-6">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push("/galleries")}
-                className="mr-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
+    <div className="min-h-screen bg-background">
+      {/* <Navbar /> */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/galleries")}
+              className="mr-4"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
 
-              <div className="flex-grow">
-                {isEditing ? (
-                  <div className="space-y-4">
-                    <Input
-                      value={editedGallery.name}
-                      onChange={(e) =>
-                        setEditedGallery((prev) => ({
-                          ...prev,
-                          name: e.target.value,
-                        }))
-                      }
-                      placeholder="Gallery name"
-                      className="text-2xl font-semibold"
-                    />
-                    <Textarea
-                      value={editedGallery.description}
-                      onChange={(e) =>
-                        setEditedGallery((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
-                      placeholder="Gallery description"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <h1 className="text-3xl font-semibold tracking-tight">
-                      {gallery.name}
-                    </h1>
-                    {gallery.description && (
-                      <p className="text-muted-foreground mt-2">
-                        {gallery.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                {isEditing ? (
-                  <>
-                    <Button onClick={handleSave}>Save</Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEditing(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEditing(true)}
-                    >
-                      Edit Details
-                    </Button>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="destructive">Delete</Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Delete Gallery</DialogTitle>
-                          <DialogDescription>
-                            Are you sure you want to delete this gallery? This
-                            action cannot be undone.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter>
-                          <Button
-                            variant="destructive"
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                          >
-                            {isDeleting ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : null}
-                            Delete Gallery
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </>
-                )}
-              </div>
+            <div className="flex-grow">
+              {isEditing ? (
+                <div className="space-y-4">
+                  <Input
+                    value={editedGallery.name}
+                    onChange={(e) =>
+                      setEditedGallery((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    placeholder="Gallery name"
+                    className="text-2xl font-semibold"
+                  />
+                  <Textarea
+                    value={editedGallery.description}
+                    onChange={(e) =>
+                      setEditedGallery((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Gallery description"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <h1 className="text-3xl font-semibold tracking-tight">
+                    {gallery.name}
+                  </h1>
+                  {gallery.description && (
+                    <p className="text-muted-foreground mt-2">
+                      {gallery.description}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold tracking-tight">
-                  Gallery Images
-                </h2>
-                <div className="flex gap-2">
+            <div className="flex items-center space-x-2">
+              {isEditing ? (
+                <>
+                  <Button onClick={handleSave}>Save</Button>
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => setIsEditing(true)}>
+                    Edit Details
+                  </Button>
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="outline">
-                        <Code className="h-4 w-4 mr-2" />
-                        Generate MDX
-                      </Button>
+                      <Button variant="destructive">Delete</Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>MDX Gallery Code</DialogTitle>
+                        <DialogTitle>Delete Gallery</DialogTitle>
                         <DialogDescription>
-                          Copy and paste this code into your MDX file to create
-                          a gallery with lightbox functionality.
+                          Are you sure you want to delete this gallery? This
+                          action cannot be undone.
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="relative flex-1 min-h-0">
-                        <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
-                          <code className="text-sm block">
-                            {`<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <DialogFooter>
+                        <Button
+                          variant="destructive"
+                          onClick={handleDelete}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : null}
+                          Delete Gallery
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold tracking-tight">
+                Gallery Images
+              </h2>
+              <div className="flex gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Code className="h-4 w-4 mr-2" />
+                      Generate MDX
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>MDX Gallery Code</DialogTitle>
+                      <DialogDescription>
+                        Copy and paste this code into your MDX file to create a
+                        gallery with lightbox functionality.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="relative flex-1 min-h-0">
+                      <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
+                        <code className="text-sm block">
+                          {`<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
   {(() => {
     const openModal = (id) => {
       const dialog = document.getElementById(id);
@@ -472,48 +465,48 @@ ${(() => {
     display: block;
   }
 \`}</style>`}
-                          </code>
-                        </pre>
-                        <Button
-                          className="absolute top-4 right-4"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText(
-                              document.querySelector("pre code")?.textContent ||
-                                ""
-                            );
-                            toast({
-                              title: "Copied!",
-                              description: "MDX code copied to clipboard",
-                            });
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline">
-                        <Code className="h-4 w-4 mr-2" />
-                        Generate Gallery Component
+                        </code>
+                      </pre>
+                      <Button
+                        className="absolute top-4 right-4"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            document.querySelector("pre code")?.textContent ||
+                              ""
+                          );
+                          toast({
+                            title: "Copied!",
+                            description: "MDX code copied to clipboard",
+                          });
+                        }}
+                      >
+                        Copy
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle>Image Gallery Component Code</DialogTitle>
-                        <DialogDescription>
-                          Copy and paste this code into your MDX file to create
-                          a gallery using the ImageGallery component.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="relative flex-1 min-h-0">
-                        <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
-                          <code className="text-sm block">
-                            {`<ImageGallery
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Code className="h-4 w-4 mr-2" />
+                      Generate Gallery Component
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>Image Gallery Component Code</DialogTitle>
+                      <DialogDescription>
+                        Copy and paste this code into your MDX file to create a
+                        gallery using the ImageGallery component.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="relative flex-1 min-h-0">
+                      <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
+                        <code className="text-sm block">
+                          {`<ImageGallery
   images={[
 ${(() => {
   // Create a map of images by their ID for quick lookup
@@ -550,52 +543,51 @@ ${(() => {
       : ""
   }
 />`}
-                          </code>
-                        </pre>
-                        <Button
-                          className="absolute top-4 right-4"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText(
-                              document.querySelector("pre code:last-child")
-                                ?.textContent || ""
-                            );
-                            toast({
-                              title: "Copied!",
-                              description:
-                                "Gallery component code copied to clipboard",
-                            });
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline">
-                        <Code className="h-4 w-4 mr-2" />
-                        Generate Full Width Gallery
+                        </code>
+                      </pre>
+                      <Button
+                        className="absolute top-4 right-4"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            document.querySelector("pre code:last-child")
+                              ?.textContent || ""
+                          );
+                          toast({
+                            title: "Copied!",
+                            description:
+                              "Gallery component code copied to clipboard",
+                          });
+                        }}
+                      >
+                        Copy
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle>
-                          Full Width Gallery Component Code
-                        </DialogTitle>
-                        <DialogDescription>
-                          Copy and paste this code into your MDX file to create
-                          a full-width gallery using the FullWidthGallery
-                          component.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="relative flex-1 min-h-0">
-                        <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
-                          <code className="text-sm block">
-                            {`<FullWidthGallery
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Code className="h-4 w-4 mr-2" />
+                      Generate Full Width Gallery
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>
+                        Full Width Gallery Component Code
+                      </DialogTitle>
+                      <DialogDescription>
+                        Copy and paste this code into your MDX file to create a
+                        full-width gallery using the FullWidthGallery component.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="relative flex-1 min-h-0">
+                      <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
+                        <code className="text-sm block">
+                          {`<FullWidthGallery
   images={[
 ${(() => {
   // Create a map of images by their ID for quick lookup
@@ -627,72 +619,72 @@ ${(() => {
   ]}
   cols={{ sm: 1, md: 3, lg: 3 }}
 />`}
-                          </code>
-                        </pre>
-                        <Button
-                          className="absolute top-4 right-4"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText(
-                              document.querySelector("pre code:last-child")
-                                ?.textContent || ""
-                            );
-                            toast({
-                              title: "Copied!",
-                              description:
-                                "Full width gallery code copied to clipboard",
-                            });
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                        </code>
+                      </pre>
+                      <Button
+                        className="absolute top-4 right-4"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            document.querySelector("pre code:last-child")
+                              ?.textContent || ""
+                          );
+                          toast({
+                            title: "Copied!",
+                            description:
+                              "Full width gallery code copied to clipboard",
+                          });
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
 
-                  <Button
-                    onClick={() => {
-                      if (isAddingImages) {
-                        handleDoneAddingImages();
-                      } else {
-                        setIsAddingImages(true);
-                      }
-                    }}
-                    variant={isAddingImages ? "secondary" : "default"}
-                  >
-                    {isAddingImages ? (
-                      "Done"
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Images
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  onClick={() => {
+                    if (isAddingImages) {
+                      handleDoneAddingImages();
+                    } else {
+                      setIsAddingImages(true);
+                    }
+                  }}
+                  variant={isAddingImages ? "secondary" : "default"}
+                >
+                  {isAddingImages ? (
+                    "Done"
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Images
+                    </>
+                  )}
+                </Button>
               </div>
-
-              {isAddingImages ? (
-                <GalleryImageSelector
-                  selectedImageIds={gallery.imageIds}
-                  onImageSelect={handleImageSelect}
-                />
-              ) : gallery.images && gallery.images.length > 0 ? (
-                <DraggableGalleryGrid
-                  gallery={gallery}
-                  onOrderChange={handleOrderChange}
-                  onImageSelect={handleImageSelect}
-                />
-              ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  No images in this gallery
-                </div>
-              )}
             </div>
+
+            {isAddingImages ? (
+              <GalleryImageSelector
+                selectedImageIds={gallery.imageIds}
+                onImageSelect={handleImageSelect}
+              />
+            ) : gallery.images && gallery.images.length > 0 ? (
+              <DraggableGalleryGrid
+                gallery={gallery}
+                onOrderChange={handleOrderChange}
+                onImageSelect={handleImageSelect}
+              />
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                No images in this gallery
+              </div>
+            )}
           </div>
         </div>
       </main>
-    </>
+      {/* <Footer /> */}
+    </div>
   );
 }

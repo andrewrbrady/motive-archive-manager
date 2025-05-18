@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Navbar from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -355,7 +354,6 @@ export default function HardDriveDetails({ params }: any) {
   if (error || !drive) {
     return (
       <div className="container mx-auto p-6">
-        <Navbar />
         <div className="mt-8 p-6 bg-background-secondary rounded-lg text-center">
           <h2 className="text-xl font-semibold mb-4">
             {error || "Hard drive not found"}
@@ -371,8 +369,6 @@ export default function HardDriveDetails({ params }: any) {
 
   return (
     <div className="container mx-auto p-6">
-      <Navbar />
-
       <div className="mt-8 mb-4">
         <Button
           variant="outline"

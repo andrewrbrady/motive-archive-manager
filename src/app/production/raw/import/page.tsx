@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/layout/navbar";
+import { PageTitle } from "@/components/ui/PageTitle";
 import { UploadIcon } from "lucide-react";
 
 export default function ImportRawAssets() {
@@ -70,9 +70,9 @@ export default function ImportRawAssets() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background">
+      {/* <Navbar /> */}
+      <main className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">Import Raw Assets</h1>
 
@@ -116,6 +116,7 @@ export default function ImportRawAssets() {
           </form>
         </div>
       </main>
+      {/* <Footer /> */}
     </div>
   );
 }

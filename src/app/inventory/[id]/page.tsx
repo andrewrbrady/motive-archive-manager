@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useParams } from "next/navigation";
-import Navbar from "@/components/layout/navbar";
+// import Navbar from "@/components/layout/navbar";
 import { ImageGallery } from "@/components/ImageGallery";
 import VehicleDetails from "@/components/inventory/VehicleDetails";
 import { VehicleInventoryItem } from "@/components/inventory/types";
@@ -33,9 +33,11 @@ export default function InventoryItemPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="flex justify-center items-center h-[calc(100vh-64px)]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900" />
+        {/* <Navbar /> */}
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center h-[calc(100vh-64px)]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-900" />
+          </div>
         </div>
       </div>
     );
@@ -44,7 +46,7 @@ export default function InventoryItemPage() {
   if (!item) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
+        {/* <Navbar /> */}
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold">Item not found</h1>
         </div>
@@ -54,8 +56,8 @@ export default function InventoryItemPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
+      {/* <Navbar /> */}
+      <main className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <ImageGallery
             images={(item.images || []).map((url: string) => ({
@@ -82,7 +84,7 @@ export default function InventoryItemPage() {
             <VehicleDetails item={item} />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

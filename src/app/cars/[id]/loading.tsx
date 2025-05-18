@@ -1,15 +1,16 @@
 "use client";
 
 import React from "react";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
+import { Skeleton } from "@/components/ui/skeleton";
+// import Navbar from "@/components/layout/navbar";
+// import Footer from "@/components/layout/footer";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function CarDetailLoading() {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
+      {/* <Navbar /> */}
+      <div className="container mx-auto px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
           <div className="w-12 h-12 rounded-full bg-background-secondary animate-pulse" />
           <div className="h-8 w-64 bg-background-secondary animate-pulse rounded" />
@@ -30,8 +31,8 @@ export default function CarDetailLoading() {
         <div className="flex justify-center items-center py-12">
           <LoadingSpinner />
         </div>
-      </main>
-      <Footer />
+      </div>
+      {/* <Footer /> */}
     </div>
   );
 }

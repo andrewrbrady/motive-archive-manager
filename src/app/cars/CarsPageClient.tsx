@@ -2,9 +2,7 @@
 
 import React from "react";
 import Pagination from "@/components/Pagination";
-import Navbar from "@/components/layout/navbar";
 import CarFiltersSection from "@/components/cars/CarFiltersSection";
-import Footer from "@/components/layout/footer";
 import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import EditModeToggle from "@/components/cars/EditModeToggle";
@@ -100,9 +98,8 @@ export default function CarsPageClient({
   }).toString();
 
   return (
-    <div className="flex flex-col min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
-      <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
           <PageTitle title="Cars Collection" count={totalCount}>
             <div className="flex items-center gap-4 ml-auto">
@@ -149,7 +146,6 @@ export default function CarsPageClient({
           />
         </div>
       </main>
-      <Footer />
     </div>
   );
 }

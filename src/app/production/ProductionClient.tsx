@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
+// import Navbar from "@/components/layout/navbar"; // Removed Navbar import
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -262,63 +261,59 @@ export default function ProductionClient() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <PageTitle title="Production" />
+      {/* <Navbar /> */} {/* Removed Navbar component */}
+      <div className="space-y-6">
+        <PageTitle title="Production" />
 
-          <CustomTabs
-            items={[
-              {
-                value: "shot-lists",
-                label: "Shot List Templates",
-                content: (
-                  <ShotListTemplatesTab
-                    shouldCreateTemplate={shouldCreateShotListTemplate}
-                  />
-                ),
-              },
-              {
-                value: "scripts",
-                label: "Script Templates",
-                content: (
-                  <ScriptTemplatesTab
-                    shouldCreateTemplate={shouldCreateScriptTemplate}
-                  />
-                ),
-              },
-              {
-                value: "raw-assets",
-                label: "Raw Assets",
-                content: <RawAssetsTab />,
-              },
-              {
-                value: "upcoming",
-                label: "Upcoming Productions",
-                content: (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Upcoming productions feature coming soon
-                  </div>
-                ),
-              },
-              {
-                value: "studio-inventory",
-                label: "Studio Inventory",
-                content: <StudioInventoryTab />,
-              },
-              {
-                value: "hard-drives",
-                label: "Hard Drives",
-                content: <HardDrivesTab />,
-              },
-            ]}
-            defaultValue={activeTab}
-            basePath="/production"
-          />
-        </div>
-      </main>
-      <Footer />
-
+        <CustomTabs
+          items={[
+            {
+              value: "shot-lists",
+              label: "Shot List Templates",
+              content: (
+                <ShotListTemplatesTab
+                  shouldCreateTemplate={shouldCreateShotListTemplate}
+                />
+              ),
+            },
+            {
+              value: "scripts",
+              label: "Script Templates",
+              content: (
+                <ScriptTemplatesTab
+                  shouldCreateTemplate={shouldCreateScriptTemplate}
+                />
+              ),
+            },
+            {
+              value: "raw-assets",
+              label: "Raw Assets",
+              content: <RawAssetsTab />,
+            },
+            {
+              value: "upcoming",
+              label: "Upcoming Productions",
+              content: (
+                <div className="text-center py-12 text-muted-foreground">
+                  Upcoming productions feature coming soon
+                </div>
+              ),
+            },
+            {
+              value: "studio-inventory",
+              label: "Studio Inventory",
+              content: <StudioInventoryTab />,
+            },
+            {
+              value: "hard-drives",
+              label: "Hard Drives",
+              content: <HardDrivesTab />,
+            },
+          ]}
+          defaultValue={activeTab}
+          basePath="/production"
+        />
+      </div>
       {/* Template selection modal */}
       <NewTemplateModal
         open={showNewTemplateModal}

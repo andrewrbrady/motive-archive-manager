@@ -1,8 +1,8 @@
 import React from "react";
 import { Metadata } from "next";
-import Navbar from "@/components/layout/navbar";
+// import Navbar from "@/components/layout/navbar";
+// import Footer from "@/components/layout/footer";
 import { AuthGuard } from "@/components/auth/AuthGuard";
-import Footer from "@/components/layout/footer";
 
 export const metadata: Metadata = {
   title: "Schedule | Motive Archive",
@@ -16,13 +16,11 @@ export default function ScheduleLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="relative min-h-screen bg-background">
-        <Navbar />
-        <main className="container relative mx-auto px-4 pt-20 pb-16">
-          {children}
-        </main>
-        <Footer />
+      {/* <Navbar /> */}
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">{children}</main>
       </div>
+      {/* <Footer /> */}
     </AuthGuard>
   );
 }

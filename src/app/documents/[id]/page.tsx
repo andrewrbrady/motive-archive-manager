@@ -1,8 +1,7 @@
-// app/receipts/[id]/page.tsx
+import React from "react";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { format } from "date-fns";
-import Navbar from "@/components/layout/navbar";
 
 interface ReceiptItem {
   name: string;
@@ -33,9 +32,8 @@ export default async function ReceiptPage(props: any) {
   const receipt = await getReceipt(props.params.id);
 
   return (
-    <>
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-6">
           Receipt - {receipt.merchant.name}
         </h1>
@@ -123,7 +121,7 @@ export default async function ReceiptPage(props: any) {
             </section>
           </div>
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 }

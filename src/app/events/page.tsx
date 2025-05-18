@@ -22,8 +22,6 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
 import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
@@ -156,8 +154,7 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
-      <Navbar />
+    <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -317,7 +314,6 @@ export default function EventsPage() {
           )}
         </div>
       </main>
-      <Footer />
     </div>
   );
 }

@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2, MapPin } from "lucide-react";
@@ -16,12 +14,12 @@ import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterContainer } from "@/components/ui/FilterContainer";
 import { ListContainer } from "@/components/ui/ListContainer";
 
-export interface LocationsClientProps {
-  hideNavbar?: boolean;
+interface LocationsClientProps {
+  initialLocations?: Location[];
 }
 
 export default function LocationsClient({
-  hideNavbar = false,
+  initialLocations,
 }: LocationsClientProps) {
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<
@@ -226,17 +224,9 @@ export default function LocationsClient({
     </div>
   );
 
-  // If hideNavbar is true, return just the content
-  if (hideNavbar) {
-    return content;
-  }
-
-  // Otherwise return the full page with navbar and footer
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <main className="container mx-auto px-4 py-8">{content}</main>
-      <Footer />
     </div>
   );
 }

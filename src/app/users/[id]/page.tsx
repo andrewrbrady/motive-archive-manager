@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Navbar from "@/components/layout/navbar";
+import { UserDetails } from "@/components/users/UserDetails";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -71,8 +71,7 @@ export default function UserDashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container mx-auto py-8">
+        <div className="container mx-auto px-4 py-8 flex justify-center items-center">
           <div className="animate-pulse text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
             Loading user data...
           </div>
@@ -84,8 +83,7 @@ export default function UserDashboard() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container mx-auto py-8">
+        <div className="container mx-auto px-4 py-8">
           <div className="text-destructive-500">User not found</div>
         </div>
       </div>
@@ -94,8 +92,7 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="container mx-auto py-8">
+      <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
           {/* User Profile Card */}
           <Card>
@@ -212,7 +209,7 @@ export default function UserDashboard() {
             className="space-y-4"
           />
         </div>
-      </div>
+      </main>
     </div>
   );
 }

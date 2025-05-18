@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import { Make } from "@/lib/fetchMakes";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
+import { DataTable } from "@/components/ui/data-table";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -77,9 +76,8 @@ export default function MakesPageClient({
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[hsl(var(--background))] dark:bg-[var(--background-primary)]">
-      <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           <PageTitle title="Makes Management">
             <Button
@@ -127,7 +125,6 @@ export default function MakesPageClient({
           </div>
         </div>
       </main>
-      <Footer />
 
       <NewMakeDialog
         open={isNewMakeDialogOpen}

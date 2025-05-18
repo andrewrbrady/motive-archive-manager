@@ -1,13 +1,13 @@
 "use client";
 
+import React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/layout/navbar";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import CarEntryForm from "@/components/cars/CarEntryForm";
 import { Car } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import type { CarFormData } from "@/components/cars/CarEntryForm";
-import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export default function NewCarPage() {
   const router = useRouter();
@@ -41,8 +41,7 @@ export default function NewCarPage() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="container mx-auto px-4 pt-8 pb-16">
+        <main className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto">
             <PageTitle title="Add New Car" className="mb-8" />
             <CarEntryForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />

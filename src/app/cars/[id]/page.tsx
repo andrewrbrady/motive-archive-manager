@@ -6,7 +6,7 @@ import React, {
   useTransition as useReactTransition,
 } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Navbar from "@/components/layout/navbar";
+// import Navbar from "@/components/layout/navbar"; // Removed Navbar import
 import { PageTitle } from "@/components/ui/PageTitle";
 import { CarAvatar } from "@/components/ui/CarAvatar";
 import SpecificationsStandalone from "@/components/cars/SpecificationsStandalone";
@@ -111,7 +111,7 @@ export default function CarPage() {
   return (
     <AuthGuard>
       <div className="flex flex-col min-h-screen bg-background">
-        <Navbar />
+        {/* <Navbar /> */} {/* Removed Navbar component */}
         <main className="flex-grow container mx-auto px-4 py-8">
           {error ? (
             <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
@@ -208,7 +208,6 @@ export default function CarPage() {
             </>
           )}
         </main>
-
         {/* Sticky header for primary image and car title when scrolling */}
         {car && !isLoading && (
           <div

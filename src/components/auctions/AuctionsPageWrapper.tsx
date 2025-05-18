@@ -2,7 +2,8 @@
 
 import React from "react";
 import MarketTabs from "@/components/market/MarketTabs";
-import Navbar from "@/components/layout/navbar";
+import { PageTitle } from "@/components/ui/PageTitle";
+import { Separator } from "@/components/ui/separator";
 import { usePathname } from "next/navigation";
 
 export default function AuctionsPageWrapper({
@@ -15,7 +16,6 @@ export default function AuctionsPageWrapper({
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <main className="container mx-auto px-4 py-8">
         {showTabs && <MarketTabs />}
         {children}

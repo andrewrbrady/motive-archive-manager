@@ -1,6 +1,7 @@
 import React from "react";
+// import Navbar from "@/components/layout/navbar";
+// import Footer from "@/components/layout/footer";
 import { Metadata } from "next";
-import Navbar from "@/components/layout/navbar";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export const metadata: Metadata = {
@@ -15,10 +16,8 @@ export default function CarsLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="container mx-auto px-4 py-4 pt-20">{children}</main>
-      </div>
+      <div className="min-h-screen bg-background">{children}</div>
+      {/* <Footer /> */}
     </AuthGuard>
   );
 }

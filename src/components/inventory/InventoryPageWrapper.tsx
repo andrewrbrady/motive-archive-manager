@@ -2,8 +2,9 @@
 
 import React from "react";
 import MarketTabs from "@/components/market/MarketTabs";
-import Navbar from "@/components/layout/navbar";
 import { usePathname } from "next/navigation";
+import { PageTitle } from "@/components/ui/PageTitle";
+import Footer from "@/components/layout/footer";
 
 export default function InventoryPageWrapper({
   children,
@@ -15,11 +16,12 @@ export default function InventoryPageWrapper({
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {/* <Navbar /> */}
       <main className="container mx-auto px-4 py-8">
         {showTabs && <MarketTabs />}
         {children}
       </main>
+      <Footer />
     </div>
   );
 }

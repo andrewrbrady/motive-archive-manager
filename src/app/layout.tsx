@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "./providers";
 import Script from "next/script";
 import { cn } from "@/lib/utils";
+import Navbar from "@/components/layout/navbar";
+import Footer from "@/components/layout/footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,7 +42,9 @@ export default function RootLayout({
         )}
       >
         <Providers>
-          {children}
+          <Navbar />
+          <main className="flex-grow pt-20">{children}</main>
+          <Footer />
           <Toaster />
         </Providers>
       </body>

@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import AdminTabs from "./AdminTabs";
 import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { AdminGuard } from "@/components/auth/AuthGuard";
 
@@ -21,7 +20,6 @@ export default function AdminPage() {
             <AdminTabs />
           </div>
         </main>
-        <Footer />
       </div>
     </AdminGuard>
   );

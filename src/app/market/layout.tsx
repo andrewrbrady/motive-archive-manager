@@ -1,5 +1,7 @@
+import React from "react";
 import type { Metadata } from "next";
-import Navbar from "@/components/layout/navbar";
+// import Navbar from "@/components/layout/navbar";
+// import Footer from "@/components/layout/footer";
 import MarketTabs from "@/components/market/MarketTabs";
 
 export const metadata: Metadata = {
@@ -14,11 +16,12 @@ export default function MarketLayout({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {/* <Navbar /> */}
       <main className="container mx-auto px-4 py-8">
         <MarketTabs />
         {children}
       </main>
+      {/* <Footer /> */}
     </div>
   );
 }

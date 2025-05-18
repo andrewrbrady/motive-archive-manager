@@ -11,10 +11,11 @@ import {
   transformInventoryItem,
   InventoryItemRaw,
 } from "@/components/inventory/types";
-import Footer from "@/components/layout/footer";
 import FiltersSection from "@/components/inventory/FiltersSection";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
+import InventoryTable from "@/components/inventory/InventoryTable";
+import MarketTabs from "@/components/market/MarketTabs";
 
 // Update the InventoryPageProps interface to include tab
 interface ExtendedInventoryPageProps extends InventoryPageProps {
