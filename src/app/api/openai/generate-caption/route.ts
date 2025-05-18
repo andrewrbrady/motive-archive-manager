@@ -52,19 +52,6 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    console.log("Caption Generation Input:");
-    console.log("------------------------");
-    console.log("Car Details:", carDetails);
-    console.log("Description:", carDetails.description);
-    console.log("Formatted Specs:", specs);
-    console.log("Template:", template);
-    console.log("Platform:", platform);
-    console.log("Tone:", tone);
-    console.log("Style:", style);
-    console.log("Length:", length);
-    console.log("Temperature:", temperature);
-    console.log("------------------------");
-
     // Get platform-specific guidelines
     const guidelines =
       CAPTION_GUIDELINES[platform as keyof typeof CAPTION_GUIDELINES];

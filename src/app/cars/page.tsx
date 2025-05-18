@@ -85,24 +85,6 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       throw new Error("Invalid response data from cars API");
     }
 
-    // Debug the first car's image data
-    if (data.cars.length > 0) {
-      const firstCar = data.cars[0];
-      console.log("DEBUG: First car image data:", {
-        carId: firstCar._id,
-        imagesType: firstCar.images
-          ? Array.isArray(firstCar.images)
-            ? "array"
-            : "object"
-          : "undefined",
-        hasImageIds: Boolean(firstCar.imageIds?.length),
-        imagesCount: firstCar.images?.length || 0,
-        sampleImage: firstCar.images?.length
-          ? `URL: ${firstCar.images[0].url.substring(0, 50)}...`
-          : "None",
-      });
-    }
-
     return {
       cars: data.cars as Car[],
       totalPages: data.pagination.totalPages,
