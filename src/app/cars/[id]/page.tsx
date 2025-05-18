@@ -91,18 +91,10 @@ export default function CarPage() {
         : "gallery")
   );
   const [car, setCar] = useState<ExtendedCar | null>(null);
-  const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [uploadingImages, setUploadingImages] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
-  const [additionalContext, setAdditionalContext] = useState("");
-  const [imagesLoading, setImagesLoading] = useState(true);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isPending, startTransition] = useReactTransition();
-  const [uploadedImages, setUploadedImages] = useState<UploadedImageData[]>([]);
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   // All useEffect declarations at the top level
   useEffect(() => {
@@ -147,24 +139,6 @@ export default function CarPage() {
   }, [id]);
 
   useEffect(() => {
-    const prefetchRelatedData = async () => {
-      if (!id) return;
-      try {
-        const [docsResponse] = await Promise.all([
-          fetch(`/api/cars/${id}/documents`),
-        ]);
-        if (docsResponse.ok) {
-          const docsData = await docsResponse.json();
-          setDocuments(docsData);
-        }
-      } catch (error) {
-        console.error("Error fetching related data:", error);
-      }
-    };
-    prefetchRelatedData();
-  }, [id]);
-
-  useEffect(() => {
     const handleScroll = () => {
       setHasScrolled(window.scrollY > 0);
     };
@@ -177,42 +151,11 @@ export default function CarPage() {
     // Additional car-related effects
   }, [car]);
 
-  useEffect(() => {
-    const handleImageUploadComplete = () => {
-      setUploadingImages(false);
-      setUploadProgress([]);
-    };
-    window.addEventListener("imageUploadComplete", handleImageUploadComplete);
-    return () =>
-      window.removeEventListener(
-        "imageUploadComplete",
-        handleImageUploadComplete
-      );
-  }, []);
-
   // Return early if no ID
   if (!id) {
     router.push("/cars");
     return null;
   }
-
-  // Define all handler functions after hooks and early return
-  const handleImageUpload = async (files: FileList) => {
-    if (!files.length) return;
-    try {
-      setUploadingImages(true);
-      // ... rest of the upload logic ...
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      toast({
-        title: "Error",
-        description: "Failed to upload images",
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingImages(false);
-    }
-  };
 
   return (
     <AuthGuard>
