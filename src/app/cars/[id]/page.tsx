@@ -32,7 +32,6 @@ import BaTListingGenerator from "@/components/BaTListingGenerator";
 import { toast } from "@/components/ui/use-toast";
 import ResearchFiles from "@/components/ResearchFiles";
 import DocumentationFiles from "@/components/DocumentationFiles";
-import Specifications from "@/components/cars/Specifications";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
@@ -69,27 +68,10 @@ import {
 } from "@/components/ui/tooltip";
 import { StatusNotification } from "@/components/StatusNotification";
 import { AuthGuard } from "@/components/auth/AuthGuard";
-import {
-  isString,
-  isMeasurementValue,
-  handleDimensions,
-  handleInteriorFeatures,
-  handleTransmission,
-  isStringField,
-  handleNestedPath,
-  toCarFormData,
-  toBaseMileage,
-  fromCarFormData,
-  toBaTCarDetails,
-  formatMeasurement,
-  formatMileage,
-  formatPower,
-  formatTorque,
-  formatAddress,
-  generateCarTitle,
-} from "@/utils/car-helpers";
+import { generateCarTitle } from "@/utils/car-helpers";
 import { CarAvatar } from "@/components/ui/CarAvatar";
 import { FileInfoDisplay } from "@/components/ui/FileInfoDisplay";
+import SpecificationsStandalone from "@/components/cars/SpecificationsStandalone";
 
 interface PageParams {
   id: string;
@@ -112,10 +94,6 @@ export default function CarPage() {
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [isSpecsEditMode, setIsSpecsEditMode] = useState(false);
-  const [isSpecsSaving, setIsSpecsSaving] = useState(false);
-  const [editedSpecs, setEditedSpecs] = useState<EditableSpecs | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [additionalContext, setAdditionalContext] = useState("");
@@ -133,16 +111,6 @@ export default function CarPage() {
       return;
     }
   }, [id, router]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsEditMode(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   useEffect(() => {
     const refreshCarData = async () => {
@@ -246,106 +214,6 @@ export default function CarPage() {
     }
   };
 
-  const handleSpecsEdit = async (editedSpecs: ExtendedCar) => {
-    try {
-      const response = await fetch(`/api/cars/${params.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(editedSpecs),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update specifications");
-      }
-
-      await refreshCarData();
-      setIsSpecsEditMode(false);
-      toast({
-        title: "Success",
-        description: "Car specifications updated successfully",
-      });
-    } catch (error) {
-      console.error("Error updating specifications:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update specifications",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleInputChange = (
-    field: string,
-    value: any,
-    nestedField?: string
-  ) => {
-    setEditedSpecs((prev: any) => ({
-      ...prev,
-      [field]: nestedField ? { ...prev[field], [nestedField]: value } : value,
-    }));
-  };
-
-  const handleMeasurementChange = (
-    field: string,
-    value: any,
-    nestedField?: string
-  ) => {
-    handleInputChange(field, value, nestedField);
-  };
-
-  const handlePowerChange = (value: MeasurementValue) => {
-    const hp = value.value || 0;
-    const kW = Math.round(hp * 0.7457);
-    const ps = Math.round(hp * 1.014);
-
-    setEditedSpecs((prev: any) => ({
-      ...prev,
-      engine: {
-        ...prev.engine,
-        power: { hp, kW, ps },
-      },
-    }));
-  };
-
-  const handleTorqueChange = (value: MeasurementValue) => {
-    const isLbFt = value.unit === "lb-ft";
-    const lbFt = isLbFt
-      ? value.value || 0
-      : Math.round((value.value || 0) * 0.7376);
-    const Nm = isLbFt
-      ? Math.round((value.value || 0) * 1.3558)
-      : value.value || 0;
-
-    setEditedSpecs((prev: any) => ({
-      ...prev,
-      engine: {
-        ...prev.engine,
-        torque: { "lb-ft": lbFt, Nm },
-      },
-    }));
-  };
-
-  const refreshCarData = async () => {
-    try {
-      const response = await fetch(`/api/cars/${params.id}`);
-      if (!response.ok) {
-        throw new Error("Failed to refresh car data");
-      }
-      const data = await response.json();
-      // Update your car state here
-      setCar(data);
-    } catch (error) {
-      console.error("Error refreshing car data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh car data",
-        variant: "destructive",
-      });
-    }
-  };
-
   return (
     <AuthGuard>
       <div className="flex flex-col min-h-screen bg-background">
@@ -401,29 +269,7 @@ export default function CarPage() {
                   {
                     value: "specs",
                     label: "Specifications",
-                    content: car ? (
-                      <Specifications
-                        car={toCarFormData(car)}
-                        isEditMode={isSpecsEditMode}
-                        onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
-                        onSave={async (editedSpecs) => {
-                          await handleSpecsEdit(editedSpecs as ExtendedCar);
-                        }}
-                        onCancel={() => setIsSpecsEditMode(false)}
-                        onRefresh={refreshCarData}
-                        editedSpecs={editedSpecs}
-                        onInputChange={(field, value, nestedField) =>
-                          handleInputChange(field, value, nestedField)
-                        }
-                        onMeasurementChange={handleMeasurementChange}
-                        onPowerChange={handlePowerChange}
-                        onTorqueChange={handleTorqueChange}
-                      />
-                    ) : (
-                      <div className="py-8 text-center text-muted-foreground">
-                        Loading specifications...
-                      </div>
-                    ),
+                    content: <SpecificationsStandalone carId={id} />,
                   },
                   {
                     value: "shoots",
@@ -519,11 +365,7 @@ export default function CarPage() {
                     value: "article",
                     label: "Article",
                     content: car ? (
-                      <ArticleGenerator
-                        car={
-                          fromCarFormData(toCarFormData(car), car) as BaseCar
-                        }
-                      />
+                      <ArticleGenerator car={car as BaseCar} />
                     ) : (
                       <div className="py-8 text-center text-muted-foreground">
                         Loading article generator...
