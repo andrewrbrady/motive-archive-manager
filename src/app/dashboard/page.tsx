@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Link from "next/link";
 
 interface DeliverableResponse {
   deliverables: (Deliverable & { car?: Car })[];
@@ -212,17 +213,13 @@ function DashboardInner() {
                       {/* Car Header */}
                       <div className="py-3 px-3 border-b border-border">
                         <div className="flex items-center gap-3">
-                          <CarAvatar
-                            primaryImageId={car.primaryImageId}
-                            alt={`${car.year} ${car.make} ${car.model}`}
-                            size="md"
-                            showTooltip
-                            tooltipContent={
-                              <p>
-                                {car.year} {car.make} {car.model}
-                              </p>
-                            }
-                          />
+                          <Link href={`/cars/${car.id}`}>
+                            <CarAvatar
+                              primaryImageId={car.primaryImageId}
+                              entityName={`${car.year} ${car.make} ${car.model}`}
+                              size="md"
+                            />
+                          </Link>
                           <div>
                             <p className="text-base font-medium">
                               {car.year} {car.make} {car.model}
@@ -315,17 +312,13 @@ function DashboardInner() {
                       {/* Car Header */}
                       <div className="py-3 px-3 border-b border-border">
                         <div className="flex items-center gap-3">
-                          <CarAvatar
-                            primaryImageId={car.primaryImageId}
-                            alt={`${car.year} ${car.make} ${car.model}`}
-                            size="md"
-                            showTooltip
-                            tooltipContent={
-                              <p>
-                                {car.year} {car.make} {car.model}
-                              </p>
-                            }
-                          />
+                          <Link href={`/cars/${car.id}`}>
+                            <CarAvatar
+                              primaryImageId={car.primaryImageId}
+                              entityName={`${car.year} ${car.make} ${car.model}`}
+                              size="md"
+                            />
+                          </Link>
                           <div>
                             <p className="text-base font-medium">
                               {car.year} {car.make} {car.model}
