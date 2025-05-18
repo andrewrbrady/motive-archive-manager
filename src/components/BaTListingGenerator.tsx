@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { RefreshCw, Copy, Check, Pencil, Trash2, X } from "lucide-react";
+import type { BaTCarDetails } from "@/types/car-page";
 
 type ListingFocus = "mechanical" | "cosmetic" | "historical" | "comprehensive";
 type Style = "factual" | "storytelling" | "technical";
@@ -18,38 +19,7 @@ type Tone = "enthusiastic" | "professional" | "casual" | "formal";
 type Length = "concise" | "standard" | "detailed" | "comprehensive";
 
 interface BaTListingGeneratorProps {
-  carDetails: {
-    _id: string;
-    year: number;
-    make: string;
-    model: string;
-    color?: string;
-    mileage?: {
-      value: number;
-      unit: string;
-    };
-    engine?: {
-      type?: string;
-      displacement?: {
-        value: number;
-        unit: string;
-      };
-      power?: {
-        hp?: number;
-      };
-    };
-    transmission?: {
-      type: string;
-    };
-    vin?: string;
-    condition?: string;
-    interior_color?: string;
-    interior_features?: {
-      seats: number;
-      upholstery?: string;
-    };
-    description?: string;
-  };
+  carId: string;
 }
 
 interface SavedBaTListing {
@@ -72,8 +42,11 @@ interface SavedBaTListing {
 }
 
 export default function BaTListingGenerator({
-  carDetails,
+  carId,
 }: BaTListingGeneratorProps) {
+  const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
+  const [carLoading, setCarLoading] = useState(true);
+  const [carError, setCarError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedListing, setGeneratedListing] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -89,8 +62,30 @@ export default function BaTListingGenerator({
   const [editingText, setEditingText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch saved listings when component mounts
+  // Fetch car details when carId changes
   useEffect(() => {
+    const fetchCarDetails = async () => {
+      setCarLoading(true);
+      setCarError(null);
+      try {
+        const response = await fetch(`/api/cars/${carId}`);
+        if (!response.ok) throw new Error("Failed to fetch car details");
+        const data = await response.json();
+        setCarDetails(data);
+      } catch (err) {
+        setCarError(
+          err instanceof Error ? err.message : "Failed to fetch car details"
+        );
+      } finally {
+        setCarLoading(false);
+      }
+    };
+    fetchCarDetails();
+  }, [carId]);
+
+  // Fetch saved listings when carDetails is loaded
+  useEffect(() => {
+    if (!carDetails) return;
     const fetchListings = async () => {
       try {
         const response = await fetch(
@@ -105,9 +100,8 @@ export default function BaTListingGenerator({
         console.error("Error fetching listings:", err);
       }
     };
-
     fetchListings();
-  }, [carDetails._id]);
+  }, [carDetails]);
 
   // Add new useEffect for textarea height adjustment
   useEffect(() => {
@@ -118,9 +112,9 @@ export default function BaTListingGenerator({
   }, [editingText, editingListingId]);
 
   const handleGenerate = async () => {
+    if (!carDetails) return;
     setIsGenerating(true);
     setError(null);
-
     try {
       const response = await fetch("/api/openai/generate-bat-listing", {
         method: "POST",
@@ -137,11 +131,9 @@ export default function BaTListingGenerator({
           additionalContext,
         }),
       });
-
       if (!response.ok) {
         throw new Error("Failed to generate BaT listing");
       }
-
       const data = await response.json();
       setGeneratedListing(data.listing);
     } catch (err) {
@@ -162,6 +154,7 @@ export default function BaTListingGenerator({
   };
 
   const handleSave = async () => {
+    if (!carDetails) return;
     try {
       const response = await fetch("/api/bat-listings", {
         method: "POST",
@@ -185,14 +178,12 @@ export default function BaTListingGenerator({
           },
         }),
       });
-
       if (!response.ok) {
         throw new Error("Failed to save listing");
       }
-
       const savedListing = await response.json();
       setSavedListings((prev) => [savedListing, ...prev]);
-      setGeneratedListing(""); // Clear the generated listing since it's now saved
+      setGeneratedListing("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save listing");
     }
@@ -249,6 +240,22 @@ export default function BaTListingGenerator({
     setEditingListingId(null);
     setEditingText("");
   };
+
+  if (carLoading) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        Loading BaT listing...
+      </div>
+    );
+  }
+  if (carError) {
+    return (
+      <div className="py-8 text-center text-destructive-500">{carError}</div>
+    );
+  }
+  if (!carDetails) {
+    return null;
+  }
 
   return (
     <div className="space-y-3">
@@ -456,7 +463,9 @@ export default function BaTListingGenerator({
         </Button>
 
         {error && (
-          <p className="text-sm text-destructive-500 dark:text-destructive-400">{error}</p>
+          <p className="text-sm text-destructive-500 dark:text-destructive-400">
+            {error}
+          </p>
         )}
 
         {generatedListing && (

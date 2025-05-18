@@ -11,12 +11,9 @@ import {
 import type { CarImage } from "@/types/car";
 
 interface CarAvatarProps {
-  images?: CarImage[];
   primaryImageId?: string | ObjectId;
-  alt: string;
+  entityName: string;
   size?: "sm" | "md" | "lg";
-  showTooltip?: boolean;
-  tooltipContent?: React.ReactNode;
   className?: string;
 }
 
@@ -27,12 +24,9 @@ const sizeClasses = {
 };
 
 export function CarAvatar({
-  images,
   primaryImageId,
-  alt,
+  entityName,
   size = "md",
-  showTooltip = false,
-  tooltipContent,
   className,
 }: CarAvatarProps) {
   const [imageError, setImageError] = React.useState(false);
@@ -92,6 +86,10 @@ export function CarAvatar({
     }
   }, []);
 
+  const resolvedTooltipContent = primaryImageId
+    ? `Primary image for ${entityName}`
+    : `No primary image selected for ${entityName}`;
+
   const avatar = React.useMemo(
     () => (
       <div
@@ -104,7 +102,7 @@ export function CarAvatar({
         {imageUrl && !imageError ? (
           <img
             src={imageUrl}
-            alt={alt}
+            alt={`Avatar for ${entityName}`}
             className="w-full h-full object-cover"
             onError={handleImageError}
           />
@@ -115,19 +113,15 @@ export function CarAvatar({
         )}
       </div>
     ),
-    [imageUrl, imageError, size, className, alt, handleImageError]
+    [imageUrl, imageError, size, className, entityName, handleImageError]
   );
 
-  if (showTooltip) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>{avatar}</TooltipTrigger>
-          <TooltipContent>{tooltipContent || <p>{alt}</p>}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  return avatar;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{avatar}</TooltipTrigger>
+        <TooltipContent>{resolvedTooltipContent}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }

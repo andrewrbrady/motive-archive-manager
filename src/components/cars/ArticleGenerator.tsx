@@ -48,10 +48,13 @@ interface SavedArticle {
 }
 
 interface ArticleGeneratorProps {
-  car: Car;
+  carId: string;
 }
 
-export function ArticleGenerator({ car }: ArticleGeneratorProps) {
+export function ArticleGenerator({ carId }: ArticleGeneratorProps) {
+  const [car, setCar] = useState<Car | null>(null);
+  const [carLoading, setCarLoading] = useState(true);
+  const [carError, setCarError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<ArticleMetadata | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +144,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
         currentStage: metadata?.currentStage,
       });
 
-      const response = await fetch(`/api/cars/${car._id}/article`, {
+      const response = await fetch(`/api/cars/${carId}/article`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -288,7 +291,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
         throw new Error("No content available to save");
       }
 
-      const response = await fetch(`/api/cars/${car._id}/article/save`, {
+      const response = await fetch(`/api/cars/${carId}/article/save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -308,7 +311,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
       }
 
       // Refresh saved articles list
-      const savedResponse = await fetch(`/api/cars/${car._id}/article/saved`);
+      const savedResponse = await fetch(`/api/cars/${carId}/article/saved`);
       if (!savedResponse.ok) {
         throw new Error("Failed to refresh saved articles");
       }
@@ -327,7 +330,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
   const fetchSavedArticles = async () => {
     try {
       setIsFetchingSaved(true);
-      const response = await fetch(`/api/cars/${car._id}/article/saved`);
+      const response = await fetch(`/api/cars/${carId}/article/saved`);
       if (!response.ok) {
         throw new Error("Failed to fetch saved articles");
       }
@@ -345,7 +348,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
     const fetchInitialData = async () => {
       setIsFetchingSaved(true);
       try {
-        const response = await fetch(`/api/cars/${car._id}/article/saved`);
+        const response = await fetch(`/api/cars/${carId}/article/saved`);
         if (!response.ok) {
           throw new Error("Failed to fetch saved articles");
         }
@@ -360,7 +363,27 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
     };
 
     fetchInitialData();
-  }, [car._id]);
+  }, [carId]);
+
+  useEffect(() => {
+    const fetchCarDetails = async () => {
+      setCarLoading(true);
+      setCarError(null);
+      try {
+        const response = await fetch(`/api/cars/${carId}`);
+        if (!response.ok) throw new Error("Failed to fetch car details");
+        const data = await response.json();
+        setCar(data);
+      } catch (err) {
+        setCarError(
+          err instanceof Error ? err.message : "Failed to fetch car details"
+        );
+      } finally {
+        setCarLoading(false);
+      }
+    };
+    fetchCarDetails();
+  }, [carId]);
 
   const handleViewSaved = (article: SavedArticle) => {
     setSelectedSavedArticle(article);
@@ -379,7 +402,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
 
     try {
       const response = await fetch(
-        `/api/cars/${car._id}/article/saved/${article.metadata.sessionId}`,
+        `/api/cars/${carId}/article/saved/${article.metadata.sessionId}`,
         {
           method: "DELETE",
         }
@@ -390,7 +413,7 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
       }
 
       // Refresh saved articles list
-      const savedResponse = await fetch(`/api/cars/${car._id}/article/saved`);
+      const savedResponse = await fetch(`/api/cars/${carId}/article/saved`);
       if (!savedResponse.ok) {
         throw new Error("Failed to refresh saved articles");
       }
@@ -414,6 +437,22 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
       );
     }
   };
+
+  if (carLoading) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        Loading article generator...
+      </div>
+    );
+  }
+  if (carError) {
+    return (
+      <div className="py-8 text-center text-destructive-500">{carError}</div>
+    );
+  }
+  if (!car) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
@@ -531,8 +570,8 @@ export function ArticleGenerator({ car }: ArticleGeneratorProps) {
                           selectedSavedArticle.createdAt
                         ).getTime()}.md`
                       : metadata?.sessionId
-                      ? `${metadata.currentStage}-stage-${metadata.sessionId}.md`
-                      : "article.md"
+                        ? `${metadata.currentStage}-stage-${metadata.sessionId}.md`
+                        : "article.md"
                   }
                 />
               </div>

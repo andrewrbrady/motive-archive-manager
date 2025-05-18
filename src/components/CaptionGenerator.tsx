@@ -24,6 +24,7 @@ import {
   getRandomQuestion,
   formatQuestion,
 } from "@/constants/question-examples";
+import type { BaTCarDetails } from "@/types/car-page";
 
 type Platform = "instagram" | "youtube";
 type Template = "none" | "bat" | "dealer" | "question";
@@ -38,31 +39,10 @@ const TEMPLATE_CONTEXTS = {
 };
 
 interface CaptionGeneratorProps {
-  carDetails: {
-    _id: string;
-    year: number;
-    make: string;
-    model: string;
-    color?: string;
-    engine?: {
-      type?: string;
-      power?: {
-        hp?: number;
-      };
-    };
-    mileage?: {
-      value: number;
-      unit: string;
-    };
-    type?: string;
-    client?: string;
-    description: string;
-  };
+  carId: string;
 }
 
-const generateQuestion = async (
-  carDetails: CaptionGeneratorProps["carDetails"]
-) => {
+const generateQuestion = async (carDetails: BaTCarDetails) => {
   // Instead of calling the API, directly use our question generator
   const randomQuestion = getRandomQuestion();
   return formatQuestion(randomQuestion, {
@@ -91,9 +71,10 @@ const fetchClientInstagram = async (clientId: string) => {
   }
 };
 
-export default function CaptionGenerator({
-  carDetails,
-}: CaptionGeneratorProps) {
+export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
+  const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
+  const [carLoading, setCarLoading] = useState(true);
+  const [carError, setCarError] = useState<string | null>(null);
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [template, setTemplate] = useState<Template>("none");
   const [context, setContext] = useState("");
@@ -117,11 +98,32 @@ export default function CaptionGenerator({
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
 
+  // Fetch car details when carId changes
+  useEffect(() => {
+    const fetchCarDetails = async () => {
+      setCarLoading(true);
+      setCarError(null);
+      try {
+        const response = await fetch(`/api/cars/${carId}`);
+        if (!response.ok) throw new Error("Failed to fetch car details");
+        const data = await response.json();
+        setCarDetails(data);
+      } catch (err) {
+        setCarError(
+          err instanceof Error ? err.message : "Failed to fetch car details"
+        );
+      } finally {
+        setCarLoading(false);
+      }
+    };
+    fetchCarDetails();
+  }, [carId]);
+
   // Fetch existing captions when component mounts
   useEffect(() => {
     const fetchCaptions = async () => {
       try {
-        const response = await fetch(`/api/captions?carId=${carDetails._id}`);
+        const response = await fetch(`/api/captions?carId=${carId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch captions");
         }
@@ -133,7 +135,7 @@ export default function CaptionGenerator({
     };
 
     fetchCaptions();
-  }, [carDetails._id]);
+  }, [carId]);
 
   const handleGenerate = async (_captionId?: string) => {
     setIsGenerating(true);
@@ -150,15 +152,14 @@ export default function CaptionGenerator({
           platform,
           context,
           carDetails: {
-            _id: carDetails._id,
-            year: carDetails.year,
-            make: carDetails.make,
-            model: carDetails.model,
-            color: carDetails.color,
-            engine: carDetails.engine,
-            mileage: carDetails.mileage,
-            type: carDetails.type,
-            description: carDetails.description || "",
+            _id: carDetails?._id,
+            year: carDetails?.year,
+            make: carDetails?.make,
+            model: carDetails?.model,
+            color: carDetails?.color,
+            engine: carDetails?.engine,
+            mileage: carDetails?.mileage,
+            description: carDetails?.description || "",
           },
           temperature,
           tone,
@@ -216,7 +217,7 @@ export default function CaptionGenerator({
           },
           body: JSON.stringify({
             platform,
-            carId: carDetails._id,
+            carId: carDetails?._id,
             context,
             caption: data.caption,
           }),
@@ -241,36 +242,14 @@ export default function CaptionGenerator({
   const handleTemplateChange = async (value: Template) => {
     setTemplate(value);
     if (value === "question") {
-      const question = await generateQuestion(carDetails);
+      const question = await generateQuestion(carDetails!);
       setContext(question);
     } else if (value === "dealer") {
-      if (carDetails.client) {
-        const handle = await fetchClientInstagram(carDetails.client);
-        if (handle) {
-          setContext(`This car is now available from our friends at ${handle}`);
-        } else {
-          setContext("This car is now available from our friends at [DEALER]");
-        }
-      } else {
-        setContext("This car is now available from our friends at [DEALER]");
-      }
+      setContext("This car is now available from our friends at [DEALER]");
     } else if (value === "bat") {
-      if (carDetails.client) {
-        const handle = await fetchClientInstagram(carDetails.client);
-        if (handle) {
-          setContext(
-            `This car is currently live from our friends ${handle} on @bringatrailer. Follow the link in our bio to view the auction.`
-          );
-        } else {
-          setContext(
-            "This car is currently live from our friends [DEALER] on @bringatrailer. Follow the link in our bio to view the auction."
-          );
-        }
-      } else {
-        setContext(
-          "This car is currently live from our friends [DEALER] on @bringatrailer. Follow the link in our bio to view the auction."
-        );
-      }
+      setContext(
+        "This car is currently live from our friends [DEALER] on @bringatrailer. Follow the link in our bio to view the auction."
+      );
     } else {
       setContext(TEMPLATE_CONTEXTS[value]);
     }
@@ -279,7 +258,7 @@ export default function CaptionGenerator({
   const handleDelete = async (captionId: string) => {
     try {
       const response = await fetch(
-        `/api/captions?id=${captionId}&carId=${carDetails._id}`,
+        `/api/captions?id=${captionId}&carId=${carDetails?._id}`,
         {
           method: "DELETE",
         }
@@ -366,6 +345,23 @@ export default function CaptionGenerator({
     setEditingCaptionId(null);
     setEditingText("");
   };
+
+  // Show a loading or error state if car details are not loaded
+  if (carLoading) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        Loading caption generator...
+      </div>
+    );
+  }
+  if (carError) {
+    return (
+      <div className="py-8 text-center text-destructive-500">{carError}</div>
+    );
+  }
+  if (!carDetails) {
+    return null;
+  }
 
   return (
     <div className="space-y-3">
@@ -604,7 +600,9 @@ export default function CaptionGenerator({
         </Button>
 
         {error && (
-          <p className="text-sm text-destructive-500 dark:text-destructive-400">{error}</p>
+          <p className="text-sm text-destructive-500 dark:text-destructive-400">
+            {error}
+          </p>
         )}
 
         {/* Grid layout for all captions */}

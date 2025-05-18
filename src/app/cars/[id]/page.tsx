@@ -3,79 +3,30 @@
 import React, {
   useState,
   useEffect,
-  useCallback,
   useTransition as useReactTransition,
-  useRef,
 } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
-import DocumentsClient from "@/app/documents/DocumentsClient";
-import {
-  Loader2,
-  Plus,
-  Sparkles,
-  Pencil,
-  Trash2,
-  Check,
-  RefreshCw,
-  ImageIcon,
-} from "lucide-react";
-import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
-import { getUnitsForType } from "@/constants/units";
 import { PageTitle } from "@/components/ui/PageTitle";
-import Footer from "@/components/layout/footer";
-import { CarPageSkeleton } from "@/components/ui/CarPageSkeleton";
-import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
-import ImageUploadWithContext from "@/components/ImageUploadWithContext";
-import CaptionGenerator from "@/components/CaptionGenerator";
-import BaTListingGenerator from "@/components/BaTListingGenerator";
-import { toast } from "@/components/ui/use-toast";
-import ResearchFiles from "@/components/ResearchFiles";
-import DocumentationFiles from "@/components/DocumentationFiles";
-import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
-import type { Car as BaseCar, CarImage } from "@/types/car";
-import type { MeasurementValue } from "@/types/measurements";
-import type {
-  ExtendedCar,
-  CarFormData,
-  EditableSpecs,
-  UploadProgress,
-  UploadedImageData,
-  BaTCarDetails,
-  FormClientInfo,
-  ApiClientInfo,
-  ImageData,
-  Performance,
-} from "@/types/car-page";
-import { Power, Torque } from "@/types/car";
+import { CarAvatar } from "@/components/ui/CarAvatar";
+import SpecificationsStandalone from "@/components/cars/SpecificationsStandalone";
+import { CustomTabs } from "@/components/ui/custom-tabs";
+import type { ExtendedCar } from "@/types/car-page";
 import DeliverablesTab from "@/components/deliverables/DeliverablesTab";
 import EventsTab from "@/components/events/EventsTab";
-import CalendarTab from "@/components/cars/CalendarTab";
 import FullCalendarTab from "@/components/cars/FullCalendarTab";
 import ShotList from "@/components/cars/ShotList";
 import Scripts from "@/components/cars/Scripts";
 import PhotoShoots from "@/components/cars/PhotoShoots";
 import { GalleryContainer } from "@/components/cars/GalleryContainer";
-import { Button } from "@/components/ui/button";
-import Image from "next/image";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { StatusNotification } from "@/components/StatusNotification";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { generateCarTitle } from "@/utils/car-helpers";
-import { CarAvatar } from "@/components/ui/CarAvatar";
-import { FileInfoDisplay } from "@/components/ui/FileInfoDisplay";
-import SpecificationsStandalone from "@/components/cars/SpecificationsStandalone";
-
-interface PageParams {
-  id: string;
-}
+import CaptionGenerator from "@/components/CaptionGenerator";
+import BaTListingGenerator from "@/components/BaTListingGenerator";
+import ResearchFiles from "@/components/ResearchFiles";
+import DocumentationFiles from "@/components/DocumentationFiles";
+import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
+import ServiceHistoryTab from "@/components/cars/ServiceHistoryTab";
 
 export default function CarPage() {
   const params = useParams();
@@ -171,17 +122,8 @@ export default function CarPage() {
               {/* Car title and header - always show this */}
               <div className="flex items-center gap-4 mb-6">
                 <CarAvatar
-                  images={car?.images}
                   primaryImageId={car?.primaryImageId}
-                  alt={generateCarTitle(car)}
-                  showTooltip
-                  tooltipContent={
-                    <p>
-                      {car?.primaryImageId
-                        ? "Primary image"
-                        : "No primary image selected"}
-                    </p>
-                  }
+                  entityName={generateCarTitle(car)}
                 />
                 <PageTitle title={generateCarTitle(car)} className="" />
               </div>
@@ -192,22 +134,7 @@ export default function CarPage() {
                   {
                     value: "gallery",
                     label: "Image Gallery",
-                    content: (
-                      <div className="space-y-4">
-                        <div className="image-gallery-wrapper">
-                          <GalleryContainer
-                            carId={id}
-                            car={{
-                              _id: id,
-                              year: car?.year || 0,
-                              make: car?.make || "",
-                              model: car?.model || "",
-                              primaryImageId: car?.primaryImageId,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ),
+                    content: <GalleryContainer carId={id} />,
                   },
                   {
                     value: "specs",
@@ -232,67 +159,17 @@ export default function CarPage() {
                   {
                     value: "bat",
                     label: "BaT Listing",
-                    content: car ? (
-                      <BaTListingGenerator
-                        carDetails={{
-                          _id: car._id,
-                          year: car.year ?? 0,
-                          make: car.make,
-                          model: car.model,
-                          color: car.color,
-                          mileage: car.mileage
-                            ? {
-                                value: car.mileage.value || 0,
-                                unit: car.mileage.unit,
-                              }
-                            : undefined,
-                          engine: car.engine,
-                          description: car.description || "",
-                        }}
-                      />
-                    ) : (
-                      <div className="py-8 text-center text-muted-foreground">
-                        Loading BaT listing...
-                      </div>
-                    ),
+                    content: <BaTListingGenerator carId={id} />,
                   },
                   {
                     value: "captions",
                     label: "Social Media",
-                    content: car ? (
-                      <CaptionGenerator
-                        carDetails={{
-                          _id: car._id,
-                          year: car.year ?? 0,
-                          make: car.make,
-                          model: car.model,
-                          color: car.color,
-                          engine: car.engine,
-                          mileage: car.mileage
-                            ? {
-                                value: car.mileage.value || 0,
-                                unit: car.mileage.unit,
-                              }
-                            : undefined,
-                          type: car.type,
-                          client: car.client,
-                          description: car.description || "",
-                        }}
-                      />
-                    ) : (
-                      <div className="py-8 text-center text-muted-foreground">
-                        Loading caption generator...
-                      </div>
-                    ),
+                    content: <CaptionGenerator carId={id} />,
                   },
                   {
                     value: "service",
                     label: "Service History",
-                    content: (
-                      <div className="text-center py-12 text-muted-foreground">
-                        Service history coming soon
-                      </div>
-                    ),
+                    content: <ServiceHistoryTab carId={id} />,
                   },
                   {
                     value: "research",
@@ -307,13 +184,7 @@ export default function CarPage() {
                   {
                     value: "article",
                     label: "Article",
-                    content: car ? (
-                      <ArticleGenerator car={car as BaseCar} />
-                    ) : (
-                      <div className="py-8 text-center text-muted-foreground">
-                        Loading article generator...
-                      </div>
-                    ),
+                    content: <ArticleGenerator carId={id} />,
                   },
                   {
                     value: "deliverables",
@@ -350,9 +221,8 @@ export default function CarPage() {
             <div className="container mx-auto px-4">
               <div className="flex items-center gap-3">
                 <CarAvatar
-                  images={car?.images}
                   primaryImageId={car?.primaryImageId}
-                  alt={generateCarTitle(car)}
+                  entityName={generateCarTitle(car)}
                   size="sm"
                 />
                 <h1 className="text-base font-semibold text-text-primary truncate">
