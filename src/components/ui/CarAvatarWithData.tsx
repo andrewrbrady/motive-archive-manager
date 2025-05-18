@@ -68,24 +68,16 @@ export function CarAvatarWithData({
   if (error) {
     return (
       <CarAvatar
-        images={[]}
-        alt="Failed to load car"
+        entityName="Failed to load car"
         size={size}
         className={className}
-        showTooltip={showTooltip}
-        tooltipContent={<p>Error: {error}</p>}
       />
     );
   }
 
   if (!car) {
     return (
-      <CarAvatar
-        images={[]}
-        alt="Loading..."
-        size={size}
-        className={className}
-      />
+      <CarAvatar entityName="Loading..." size={size} className={className} />
     );
   }
 
@@ -93,12 +85,9 @@ export function CarAvatarWithData({
 
   return (
     <CarAvatar
-      images={primaryImage ? [primaryImage] : []}
       primaryImageId={car.primaryImageId}
-      alt={title}
+      entityName={title}
       size={size}
-      showTooltip={showTooltip}
-      tooltipContent={tooltipContent}
       className={className}
     />
   );

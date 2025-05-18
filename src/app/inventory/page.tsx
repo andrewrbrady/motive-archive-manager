@@ -14,7 +14,6 @@ import {
 import FiltersSection from "@/components/inventory/FiltersSection";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
-import InventoryTable from "@/components/inventory/InventoryTable";
 import MarketTabs from "@/components/market/MarketTabs";
 
 // Update the InventoryPageProps interface to include tab

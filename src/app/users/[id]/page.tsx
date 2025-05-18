@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { UserDetails } from "@/components/users/UserDetails";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import {
   Card,
