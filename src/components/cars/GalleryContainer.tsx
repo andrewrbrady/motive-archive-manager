@@ -153,7 +153,7 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
                 console.log("Upload complete:", data);
                 // Mark all remaining files as completed
                 files.forEach((file) => {
-                  if (fileProgressMap.get(file.name) < 100) {
+                  if ((fileProgressMap.get(file.name) ?? 0) < 100) {
                     onProgress(file, 100);
                     onSuccess(file);
                   }

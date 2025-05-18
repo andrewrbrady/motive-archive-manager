@@ -266,3 +266,62 @@ export function generateCarTitle(car: ExtendedCar | null): string {
     .filter(Boolean)
     .join(" ");
 }
+
+// Removes redundant fields from aiAnalysis and deletes it if empty
+export function cleanAiAnalysis(car: any) {
+  if (!car.aiAnalysis) return car;
+
+  // Remove redundant fields that we already have structured data for
+  const cleanedAnalysis = Object.fromEntries(
+    Object.entries(car.aiAnalysis).filter(([key]) => {
+      return (
+        !key.toLowerCase().includes("gvwr") &&
+        !key.toLowerCase().includes("weight") &&
+        !key.toLowerCase().includes("engine") &&
+        !key.toLowerCase().includes("doors") &&
+        !key.toLowerCase().includes("displacement") &&
+        !key.toLowerCase().includes("horsepower") &&
+        !key.toLowerCase().includes("tire")
+      );
+    })
+  );
+
+  // If there are no fields left, remove the aiAnalysis object entirely
+  if (Object.keys(cleanedAnalysis).length === 0) {
+    delete car.aiAnalysis;
+  } else {
+    car.aiAnalysis = cleanedAnalysis;
+  }
+
+  return car;
+}
+
+// Recursively converts MongoDB ObjectIds and arrays to plain objects/strings
+export function convertToPlainObject(doc: any): any {
+  if (doc === null || typeof doc !== "object") {
+    return doc;
+  }
+
+  // Handle MongoDB ObjectId
+  if (
+    typeof doc === "object" &&
+    doc &&
+    typeof doc.toString === "function" &&
+    doc.constructor &&
+    doc.constructor.name === "ObjectId"
+  ) {
+    return doc.toString();
+  }
+
+  if (Array.isArray(doc)) {
+    return doc.map(convertToPlainObject);
+  }
+
+  const plainObj: any = {};
+  for (const key in doc) {
+    if (Object.prototype.hasOwnProperty.call(doc, key)) {
+      plainObj[key] = convertToPlainObject(doc[key]);
+    }
+  }
+  return plainObj;
+}

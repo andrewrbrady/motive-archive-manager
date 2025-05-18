@@ -1,6 +1,8 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { ImageMetadata, getFormattedImageUrl } from "@/lib/cloudflare";
+import { StandardizedCar } from "@/types/routes/cars";
+import { cleanAiAnalysis, convertToPlainObject } from "@/utils/car-helpers";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -9,40 +11,6 @@ export const dynamic = "force-dynamic";
 
 if (!MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
-}
-
-interface StandardizedCar {
-  _id: string;
-  price: {
-    listPrice: number | null;
-    soldPrice?: number | null;
-    priceHistory: Array<{
-      type: "list" | "sold";
-      price: number | null;
-      date: string;
-      notes?: string;
-    }>;
-  };
-  year: number;
-  mileage: {
-    value: number;
-    unit: string;
-  };
-  status: string;
-  imageIds: string[];
-  images: Array<{
-    _id: string;
-    car_id: string;
-    [key: string]: any;
-  }>;
-  client: string | null;
-  clientInfo: {
-    _id: string;
-    [key: string]: any;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-  [key: string]: any;
 }
 
 interface Car {
@@ -213,10 +181,13 @@ export async function GET(request: Request) {
       pipeline.push({
         $project: {
           imageObjectIds: 0,
-          ...Object.keys(projection).reduce((acc, key) => {
-            acc[key] = 1;
-            return acc;
-          }, {} as Record<string, number>),
+          ...Object.keys(projection).reduce(
+            (acc, key) => {
+              acc[key] = 1;
+              return acc;
+            },
+            {} as Record<string, number>
+          ),
         },
       });
     }
@@ -237,15 +208,18 @@ export async function GET(request: Request) {
     const standardizedCar: StandardizedCar = {
       ...car,
       _id: car._id?.toString() || "unknown",
+      make: car.make || "Unknown",
+      model: car.model || "Unknown",
+      documents: Array.isArray(car.documents) ? car.documents : [],
       price: {
         listPrice:
           typeof car.price === "object"
             ? car.price.listPrice
             : typeof car.price === "string"
-            ? parseFloat(car.price)
-            : typeof car.price === "number"
-            ? car.price
-            : null,
+              ? parseFloat(car.price)
+              : typeof car.price === "number"
+                ? car.price
+                : null,
         soldPrice: typeof car.price === "object" ? car.price.soldPrice : null,
         priceHistory:
           typeof car.price === "object" ? car.price.priceHistory : [],
@@ -424,58 +398,6 @@ export async function DELETE(request: Request) {
       await client.close();
     }
   }
-}
-
-// Helper function to clean aiAnalysis
-function cleanAiAnalysis(car: any) {
-  if (!car.aiAnalysis) return car;
-
-  // Remove redundant fields that we already have structured data for
-  const cleanedAnalysis = Object.fromEntries(
-    Object.entries(car.aiAnalysis).filter(([key]) => {
-      return (
-        !key.toLowerCase().includes("gvwr") &&
-        !key.toLowerCase().includes("weight") &&
-        !key.toLowerCase().includes("engine") &&
-        !key.toLowerCase().includes("doors") &&
-        !key.toLowerCase().includes("displacement") &&
-        !key.toLowerCase().includes("horsepower") &&
-        !key.toLowerCase().includes("tire")
-      );
-    })
-  );
-
-  // If there are no fields left, remove the aiAnalysis object entirely
-  if (Object.keys(cleanedAnalysis).length === 0) {
-    delete car.aiAnalysis;
-  } else {
-    car.aiAnalysis = cleanedAnalysis;
-  }
-
-  return car;
-}
-
-// Helper function to convert MongoDB document to plain object
-function convertToPlainObject(doc: any): any {
-  if (doc === null || typeof doc !== "object") {
-    return doc;
-  }
-
-  if (doc instanceof ObjectId) {
-    return doc.toString();
-  }
-
-  if (Array.isArray(doc)) {
-    return doc.map(convertToPlainObject);
-  }
-
-  const plainObj: any = {};
-  for (const key in doc) {
-    if (Object.prototype.hasOwnProperty.call(doc, key)) {
-      plainObj[key] = convertToPlainObject(doc[key]);
-    }
-  }
-  return plainObj;
 }
 
 // PATCH to update car information

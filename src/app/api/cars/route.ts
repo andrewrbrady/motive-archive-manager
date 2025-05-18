@@ -8,42 +8,7 @@ import { Car as InventoryCar } from "@/types/inventory";
 import { getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
 import { MongoPipelineStage } from "@/types/mongodb";
-
-interface StandardizedCar {
-  _id: string;
-  make: string;
-  model: string;
-  price: {
-    listPrice: number | null;
-    soldPrice?: number | null;
-    priceHistory: Array<{
-      type: "list" | "sold";
-      price: number | null;
-      date: string;
-      notes?: string;
-    }>;
-  };
-  year: number;
-  mileage: {
-    value: number;
-    unit: string;
-  };
-  status: string;
-  imageIds: string[];
-  images: Array<{
-    _id: string;
-    car_id: string;
-    [key: string]: any;
-  }>;
-  client: string | null;
-  clientInfo: {
-    _id: string;
-    [key: string]: any;
-  } | null;
-  createdAt: string | Date;
-  updatedAt: string;
-  [key: string]: any;
-}
+import { StandardizedCar } from "@/types/routes/cars";
 
 export const dynamic = "force-dynamic";
 

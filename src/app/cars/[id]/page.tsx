@@ -347,232 +347,237 @@ export default function CarPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <main className="flex-grow">
-        {error ? (
-          <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
-            {error}
-          </div>
-        ) : (
-          <>
-            {/* Car title and header - always show this */}
-            <div className="flex items-center gap-4 mb-6">
-              <CarAvatar
-                images={car?.images}
-                primaryImageId={car?.primaryImageId}
-                alt={generateCarTitle(car)}
-                showTooltip
-                tooltipContent={
-                  <p>
-                    {car?.primaryImageId
-                      ? "Primary image"
-                      : "No primary image selected"}
-                  </p>
-                }
-              />
-              <PageTitle title={generateCarTitle(car)} className="" />
+    <AuthGuard>
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <main className="flex-grow container mx-auto px-4 py-8">
+          {error ? (
+            <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
+              {error}
             </div>
+          ) : (
+            <>
+              {/* Car title and header - always show this */}
+              <div className="flex items-center gap-4 mb-6">
+                <CarAvatar
+                  images={car?.images}
+                  primaryImageId={car?.primaryImageId}
+                  alt={generateCarTitle(car)}
+                  showTooltip
+                  tooltipContent={
+                    <p>
+                      {car?.primaryImageId
+                        ? "Primary image"
+                        : "No primary image selected"}
+                    </p>
+                  }
+                />
+                <PageTitle title={generateCarTitle(car)} className="" />
+              </div>
 
-            {/* Always render tabs - each tab handles its own loading state */}
-            <CustomTabs
-              items={[
-                {
-                  value: "gallery",
-                  label: "Image Gallery",
-                  content: (
-                    <div className="space-y-4">
-                      <div className="image-gallery-wrapper">
-                        <GalleryContainer
-                          carId={id}
-                          car={{
-                            _id: id,
-                            year: car?.year || 0,
-                            make: car?.make || "",
-                            model: car?.model || "",
-                            primaryImageId: car?.primaryImageId,
-                          }}
-                        />
+              {/* Always render tabs - each tab handles its own loading state */}
+              <CustomTabs
+                items={[
+                  {
+                    value: "gallery",
+                    label: "Image Gallery",
+                    content: (
+                      <div className="space-y-4">
+                        <div className="image-gallery-wrapper">
+                          <GalleryContainer
+                            carId={id}
+                            car={{
+                              _id: id,
+                              year: car?.year || 0,
+                              make: car?.make || "",
+                              model: car?.model || "",
+                              primaryImageId: car?.primaryImageId,
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ),
-                },
-                {
-                  value: "specs",
-                  label: "Specifications",
-                  content: car ? (
-                    <Specifications
-                      car={toCarFormData(car)}
-                      isEditMode={isSpecsEditMode}
-                      onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
-                      onSave={async (editedSpecs) => {
-                        await handleSpecsEdit(editedSpecs as ExtendedCar);
-                      }}
-                      onCancel={() => setIsSpecsEditMode(false)}
-                      onRefresh={refreshCarData}
-                      editedSpecs={editedSpecs}
-                      onInputChange={(field, value, nestedField) =>
-                        handleInputChange(field, value, nestedField)
-                      }
-                      onMeasurementChange={handleMeasurementChange}
-                      onPowerChange={handlePowerChange}
-                      onTorqueChange={handleTorqueChange}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading specifications...
-                    </div>
-                  ),
-                },
-                {
-                  value: "shoots",
-                  label: "Photo Shoots",
-                  content: <PhotoShoots carId={id} />,
-                },
-                {
-                  value: "shot-lists",
-                  label: "Shot Lists",
-                  content: <ShotList carId={id} />,
-                },
-                {
-                  value: "scripts",
-                  label: "Scripts",
-                  content: <Scripts carId={id} />,
-                },
-                {
-                  value: "bat",
-                  label: "BaT Listing",
-                  content: car ? (
-                    <BaTListingGenerator
-                      carDetails={{
-                        _id: car._id,
-                        year: car.year ?? 0,
-                        make: car.make,
-                        model: car.model,
-                        color: car.color,
-                        mileage: car.mileage
-                          ? {
-                              value: car.mileage.value || 0,
-                              unit: car.mileage.unit,
-                            }
-                          : undefined,
-                        engine: car.engine,
-                        description: car.description || "",
-                      }}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading BaT listing...
-                    </div>
-                  ),
-                },
-                {
-                  value: "captions",
-                  label: "Social Media",
-                  content: car ? (
-                    <CaptionGenerator
-                      carDetails={{
-                        _id: car._id,
-                        year: car.year ?? 0,
-                        make: car.make,
-                        model: car.model,
-                        color: car.color,
-                        engine: car.engine,
-                        mileage: car.mileage
-                          ? {
-                              value: car.mileage.value || 0,
-                              unit: car.mileage.unit,
-                            }
-                          : undefined,
-                        type: car.type,
-                        client: car.client,
-                        description: car.description || "",
-                      }}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading caption generator...
-                    </div>
-                  ),
-                },
-                {
-                  value: "service",
-                  label: "Service History",
-                  content: (
-                    <div className="text-center py-12 text-muted-foreground">
-                      Service history coming soon
-                    </div>
-                  ),
-                },
-                {
-                  value: "research",
-                  label: "Research",
-                  content: <ResearchFiles carId={id} />,
-                },
-                {
-                  value: "documentation",
-                  label: "Documentation",
-                  content: <DocumentationFiles carId={id} />,
-                },
-                {
-                  value: "article",
-                  label: "Article",
-                  content: car ? (
-                    <ArticleGenerator
-                      car={fromCarFormData(toCarFormData(car), car) as BaseCar}
-                    />
-                  ) : (
-                    <div className="py-8 text-center text-muted-foreground">
-                      Loading article generator...
-                    </div>
-                  ),
-                },
-                {
-                  value: "deliverables",
-                  label: "Deliverables",
-                  content: <DeliverablesTab carId={id} />,
-                },
-                {
-                  value: "events",
-                  label: "Events",
-                  content: <EventsTab carId={id} />,
-                },
-                {
-                  value: "calendar",
-                  label: "Calendar",
-                  content: <FullCalendarTab carId={id} />,
-                },
-              ]}
-              defaultValue={activeTab}
-              basePath={`/cars/${id}`}
-            />
-          </>
-        )}
-      </main>
-
-      {/* Sticky header for primary image and car title when scrolling */}
-      {car && !isLoading && (
-        <div
-          className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
-            hasScrolled
-              ? "translate-y-0 opacity-100"
-              : "-translate-y-full opacity-0"
-          }`}
-        >
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-3">
-              <CarAvatar
-                images={car?.images}
-                primaryImageId={car?.primaryImageId}
-                alt={generateCarTitle(car)}
-                size="sm"
+                    ),
+                  },
+                  {
+                    value: "specs",
+                    label: "Specifications",
+                    content: car ? (
+                      <Specifications
+                        car={toCarFormData(car)}
+                        isEditMode={isSpecsEditMode}
+                        onEdit={() => setIsSpecsEditMode(!isSpecsEditMode)}
+                        onSave={async (editedSpecs) => {
+                          await handleSpecsEdit(editedSpecs as ExtendedCar);
+                        }}
+                        onCancel={() => setIsSpecsEditMode(false)}
+                        onRefresh={refreshCarData}
+                        editedSpecs={editedSpecs}
+                        onInputChange={(field, value, nestedField) =>
+                          handleInputChange(field, value, nestedField)
+                        }
+                        onMeasurementChange={handleMeasurementChange}
+                        onPowerChange={handlePowerChange}
+                        onTorqueChange={handleTorqueChange}
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading specifications...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "shoots",
+                    label: "Photo Shoots",
+                    content: <PhotoShoots carId={id} />,
+                  },
+                  {
+                    value: "shot-lists",
+                    label: "Shot Lists",
+                    content: <ShotList carId={id} />,
+                  },
+                  {
+                    value: "scripts",
+                    label: "Scripts",
+                    content: <Scripts carId={id} />,
+                  },
+                  {
+                    value: "bat",
+                    label: "BaT Listing",
+                    content: car ? (
+                      <BaTListingGenerator
+                        carDetails={{
+                          _id: car._id,
+                          year: car.year ?? 0,
+                          make: car.make,
+                          model: car.model,
+                          color: car.color,
+                          mileage: car.mileage
+                            ? {
+                                value: car.mileage.value || 0,
+                                unit: car.mileage.unit,
+                              }
+                            : undefined,
+                          engine: car.engine,
+                          description: car.description || "",
+                        }}
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading BaT listing...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "captions",
+                    label: "Social Media",
+                    content: car ? (
+                      <CaptionGenerator
+                        carDetails={{
+                          _id: car._id,
+                          year: car.year ?? 0,
+                          make: car.make,
+                          model: car.model,
+                          color: car.color,
+                          engine: car.engine,
+                          mileage: car.mileage
+                            ? {
+                                value: car.mileage.value || 0,
+                                unit: car.mileage.unit,
+                              }
+                            : undefined,
+                          type: car.type,
+                          client: car.client,
+                          description: car.description || "",
+                        }}
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading caption generator...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "service",
+                    label: "Service History",
+                    content: (
+                      <div className="text-center py-12 text-muted-foreground">
+                        Service history coming soon
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "research",
+                    label: "Research",
+                    content: <ResearchFiles carId={id} />,
+                  },
+                  {
+                    value: "documentation",
+                    label: "Documentation",
+                    content: <DocumentationFiles carId={id} />,
+                  },
+                  {
+                    value: "article",
+                    label: "Article",
+                    content: car ? (
+                      <ArticleGenerator
+                        car={
+                          fromCarFormData(toCarFormData(car), car) as BaseCar
+                        }
+                      />
+                    ) : (
+                      <div className="py-8 text-center text-muted-foreground">
+                        Loading article generator...
+                      </div>
+                    ),
+                  },
+                  {
+                    value: "deliverables",
+                    label: "Deliverables",
+                    content: <DeliverablesTab carId={id} />,
+                  },
+                  {
+                    value: "events",
+                    label: "Events",
+                    content: <EventsTab carId={id} />,
+                  },
+                  {
+                    value: "calendar",
+                    label: "Calendar",
+                    content: <FullCalendarTab carId={id} />,
+                  },
+                ]}
+                defaultValue={activeTab}
+                basePath={`/cars/${id}`}
               />
-              <h1 className="text-base font-semibold text-text-primary truncate">
-                {generateCarTitle(car)}
-              </h1>
+            </>
+          )}
+        </main>
+
+        {/* Sticky header for primary image and car title when scrolling */}
+        {car && !isLoading && (
+          <div
+            className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
+              hasScrolled
+                ? "translate-y-0 opacity-100"
+                : "-translate-y-full opacity-0"
+            }`}
+          >
+            <div className="container mx-auto px-4">
+              <div className="flex items-center gap-3">
+                <CarAvatar
+                  images={car?.images}
+                  primaryImageId={car?.primaryImageId}
+                  alt={generateCarTitle(car)}
+                  size="sm"
+                />
+                <h1 className="text-base font-semibold text-text-primary truncate">
+                  {generateCarTitle(car)}
+                </h1>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </AuthGuard>
   );
 }
