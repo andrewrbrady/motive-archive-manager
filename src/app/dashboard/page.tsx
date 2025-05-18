@@ -213,7 +213,7 @@ function DashboardInner() {
                       {/* Car Header */}
                       <div className="py-3 px-3 border-b border-border">
                         <div className="flex items-center gap-3">
-                          <Link href={`/cars/${car.id}`}>
+                          <Link href={`/cars/${car._id?.toString()}`}>
                             <CarAvatar
                               primaryImageId={car.primaryImageId}
                               entityName={`${car.year} ${car.make} ${car.model}`}
@@ -312,7 +312,7 @@ function DashboardInner() {
                       {/* Car Header */}
                       <div className="py-3 px-3 border-b border-border">
                         <div className="flex items-center gap-3">
-                          <Link href={`/cars/${car.id}`}>
+                          <Link href={`/cars/${car._id?.toString()}`}>
                             <CarAvatar
                               primaryImageId={car.primaryImageId}
                               entityName={`${car.year} ${car.make} ${car.model}`}

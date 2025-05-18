@@ -26,14 +26,11 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
         </thead>
         <tbody>
           {cars.map((car) => (
-            <tr
-              key={car.id}
-              className="border-b hover:bg-[hsl(var(--background))]"
-            >
+            <tr key={car.id} className="group hover:bg-muted/50">
               <td className="py-2 px-3 border">
                 <Link
                   href={`/cars/${car.id}?${currentSearchParams}`}
-                  className="text-info-600 hover:text-info-800"
+                  className="flex items-center gap-3"
                 >
                   {car.year}
                 </Link>
