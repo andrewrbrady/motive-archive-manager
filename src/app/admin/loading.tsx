@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-// import Navbar from "@/components/layout/navbar";
+import Navbar from "@/components/layout/navbar";
 // import Footer from "@/components/layout/footer";
 import { PageTitle } from "@/components/ui/PageTitle";
 
