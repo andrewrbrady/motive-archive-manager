@@ -84,10 +84,7 @@ export default function AdminTabs() {
           {
             value: "locations",
             label: "Locations",
-            content: renderTabContent(
-              "locations",
-              <LocationsClient hideNavbar={true} />
-            ),
+            content: renderTabContent("locations", <LocationsClient />),
           },
           {
             value: "makes",
