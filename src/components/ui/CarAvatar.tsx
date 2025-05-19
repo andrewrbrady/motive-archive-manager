@@ -75,7 +75,7 @@ export function CarAvatar({
         }, 5000); // 5 second timeout
 
         const response = await fetch(`/api/images/${idString}`, {
-          signal: fetchController.current.signal,
+          signal: fetchController.current?.signal,
         });
 
         // Clear timeout if we got a response
