@@ -2,18 +2,25 @@ import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ImageData } from "@/lib/imageLoader";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Trash2, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface ImageCardProps {
   image: ImageData;
   onSelect?: (image: ImageData) => void;
   isSelected?: boolean;
+  onDelete?: (image: ImageData) => Promise<void>;
 }
 
-export function ImageCard({ image, onSelect, isSelected }: ImageCardProps) {
+export function ImageCard({
+  image,
+  onSelect,
+  isSelected,
+  onDelete,
+}: ImageCardProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedFilename, setCopiedFilename] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleCopyUrl = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the card click
@@ -53,6 +60,32 @@ export function ImageCard({ image, onSelect, isSelected }: ImageCardProps) {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    console.log("Delete button clicked for image:", image);
+    e.stopPropagation();
+    if (!onDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(image);
+      toast({
+        title: "Deleted!",
+        description: "Image deleted successfully",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to delete image",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (onDelete) {
+    console.log("Rendering delete button for image:", image);
+  }
+
   return (
     <div
       className={cn(
@@ -62,6 +95,21 @@ export function ImageCard({ image, onSelect, isSelected }: ImageCardProps) {
       )}
       onClick={() => onSelect?.(image)}
     >
+      {/* Delete button (top right, visible on hover) */}
+      {onDelete && (
+        <button
+          onClick={handleDelete}
+          className="absolute top-2 right-2 z-20 p-1 bg-background/80 rounded-full hover:bg-destructive/80 hover:text-white transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none"
+          aria-label="Delete image"
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </button>
+      )}
       <Image
         src={image.url}
         alt={image.filename || "Car image"}

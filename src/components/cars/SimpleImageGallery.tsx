@@ -19,6 +19,7 @@ import { ImageLightbox } from "./ImageLightbox";
 import { ImageData } from "@/lib/imageLoader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ImageCard } from "./ImageCard";
+import { toast } from "@/components/ui/use-toast";
 
 interface Car {
   _id: string;
@@ -67,6 +68,12 @@ interface SimpleImageGalleryProps {
 
 const categories = ["Exterior", "Interior", "Detail", "Action", "Studio"];
 
+const extractCloudflareId = (url: string): string | undefined => {
+  // Example: https://imagedelivery.net/<account_hash>/<cloudflare_id>/public
+  const match = url.match(/imagedelivery\.net\/[^/]+\/([^/]+)/);
+  return match ? match[1] : undefined;
+};
+
 export function SimpleImageGallery({
   data,
   isLoading,
@@ -105,6 +112,44 @@ export function SimpleImageGallery({
     );
   }
 
+  const handleDelete = async (image: ImageData) => {
+    // Try to use cloudflareId, else extract from URL
+    const cloudflareId = image.cloudflareId || extractCloudflareId(image.url);
+    if (!cloudflareId) {
+      toast({
+        title: "Error",
+        description: "No Cloudflare ID found for this image.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const payload = { cloudflareIds: [cloudflareId] };
+      console.log("Sending DELETE payload to /api/cloudflare/images:", payload);
+      const res = await fetch("/api/cloudflare/images", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      console.log("Delete response from /api/cloudflare/images:", result);
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || JSON.stringify(result));
+      }
+      toast({ title: "Deleted!", description: "Image deleted successfully" });
+      if (typeof window !== "undefined" && window.location) {
+        window.location.reload();
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description:
+          err instanceof Error ? err.message : "Failed to delete image",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {data.map((image) => (
@@ -113,6 +158,7 @@ export function SimpleImageGallery({
           image={image}
           onSelect={onImageSelect}
           isSelected={image._id === selectedImageId}
+          onDelete={handleDelete}
         />
       ))}
       {isFetchingNextPage && (

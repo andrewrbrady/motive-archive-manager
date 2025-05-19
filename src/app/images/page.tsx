@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
-import Navbar from "@/components/layout/navbar";
 import { useImages } from "@/hooks/use-images";
 import { ImageData } from "@/app/images/columns";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ImageUpload } from "@/components/ui/image-upload";
+import ImageUploadWithProgress from "@/components/ui/ImageUploadWithProgress";
 import Pagination from "@/components/ui/pagination";
 import { Plus, Filter, Search, Loader2, FilterX } from "lucide-react";
 import {
@@ -234,164 +233,178 @@ export default function ImagesPage() {
   };
 
   return (
-    <>
-      <Navbar />
-      <main className="container mx-auto py-10 pt-24">
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                Image Gallery
-              </h1>
-              <p className="text-muted-foreground">
-                Browse and manage your car images
-              </p>
-            </div>
-
-            <Dialog
-              open={isUploadDialogOpen}
-              onOpenChange={setIsUploadDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Upload Images
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Upload Images</DialogTitle>
-                  <DialogDescription>
-                    Select images to upload to your gallery
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <ImageUpload onUpload={handleUpload} multiple={true} />
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsUploadDialogOpen(false)}
-                    disabled={isUploading}
-                  >
-                    Cancel
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+    <div className="container mx-auto py-10">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Image Gallery
+            </h1>
+            <p className="text-muted-foreground">
+              Browse and manage your car images
+            </p>
           </div>
 
-          <div className="space-y-4">
-            {/* Search */}
-            <div className="flex items-center space-x-2 max-w-sm">
-              <Input
-                placeholder="Search images..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="max-w-sm"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3 items-center">
-              {/* Angle filter */}
-              <Select value={angle} onValueChange={handleAngleChange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Angle" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All angles</SelectItem>
-                  {metadataOptions.angles.map((angleOption) => (
-                    <SelectItem key={angleOption} value={angleOption}>
-                      {angleOption}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Movement filter */}
-              <Select value={movement} onValueChange={handleMovementChange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Movement" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All movements</SelectItem>
-                  {metadataOptions.movements.map((movementOption) => (
-                    <SelectItem key={movementOption} value={movementOption}>
-                      {movementOption}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Time of Day filter */}
-              <Select value={tod} onValueChange={handleTodChange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Time of Day" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All times</SelectItem>
-                  {metadataOptions.tods.map((todOption) => (
-                    <SelectItem key={todOption} value={todOption}>
-                      {todOption}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* View filter */}
-              <Select value={view} onValueChange={handleViewChange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="View" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All views</SelectItem>
-                  {metadataOptions.views.map((viewOption) => (
-                    <SelectItem key={viewOption} value={viewOption}>
-                      {viewOption}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Reset filters button */}
-              {hasActiveFilters && (
+          <Dialog
+            open={isUploadDialogOpen}
+            onOpenChange={setIsUploadDialogOpen}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Upload Images
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Upload Images</DialogTitle>
+                <DialogDescription>
+                  Select images to upload to your gallery
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <ImageUploadWithProgress
+                  multiple={true}
+                  onComplete={() => {
+                    mutate();
+                    setIsUploadDialogOpen(false);
+                    toast({
+                      title: "Success",
+                      description: "Images uploaded successfully",
+                    });
+                  }}
+                  onError={() => {
+                    toast({
+                      title: "Error",
+                      description: "Failed to upload images",
+                      variant: "destructive",
+                    });
+                  }}
+                />
+              </div>
+              <DialogFooter>
                 <Button
                   variant="outline"
-                  size="icon"
-                  onClick={resetAllFilters}
-                  title="Reset filters"
+                  onClick={() => setIsUploadDialogOpen(false)}
+                  disabled={isUploading}
                 >
-                  <FilterX className="h-4 w-4" />
+                  Cancel
                 </Button>
-              )}
-            </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="space-y-4">
+          {/* Search */}
+          <div className="flex items-center space-x-2 max-w-sm">
+            <Input
+              placeholder="Search images..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="max-w-sm"
+            />
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              <SimpleImageGallery
-                data={mappedImages}
-                isLoading={isLoading}
-                error={error || undefined}
-              />
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 items-center">
+            {/* Angle filter */}
+            <Select value={angle} onValueChange={handleAngleChange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Angle" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All angles</SelectItem>
+                {metadataOptions.angles.map((angleOption) => (
+                  <SelectItem key={angleOption} value={angleOption}>
+                    {angleOption}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              {data?.pagination && data.pagination.pages > 1 && (
-                <Pagination
-                  className="mt-8 flex justify-center"
-                  currentPage={data.pagination.page}
-                  totalPages={data.pagination.pages}
-                  onPageChange={handlePageChange}
-                />
-              )}
-            </>
-          )}
+            {/* Movement filter */}
+            <Select value={movement} onValueChange={handleMovementChange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Movement" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All movements</SelectItem>
+                {metadataOptions.movements.map((movementOption) => (
+                  <SelectItem key={movementOption} value={movementOption}>
+                    {movementOption}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Time of Day filter */}
+            <Select value={tod} onValueChange={handleTodChange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Time of Day" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All times</SelectItem>
+                {metadataOptions.tods.map((todOption) => (
+                  <SelectItem key={todOption} value={todOption}>
+                    {todOption}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* View filter */}
+            <Select value={view} onValueChange={handleViewChange}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="View" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All views</SelectItem>
+                {metadataOptions.views.map((viewOption) => (
+                  <SelectItem key={viewOption} value={viewOption}>
+                    {viewOption}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Reset filters button */}
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={resetAllFilters}
+                title="Reset filters"
+              >
+                <FilterX className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
-      </main>
-    </>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <SimpleImageGallery
+              data={mappedImages}
+              isLoading={isLoading}
+              error={error || undefined}
+            />
+
+            {data?.pagination && data.pagination.pages > 1 && (
+              <Pagination
+                className="mt-8 flex justify-center"
+                currentPage={data.pagination.page}
+                totalPages={data.pagination.pages}
+                onPageChange={handlePageChange}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
