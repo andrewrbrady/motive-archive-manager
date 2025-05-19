@@ -2,12 +2,6 @@ import React from "react";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ObjectId } from "mongodb";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { CarImage } from "@/types/car";
 
 interface CarAvatarProps {
@@ -23,6 +17,9 @@ const sizeClasses = {
   lg: "w-16 h-16",
 };
 
+// Cache for image URLs to avoid repeated fetches
+const imageUrlCache = new Map<string, string>();
+
 export function CarAvatar({
   primaryImageId,
   entityName,
@@ -31,97 +28,125 @@ export function CarAvatar({
 }: CarAvatarProps) {
   const [imageError, setImageError] = React.useState(false);
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
-  const isMounted = React.useRef(true);
-  const hasErrored = React.useRef(false);
-  const isLoading = React.useRef(false);
+  const fetchController = React.useRef<AbortController | null>(null);
+  const mountedRef = React.useRef(true);
 
   React.useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      isMounted.current = false;
+      mountedRef.current = false;
+      if (fetchController.current) {
+        fetchController.current.abort();
+      }
     };
   }, []);
 
   React.useEffect(() => {
-    if (!primaryImageId || isLoading.current || hasErrored.current) return;
+    // Reset state when ID changes
+    setImageError(false);
 
-    const fetchImageUrl = async () => {
-      if (!isMounted.current) return;
+    // Clean up any in-progress fetch
+    if (fetchController.current) {
+      fetchController.current.abort();
+    }
 
-      isLoading.current = true;
+    // No ID, nothing to do
+    if (!primaryImageId) return;
+
+    const idString = primaryImageId.toString();
+
+    // Check cache first
+    if (imageUrlCache.has(idString)) {
+      setImageUrl(imageUrlCache.get(idString) || null);
+      return;
+    }
+
+    // Create new abort controller for this fetch
+    fetchController.current = new AbortController();
+
+    const fetchWithTimeout = async () => {
       try {
-        const response = await fetch(
-          `/api/images/${primaryImageId.toString()}`
-        );
-        if (!isMounted.current) return;
+        // Set up timeout
+        const timeoutId = setTimeout(() => {
+          if (fetchController.current) {
+            console.log("CarAvatar: Fetch timeout, aborting");
+            fetchController.current.abort();
+          }
+        }, 5000); // 5 second timeout
+
+        const response = await fetch(`/api/images/${idString}`, {
+          signal: fetchController.current.signal,
+        });
+
+        // Clear timeout if we got a response
+        clearTimeout(timeoutId);
+
+        if (!mountedRef.current) return;
 
         if (!response.ok) {
-          throw new Error("Failed to fetch image URL");
+          throw new Error(
+            `Failed to fetch image (${response.status}): ${response.statusText}`
+          );
         }
-        const imageData = await response.json();
-        if (!imageData.url) {
+
+        const data = await response.json();
+
+        if (!mountedRef.current) return;
+
+        if (!data || !data.url) {
           throw new Error("No URL in image data");
         }
-        if (isMounted.current) {
-          setImageUrl(imageData.url);
-          setImageError(false);
-        }
+
+        // Cache the result and update state
+        imageUrlCache.set(idString, data.url);
+        setImageUrl(data.url);
       } catch (error) {
-        console.error("Error fetching image:", error);
-        if (isMounted.current && !hasErrored.current) {
-          hasErrored.current = true;
+        if (!mountedRef.current) return;
+
+        if (error instanceof DOMException && error.name === "AbortError") {
+          console.log("CarAvatar: Fetch aborted");
+        } else {
+          console.error("CarAvatar: Error fetching image:", error);
           setImageError(true);
         }
       } finally {
-        isLoading.current = false;
+        if (mountedRef.current) {
+          fetchController.current = null;
+        }
       }
     };
 
-    fetchImageUrl();
+    fetchWithTimeout();
   }, [primaryImageId]);
 
   const handleImageError = React.useCallback(() => {
-    if (!hasErrored.current && isMounted.current) {
-      hasErrored.current = true;
+    console.error("CarAvatar: Image failed to load");
+    if (mountedRef.current) {
       setImageError(true);
     }
   }, []);
 
-  const resolvedTooltipContent = primaryImageId
-    ? `Primary image for ${entityName}`
-    : `No primary image selected for ${entityName}`;
-
-  const avatar = React.useMemo(
-    () => (
-      <div
-        className={cn(
-          "relative rounded-full overflow-hidden border border-border shrink-0 bg-muted",
-          sizeClasses[size],
-          className
-        )}
-      >
-        {imageUrl && !imageError ? (
-          <img
-            src={imageUrl}
-            alt={`Avatar for ${entityName}`}
-            className="w-full h-full object-cover"
-            onError={handleImageError}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon className="w-1/3 h-1/3 text-muted-foreground" />
-          </div>
-        )}
-      </div>
-    ),
-    [imageUrl, imageError, size, className, entityName, handleImageError]
-  );
-
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>{avatar}</TooltipTrigger>
-        <TooltipContent>{resolvedTooltipContent}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div
+      className={cn(
+        "relative rounded-full overflow-hidden border border-border shrink-0 bg-muted",
+        sizeClasses[size],
+        className
+      )}
+    >
+      {imageUrl && !imageError ? (
+        <img
+          src={imageUrl}
+          alt={`Avatar for ${entityName}`}
+          className="w-full h-full object-cover"
+          loading="eager"
+          onError={handleImageError}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <ImageIcon className="w-1/3 h-1/3 text-muted-foreground" />
+        </div>
+      )}
+    </div>
   );
 }
