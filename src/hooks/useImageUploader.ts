@@ -318,7 +318,7 @@ export function useImageUploader({
         });
       }
     },
-    [carId, actions, toast, concurrentLimit, validateFiles, progress]
+    [carId, actions, toast, concurrentLimit, validateFiles, progress, error]
   );
 
   return {

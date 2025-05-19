@@ -25,6 +25,24 @@ import {
   formatQuestion,
 } from "@/constants/question-examples";
 import type { BaTCarDetails } from "@/types/car-page";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import PromptForm, { PromptFormData } from "@/components/admin/PromptForm";
+import { Switch } from "@/components/ui/switch";
+import {
+  getAllModels,
+  llmProviders,
+  ProviderId,
+  findModelById,
+} from "@/lib/llmProviders";
 
 type Platform = "instagram" | "youtube";
 type Template = "none" | "bat" | "dealer" | "question";
@@ -97,8 +115,31 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
+  // Modal state
+  const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+  const [promptList, setPromptList] = useState<any[]>([]);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [selectedPrompt, setSelectedPrompt] = useState<any | null>(null);
+  const [isPromptSubmitting, setIsPromptSubmitting] = useState(false);
+  const [isCreatingPrompt, setIsCreatingPrompt] = useState(false);
+  // Add model state
+  const [model, setModel] = useState<string>("claude-3-5-sonnet-20241022");
+  // Client info state
+  const [clientHandle, setClientHandle] = useState<string | null>(null);
+  const [includeClientHandle, setIncludeClientHandle] = useState(false);
+  // Add provider state
+  const [provider, setProvider] = useState<ProviderId>("anthropic");
+  // Get all available models
+  const allModels = getAllModels();
 
-  // Fetch car details when carId changes
+  // Group models by provider for UI display
+  const modelsByProvider = Object.values(llmProviders).map((provider) => ({
+    provider: provider,
+    models: provider.models,
+  }));
+
+  // Fetch car details and client handle when carId changes
   useEffect(() => {
     const fetchCarDetails = async () => {
       setCarLoading(true);
@@ -108,10 +149,30 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         if (!response.ok) throw new Error("Failed to fetch car details");
         const data = await response.json();
         setCarDetails(data);
+        // Try to get clientId from car details
+        const clientId = data.client || data.clientId || data.clientInfo?._id;
+        if (clientId) {
+          const clientRes = await fetch(`/api/clients/${clientId}`);
+          if (clientRes.ok) {
+            const client = await clientRes.json();
+            if (client.socialMedia?.instagram) {
+              setClientHandle(
+                `@${client.socialMedia.instagram.replace(/^@/, "")}`
+              );
+            } else {
+              setClientHandle(null);
+            }
+          } else {
+            setClientHandle(null);
+          }
+        } else {
+          setClientHandle(null);
+        }
       } catch (err) {
         setCarError(
           err instanceof Error ? err.message : "Failed to fetch car details"
         );
+        setClientHandle(null);
       } finally {
         setCarLoading(false);
       }
@@ -137,11 +198,112 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
     fetchCaptions();
   }, [carId]);
 
+  // Fetch prompts when component mounts (was previously on modal open)
+  useEffect(() => {
+    setPromptLoading(true);
+    setPromptError(null);
+    fetch("/api/caption-prompts")
+      .then((res) => res.json())
+      .then((data) => {
+        setPromptList(Array.isArray(data) ? data : []);
+        // If no prompt is selected yet, and we have prompts, try to load default
+        // This logic will be refined in the default prompt loading useEffect
+      })
+      .catch((err) => setPromptError("Failed to fetch prompts"))
+      .finally(() => setPromptLoading(false));
+  }, []); // Fetch once on mount
+
+  // When a prompt is selected, update local state for prompt/model
+  useEffect(() => {
+    if (selectedPrompt) {
+      setContext(selectedPrompt.prompt);
+      setTone(selectedPrompt.tone);
+      setStyle(selectedPrompt.style);
+      setLength(selectedPrompt.length);
+      setPlatform(selectedPrompt.platform);
+      setModel(selectedPrompt.aiModel);
+
+      // Ensure the provider is updated based on the selected prompt's AI model
+      const modelDetails = findModelById(selectedPrompt.aiModel);
+      if (modelDetails) {
+        setProvider(modelDetails.provider.id as ProviderId);
+      } else if (selectedPrompt.llmProvider) {
+        // Fallback to llmProvider field on prompt if it exists
+        setProvider(selectedPrompt.llmProvider as ProviderId);
+      }
+      // If neither is found, the provider remains unchanged, which might be an issue
+      // if the model is from a new, unrecognised provider or the prompt data is incomplete.
+      // However, llmProviders should be the source of truth for models.
+    }
+  }, [selectedPrompt]);
+
+  // Automatically load the default prompt for the current platform on mount or when platform changes
+  useEffect(() => {
+    // Only load default if no prompt is selected AND the main list has potentially loaded.
+    if (selectedPrompt || promptLoading) return;
+
+    // If promptList is empty after loading, don't attempt to fetch default (unless API handles it)
+    // For now, let's assume if promptList is empty, we wait for user to create one.
+    // Or, if the default prompt API is robust, this check isn't strictly needed.
+    // if (promptList.length === 0 && !promptLoading) return;
+
+    fetch(`/api/caption-prompts?defaultOnly=true&platform=${platform}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data._id) {
+          // Check if a prompt is already selected by the user, if so, don't override.
+          // This condition is now at the start of the useEffect.
+          setSelectedPrompt(data);
+          setContext(data.prompt);
+          setTone(data.tone);
+          setStyle(data.style);
+          setLength(data.length);
+          // setPlatform(data.platform); // Careful: This could cause a loop if data.platform is different
+          setModel(data.aiModel);
+          const modelDetails = findModelById(data.aiModel);
+          if (modelDetails) {
+            setProvider(modelDetails.provider.id as ProviderId);
+          } else if (data.llmProvider) {
+            setProvider(data.llmProvider as ProviderId);
+          }
+        }
+      })
+      .catch(() => {
+        // Silently fail or set an error state if default prompt loading is critical
+        console.warn(`No default prompt found for platform: ${platform}`);
+      });
+  }, [platform, selectedPrompt, promptLoading]); // Ensure all relevant dependencies are here. `promptList` was considered but might cause too many re-runs.
+
   const handleGenerate = async (_captionId?: string) => {
     setIsGenerating(true);
     setError(null);
-
     try {
+      let contextToUse = context;
+
+      // Always send the context as the prompt, regardless of client handle
+      console.log("Debug - sending prompt:", contextToUse);
+
+      const clientInfo =
+        includeClientHandle && clientHandle
+          ? {
+              handle: clientHandle,
+              includeInCaption: true,
+            }
+          : null;
+
+      // Log what's being sent for debugging
+      console.log("Generating caption with:", {
+        platform,
+        context: contextToUse,
+        clientInfo,
+        model,
+        carDetails: {
+          year: carDetails?.year,
+          make: carDetails?.make,
+          model: carDetails?.model,
+        },
+      });
+
       // Generate new caption text
       const response = await fetch("/api/openai/generate-caption", {
         method: "POST",
@@ -150,7 +312,8 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         },
         body: JSON.stringify({
           platform,
-          context,
+          context: contextToUse,
+          clientInfo,
           carDetails: {
             _id: carDetails?._id,
             year: carDetails?.year,
@@ -166,6 +329,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
           style,
           length,
           template,
+          aiModel: model,
         }),
       });
 
@@ -368,597 +532,805 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       <h1 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
         Caption Generator
       </h1>
-      <div className="space-y-3 rounded-lg p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <Select
-              defaultValue="instagram"
-              value={platform}
-              onValueChange={(value: Platform) => setPlatform(value)}
-            >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <SelectValue placeholder="Select platform" />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
-                <SelectItem
-                  value="instagram"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Instagram
-                </SelectItem>
-                <SelectItem
-                  value="youtube"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  YouTube
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex-1">
-            <Select
-              defaultValue="none"
-              value={template}
-              onValueChange={handleTemplateChange}
-            >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <SelectValue placeholder="Select template" />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
-                <SelectItem
-                  value="none"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  No Template
-                </SelectItem>
-                <SelectItem
-                  value="bat"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Bring a Trailer
-                </SelectItem>
-                <SelectItem
-                  value="dealer"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Dealer Reference
-                </SelectItem>
-                <SelectItem
-                  value="question"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Ask Question
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            {template === "question" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                  const newQuestion = await generateQuestion(carDetails);
-                  setContext(newQuestion);
-                }}
-                className="ml-auto h-8 px-2 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                title="Generate new question"
-              >
-                <RefreshCw className="w-3 h-3" />
-              </Button>
-            )}
-          </div>
-          <Textarea
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            onKeyDown={(e) => {
-              // Prevent event propagation when arrow keys are pressed
-              if (
-                ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
-                  e.key
-                )
-              ) {
-                e.stopPropagation();
+      {/* New Prompt Selection and Action Buttons */}
+      <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2 mb-3">
+        <div className="flex-grow">
+          <label
+            htmlFor="main-prompt-select"
+            className="block text-xs font-medium mb-1 text-[hsl(var(--foreground-muted))]"
+          >
+            Active Prompt Template
+          </label>
+          <Select
+            value={selectedPrompt?._id || ""}
+            onValueChange={(promptId) => {
+              if (promptId === "__PROMPT_NONE__") {
+                setSelectedPrompt(null);
+                setContext("");
+                setTone("professional");
+                setStyle("descriptive");
+                setLength("concise");
+                setModel("claude-3-5-sonnet-20241022");
+                setProvider("anthropic");
+                return;
               }
+              const found = promptList.find((p) => p._id === promptId);
+              setSelectedPrompt(found || null);
+              setIsCreatingPrompt(false);
             }}
-            placeholder="Add any additional context for the caption..."
-            className="min-h-[80px] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--foreground-muted))] dark:placeholder:text-[hsl(var(--foreground-muted))]"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div>
-            <Select
-              value={tone}
-              onValueChange={(value: Tone) => setTone(value)}
+            disabled={
+              promptLoading || (promptList.length === 0 && !promptError)
+            }
+          >
+            <SelectTrigger
+              id="main-prompt-select"
+              className="w-full bg-transparent border-[hsl(var(--border))]"
             >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <SelectValue placeholder="Select tone" />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
-                <SelectItem
-                  value="professional"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Professional
-                </SelectItem>
-                <SelectItem
-                  value="casual"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Casual
-                </SelectItem>
-                <SelectItem
-                  value="enthusiastic"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Enthusiastic
-                </SelectItem>
-                <SelectItem
-                  value="technical"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Technical
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Select
-              value={style}
-              onValueChange={(value: Style) => setStyle(value)}
-            >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <SelectValue placeholder="Select style" />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
-                <SelectItem
-                  value="descriptive"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Descriptive
-                </SelectItem>
-                <SelectItem
-                  value="minimal"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Minimal
-                </SelectItem>
-                <SelectItem
-                  value="storytelling"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Storytelling
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Select
-              value={length}
-              onValueChange={(value: Length) => setLength(value)}
-            >
-              <SelectTrigger className="flex h-10 items-center justify-between rounded-md border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] px-3 py-2 text-sm ring-offset-background text-[hsl(var(--foreground))] dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] dark:focus:ring-[hsl(var(--ring))] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <SelectValue placeholder="Select length" />
-              </SelectTrigger>
-              <SelectContent className="bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-white">
-                <SelectItem
-                  value="concise"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Concise (1-2 lines)
-                </SelectItem>
-                <SelectItem
-                  value="standard"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Standard (2-3 lines)
-                </SelectItem>
-                <SelectItem
-                  value="detailed"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Detailed (3-4 lines)
-                </SelectItem>
-                <SelectItem
-                  value="comprehensive"
-                  className="text-[hsl(var(--foreground))] dark:text-white"
-                >
-                  Comprehensive (4+ lines)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-              Creativity: {temperature}
-            </label>
-            <div className="relative flex items-center">
-              <input
-                type="range"
-                min="0.5"
-                max="2.0"
-                step="0.1"
-                value={temperature}
-                onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                className="w-full h-1 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] rounded-lg appearance-none cursor-pointer focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--background))] dark:[&::-webkit-slider-thumb]:bg-[var(--background-primary)]"
+              <SelectValue
+                placeholder={
+                  promptLoading
+                    ? "Loading prompts..."
+                    : promptError
+                      ? "Error loading"
+                      : "Select a prompt..."
+                }
               />
+            </SelectTrigger>
+            <SelectContent>
+              {promptError && (
+                <SelectItem
+                  value="__ERROR__"
+                  disabled
+                  className="text-destructive-500"
+                >
+                  Error: {promptError}
+                </SelectItem>
+              )}
+              {!promptError && promptList.length === 0 && !promptLoading && (
+                <SelectItem value="__NO_PROMPTS__" disabled>
+                  No prompts. Click 'New' to create.
+                </SelectItem>
+              )}
+              <SelectItem value="__PROMPT_NONE__">-- None --</SelectItem>
+              {promptList.map((prompt) => (
+                <SelectItem key={prompt._id} value={prompt._id}>
+                  {prompt.name}{" "}
+                  <span className="text-xs text-[hsl(var(--foreground-muted))] ml-2">
+                    ({prompt.platform},{" "}
+                    {findModelById(prompt.aiModel)?.model.name ||
+                      prompt.aiModel}
+                    )
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (selectedPrompt) {
+              setIsCreatingPrompt(false);
+              setIsPromptModalOpen(true);
+            }
+          }}
+          disabled={!selectedPrompt}
+          className="border-[hsl(var(--border))]"
+        >
+          Edit
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            // For a new prompt, reset relevant states to defaults
+            setSelectedPrompt(null);
+            setIsCreatingPrompt(true);
+            setContext(""); // Default or empty context for new prompt
+            setTone("professional"); // Default tone
+            setStyle("descriptive"); // Default style
+            setLength("concise"); // Default length
+            // setPlatform("instagram"); // Keep current platform or set a default
+            setModel("claude-3-5-sonnet-20241022"); // Default model
+            setProvider("anthropic"); // Default provider
+            setTemperature(1.0); // Default temperature
+            setIsPromptModalOpen(true);
+          }}
+          className="border-[hsl(var(--border))]"
+        >
+          New
+        </Button>
+      </div>
+
+      {/* Modal for Editing or Creating Prompts - Trigger is removed, controlled by buttons */}
+      <Dialog
+        open={isPromptModalOpen}
+        onOpenChange={(isOpen) => {
+          setIsPromptModalOpen(isOpen);
+          if (!isOpen) {
+            // Optional: Reset isCreatingPrompt if modal is closed without saving,
+            // but typically form submission or cancel should handle this.
+            // setIsCreatingPrompt(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          {" "}
+          {/* Increased width for better form layout */}
+          <DialogHeader>
+            <DialogTitle>
+              {isCreatingPrompt
+                ? "Create New Prompt Template"
+                : `Edit Prompt: ${selectedPrompt?.name || "Selected Prompt"}`}
+            </DialogTitle>
+            <DialogDescription>
+              {isCreatingPrompt
+                ? "Define a new reusable prompt template for caption generation."
+                : "Modify the existing prompt template, including its content, parameters, and AI model."}
+            </DialogDescription>
+          </DialogHeader>
+          {/* Client handle switch - remains the same */}
+          {clientHandle && (
+            <div className="flex items-center gap-2 my-4">
+              <Switch
+                id="include-client-handle"
+                checked={includeClientHandle}
+                onCheckedChange={setIncludeClientHandle}
+              />
+              <label htmlFor="include-client-handle" className="text-sm">
+                Make client handle ({clientHandle}) available to prompt
+              </label>
+            </div>
+          )}
+          {/* Render PromptForm only when modal is open to ensure it can pick up selectedPrompt or undefined correctly */}
+          {isPromptModalOpen && (
+            <PromptForm
+              key={
+                isCreatingPrompt
+                  ? "new-prompt-form"
+                  : selectedPrompt?._id || "edit-prompt-form"
+              }
+              prompt={
+                isCreatingPrompt ? undefined : selectedPrompt || undefined
+              }
+              isSubmitting={isPromptSubmitting}
+              onCancel={() => {
+                setIsPromptModalOpen(false);
+                // setIsCreatingPrompt(false); // Optionally reset, but opening "New" again will set it true
+              }}
+              onSubmit={async (formData) => {
+                setIsPromptSubmitting(true);
+                setPromptError(null); // Clear previous errors
+                try {
+                  const method = isCreatingPrompt ? "POST" : "PATCH";
+                  const url = "/api/caption-prompts";
+
+                  const payload: Record<string, any> = {
+                    ...formData, // This should include name, prompt, tone, style, length, platform, etc. from PromptForm
+                    aiModel: model, // Model from CaptionGenerator's state
+                    llmProvider: provider, // Provider from CaptionGenerator's state
+                    modelParams: {
+                      // Params from CaptionGenerator's state
+                      temperature: temperature || undefined,
+                      // maxTokens: 1000, // This should ideally be part of PromptForm or a shared config
+                    },
+                  };
+
+                  if (!isCreatingPrompt && selectedPrompt) {
+                    payload.id = selectedPrompt._id;
+                  }
+
+                  console.log(
+                    `Saving prompt (${method}) with payload:`,
+                    JSON.stringify(payload, null, 2)
+                  );
+
+                  const res = await fetch(url, {
+                    method,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+
+                  if (!res.ok) {
+                    const errorData = await res
+                      .json()
+                      .catch(() => ({ message: "Failed to save prompt" }));
+                    console.error(
+                      "Failed to save prompt:",
+                      res.status,
+                      errorData
+                    );
+                    throw new Error(
+                      errorData.message ||
+                        `Failed to save prompt: ${res.status}`
+                    );
+                  }
+
+                  const updatedOrCreatedPrompt = await res.json();
+
+                  // Refresh prompt list
+                  const refreshedList = await fetch(
+                    "/api/caption-prompts"
+                  ).then((r) => r.json());
+                  setPromptList(
+                    Array.isArray(refreshedList) ? refreshedList : []
+                  );
+
+                  // Update selected prompt with the newly created or edited one
+                  setSelectedPrompt(updatedOrCreatedPrompt);
+                  setIsCreatingPrompt(false); // Exit creation mode
+
+                  // Update local states from the newly selected/updated prompt
+                  setContext(updatedOrCreatedPrompt.prompt);
+                  setTone(updatedOrCreatedPrompt.tone);
+                  setStyle(updatedOrCreatedPrompt.style);
+                  setLength(updatedOrCreatedPrompt.length);
+                  setPlatform(updatedOrCreatedPrompt.platform);
+                  setModel(updatedOrCreatedPrompt.aiModel);
+
+                  const modelDetailsOnSave = findModelById(
+                    updatedOrCreatedPrompt.aiModel
+                  );
+                  if (modelDetailsOnSave) {
+                    setProvider(modelDetailsOnSave.provider.id as ProviderId);
+                  } else if (updatedOrCreatedPrompt.llmProvider) {
+                    setProvider(
+                      updatedOrCreatedPrompt.llmProvider as ProviderId
+                    );
+                  }
+                  // Temperature is already part of CaptionGenerator's state,
+                  // if PromptForm can change it, that change needs to reflect back or be included in formData.
+                  // For now, assuming temperature is managed in CaptionGenerator and passed to modelParams.
+
+                  setIsPromptModalOpen(false); // Close the modal upon successful save
+                } catch (err) {
+                  console.error("Error saving prompt:", err);
+                  setPromptError(
+                    err instanceof Error
+                      ? err.message
+                      : "An unexpected error occurred while saving the prompt."
+                  );
+                  // Keep modal open to show error
+                } finally {
+                  setIsPromptSubmitting(false);
+                }
+              }}
+              renderModelSelector={() => (
+                <div className="space-y-4 mt-4 p-4 border border-[hsl(var(--border))] rounded-md">
+                  <h3 className="text-sm font-medium text-[hsl(var(--foreground-muted))]">
+                    AI Model Configuration
+                  </h3>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      AI Provider
+                    </label>
+                    <select
+                      className="w-full border rounded p-2 bg-transparent text-[hsl(var(--foreground))] border-[hsl(var(--border))]"
+                      value={provider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value as ProviderId;
+                        setProvider(newProvider);
+                        const providerModels =
+                          llmProviders[newProvider]?.models || [];
+                        if (!providerModels.some((m) => m.id === model)) {
+                          setModel(providerModels[0]?.id || "");
+                        }
+                      }}
+                    >
+                      {Object.values(llmProviders)
+                        .filter((p) => p.models.length > 0)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      AI Model
+                    </label>
+                    <select
+                      className="w-full border rounded p-2 bg-transparent text-[hsl(var(--foreground))] border-[hsl(var(--border))]"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      disabled={
+                        !provider ||
+                        !llmProviders[provider] ||
+                        llmProviders[provider].models.length === 0
+                      }
+                    >
+                      {(llmProviders[provider]?.models || []).map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                      {(!provider ||
+                        !llmProviders[provider] ||
+                        llmProviders[provider].models.length === 0) && (
+                        <option value="" disabled>
+                          Select a provider with models
+                        </option>
+                      )}
+                    </select>
+
+                    {model && llmProviders[provider] && (
+                      <div className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                        {llmProviders[provider].models.find(
+                          (m) => m.id === model
+                        )?.contextWindow
+                          ? `Context: ${(llmProviders[provider].models.find((m) => m.id === model)?.contextWindow || 0).toLocaleString()} tokens`
+                          : ""}
+                        {llmProviders[provider].models.find(
+                          (m) => m.id === model
+                        )?.costPer1KTokens
+                          ? ` • Cost: $${(llmProviders[provider].models.find((m) => m.id === model)?.costPer1KTokens || 0).toFixed(5)}/1K tokens`
+                          : ""}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between">
+                      <label className="text-sm font-medium mb-1">
+                        Temperature
+                      </label>
+                      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                        {temperature.toFixed(1)}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="2.0"
+                      step="0.1"
+                      value={temperature}
+                      onChange={(e) =>
+                        setTemperature(parseFloat(e.target.value))
+                      }
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-[hsl(var(--muted-foreground))]">
+                      <span>Precise</span>
+                      <span>Creative</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+          {promptError && ( // Display prompt saving error inside the modal
+            <p className="mt-4 text-sm text-destructive-500 dark:text-destructive-400 text-center">
+              {promptError}
+            </p>
+          )}
+          <DialogFooter className="mt-6">
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            {/* The submit button is now part of PromptForm */}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Show summary of selected prompt/model */}
+      <div className="mb-4 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div>
+            <div className="text-xs text-[hsl(var(--foreground-muted))] mb-1">
+              Prompt
+            </div>
+            <div className="font-medium text-[hsl(var(--foreground))] dark:text-white whitespace-pre-line">
+              {context}
+            </div>
+          </div>
+          <div className="flex flex-col md:items-end gap-1 min-w-[180px]">
+            <div className="text-xs text-[hsl(var(--foreground-muted))]">
+              Model
+            </div>
+            <div className="font-mono text-sm text-[hsl(var(--foreground))] dark:text-white">
+              {(model && findModelById(model)?.model?.name) || model}
+            </div>
+            <div className="text-xs text-[hsl(var(--foreground-muted))]">
+              {provider && llmProviders[provider as ProviderId]
+                ? llmProviders[provider as ProviderId].name
+                : ""}
             </div>
           </div>
         </div>
-
-        <Button
-          onClick={() => handleGenerate()}
-          disabled={isGenerating}
-          variant="outline"
-          className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
-        >
-          {isGenerating ? "Generating..." : "Generate Caption"}
-        </Button>
-
-        {error && (
-          <p className="text-sm text-destructive-500 dark:text-destructive-400">
-            {error}
-          </p>
-        )}
-
-        {/* Grid layout for all captions */}
-        <div className="space-y-6">
-          {/* Instagram Captions */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <Instagram className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-              <span className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                Instagram Captions
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Generated caption (only if it's Instagram) */}
-              {generatedCaption && platform === "instagram" && (
-                <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
-                  <p
-                    className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
-                    onKeyDown={(e) => {
-                      if (
-                        [
-                          "ArrowLeft",
-                          "ArrowRight",
-                          "ArrowUp",
-                          "ArrowDown",
-                        ].includes(e.key)
-                      ) {
-                        e.stopPropagation();
-                      }
-                    }}
-                  >
-                    {generatedCaption}
-                  </p>
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(generatedCaption, "generated")}
-                      className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                      title="Copy caption"
-                    >
-                      {copiedId === "generated" ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="absolute bottom-2 right-2">
-                    <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                      New
-                    </span>
-                  </div>
-                </div>
-              )}
-              {/* Saved Instagram captions */}
-              {savedCaptions
-                .filter((caption) => caption.platform === "instagram")
-                .map((caption) => (
-                  <div
-                    key={caption._id}
-                    className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
-                  >
-                    {editingCaptionId === caption._id ? (
-                      <Textarea
-                        value={editingText || caption.caption}
-                        onChange={(e) =>
-                          handleTextChange(e.target.value, caption._id)
-                        }
-                        className="min-h-[200px] w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
-                        onKeyDown={(e) => {
-                          // Only stop propagation for arrow keys, don't prevent default
-                          if (
-                            [
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "ArrowUp",
-                              "ArrowDown",
-                            ].includes(e.key)
-                          ) {
-                            e.stopPropagation();
-                          }
-                          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                            e.preventDefault();
-                            handleSaveEdit(caption._id);
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setEditingCaptionId(null);
-                            setEditingText("");
-                          }
-                        }}
-                      />
-                    ) : (
-                      <p
-                        className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
-                        onKeyDown={(e) => {
-                          if (
-                            [
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "ArrowUp",
-                              "ArrowDown",
-                            ].includes(e.key)
-                          ) {
-                            e.stopPropagation();
-                          }
-                        }}
-                      >
-                        {caption.caption}
-                      </p>
-                    )}
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(caption.caption, caption._id)}
-                        className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                        title="Copy caption"
-                      >
-                        {copiedId === caption._id ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </Button>
-                      {editingCaptionId === caption._id ? (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSaveEdit(caption._id)}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                            title="Save changes"
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCaptionId(null);
-                              setEditingText("");
-                            }}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
-                            title="Cancel editing"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCaptionId(caption._id);
-                              setEditingText(caption.caption);
-                            }}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                            title="Edit caption"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(caption._id)}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
-                            title="Delete caption"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
+        <div className="flex flex-wrap gap-2 mt-2 text-xs text-[hsl(var(--foreground-muted))]">
+          <span>
+            Platform:{" "}
+            <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">
+              {platform}
+            </span>
+          </span>
+          <span>
+            Tone:{" "}
+            <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">
+              {tone}
+            </span>
+          </span>
+          <span>
+            Style:{" "}
+            <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">
+              {style}
+            </span>
+          </span>
+          <span>
+            Length:{" "}
+            <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">
+              {length}
+            </span>
+          </span>
+        </div>
+      </div>
+      <Button
+        onClick={() => handleGenerate()}
+        disabled={isGenerating}
+        variant="outline"
+        className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
+      >
+        {isGenerating ? "Generating..." : "Generate Caption"}
+      </Button>
+      {error && (
+        <p className="text-sm text-destructive-500 dark:text-destructive-400">
+          {error}
+        </p>
+      )}
+      {/* Grid layout for all captions */}
+      <div className="space-y-6">
+        {/* Instagram Captions */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-1.5">
+            <Instagram className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+            <span className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+              Instagram Captions
+            </span>
           </div>
-
-          {/* YouTube Captions */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <Youtube className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-              <span className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                YouTube Captions
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Generated caption (only if it's YouTube) */}
-              {generatedCaption && platform === "youtube" && (
-                <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
-                  <p
-                    className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
-                    onKeyDown={(e) => {
-                      if (
-                        [
-                          "ArrowLeft",
-                          "ArrowRight",
-                          "ArrowUp",
-                          "ArrowDown",
-                        ].includes(e.key)
-                      ) {
-                        e.stopPropagation();
-                      }
-                    }}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Generated caption (only if it's Instagram) */}
+            {generatedCaption && platform === "instagram" && (
+              <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
+                <p
+                  className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
+                  onKeyDown={(e) => {
+                    if (
+                      [
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "ArrowUp",
+                        "ArrowDown",
+                      ].includes(e.key)
+                    ) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  {generatedCaption}
+                </p>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopy(generatedCaption, "generated")}
+                    className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                    title="Copy caption"
                   >
-                    {generatedCaption}
-                  </p>
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {copiedId === "generated" ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+                <div className="absolute bottom-2 right-2">
+                  <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+                    New
+                  </span>
+                </div>
+              </div>
+            )}
+            {/* Saved Instagram captions */}
+            {savedCaptions
+              .filter((caption) => caption.platform === "instagram")
+              .map((caption) => (
+                <div
+                  key={caption._id}
+                  className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
+                >
+                  {editingCaptionId === caption._id ? (
+                    <Textarea
+                      value={editingText || caption.caption}
+                      onChange={(e) =>
+                        handleTextChange(e.target.value, caption._id)
+                      }
+                      className="min-h-[200px] w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
+                      onKeyDown={(e) => {
+                        // Only stop propagation for arrow keys, don't prevent default
+                        if (
+                          [
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                          ].includes(e.key)
+                        ) {
+                          e.stopPropagation();
+                        }
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          handleSaveEdit(caption._id);
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setEditingCaptionId(null);
+                          setEditingText("");
+                        }
+                      }}
+                    />
+                  ) : (
+                    <p
+                      className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
+                      onKeyDown={(e) => {
+                        if (
+                          [
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                          ].includes(e.key)
+                        ) {
+                          e.stopPropagation();
+                        }
+                      }}
+                    >
+                      {caption.caption}
+                    </p>
+                  )}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopy(generatedCaption, "generated")}
+                      onClick={() => handleCopy(caption.caption, caption._id)}
                       className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
                       title="Copy caption"
                     >
-                      {copiedId === "generated" ? (
+                      {copiedId === caption._id ? (
                         <Check className="w-4 h-4" />
                       ) : (
                         <Copy className="w-4 h-4" />
                       )}
                     </Button>
-                  </div>
-                  <div className="absolute bottom-2 right-2">
-                    <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-                      New
-                    </span>
-                  </div>
-                </div>
-              )}
-              {/* Saved YouTube captions */}
-              {savedCaptions
-                .filter((caption) => caption.platform === "youtube")
-                .map((caption) => (
-                  <div
-                    key={caption._id}
-                    className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
-                  >
                     {editingCaptionId === caption._id ? (
-                      <Textarea
-                        value={editingText || caption.caption}
-                        onChange={(e) =>
-                          handleTextChange(e.target.value, caption._id)
-                        }
-                        className="min-h-[200px] w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
-                        onKeyDown={(e) => {
-                          // Only stop propagation for arrow keys, don't prevent default
-                          if (
-                            [
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "ArrowUp",
-                              "ArrowDown",
-                            ].includes(e.key)
-                          ) {
-                            e.stopPropagation();
-                          }
-                          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                            e.preventDefault();
-                            handleSaveEdit(caption._id);
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveEdit(caption._id)}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                          title="Save changes"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
                             setEditingCaptionId(null);
                             setEditingText("");
-                          }
-                        }}
-                      />
+                          }}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
+                          title="Cancel editing"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
                     ) : (
-                      <p
-                        className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
-                        onKeyDown={(e) => {
-                          if (
-                            [
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "ArrowUp",
-                              "ArrowDown",
-                            ].includes(e.key)
-                          ) {
-                            e.stopPropagation();
-                          }
-                        }}
-                      >
-                        {caption.caption}
-                      </p>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingCaptionId(caption._id);
+                            setEditingText(caption.caption);
+                          }}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                          title="Edit caption"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(caption._id)}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
+                          title="Delete caption"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
                     )}
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(caption.caption, caption._id)}
-                        className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                        title="Copy caption"
-                      >
-                        {copiedId === caption._id ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </Button>
-                      {editingCaptionId === caption._id ? (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSaveEdit(caption._id)}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                            title="Save changes"
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCaptionId(null);
-                              setEditingText("");
-                            }}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
-                            title="Cancel editing"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCaptionId(caption._id);
-                              setEditingText(caption.caption);
-                            }}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
-                            title="Edit caption"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(caption._id)}
-                            className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
-                            title="Delete caption"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
                   </div>
-                ))}
-            </div>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {/* YouTube Captions */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-1.5">
+            <Youtube className="w-3.5 h-3.5 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
+            <span className="text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+              YouTube Captions
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Generated caption (only if it's YouTube) */}
+            {generatedCaption && platform === "youtube" && (
+              <div className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors">
+                <p
+                  className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
+                  onKeyDown={(e) => {
+                    if (
+                      [
+                        "ArrowLeft",
+                        "ArrowRight",
+                        "ArrowUp",
+                        "ArrowDown",
+                      ].includes(e.key)
+                    ) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  {generatedCaption}
+                </p>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopy(generatedCaption, "generated")}
+                    className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                    title="Copy caption"
+                  >
+                    {copiedId === "generated" ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+                <div className="absolute bottom-2 right-2">
+                  <span className="text-xs uppercase text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+                    New
+                  </span>
+                </div>
+              </div>
+            )}
+            {/* Saved YouTube captions */}
+            {savedCaptions
+              .filter((caption) => caption.platform === "youtube")
+              .map((caption) => (
+                <div
+                  key={caption._id}
+                  className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors"
+                >
+                  {editingCaptionId === caption._id ? (
+                    <Textarea
+                      value={editingText || caption.caption}
+                      onChange={(e) =>
+                        handleTextChange(e.target.value, caption._id)
+                      }
+                      className="min-h-[200px] w-full resize-none bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-sm pr-8"
+                      onKeyDown={(e) => {
+                        // Only stop propagation for arrow keys, don't prevent default
+                        if (
+                          [
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                          ].includes(e.key)
+                        ) {
+                          e.stopPropagation();
+                        }
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          handleSaveEdit(caption._id);
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setEditingCaptionId(null);
+                          setEditingText("");
+                        }
+                      }}
+                    />
+                  ) : (
+                    <p
+                      className="text-sm whitespace-pre-wrap text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] pr-8"
+                      onKeyDown={(e) => {
+                        if (
+                          [
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "ArrowUp",
+                            "ArrowDown",
+                          ].includes(e.key)
+                        ) {
+                          e.stopPropagation();
+                        }
+                      }}
+                    >
+                      {caption.caption}
+                    </p>
+                  )}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopy(caption.caption, caption._id)}
+                      className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                      title="Copy caption"
+                    >
+                      {copiedId === caption._id ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </Button>
+                    {editingCaptionId === caption._id ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveEdit(caption._id)}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                          title="Save changes"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingCaptionId(null);
+                            setEditingText("");
+                          }}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
+                          title="Cancel editing"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingCaptionId(caption._id);
+                            setEditingText(caption.caption);
+                          }}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground-subtle))]"
+                          title="Edit caption"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(caption._id)}
+                          className="h-8 w-8 p-0 text-[hsl(var(--foreground-muted))] hover:text-destructive-600 dark:text-[hsl(var(--foreground-muted))] dark:hover:text-destructive-400"
+                          title="Delete caption"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       </div>

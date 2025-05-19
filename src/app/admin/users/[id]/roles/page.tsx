@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { AdminGuard } from "@/components/auth/AuthGuard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,11 +28,7 @@ export default function UserRolesPage() {
     return null;
   }
 
-  return (
-    <AdminGuard>
-      <UserRolesContent userId={id} />
-    </AdminGuard>
-  );
+  return <UserRolesContent userId={id} />;
 }
 
 function UserRolesContent({ userId }: { userId: string }) {

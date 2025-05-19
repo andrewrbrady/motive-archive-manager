@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { CAPTION_GUIDELINES } from "@/constants/caption-examples";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { generateText } from "@/lib/llmService";
+import { findModelById } from "@/lib/llmProviders";
 
 interface MessageContent {
   type: "text";
@@ -15,42 +12,249 @@ export async function POST(request: NextRequest) {
   try {
     const {
       platform,
-      context,
+      context = "", // Provide default empty string if missing
+      clientInfo,
       carDetails,
       temperature,
       tone,
       style,
       length,
       template,
+      aiModel,
     } = await request.json();
 
-    if (!platform || !carDetails) {
+    // Log received data for debugging
+    console.log("Caption API received:", {
+      platform,
+      context,
+      clientInfo,
+      aiModel,
+      carDetails: carDetails
+        ? {
+            year: carDetails.year,
+            make: carDetails.make,
+            model: carDetails.model,
+          }
+        : null,
+      template,
+    });
+
+    if (!platform || !carDetails || !aiModel) {
       return NextResponse.json(
         { error: "Missing required parameters" },
         { status: 400 }
       );
     }
 
+    // Validate model exists in our registry
+    const modelInfo = findModelById(aiModel);
+    if (!modelInfo) {
+      return NextResponse.json(
+        { error: `Model '${aiModel}' not found or not supported` },
+        { status: 400 }
+      );
+    }
+
     // Format car specifications for generation only
-    const specs = [
-      `${carDetails.year} ${carDetails.make} ${carDetails.model}`,
-      carDetails.description && `Description: ${carDetails.description}`,
-      carDetails.type && `Type: ${carDetails.type}`,
-      carDetails.color && `Color: ${carDetails.color}`,
-      carDetails.mileage?.value &&
-        `Mileage: ${carDetails.mileage.value}${
-          carDetails.mileage.unit || "mi"
-        }`,
-      carDetails.engine?.type && `Engine: ${carDetails.engine.type}`,
-      carDetails.engine?.displacement?.value &&
-        `Displacement: ${carDetails.engine.displacement.value}${carDetails.engine.displacement.unit}`,
-      carDetails.engine?.power?.hp &&
-        `Power: ${carDetails.engine.power.hp}hp / ${carDetails.engine.power.kW}kW`,
-      carDetails.engine?.torque?.["lb-ft"] &&
-        `Torque: ${carDetails.engine.torque["lb-ft"]}lb-ft / ${carDetails.engine.torque.Nm}Nm`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const specsArray: string[] = [];
+
+    // Helper to add spec if value is valid
+    const addSpec = (label: string, value: any, unit?: string) => {
+      if (value !== null && value !== undefined && value !== "") {
+        specsArray.push(`${label}: ${value}${unit ? unit : ""}`);
+      }
+    };
+
+    // Top-level simple fields
+    addSpec("Make", carDetails.make);
+    addSpec("Model", carDetails.model);
+    addSpec("Year", carDetails.year);
+    addSpec("Color", carDetails.color);
+    addSpec("Horsepower", carDetails.horsepower);
+    addSpec("Condition", carDetails.condition);
+    addSpec("Location", carDetails.location);
+    addSpec("Description", carDetails.description);
+    addSpec("Type", carDetails.type);
+    addSpec("VIN", carDetails.vin);
+    addSpec("Interior Color", carDetails.interior_color);
+    addSpec("Status", carDetails.status);
+
+    // Price
+    if (carDetails.price) {
+      addSpec("List Price", carDetails.price.listPrice);
+      addSpec("Sold Price", carDetails.price.soldPrice);
+    }
+
+    // Mileage
+    if (carDetails.mileage) {
+      addSpec(
+        "Mileage",
+        carDetails.mileage.value,
+        carDetails.mileage.unit ? ` ${carDetails.mileage.unit}` : " mi"
+      );
+    }
+
+    // Engine
+    if (carDetails.engine) {
+      let engineSpecs = "";
+      if (carDetails.engine.type)
+        engineSpecs += `Type: ${carDetails.engine.type}`;
+      if (carDetails.engine.displacement) {
+        engineSpecs += `${engineSpecs ? ", " : ""}Displacement: ${carDetails.engine.displacement.value || ""}${carDetails.engine.displacement.unit || ""}`;
+      }
+      if (carDetails.engine.power) {
+        engineSpecs += `${engineSpecs ? ", " : ""}Power: ${carDetails.engine.power.hp || ""}hp`;
+        if (carDetails.engine.power.kW)
+          engineSpecs += ` / ${carDetails.engine.power.kW}kW`;
+        if (carDetails.engine.power.ps)
+          engineSpecs += ` / ${carDetails.engine.power.ps}ps`;
+      }
+      if (carDetails.engine.torque) {
+        engineSpecs += `${engineSpecs ? ", " : ""}Torque: ${carDetails.engine.torque["lb-ft"] || ""}lb-ft`;
+        if (carDetails.engine.torque.Nm)
+          engineSpecs += ` / ${carDetails.engine.torque.Nm}Nm`;
+      }
+      if (engineSpecs) {
+        specsArray.push(`Engine: ${engineSpecs}`);
+      }
+    }
+
+    // Dimensions
+    if (carDetails.dimensions) {
+      let dimensionSpecs = "";
+      if (carDetails.dimensions.weight) {
+        dimensionSpecs += `Weight: ${carDetails.dimensions.weight.value || ""}${carDetails.dimensions.weight.unit || ""}`;
+      }
+      if (carDetails.dimensions.gvwr) {
+        dimensionSpecs += `${dimensionSpecs ? ", " : ""}GVWR: ${carDetails.dimensions.gvwr.value || ""}${carDetails.dimensions.gvwr.unit || ""}`;
+      }
+      if (carDetails.dimensions.wheelbase) {
+        dimensionSpecs += `${dimensionSpecs ? ", " : ""}Wheelbase: ${carDetails.dimensions.wheelbase.value || ""}${carDetails.dimensions.wheelbase.unit || ""}`;
+      }
+      if (carDetails.dimensions.trackWidth) {
+        dimensionSpecs += `${dimensionSpecs ? ", " : ""}Track Width: ${carDetails.dimensions.trackWidth.value || ""}${carDetails.dimensions.trackWidth.unit || ""}`;
+      }
+      if (dimensionSpecs) {
+        specsArray.push(`Dimensions: ${dimensionSpecs}`);
+      }
+    }
+
+    // Manufacturing
+    if (carDetails.manufacturing) {
+      let manufacturingSpecs = "";
+      if (carDetails.manufacturing.series)
+        manufacturingSpecs += `Series: ${carDetails.manufacturing.series}`;
+      if (carDetails.manufacturing.trim)
+        manufacturingSpecs += `${manufacturingSpecs ? ", " : ""}Trim: ${carDetails.manufacturing.trim}`;
+      if (carDetails.manufacturing.bodyClass)
+        manufacturingSpecs += `${manufacturingSpecs ? ", " : ""}Body Class: ${carDetails.manufacturing.bodyClass}`;
+      if (carDetails.manufacturing.plant) {
+        let plantInfo = "";
+        if (carDetails.manufacturing.plant.city)
+          plantInfo += carDetails.manufacturing.plant.city;
+        if (carDetails.manufacturing.plant.country)
+          plantInfo += `${plantInfo ? ", " : ""}${carDetails.manufacturing.plant.country}`;
+        if (carDetails.manufacturing.plant.company)
+          plantInfo += `${plantInfo ? " (" : ""}${carDetails.manufacturing.plant.company}${plantInfo ? ")" : ""}`;
+        if (plantInfo)
+          manufacturingSpecs += `${manufacturingSpecs ? ", " : ""}Plant: ${plantInfo}`;
+      }
+      if (manufacturingSpecs) {
+        specsArray.push(`Manufacturing: ${manufacturingSpecs}`);
+      }
+    }
+
+    // Adding other potential fields from your previous attempt if they exist in carDetails and are simple
+    // This is a safeguard for any fields I might have missed from your example but were in the prior logic
+    const otherSimpleFields = [
+      "transmission",
+      "drivetrain",
+      "bodyStyle",
+      "exteriorColor",
+      "interiorMaterial",
+    ];
+    otherSimpleFields.forEach((field) => {
+      if (
+        carDetails[field] !== null &&
+        carDetails[field] !== undefined &&
+        carDetails[field] !== ""
+      ) {
+        // Convert camelCase to Title Case for label
+        const label = field
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, (str) => str.toUpperCase());
+        addSpec(label, carDetails[field]);
+      }
+    });
+
+    // Complex objects that might contain arbitrary key-value pairs (less structured than engine/dimensions)
+    // For these, we'll iterate keys if the object exists
+    const otherComplexObjects: { [key: string]: string } = {
+      Features: "features", // Assuming 'features' in carDetails is an object or array
+      Options: "options",
+      History: "history",
+      Provenance: "provenance",
+      Modifications: "modifications",
+      Flaws: "flaws",
+      "Known Issues": "known_issues", // maps to carDetails.known_issues
+      "Service History": "service_history",
+      "Ownership History": "ownership_history",
+      Performance: "performance",
+      "Auction Details": "auction_details", // maps to carDetails.auction_details
+    };
+
+    for (const [label, carDetailKey] of Object.entries(otherComplexObjects)) {
+      const objValue = carDetails[carDetailKey];
+      if (
+        objValue &&
+        typeof objValue === "object" &&
+        Object.keys(objValue).length > 0
+      ) {
+        const nestedSpecs: string[] = [];
+        if (Array.isArray(objValue)) {
+          // If it's an array of strings/numbers
+          if (objValue.length > 0) {
+            nestedSpecs.push(
+              objValue
+                .filter(
+                  (item) => item !== null && item !== undefined && item !== ""
+                )
+                .join(", ")
+            );
+          }
+        } else {
+          // If it's an object
+          for (const [key, value] of Object.entries(objValue)) {
+            if (value !== null && value !== undefined && value !== "") {
+              if (typeof value === "object" && !Array.isArray(value)) {
+                const subNested = Object.entries(value)
+                  .filter(
+                    ([_, sv]) => sv !== null && sv !== undefined && sv !== ""
+                  )
+                  .map(([sk, sv]) => `${sk}: ${sv}`)
+                  .join(", ");
+                if (subNested) nestedSpecs.push(`${key}: (${subNested})`);
+              } else if (Array.isArray(value) && value.length > 0) {
+                nestedSpecs.push(`${key}: ${value.join(", ")}`);
+              } else {
+                nestedSpecs.push(`${key}: ${value}`);
+              }
+            }
+          }
+        }
+        if (
+          nestedSpecs.length > 0 &&
+          nestedSpecs.some((s) => s.trim() !== "")
+        ) {
+          specsArray.push(`${label}:\\n  ${nestedSpecs.join("\\n  ")}`);
+        }
+      } else if (typeof objValue === "string" && objValue !== "") {
+        // Handle if it's a direct string
+        addSpec(label, objValue);
+      }
+    }
+
+    const specs = specsArray.join("\\n");
 
     // Get platform-specific guidelines
     const guidelines =
@@ -82,6 +286,14 @@ export async function POST(request: NextRequest) {
       storytelling: "Weave the car's features into a compelling narrative",
     };
 
+    // Add client handle instruction if provided
+    let clientHandleInstruction = "";
+    if (clientInfo && clientInfo.includeInCaption && clientInfo.handle) {
+      clientHandleInstruction = `
+- Be sure to mention the client/dealer handle in the caption: ${clientInfo.handle}`;
+      console.log("Adding client handle instruction:", clientHandleInstruction);
+    }
+
     // Add description to the prompt instructions
     const promptInstructions = `
 - Start with the title line in the specified format
@@ -93,136 +305,95 @@ export async function POST(request: NextRequest) {
 - Maintain the specified tone and style
 - Do not mention price unless specifically provided
 - Do not make assumptions about the car's history or modifications
+${template === "dealer" ? "- Do not include the dealer reference - it will be added separately" : ""}
+- Use proper formatting based on the platform
+- Make the title descriptive and impactful, focusing on a key feature or characteristic${clientHandleInstruction}
+- End with relevant hashtags on a new line
+- Each hashtag cloud must include the #make and #model of the car 
+- Do not get too creative or clever with the hashtags
+- Each caption needs to include the hashtags #motivearchive and #thecollectorsresrouce at the very end, without exception`;
+
+    // Build system prompt that works across providers
+    const systemPrompt = `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
+
+${guidelines.map((g) => `- ${g}`).join("\n")}
+
+Length Guideline: ${
+      lengthGuidelines[length as keyof typeof lengthGuidelines] ||
+      lengthGuidelines.standard
+    }
+Tone Guideline: ${
+      toneGuidelines[tone as keyof typeof toneGuidelines] ||
+      toneGuidelines.professional
+    }
+Style Guideline: ${
+      styleGuidelines[style as keyof typeof styleGuidelines] ||
+      styleGuidelines.descriptive
+    }
+
+${context ? `USER'S SPECIFIC INSTRUCTIONS: ${context}` : ""}
+
+The first line of every caption must follow this format:
+[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
+Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
+
 ${
-  template === "dealer"
-    ? "- Do not include the dealer reference - it will be added separately"
+  clientInfo && clientInfo.includeInCaption && clientInfo.handle
+    ? `IMPORTANT: You MUST include the client/dealer handle ${clientInfo.handle} in the caption.`
     : ""
 }
-- Use proper formatting based on the platform
-- Make the title descriptive and impactful, focusing on a key feature or characteristic
-- End with relevant hashtags on a new line`;
 
-    // If this is a question template, use different instructions
-    if (template === "question") {
-      // Generate a caption that will lead into the provided question
-      const response = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 500,
-        temperature: temperature || 1.0,
-        system: `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
+Important: End the caption with relevant hashtags on a new line.`;
 
-${guidelines.map((g) => `- ${g}`).join("\n")}
-
-Length Guideline: ${
-          lengthGuidelines[length as keyof typeof lengthGuidelines] ||
-          lengthGuidelines.standard
-        }
-Tone Guideline: ${
-          toneGuidelines[tone as keyof typeof toneGuidelines] ||
-          toneGuidelines.professional
-        }
-Style Guideline: ${
-          styleGuidelines[style as keyof typeof styleGuidelines] ||
-          styleGuidelines.descriptive
-        }
-
-The first line of every caption must follow this format:
-[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
-Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
-
-Important: End the caption with relevant hashtags on a new line.`,
-        messages: [
-          {
-            role: "user",
-            content: `Create a caption for this car that will lead into this specific question: ${context}
+    // User prompt construction
+    let userPrompt = `Create a caption for this car${
+      template === "dealer" ? " that will lead into a dealer reference" : ""
+    }:
 
 Car Specifications:
 ${specs}
 
+User's specific instructions: ${context}
+
 Follow these rules:
-${promptInstructions}`,
-          },
-        ],
-      });
+${promptInstructions}`;
 
-      const captionContent = response.content[0];
-      if (!captionContent || captionContent.type !== "text") {
-        throw new Error("Failed to generate caption");
-      }
-
-      // Find the last occurrence of hashtags
-      const captionText = captionContent.text.trim();
-      const hashtagIndex = captionText.lastIndexOf("\n#");
-
-      // Split content and hashtags
-      const mainContent =
-        hashtagIndex !== -1
-          ? captionText.slice(0, hashtagIndex).trim()
-          : captionText;
-      const hashtags =
-        hashtagIndex !== -1 ? captionText.slice(hashtagIndex).trim() : "";
-
-      // Combine the caption with the existing question and hashtags
-      const combinedCaption = `${mainContent}\n\n${context
-        .replace(/^["']|["']$/g, "")
-        .trim()}${hashtags ? `\n\n${hashtags}` : ""}`;
-
-      // Return only the caption text
-      return NextResponse.json({ caption: combinedCaption });
+    // Add client handle instruction to the user prompt as well for emphasis
+    if (clientInfo && clientInfo.includeInCaption && clientInfo.handle) {
+      userPrompt += `\n\nIMPORTANT: You MUST include the client/dealer handle ${clientInfo.handle} in the caption.`;
     }
 
-    // Regular caption generation (including dealer template)
-    const response = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 1000,
-      temperature: temperature || 1.0,
-      system: `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
-
-${guidelines.map((g) => `- ${g}`).join("\n")}
-
-Length Guideline: ${
-        lengthGuidelines[length as keyof typeof lengthGuidelines] ||
-        lengthGuidelines.standard
-      }
-Tone Guideline: ${
-        toneGuidelines[tone as keyof typeof toneGuidelines] ||
-        toneGuidelines.professional
-      }
-Style Guideline: ${
-        styleGuidelines[style as keyof typeof styleGuidelines] ||
-        styleGuidelines.descriptive
-      }
-
-The first line of every caption must follow this format:
-[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
-Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
-
-Important: End the caption with relevant hashtags on a new line.`,
-      messages: [
-        {
-          role: "user",
-          content: `Create a caption for this car${
-            template === "dealer"
-              ? " that will lead into a dealer reference"
-              : ""
-          }:
+    // If this is a question template, adapt the prompt accordingly
+    if (template === "question") {
+      userPrompt = `Create a caption for this car that will lead into this specific question: ${context}
 
 Car Specifications:
 ${specs}
 
 Follow these rules:
-${promptInstructions}`,
-        },
-      ],
+${promptInstructions}`;
+    }
+
+    // Log the final prompt
+    console.log("FINAL PROMPT BEING SENT:", {
+      userPrompt: userPrompt.substring(0, 300) + "...",
+      systemPrompt: systemPrompt.substring(0, 300) + "...",
+      context,
     });
 
-    const content = response.content[0] as MessageContent;
-    if (!content.text) {
-      throw new Error("Failed to generate caption");
-    }
+    // Generate the caption using our provider-agnostic service
+    const generationResponse = await generateText({
+      modelId: aiModel,
+      prompt: userPrompt,
+      systemPrompt,
+      params: {
+        temperature: temperature || modelInfo.model.defaultTemperature,
+        maxTokens: template === "question" ? 500 : 1000,
+      },
+    });
 
-    // Find the last occurrence of hashtags
-    const captionText = content.text.trim();
+    // Process the output in a standardized way regardless of provider
+    const captionText = generationResponse.text.trim();
     const hashtagIndex = captionText.lastIndexOf("\n#");
 
     // Split content and hashtags
@@ -233,20 +404,21 @@ ${promptInstructions}`,
     const hashtags =
       hashtagIndex !== -1 ? captionText.slice(hashtagIndex).trim() : "";
 
-    // Handle templates that need a reference line before hashtags
-    if (template === "dealer" || template === "bat") {
-      const cleanedContext = context
-        .replace(/Please include this at the end of the caption:.*$/, "")
-        .trim();
-      const finalCaption = `${mainContent}\n\n${cleanedContext}${
-        hashtags ? `\n\n${hashtags}` : ""
-      }`;
-      // Return only the caption text
-      return NextResponse.json({ caption: finalCaption });
-    }
+    // Regular caption with possible client handle - REMOVE forcing the handle
+    let finalContent = mainContent;
 
-    // Return only the caption text
-    const finalCaption = `${mainContent}${hashtags ? `\n\n${hashtags}` : ""}`;
+    // No longer force-adding client handle - it should be included by the LLM in an appropriate way
+    // based on its instructions, not artificially injected
+
+    // Add hashtags
+    let lowerHashtags = hashtags
+      ? hashtags
+          .split(/\n/)
+          .map((line) => (line.startsWith("#") ? line.toLowerCase() : line))
+          .join("\n")
+      : "";
+
+    const finalCaption = `${finalContent}${lowerHashtags ? `\n\n${lowerHashtags}` : ""}`;
     return NextResponse.json({ caption: finalCaption });
   } catch (error) {
     console.error("Error generating caption:", error);

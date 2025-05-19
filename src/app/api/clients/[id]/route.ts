@@ -23,6 +23,33 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
 
+    // Find and return the client
+    const client = await db.collection("clients").findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!client) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(client);
+  } catch (error) {
+    console.error("Error fetching client:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch client" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const segments = url.pathname.split("/");
+    const id = segments[segments.length - 1];
+
+    const db = await getDatabase();
+
     // Check if there are any associated cars
     const carCount = await db.collection("cars").countDocuments({
       clientId: new ObjectId(id),

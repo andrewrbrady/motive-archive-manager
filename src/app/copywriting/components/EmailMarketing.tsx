@@ -91,6 +91,9 @@ export default function EmailMarketing() {
     },
   });
 
+  // Watch the carId field from the form
+  const watchedCarId = form.watch("carId");
+
   // Fetch cars when component mounts
   useEffect(() => {
     const fetchCars = async () => {
@@ -119,9 +122,9 @@ export default function EmailMarketing() {
     fetchCars();
   }, [toast]);
 
-  // Fetch car details when car ID changes
+  // Fetch car details when carId changes
   useEffect(() => {
-    const carId = form.getValues("carId");
+    const carId = watchedCarId; // Use the watched value
     if (!carId || carId === "none") {
       setSelectedCar(null);
       return;
@@ -147,7 +150,7 @@ export default function EmailMarketing() {
     };
 
     fetchCarDetails();
-  }, [form.watch("carId"), toast]);
+  }, [watchedCarId, toast]); // Dependency is now the watched value and toast
 
   // Handle the generation of instructions based on the prompt
   const handleGenerateInstructions = async () => {

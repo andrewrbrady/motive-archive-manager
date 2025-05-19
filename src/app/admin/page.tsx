@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import AdminTabs from "./AdminTabs";
 import Navbar from "@/components/layout/navbar";
 import { PageTitle } from "@/components/ui/PageTitle";
-import { AdminGuard } from "@/components/auth/AuthGuard";
+// import { AdminGuard } from "@/components/auth/AuthGuard";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard | Motive Archive",
@@ -11,16 +11,14 @@ export const metadata: Metadata = {
 
 export default function AdminPage() {
   return (
-    <AdminGuard>
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="space-y-6">
-            <PageTitle title="Admin Dashboard" />
-            <AdminTabs />
-          </div>
-        </main>
-      </div>
-    </AdminGuard>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="container mx-auto px-4 py-8">
+        <div className="space-y-6">
+          <PageTitle title="Admin Dashboard" />
+          <AdminTabs />
+        </div>
+      </main>
+    </div>
   );
 }

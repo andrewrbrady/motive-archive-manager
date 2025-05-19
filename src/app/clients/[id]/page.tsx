@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function ClientDetailsPage({ params }: any) {
   const [client, setClient] = useState<Client | null>(null);
@@ -28,12 +29,7 @@ export default function ClientDetailsPage({ params }: any) {
   const router = useRouter();
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchClient();
-    fetchClientCars();
-  }, [params.id]);
-
-  const fetchClient = async () => {
+  const fetchClient = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/clients/${params.id}`);
@@ -50,9 +46,9 @@ export default function ClientDetailsPage({ params }: any) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id, toast]);
 
-  const fetchClientCars = async () => {
+  const fetchClientCars = useCallback(async () => {
     try {
       console.log("Fetching cars for client:", params.id);
       const response = await fetch(`/api/clients/${params.id}/cars`);
@@ -69,7 +65,12 @@ export default function ClientDetailsPage({ params }: any) {
         variant: "destructive",
       });
     }
-  };
+  }, [params.id, toast]);
+
+  useEffect(() => {
+    fetchClient();
+    fetchClientCars();
+  }, [params.id, fetchClient, fetchClientCars]);
 
   useEffect(() => {
     console.log("Current cars state:", cars);
@@ -232,13 +233,15 @@ export default function ClientDetailsPage({ params }: any) {
                           <div className="hover:bg-muted/50 transition-colors h-16 flex items-center rounded-b-lg">
                             {car.images?.[0] ? (
                               <div className="w-16 h-16 relative flex-shrink-0 overflow-hidden">
-                                <img
+                                <Image
                                   src={`${car.images[0].url.replace(
                                     "/public",
                                     ""
                                   )}/width=200`}
                                   alt={`${car.year} ${car.make} ${car.model}`}
-                                  className="object-cover w-full h-full"
+                                  fill
+                                  style={{ objectFit: "cover" }}
+                                  sizes="(max-width: 768px) 10vw, 64px"
                                 />
                               </div>
                             ) : (

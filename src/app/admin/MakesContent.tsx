@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Database } from "lucide-react";
 import {
@@ -32,9 +32,27 @@ export default function MakesContent() {
     fetchMakes();
   }, []);
 
+  const filterMakes = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setFilteredMakes(makes);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = makes.filter(
+      (make) =>
+        make.name.toLowerCase().includes(query) ||
+        make.country_of_origin.toLowerCase().includes(query) ||
+        make.parent_company?.toLowerCase().includes(query) ||
+        (make.type && make.type.some((t) => t.toLowerCase().includes(query)))
+    );
+
+    setFilteredMakes(filtered);
+  }, [makes, searchQuery]);
+
   useEffect(() => {
     filterMakes();
-  }, [makes, searchQuery]);
+  }, [makes, searchQuery, filterMakes]);
 
   const fetchMakes = async () => {
     try {
@@ -56,24 +74,6 @@ export default function MakesContent() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const filterMakes = () => {
-    if (!searchQuery.trim()) {
-      setFilteredMakes(makes);
-      return;
-    }
-
-    const query = searchQuery.toLowerCase();
-    const filtered = makes.filter(
-      (make) =>
-        make.name.toLowerCase().includes(query) ||
-        make.country_of_origin.toLowerCase().includes(query) ||
-        make.parent_company?.toLowerCase().includes(query) ||
-        (make.type && make.type.some((t) => t.toLowerCase().includes(query)))
-    );
-
-    setFilteredMakes(filtered);
   };
 
   const resetSearch = () => {
