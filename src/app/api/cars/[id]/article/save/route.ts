@@ -2,66 +2,78 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export const dynamic = "force-dynamic";
+// Configure Vercel runtime
+export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+// POST: Save a generated article
+export async function POST(request: NextRequest) {
   try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 3]; // -3 because the url is /cars/[id]/article/save
+    const db = await getDatabase();
+    const segments = request.nextUrl.pathname.split("/");
+    const carId = segments[segments.indexOf("cars") + 1];
 
-    const { content, name, description, sessionId } = await request.json();
-
-    if (!content) {
+    // Validate car ID
+    if (!carId || !ObjectId.isValid(carId)) {
       return NextResponse.json(
-        { error: "Content is required" },
+        { error: "Valid car ID is required" },
         { status: 400 }
       );
     }
 
-    const db = await getDatabase();
-    const now = new Date();
+    // Parse request body
+    const { articleContent, promptSnapshot, modelUsed, versionName } =
+      await request.json();
 
-    // Create a unique ID for the saved session if not provided
-    const session = sessionId || new ObjectId().toString();
+    // Validate required fields
+    if (!articleContent || !articleContent.trim()) {
+      return NextResponse.json(
+        { error: "Article content is required" },
+        { status: 400 }
+      );
+    }
 
-    // Save the article draft
-    const result = await db.collection("saved_articles").updateOne(
-      {
-        carId: new ObjectId(id),
-        sessionId: session,
-      },
-      {
-        $set: {
-          content,
-          name: name || "Untitled Draft",
-          description: description || "",
-          updatedAt: now,
-        },
-        $setOnInsert: {
-          carId: new ObjectId(id),
-          sessionId: session,
-          createdAt: now,
-        },
-      },
-      { upsert: true }
-    );
+    // Verify car exists
+    const car = await db
+      .collection("cars")
+      .findOne({ _id: new ObjectId(carId) });
+    if (!car) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
 
-    return NextResponse.json({
-      success: true,
-      sessionId: session,
-      name: name || "Untitled Draft",
-      updatedAt: now,
-    });
+    // Create article version document
+    const articleVersion = {
+      carId,
+      articleContent,
+      promptSnapshot: promptSnapshot || null,
+      modelUsed: modelUsed || "unknown",
+      versionName: versionName || `Version ${new Date().toLocaleString()}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Save to database
+    const result = await db
+      .collection("car_article_versions")
+      .insertOne(articleVersion);
+
+    if (!result.insertedId) {
+      return NextResponse.json(
+        { error: "Failed to save article version" },
+        { status: 500 }
+      );
+    }
+
+    // Return saved article with ID
+    const savedArticle = {
+      ...articleVersion,
+      _id: result.insertedId,
+    };
+
+    return NextResponse.json(savedArticle, { status: 201 });
   } catch (error) {
-    console.error("Error saving article draft:", error);
+    console.error("Error saving article:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to save article draft",
-      },
+      { error: "Failed to save article" },
       { status: 500 }
     );
   }

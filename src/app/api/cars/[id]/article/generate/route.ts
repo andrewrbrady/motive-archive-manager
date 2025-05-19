@@ -1,154 +1,250 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import ArticlePrompt from "@/models/ArticlePrompt";
+import { dbConnect } from "@/lib/mongodb";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { RateLimiter } from "limiter";
 
+// Configure Vercel runtime
+export const runtime = "nodejs";
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+// Initialize API clients
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Set up rate limiters
+const claudeLimiter = new RateLimiter({
+  tokensPerInterval: 3,
+  interval: "minute",
+});
+
+const openaiLimiter = new RateLimiter({
+  tokensPerInterval: 3,
+  interval: "minute",
+});
+
+// Helper function to estimate tokens
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+// Helper function to handle rate limiting for API calls
+async function callWithRateLimit<T>(
+  fn: () => Promise<T>,
+  llmProvider: string,
+  maxRetries: number = 3
+): Promise<T> {
+  const limiter = llmProvider === "anthropic" ? claudeLimiter : openaiLimiter;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Wait for rate limit token
+      await limiter.removeTokens(1);
+
+      // If not the first attempt, add a delay before retry
+      if (attempt > 0) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 8000); // Exponential backoff, max 8s
+        console.log(
+          `Retry attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      console.error(
+        `API call failed (attempt ${attempt + 1}/${maxRetries}):`,
+        error
+      );
+
+      // If it's not a rate limit error, or we're out of retries, throw
+      if (
+        (error.status !== 429 && !error.message?.includes("Rate limit")) ||
+        attempt === maxRetries - 1
+      ) {
+        throw error;
+      }
+
+      // For rate limit errors, continue to next retry
+      console.log("Rate limit hit, will retry with backoff...");
+    }
+  }
+
+  throw lastError || new Error("Max retries exceeded");
+}
+
+export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id") || "";
+  const params = { id };
   try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 3]; // -3 because path is /cars/[id]/article/generate
-
-    const { model = "gpt-4o", style, outline, sections } = await request.json();
-
-    if (!id) {
+    const segments = request.nextUrl.pathname.split("/");
+    const carId = segments[segments.indexOf("cars") + 1];
+    if (!carId || !ObjectId.isValid(carId)) {
       return NextResponse.json(
-        { error: "Car ID is required" },
+        { error: "Valid car ID is required" },
         { status: 400 }
       );
     }
 
-    // Connect to MongoDB
+    // Connect to database
+    await dbConnect();
     const db = await getDatabase();
 
-    // Get car details
-    const car = await db.collection("cars").findOne({ _id: new ObjectId(id) });
+    // Parse request body
+    const {
+      promptText,
+      aiModel,
+      llmProvider = "anthropic",
+      modelParams = { temperature: 0.7 },
+      carData,
+      additionalContext = "",
+      lengthPreference = "medium",
+    } = await request.json();
 
-    if (!car) {
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    if (!promptText) {
+      return NextResponse.json(
+        { error: "Prompt text is required" },
+        { status: 400 }
+      );
     }
 
-    const carInfo = {
-      _id: car._id,
-      make: car.make,
-      model: car.model,
-      year: car.year,
-      trim: car.manufacturing?.trim,
-      engine: car.engine,
-      color: car.color,
-      vin: car.vin,
-    };
-
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    };
-
-    let promptContent = "";
-    let systemPrompt = "";
-
-    // Decide on content generation strategy
-    if (style === "outline" && outline) {
-      // Generate from outline
-      promptContent = `Generate an article about this car using the following outline:\n\n${outline}\n\nInclude all the points from the outline and expand on them appropriately.`;
-      systemPrompt = `You are a professional automotive writer. Write an engaging and informative article about a ${car.year} ${car.make} ${car.model}. 
-      Format your response in markdown. Do not include a title or introduction - start with the first section heading.
-      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
-    } else if (style === "sections" && sections) {
-      // Generate from sections
-      promptContent = `Generate an article about this car with the following sections:\n\n${(
-        sections as string[]
-      )
-        .map((section: string) => `- ${section}`)
-        .join(
-          "\n"
-        )}\n\nCreate content for each section that is informative and engaging.`;
-      systemPrompt = `You are a professional automotive writer. Write an engaging and informative article about a ${car.year} ${car.make} ${car.model}.
-      Format your response in markdown with the requested sections as headings.
-      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
-    } else if (style === "point-by-point" && outline) {
-      // Generate one section at a time
-      const outlinePoints = outline
-        .split("\n")
-        .filter((point: string) => point.trim());
-      const point = outlinePoints[0];
-
-      if (!point) {
-        return NextResponse.json(
-          { error: "Invalid outline point" },
-          { status: 400 }
-        );
+    // Fetch car details if not provided in carData
+    let car;
+    if (!carData || Object.keys(carData).length === 0) {
+      car = await db.collection("cars").findOne({ _id: new ObjectId(carId) });
+      if (!car) {
+        return NextResponse.json({ error: "Car not found" }, { status: 404 });
       }
-
-      promptContent = `Generate content for this section of an article about a ${car.year} ${car.make} ${car.model}:\n\n${point}\n\nCreate approximately 1-2 paragraphs of engaging content.`;
-      systemPrompt = `You are a professional automotive writer. Write an engaging and informative section for an article about a ${car.year} ${car.make} ${car.model}.
-      Format your response in markdown.
-      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
     } else {
-      // Default to general article
-      promptContent = `Write a comprehensive article about this ${car.year} ${car.make} ${car.model}.`;
-      systemPrompt = `You are a professional automotive writer. Write an engaging and informative article about a ${car.year} ${car.make} ${car.model}.
-      Format your response in markdown with appropriate sections. Include:
-      - A section about performance and driving experience
-      - A section about design and aesthetics
-      - A section about technology and features
-      - A section about the car's place in automotive history or its market segment
-      
-      Focus on being accurate, engaging, and maintaining a tone suitable for luxury car enthusiasts.`;
+      car = carData;
     }
 
-    // Use OpenAI to generate the article
-    const generateResponse = await fetch(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model,
+    // Map length preference to word count guidance
+    let lengthGuidance = "";
+    switch (lengthPreference) {
+      case "short":
+        lengthGuidance = "Write a concise article (around 300-500 words).";
+        break;
+      case "medium":
+        lengthGuidance =
+          "Write a standard-length article (around 800-1200 words).";
+        break;
+      case "long":
+        lengthGuidance =
+          "Write a comprehensive article (around 1500-2000 words).";
+        break;
+      case "very-long":
+        lengthGuidance = "Write an in-depth, detailed article (2000+ words).";
+        break;
+      default:
+        lengthGuidance =
+          "Write a standard-length article (around 800-1200 words).";
+    }
+
+    // Build a comprehensive system prompt that includes car data directly
+    const systemPrompt = `You are a professional automotive writer creating detailed, engaging articles for Motive Archive.
+- Your task is to write a article for a ${car.year} ${car.make} ${car.model}
+- Format your response in clean markdown with appropriate headings
+- Focus on accuracy, engaging storytelling, and a tone that appeals to car enthusiasts
+- Highlight the special features of this specific vehicle
+- Do NOT ask for more information - use what is provided
+- Do NOT include image placeholders or references
+- Include a compelling title at the beginning
+- ${lengthGuidance}`;
+
+    // Add more specific details to the user prompt
+    let userPrompt = `${promptText}
+
+Here are the specific details about this ${car.year} ${car.make} ${car.model}:
+
+- Year: ${car.year}
+- Make: ${car.make}
+- Model: ${car.model}
+- VIN: ${car.vin || "Not provided"}
+- Color: ${car.color || car.exteriorColor || "Not specified"}
+- Interior Color: ${car.interior_color || car.interiorColor || "Not specified"}
+${car.mileage ? `- Mileage: ${typeof car.mileage === "object" ? `${car.mileage.value} ${car.mileage.unit || "mi"}` : car.mileage}` : ""}
+${car.engine ? `- Engine: ${typeof car.engine === "object" ? car.engine.type || "Standard" : car.engine}` : ""}
+${car.transmission ? `- Transmission: ${typeof car.transmission === "object" ? car.transmission.type : car.transmission}` : ""}
+
+${car.description ? `Vehicle description:\n${car.description}` : ""}`;
+
+    // Add additional context if provided
+    if (additionalContext && additionalContext.trim()) {
+      userPrompt += `\n\nAdditional context and requirements:\n${additionalContext}`;
+    }
+
+    userPrompt += `\n\nWrite a ${lengthPreference}-length, comprehensive, engaging article about this vehicle that would appeal to car enthusiasts and collectors.`;
+
+    // Generate article using the appropriate LLM provider
+    let articleContent;
+
+    if (llmProvider === "anthropic") {
+      articleContent = await callWithRateLimit(async () => {
+        const response = await anthropic.messages.create({
+          model: aiModel || "claude-3-5-sonnet-20241022",
+          max_tokens: 4000,
+          temperature: modelParams.temperature || 0.7,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: userPrompt,
+            },
+          ],
+        });
+
+        const content = response.content[0];
+        if (!content || content.type !== "text") {
+          throw new Error("Invalid response format from Claude");
+        }
+
+        return content.text;
+      }, llmProvider);
+    } else if (llmProvider === "openai") {
+      articleContent = await callWithRateLimit(async () => {
+        const response = await openai.chat.completions.create({
+          model: aiModel || "gpt-4o",
           messages: [
             {
               role: "system",
               content: systemPrompt,
             },
-            {
-              role: "user",
-              content: `${promptContent}\n\nHere are details about the specific car:\n${JSON.stringify(
-                carInfo,
-                null,
-                2
-              )}`,
-            },
+            { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
-          top_p: 0.9,
-          frequency_penalty: 0.2,
-          presence_penalty: 0.1,
-        }),
-      }
-    );
+          max_tokens: 4000,
+          temperature: modelParams.temperature || 0.7,
+        });
 
-    if (!generateResponse.ok) {
-      console.error(
-        "OpenAI API error:",
-        generateResponse.status,
-        await generateResponse.text()
-      );
+        return response.choices[0].message.content || "";
+      }, llmProvider);
+    } else {
       return NextResponse.json(
-        { error: "Failed to generate article" },
-        { status: 500 }
+        { error: "Unsupported LLM provider" },
+        { status: 400 }
       );
     }
 
-    const data = await generateResponse.json();
-    const content = data.choices[0].message.content;
-
+    // Return the generated article
     return NextResponse.json({
       success: true,
-      content,
-      usage: data.usage,
-      style,
-      model,
+      articleContent,
+      carId,
+      modelUsed: aiModel,
+      llmProvider,
+      lengthPreference,
     });
   } catch (error) {
     console.error("Error generating article:", error);
