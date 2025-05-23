@@ -82,7 +82,7 @@ export default function DeliverableAssignment({
         (user: FirestoreUser) => user.status === "active"
       );
 
-      console.log("Active users count:", eligibleUsers.length);
+      // [REMOVED] // [REMOVED] console.log("Active users count:", eligibleUsers.length);
 
       // Make sure we're setting all active users to the state
       setUsers(eligibleUsers);
@@ -97,8 +97,8 @@ export default function DeliverableAssignment({
   // Add a useEffect for logging the users
   useEffect(() => {
     if (users.length > 0) {
-      console.log("Users state updated:", users.length);
-      console.log("User names:", users.map((u) => u.name).join(", "));
+      // [REMOVED] // [REMOVED] console.log("Users state updated:", users.length);
+      // [REMOVED] // [REMOVED] console.log("User names:", users.map((u) => u.name).join(", "));
     }
   }, [users]);
 

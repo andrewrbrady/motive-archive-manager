@@ -98,11 +98,11 @@ export default function KitsTab() {
   // Reset form when opening create/edit modal
   useEffect(() => {
     if (isCreateModalOpen) {
-      console.log("Modal opened, initializing form state");
+      // [REMOVED] // [REMOVED] console.log("Modal opened, initializing form state");
 
       if (currentKit) {
         // Edit mode - populate form with current kit data
-        console.log("Edit mode for kit:", currentKit);
+        // [REMOVED] // [REMOVED] console.log("Edit mode for kit:", currentKit);
         setFormName(currentKit.name || "");
         setFormDescription(currentKit.description || "");
         setFormStatus(currentKit.status || "available");
@@ -115,11 +115,11 @@ export default function KitsTab() {
         kitItems.forEach((id) => {
           itemsMap[id] = true;
         });
-        console.log("Setting selected items map:", itemsMap);
+        // [REMOVED] // [REMOVED] console.log("Setting selected items map:", itemsMap);
         setSelectedItemsMap(itemsMap);
       } else {
         // Create mode - reset form to defaults
-        console.log("Create mode - resetting form");
+        // [REMOVED] // [REMOVED] console.log("Create mode - resetting form");
         setFormName("");
         setFormDescription("");
         setFormStatus("available");
@@ -130,7 +130,7 @@ export default function KitsTab() {
       fetchInventoryItems();
     } else {
       // Modal closed, clear selections
-      console.log("Modal closed, clearing form state");
+      // [REMOVED] // [REMOVED] console.log("Modal closed, clearing form state");
       setSelectedItemsMap({});
     }
   }, [isCreateModalOpen, currentKit]);
@@ -146,7 +146,7 @@ export default function KitsTab() {
       item.model?.toLowerCase().includes(query);
     // Debug: Log the item ID to ensure it exists and is correct
     if (isCreateModalOpen && matches) {
-      console.log("Matched item:", item.id, item.name);
+      // [REMOVED] // [REMOVED] console.log("Matched item:", item.id, item.name);
     }
     return matches;
   });
@@ -440,7 +440,7 @@ export default function KitsTab() {
         id: item.id || item._id,
       }));
 
-      console.log("Fetched items sample:", processedItems.slice(0, 3));
+      // [REMOVED] // [REMOVED] console.log("Fetched items sample:", processedItems.slice(0, 3));
 
       // Filter out items that are already in other kits
       const availableItems = processedItems.filter(
@@ -464,12 +464,12 @@ export default function KitsTab() {
 
   // Toggle selection of an inventory item with new approach
   const toggleItemSelection = (itemId: string) => {
-    console.log("Toggling item:", itemId);
+    // [REMOVED] // [REMOVED] console.log("Toggling item:", itemId);
 
     setSelectedItemsMap((prev) => {
       const newMap = { ...prev };
       newMap[itemId] = !prev[itemId];
-      console.log("New selection map:", newMap);
+      // [REMOVED] // [REMOVED] console.log("New selection map:", newMap);
       return newMap;
     });
   };
@@ -757,9 +757,9 @@ export default function KitsTab() {
           <Dialog
             open={isCreateModalOpen}
             onOpenChange={(open) => {
-              console.log("Dialog onOpenChange:", open);
+              // [REMOVED] // [REMOVED] console.log("Dialog onOpenChange:", open);
               if (!open) {
-                console.log("Dialog closing, cleaning up state");
+                // [REMOVED] // [REMOVED] console.log("Dialog closing, cleaning up state");
                 setSelectedItemsMap({});
                 setIsCreateModalOpen(false);
                 setCurrentKit(null);
@@ -850,7 +850,7 @@ export default function KitsTab() {
                       <div className="flex flex-col gap-2">
                         {filteredInventoryItems.map((item) => {
                           // Debug: Log each item being rendered
-                          console.log("Rendering item:", item.id, item.name);
+                          // [REMOVED] // [REMOVED] console.log("Rendering item:", item.id, item.name);
                           const isSelected = !!selectedItemsMap[item.id];
 
                           return (

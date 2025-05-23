@@ -15,14 +15,14 @@ export async function GET() {
     }
     const db = client.db("motive_archive");
 
-    console.log("Fetching makes from MongoDB...");
+    // [REMOVED] // [REMOVED] console.log("Fetching makes from MongoDB...");
     const makes = await db
       .collection("makes")
       .find({ active: true })
       .sort({ name: 1 })
       .toArray();
 
-    console.log(`Successfully fetched ${makes.length} makes`);
+    // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${makes.length} makes`);
 
     const formattedMakes = makes.map((make) => ({
       _id: make._id.toString(),

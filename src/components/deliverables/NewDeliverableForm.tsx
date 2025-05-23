@@ -55,22 +55,22 @@ export default function NewDeliverableForm({
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        console.log("NewDeliverableForm: Starting to fetch users...");
+        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Starting to fetch users...");
         const response = await fetch("/api/users");
         if (!response.ok) {
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
 
-        console.log("NewDeliverableForm: Raw API response:", data);
-        console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
+        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Raw API response:", data);
+        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
 
         if (Array.isArray(data)) {
           const activeUsers = data.filter(
             (user: FirestoreUser) => user.status === "active"
           );
-          console.log("NewDeliverableForm: Active users:", activeUsers.length);
-          console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
+          // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Active users:", activeUsers.length);
+          // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
           setUsers(activeUsers);
         } else {
           console.error("Unexpected API response structure:", data);

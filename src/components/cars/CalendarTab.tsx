@@ -72,7 +72,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
 
   const handleSelectEvent = (event: any) => {
     // Implementation for event selection
-    console.log("Event selected:", event);
+    // [REMOVED] // [REMOVED] console.log("Event selected:", event);
   };
 
   return (

@@ -28,13 +28,13 @@ export async function POST(request: Request) {
 
     const { messages, prompt } = await request.json();
 
-    console.log("Processing chat request:");
-    console.log("Car ID:", carId);
-    console.log("Prompt:", prompt);
+    // [REMOVED] // [REMOVED] console.log("Processing chat request:");
+    // [REMOVED] // [REMOVED] console.log("Car ID:", carId);
+    // [REMOVED] // [REMOVED] console.log("Prompt:", prompt);
 
     // Search for relevant research chunks
     const researchChunks = await searchResearchVectors(prompt, carId);
-    console.log("Number of research chunks found:", researchChunks.length);
+    // [REMOVED] // [REMOVED] console.log("Number of research chunks found:", researchChunks.length);
 
     // Format research context
     const researchContext = researchChunks
@@ -46,7 +46,7 @@ ${chunk.pageContent}
       )
       .join("\n\n");
 
-    console.log("Research context:", researchContext || "No context available");
+    // [REMOVED] // [REMOVED] console.log("Research context:", researchContext || "No context available");
 
     // Prepare chat messages
     const systemMessage = new SystemMessage(

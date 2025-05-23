@@ -42,7 +42,7 @@ async function retryOpenAICall<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        console.log(`Retry attempt ${attempt} for OpenAI analysis`);
+        // [REMOVED] // [REMOVED] console.log(`Retry attempt ${attempt} for OpenAI analysis`);
         // Exponential backoff
         await new Promise((resolve) =>
           setTimeout(resolve, initialDelay * Math.pow(2, attempt - 1))
@@ -69,7 +69,7 @@ function safeJSONParse(text: string): any {
     return JSON.parse(cleanText);
   } catch (error) {
     console.error("Failed to parse JSON from OpenAI response:", error);
-    console.log("Raw text:", text);
+    // [REMOVED] // [REMOVED] console.log("Raw text:", text);
     throw new Error("Failed to parse analysis result");
   }
 }
@@ -77,7 +77,7 @@ function safeJSONParse(text: string): any {
 export async function analyzeImage(imageUrl: string): Promise<ImageAnalysis> {
   console.time("imageAnalysis");
   try {
-    console.log(`Analyzing image: ${imageUrl}`);
+    // [REMOVED] // [REMOVED] console.log(`Analyzing image: ${imageUrl}`);
 
     const response = await retryOpenAICall(async () => {
       return openai.chat.completions.create({

@@ -69,7 +69,7 @@ export function CarAvatar({
         // Set up timeout
         const timeoutId = setTimeout(() => {
           if (fetchController.current) {
-            console.log("CarAvatar: Fetch timeout, aborting");
+            // [REMOVED] // [REMOVED] console.log("CarAvatar: Fetch timeout, aborting");
             fetchController.current.abort();
           }
         }, 5000); // 5 second timeout
@@ -104,7 +104,7 @@ export function CarAvatar({
         if (!mountedRef.current) return;
 
         if (error instanceof DOMException && error.name === "AbortError") {
-          console.log("CarAvatar: Fetch aborted");
+          // [REMOVED] // [REMOVED] console.log("CarAvatar: Fetch aborted");
         } else {
           console.error("CarAvatar: Error fetching image:", error);
           setImageError(true);

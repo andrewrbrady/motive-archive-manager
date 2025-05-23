@@ -15,12 +15,12 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 
 // Debug logging for environment variables (only in development)
 if (process.env.NODE_ENV !== "production") {
-  console.log("Authentication Environment Check:");
+  // [REMOVED] // [REMOVED] console.log("Authentication Environment Check:");
   console.log(
     "- NEXTAUTH_SECRET:",
     process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
   );
-  console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
+  // [REMOVED] // [REMOVED] console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
   console.log(
     "- GOOGLE_CLIENT_ID:",
     process.env.GOOGLE_CLIENT_ID
@@ -31,9 +31,9 @@ if (process.env.NODE_ENV !== "production") {
     "- GOOGLE_CLIENT_SECRET:",
     process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
   );
-  console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
-  console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
-  console.log("- NODE_ENV:", process.env.NODE_ENV || "Not set");
+  // [REMOVED] // [REMOVED] console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
+  // [REMOVED] // [REMOVED] console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
+  // [REMOVED] // [REMOVED] console.log("- NODE_ENV:", process.env.NODE_ENV || "Not set");
 }
 
 export const authConfig: NextAuthConfig = {
@@ -254,7 +254,7 @@ export const authConfig: NextAuthConfig = {
                 status: "active",
               });
               if (process.env.NODE_ENV !== "production") {
-                console.log(`🔧 Updated claims for existing user`);
+                // [REMOVED] // [REMOVED] console.log(`🔧 Updated claims for existing user`);
               }
             }
 
@@ -281,20 +281,20 @@ export const authConfig: NextAuthConfig = {
                   updatedAt: new Date(),
                 });
               if (process.env.NODE_ENV !== "production") {
-                console.log(`📄 Created Firestore document for existing user`);
+                // [REMOVED] // [REMOVED] console.log(`📄 Created Firestore document for existing user`);
               }
             }
 
             return true;
           } catch (error: any) {
             if (process.env.NODE_ENV !== "production") {
-              console.log(`❌ Firebase Auth error:`, error.code, error.message);
+              // [REMOVED] // [REMOVED] console.log(`❌ Firebase Auth error:`, error.code, error.message);
             }
 
             // User doesn't exist in Firebase Auth
             if (error.code === "auth/user-not-found") {
               if (process.env.NODE_ENV !== "production") {
-                console.log(`🆕 Creating new Firebase user`);
+                // [REMOVED] // [REMOVED] console.log(`🆕 Creating new Firebase user`);
               }
 
               // Check if this user was invited
@@ -323,7 +323,7 @@ export const authConfig: NextAuthConfig = {
                   accountType: inviteData.accountType || "personal",
                 };
                 if (process.env.NODE_ENV !== "production") {
-                  console.log(`📧 Found invitation, using invited data`);
+                  // [REMOVED] // [REMOVED] console.log(`📧 Found invitation, using invited data`);
                 }
               } else {
                 if (process.env.NODE_ENV !== "production") {
@@ -349,7 +349,7 @@ export const authConfig: NextAuthConfig = {
 
                 const newUser = await adminAuth.createUser(createUserData);
                 if (process.env.NODE_ENV !== "production") {
-                  console.log(`🔥 Created new Firebase Auth user`);
+                  // [REMOVED] // [REMOVED] console.log(`🔥 Created new Firebase Auth user`);
                 }
 
                 // Set custom claims
@@ -359,7 +359,7 @@ export const authConfig: NextAuthConfig = {
                   status: userData.status,
                 });
                 if (process.env.NODE_ENV !== "production") {
-                  console.log(`🎫 Set custom claims for new user`);
+                  // [REMOVED] // [REMOVED] console.log(`🎫 Set custom claims for new user`);
                 }
 
                 // Create Firestore document
@@ -380,7 +380,7 @@ export const authConfig: NextAuthConfig = {
                     updatedAt: new Date(),
                   });
                 if (process.env.NODE_ENV !== "production") {
-                  console.log(`📄 Created Firestore document for new user`);
+                  // [REMOVED] // [REMOVED] console.log(`📄 Created Firestore document for new user`);
                 }
 
                 // Clean up invitation document if it existed
@@ -390,12 +390,12 @@ export const authConfig: NextAuthConfig = {
                     .doc(inviteDocId)
                     .delete();
                   if (process.env.NODE_ENV !== "production") {
-                    console.log(`🧹 Cleaned up invitation document`);
+                    // [REMOVED] // [REMOVED] console.log(`🧹 Cleaned up invitation document`);
                   }
                 }
 
                 if (process.env.NODE_ENV !== "production") {
-                  console.log(`✅ Successfully created new user`);
+                  // [REMOVED] // [REMOVED] console.log(`✅ Successfully created new user`);
                 }
                 return true;
               } catch (createError: any) {
@@ -421,7 +421,7 @@ export const authConfig: NextAuthConfig = {
 
         // For non-Google providers
         if (process.env.NODE_ENV !== "production") {
-          console.log(`🔍 Non-Google provider sign-in: ${account?.provider}`);
+          // [REMOVED] // [REMOVED] console.log(`🔍 Non-Google provider sign-in: ${account?.provider}`);
         }
         return true;
       } catch (error) {

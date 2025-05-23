@@ -136,7 +136,7 @@ interface GallerySelectionDialogProps {
 
 export default function AdvancedMDXTab() {
   if (process.env.NODE_ENV !== "production") {
-    console.log("AdvancedMDXTab rendering");
+    // [REMOVED] // [REMOVED] console.log("AdvancedMDXTab rendering");
   }
   const [files, setFiles] = useState<AdvancedMDXFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<AdvancedMDXFile | null>(
@@ -175,7 +175,7 @@ export default function AdvancedMDXTab() {
           throw new Error(data.error || "Failed to load advanced MDX files");
         }
 
-        console.log("AdvancedMDXTab - Received files from API:", data.files);
+        // [REMOVED] // [REMOVED] console.log("AdvancedMDXTab - Received files from API:", data.files);
 
         // Ensure each file has the required properties
         const processedFiles = data.files.map((file: any) => ({
@@ -186,7 +186,7 @@ export default function AdvancedMDXTab() {
           frontmatter: file.frontmatter || {},
         }));
 
-        console.log("AdvancedMDXTab - Processed files:", processedFiles);
+        // [REMOVED] // [REMOVED] console.log("AdvancedMDXTab - Processed files:", processedFiles);
         setFiles(processedFiles);
       } catch (error) {
         console.error("Error loading advanced MDX files:", error);
@@ -428,7 +428,7 @@ Enter documentation and heritage information here...
   };
 
   const handleFileChange = (newContent: string | undefined) => {
-    console.log("File content changed:", newContent);
+    // [REMOVED] // [REMOVED] console.log("File content changed:", newContent);
     if (selectedFile && newContent !== undefined) {
       setFiles((prevFiles) =>
         prevFiles.map((file) =>
@@ -486,7 +486,7 @@ Enter documentation and heritage information here...
     gallery: IGallery,
     type: GalleryDisplayType
   ) => {
-    console.log("Inserting gallery:", gallery, "with type:", type);
+    // [REMOVED] // [REMOVED] console.log("Inserting gallery:", gallery, "with type:", type);
 
     if (!gallery._id || !selectedFile) {
       toast({
@@ -893,7 +893,7 @@ ${galleryData.images
                   </div>
 
                   {files.map((file) => {
-                    console.log("Rendering file:", file);
+                    // [REMOVED] // [REMOVED] console.log("Rendering file:", file);
                     return (
                       <div
                         key={file._id || file.filename}
@@ -905,7 +905,7 @@ ${galleryData.images
                       >
                         <button
                           onClick={() => {
-                            console.log("Selecting file:", file);
+                            // [REMOVED] // [REMOVED] console.log("Selecting file:", file);
                             setSelectedFile(file);
                           }}
                           className="w-full text-left flex items-center gap-2"

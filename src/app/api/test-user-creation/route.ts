@@ -4,29 +4,29 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 export async function POST(request: Request) {
   try {
     const testEmail = `test-${Date.now()}@example.com`;
-    console.log(`🧪 Testing user creation for: ${testEmail}`);
+    // [REMOVED] // [REMOVED] console.log(`🧪 Testing user creation for: ${testEmail}`);
 
     // Step 1: Test Firebase Auth user creation
-    console.log(`Step 1: Creating Firebase Auth user...`);
+    // [REMOVED] // [REMOVED] console.log(`Step 1: Creating Firebase Auth user...`);
     const newUser = await adminAuth.createUser({
       email: testEmail,
       emailVerified: true,
       displayName: "Test User",
       disabled: false,
     });
-    console.log(`✅ Firebase Auth user created: ${newUser.uid}`);
+    // [REMOVED] // [REMOVED] console.log(`✅ Firebase Auth user created: ${newUser.uid}`);
 
     // Step 2: Test custom claims
-    console.log(`Step 2: Setting custom claims...`);
+    // [REMOVED] // [REMOVED] console.log(`Step 2: Setting custom claims...`);
     await adminAuth.setCustomUserClaims(newUser.uid, {
       roles: ["user"],
       creativeRoles: [],
       status: "active",
     });
-    console.log(`✅ Custom claims set`);
+    // [REMOVED] // [REMOVED] console.log(`✅ Custom claims set`);
 
     // Step 3: Test Firestore document creation
-    console.log(`Step 3: Creating Firestore document...`);
+    // [REMOVED] // [REMOVED] console.log(`Step 3: Creating Firestore document...`);
     await adminDb
       .collection("users")
       .doc(newUser.uid)
@@ -43,13 +43,13 @@ export async function POST(request: Request) {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-    console.log(`✅ Firestore document created`);
+    // [REMOVED] // [REMOVED] console.log(`✅ Firestore document created`);
 
     // Step 4: Clean up test user
-    console.log(`Step 4: Cleaning up test user...`);
+    // [REMOVED] // [REMOVED] console.log(`Step 4: Cleaning up test user...`);
     await adminDb.collection("users").doc(newUser.uid).delete();
     await adminAuth.deleteUser(newUser.uid);
-    console.log(`✅ Test user cleaned up`);
+    // [REMOVED] // [REMOVED] console.log(`✅ Test user cleaned up`);
 
     return NextResponse.json({
       success: true,

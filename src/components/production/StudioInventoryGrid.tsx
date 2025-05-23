@@ -288,7 +288,7 @@ export default function StudioInventoryGrid({
 
         // Use the uploadToCloudflare function instead of direct fetch
         const result = await uploadToCloudflare(imageFile);
-        console.log("Upload success response:", result);
+        // [REMOVED] // [REMOVED] console.log("Upload success response:", result);
 
         // Use the image URL from the result
         const imageUrl = result.url;

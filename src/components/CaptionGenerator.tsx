@@ -281,7 +281,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       let contextToUse = context;
 
       // Always send the context as the prompt, regardless of client handle
-      console.log("Debug - sending prompt:", contextToUse);
+      // [REMOVED] // [REMOVED] console.log("Debug - sending prompt:", contextToUse);
 
       const clientInfo =
         includeClientHandle && clientHandle

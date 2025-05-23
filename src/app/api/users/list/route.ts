@@ -41,7 +41,7 @@ export async function GET(
     });
 
     if (!session?.user?.roles?.includes("admin")) {
-      console.log("User does not have admin role:", session?.user);
+      // [REMOVED] // [REMOVED] console.log("User does not have admin role:", session?.user);
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 403 }

@@ -66,7 +66,7 @@ function DashboardInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  console.log("Dashboard: Component mounted/updated");
+  // [REMOVED] // [REMOVED] console.log("Dashboard: Component mounted/updated");
   console.log("Dashboard: Session status:", {
     hasSession: !!session,
     hasUser: !!session?.user,
@@ -77,11 +77,11 @@ function DashboardInner() {
   });
 
   const fetchUserDeliverables = async () => {
-    console.log("Dashboard: fetchUserDeliverables - checking session");
-    console.log("Dashboard: session?.user?.id =", session?.user?.id);
+    // [REMOVED] // [REMOVED] console.log("Dashboard: fetchUserDeliverables - checking session");
+    // [REMOVED] // [REMOVED] console.log("Dashboard: session?.user?.id =", session?.user?.id);
 
     if (!session?.user?.id) {
-      console.log("Dashboard: No session user ID, returning early");
+      // [REMOVED] // [REMOVED] console.log("Dashboard: No session user ID, returning early");
       return;
     }
 
@@ -103,7 +103,7 @@ function DashboardInner() {
       url.searchParams.append("sortDirection", "desc");
       url.searchParams.append("limit", "100");
 
-      console.log("Dashboard: API URL:", url.toString());
+      // [REMOVED] // [REMOVED] console.log("Dashboard: API URL:", url.toString());
 
       const response = await fetch(url.toString());
       if (!response.ok) {
@@ -117,7 +117,7 @@ function DashboardInner() {
         deliverableCount: data.deliverables?.length || 0,
         pagination: data.pagination,
       });
-      console.log("Dashboard: Full API response data:", data);
+      // [REMOVED] // [REMOVED] console.log("Dashboard: Full API response data:", data);
       console.log(
         "Dashboard: First few deliverables:",
         data.deliverables?.slice(0, 3)
@@ -139,10 +139,10 @@ function DashboardInner() {
     });
 
     if (session?.user?.id) {
-      console.log("Dashboard: Calling fetchUserDeliverables");
+      // [REMOVED] // [REMOVED] console.log("Dashboard: Calling fetchUserDeliverables");
       fetchUserDeliverables();
     } else {
-      console.log("Dashboard: Not calling fetchUserDeliverables - no user ID");
+      // [REMOVED] // [REMOVED] console.log("Dashboard: Not calling fetchUserDeliverables - no user ID");
     }
   }, [session?.user?.id, refreshTrigger]);
 

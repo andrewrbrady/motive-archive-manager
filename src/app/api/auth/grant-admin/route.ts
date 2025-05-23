@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       });
     } catch (error) {
       if ((error as any)?.errorInfo?.code === "auth/user-not-found") {
-        console.log("Creating new Firebase user...");
+        // [REMOVED] // [REMOVED] console.log("Creating new Firebase user...");
         // Create the user in Firebase Auth
         firebaseUser = await adminAuth.createUser({
           email: session.user.email,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       creativeRoles: [],
       status: "active",
     });
-    console.log("Set Firebase Auth custom claims");
+    // [REMOVED] // [REMOVED] console.log("Set Firebase Auth custom claims");
 
     // Create or update Firestore document
     const userDoc = await adminDb
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       };
 
       await adminDb.collection("users").doc(firebaseUser.uid).set(userData);
-      console.log("Created new Firestore document");
+      // [REMOVED] // [REMOVED] console.log("Created new Firestore document");
     } else {
       await adminDb
         .collection("users")
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
           name: session.user.name || session.user.email.split("@")[0],
           photoURL: session.user.image || null,
         });
-      console.log("Updated existing Firestore document");
+      // [REMOVED] // [REMOVED] console.log("Updated existing Firestore document");
     }
 
     // Return success with instructions

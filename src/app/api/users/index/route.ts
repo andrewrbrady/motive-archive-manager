@@ -44,7 +44,7 @@ async function getUsers(request: NextRequest) {
 
     // Check if user has admin role
     if (!session?.user?.roles?.includes("admin")) {
-      console.log("Access denied: User does not have admin role in any system");
+      // [REMOVED] // [REMOVED] console.log("Access denied: User does not have admin role in any system");
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 403 }
@@ -139,7 +139,7 @@ async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
       );
     }
 
-    console.log(`Processing user invitation for email: ${data.email}`);
+    // [REMOVED] // [REMOVED] console.log(`Processing user invitation for email: ${data.email}`);
 
     // Check if user already exists in Firebase Auth
     try {
@@ -175,7 +175,7 @@ async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
 
       await adminDb.collection("users").doc(existingUser.uid).update(userData);
 
-      console.log(`Updated existing user: ${existingUser.uid}`);
+      // [REMOVED] // [REMOVED] console.log(`Updated existing user: ${existingUser.uid}`);
 
       return NextResponse.json({
         ...userData,
@@ -213,7 +213,7 @@ async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
           .doc(docId)
           .set(invitedUserData);
 
-        console.log(`Created invitation for user: ${data.email}`);
+        // [REMOVED] // [REMOVED] console.log(`Created invitation for user: ${data.email}`);
 
         return NextResponse.json({
           ...invitedUserData,

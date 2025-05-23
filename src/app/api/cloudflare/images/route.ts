@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         const client = await getMongoClient();
         // Test the connection
         await client.db("admin").command({ ping: 1 });
-        console.log("MongoDB connection established successfully");
+        // [REMOVED] // [REMOVED] console.log("MongoDB connection established successfully");
         return client;
       } catch (error) {
         retryCount++;
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
 
           const { analysis } = await analysisResponse.json();
           imageAnalysis = analysis;
-          console.log(`Image analysis result for ${file.name}:`, imageAnalysis);
+          // [REMOVED] // [REMOVED] console.log(`Image analysis result for ${file.name}:`, imageAnalysis);
           break; // Success, exit retry loop
         } catch (error) {
           analysisError = error;
@@ -400,7 +400,7 @@ export async function POST(request: NextRequest) {
 
   const processImages = async () => {
     try {
-      console.log("Starting image upload process in API route");
+      // [REMOVED] // [REMOVED] console.log("Starting image upload process in API route");
 
       const formData = await request.formData();
       const fileCount = parseInt(formData.get("fileCount") as string) || 0;
@@ -454,7 +454,7 @@ export async function POST(request: NextRequest) {
         if (file) {
           files.push(file);
         } else {
-          console.log(`File ${i} not found in FormData`);
+          // [REMOVED] // [REMOVED] console.log(`File ${i} not found in FormData`);
         }
       }
 
@@ -502,7 +502,7 @@ export async function POST(request: NextRequest) {
       if (mongoClient) {
         try {
           await mongoClient.close();
-          console.log("MongoDB connection closed successfully");
+          // [REMOVED] // [REMOVED] console.log("MongoDB connection closed successfully");
         } catch (error) {
           console.error("Error closing MongoDB connection:", error);
         }
@@ -528,13 +528,13 @@ export async function DELETE(request: NextRequest) {
     const requestData = await request.json();
     const { imageIds = [], cloudflareIds = [] } = requestData;
 
-    console.log("======== CLOUDFLARE DIRECT DELETE API CALLED ========");
-    console.log("Request URL:", request.url);
+    // [REMOVED] // [REMOVED] console.log("======== CLOUDFLARE DIRECT DELETE API CALLED ========");
+    // [REMOVED] // [REMOVED] console.log("Request URL:", request.url);
     console.log(
       "Request headers:",
       Object.fromEntries([...request.headers.entries()])
     );
-    console.log("DELETE body:", JSON.stringify(requestData, null, 2));
+    // [REMOVED] // [REMOVED] console.log("DELETE body:", JSON.stringify(requestData, null, 2));
 
     if (imageIds.length === 0 && cloudflareIds.length === 0) {
       return NextResponse.json(
@@ -556,7 +556,7 @@ export async function DELETE(request: NextRequest) {
 
     for (const id of allPossibleIds) {
       try {
-        console.log(`Attempting to delete image ${id} from Cloudflare`);
+        // [REMOVED] // [REMOVED] console.log(`Attempting to delete image ${id} from Cloudflare`);
         const response = await fetch(
           `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
           {
@@ -570,7 +570,7 @@ export async function DELETE(request: NextRequest) {
         const result = await response.json();
 
         if (result.success) {
-          console.log(`Successfully deleted image ${id} from Cloudflare`);
+          // [REMOVED] // [REMOVED] console.log(`Successfully deleted image ${id} from Cloudflare`);
           deletedFromCloudflare.push(id);
         } else {
           console.error(
@@ -599,7 +599,7 @@ export async function DELETE(request: NextRequest) {
 
     // First check if these are UUIDs rather than ObjectIds (Cloudflare IDs)
     // Handle both ObjectIds and string IDs to maximize compatibility
-    console.log("Building query to match MongoDB documents...");
+    // [REMOVED] // [REMOVED] console.log("Building query to match MongoDB documents...");
 
     // Try multiple query strategies for maximum effectiveness
     const objectIdQuery = allPossibleIds
@@ -613,7 +613,7 @@ export async function DELETE(request: NextRequest) {
       })
       .filter((item) => item !== null);
 
-    console.log(`Generated ${objectIdQuery.length} valid ObjectId queries`);
+    // [REMOVED] // [REMOVED] console.log(`Generated ${objectIdQuery.length} valid ObjectId queries`);
 
     const cloudflareIdQuery = { cloudflareId: { $in: allPossibleIds } };
 
@@ -623,11 +623,11 @@ export async function DELETE(request: NextRequest) {
     queryConditions.push(cloudflareIdQuery);
 
     const query = { $or: queryConditions };
-    console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
 
     // Find all matching images
     const imagesToDelete = await imagesCollection.find(query).toArray();
-    console.log(`Found ${imagesToDelete.length} images to delete in MongoDB`);
+    // [REMOVED] // [REMOVED] console.log(`Found ${imagesToDelete.length} images to delete in MongoDB`);
 
     if (imagesToDelete.length > 0) {
       console.log("Sample image found:", {
@@ -706,13 +706,13 @@ export async function DELETE(request: NextRequest) {
           { $pull: { imageIds: image._id } as any }
         );
 
-        console.log(`Car update result: ${JSON.stringify(carUpdateResult)}`);
+        // [REMOVED] // [REMOVED] console.log(`Car update result: ${JSON.stringify(carUpdateResult)}`);
 
         // 2. Delete the image document
         const deleteResult = await imagesCollection.deleteOne({
           _id: image._id,
         });
-        console.log(`Image deletion result: ${JSON.stringify(deleteResult)}`);
+        // [REMOVED] // [REMOVED] console.log(`Image deletion result: ${JSON.stringify(deleteResult)}`);
 
         const resultItem = {
           imageId: image._id.toString(),

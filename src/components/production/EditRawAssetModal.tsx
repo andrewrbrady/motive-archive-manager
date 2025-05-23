@@ -55,7 +55,7 @@ const hasProperCarData = (car: any): boolean => {
 // Helper function to fetch a single car by ID - used as a last resort
 const fetchSingleCar = async (carId: string): Promise<any> => {
   try {
-    console.log(`Attempting direct fetch for car with ID: ${carId}`);
+    // [REMOVED] // [REMOVED] console.log(`Attempting direct fetch for car with ID: ${carId}`);
     const response = await fetch(
       `/api/cars/${carId}?fields=_id,year,make,model,color,manufacturing`
     );
@@ -68,7 +68,7 @@ const fetchSingleCar = async (carId: string): Promise<any> => {
     }
 
     const data = await response.json();
-    console.log(`Direct fetch for car ${carId} successful:`, data);
+    // [REMOVED] // [REMOVED] console.log(`Direct fetch for car ${carId} successful:`, data);
 
     // Get the car data from the response
     const car = data.car || data;
@@ -199,7 +199,7 @@ export default function EditRawAssetModal({
     // 1. It's a different asset than we've seen before
     // 2. Or we haven't modified the form yet
     if (currentAssetId !== initialAssetId || (!hasModifiedForm && isOpen)) {
-      console.log("Initializing form with asset:", asset);
+      // [REMOVED] // [REMOVED] console.log("Initializing form with asset:", asset);
 
       // Save this as our initial asset
       setInitialAssetId(currentAssetId);
@@ -249,7 +249,7 @@ export default function EditRawAssetModal({
             return;
           }
 
-          console.log("Car IDs to fetch:", carIdsAsStrings);
+          // [REMOVED] // [REMOVED] console.log("Car IDs to fetch:", carIdsAsStrings);
 
           // Check which cars we already have in the cache
           const cachedCars: any[] = [];
@@ -280,13 +280,13 @@ export default function EditRawAssetModal({
 
           // If all cars are cached, use them directly
           if (missingCarIds.length === 0) {
-            console.log("All cars found in cache:", cachedCars);
+            // [REMOVED] // [REMOVED] console.log("All cars found in cache:", cachedCars);
             setSelectedCars(cachedCars);
             return;
           }
 
           // Fetch only the missing cars
-          console.log("Fetching cars for IDs:", missingCarIds);
+          // [REMOVED] // [REMOVED] console.log("Fetching cars for IDs:", missingCarIds);
 
           const response = await fetch(
             `/api/cars?ids=${missingCarIds.join(
@@ -312,10 +312,10 @@ export default function EditRawAssetModal({
           }
 
           const data = await response.json();
-          console.log("Fetched car data:", data);
+          // [REMOVED] // [REMOVED] console.log("Fetched car data:", data);
 
           if (data && data.cars && Array.isArray(data.cars)) {
-            console.log("Raw car data from API:", data.cars);
+            // [REMOVED] // [REMOVED] console.log("Raw car data from API:", data.cars);
 
             // Process the newly fetched cars
             const newlyFetchedCars = data.cars
@@ -379,7 +379,7 @@ export default function EditRawAssetModal({
               return foundCar;
             });
 
-            console.log("Final processed cars:", orderedCars);
+            // [REMOVED] // [REMOVED] console.log("Final processed cars:", orderedCars);
             setSelectedCars(orderedCars);
 
             // For cars without proper data, try individual fetches
@@ -458,7 +458,7 @@ export default function EditRawAssetModal({
             color: "",
             manufacturing: {},
           }));
-          console.log("Setting fallback car data after error:", fallbackCars);
+          // [REMOVED] // [REMOVED] console.log("Setting fallback car data after error:", fallbackCars);
           setSelectedCars(fallbackCars);
         }
       };
@@ -471,7 +471,7 @@ export default function EditRawAssetModal({
             typeof id === "string" ? id : (id as any).toString()
           );
 
-          console.log("Fetching drives for IDs:", hardDriveIdsAsStrings);
+          // [REMOVED] // [REMOVED] console.log("Fetching drives for IDs:", hardDriveIdsAsStrings);
 
           const promises = hardDriveIdsAsStrings.map(async (hardDriveId) => {
             const response = await fetch(`/api/hard-drives/${hardDriveId}`);
@@ -489,7 +489,7 @@ export default function EditRawAssetModal({
           const drives = (await Promise.all(promises)).filter(
             (drive): drive is HardDriveWithId => drive !== null
           );
-          console.log("Fetched drives:", drives);
+          // [REMOVED] // [REMOVED] console.log("Fetched drives:", drives);
           setSelectedDrives(drives);
         } catch (error) {
           console.error("Error fetching selected drives:", error);
@@ -507,7 +507,7 @@ export default function EditRawAssetModal({
         setSelectedDrives([]);
       }
     } else {
-      console.log("Skipping form reset - form has been modified or same asset");
+      // [REMOVED] // [REMOVED] console.log("Skipping form reset - form has been modified or same asset");
     }
   }, [asset, initialAssetId, hasModifiedForm, isOpen]);
 
@@ -552,7 +552,7 @@ export default function EditRawAssetModal({
   const handleSelectDrive = (drive: HardDriveWithId) => {
     if (!selectedDrives.find((d) => d._id === drive._id)) {
       const updatedDrives = [...selectedDrives, drive];
-      console.log("Adding drive:", drive, "Updated drives:", updatedDrives);
+      // [REMOVED] // [REMOVED] console.log("Adding drive:", drive, "Updated drives:", updatedDrives);
       setSelectedDrives(updatedDrives);
       // Update formData.hardDriveIds to keep in sync with selectedDrives
       setFormData((prevData) => ({
@@ -566,11 +566,11 @@ export default function EditRawAssetModal({
   };
 
   const handleRemoveDrive = (driveId: string) => {
-    console.log("Removing drive:", driveId);
+    // [REMOVED] // [REMOVED] console.log("Removing drive:", driveId);
     const updatedDrives = selectedDrives.filter(
       (drive) => drive._id !== driveId
     );
-    console.log("Updated drives after removal:", updatedDrives);
+    // [REMOVED] // [REMOVED] console.log("Updated drives after removal:", updatedDrives);
     setSelectedDrives(updatedDrives);
     // Update formData.hardDriveIds to keep in sync with selectedDrives
     setFormData((prevData) => ({
@@ -582,7 +582,7 @@ export default function EditRawAssetModal({
   };
 
   const handleCarSelectionChange = (selectedCars: Car[]) => {
-    console.log("Car selection changed:", selectedCars);
+    // [REMOVED] // [REMOVED] console.log("Car selection changed:", selectedCars);
     setSelectedCars(selectedCars);
     setFormData((prevData) => ({
       ...prevData,

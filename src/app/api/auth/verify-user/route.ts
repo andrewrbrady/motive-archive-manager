@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     }
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(`Verifying user with UID: ${uid.substring(0, 8)}***`);
+      // [REMOVED] // [REMOVED] console.log(`Verifying user with UID: ${uid.substring(0, 8)}***`);
     }
 
     // Check if the user exists in Firebase Auth

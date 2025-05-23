@@ -41,9 +41,9 @@ export async function vectorizeResearchFile(
   fileName: string
 ): Promise<void> {
   try {
-    console.log(`\nVectorizing file: ${fileName}`);
-    console.log(`Car ID: ${carId}`);
-    console.log(`Content length: ${content.length} chars`);
+    // [REMOVED] // [REMOVED] console.log(`\nVectorizing file: ${fileName}`);
+    // [REMOVED] // [REMOVED] console.log(`Car ID: ${carId}`);
+    // [REMOVED] // [REMOVED] console.log(`Content length: ${content.length} chars`);
 
     if (!content) {
       throw new Error("No content provided for vectorization");
@@ -51,7 +51,7 @@ export async function vectorizeResearchFile(
 
     // Split the content into chunks
     const textChunks = await textSplitter.splitText(content);
-    console.log(`Split into ${textChunks.length} chunks`);
+    // [REMOVED] // [REMOVED] console.log(`Split into ${textChunks.length} chunks`);
 
     if (textChunks.length === 0) {
       throw new Error("No text chunks generated from content");
@@ -85,17 +85,17 @@ export async function vectorizeResearchFile(
     const db = await getDatabase();
 
     // Generate embeddings
-    console.log("Generating embeddings...");
+    // [REMOVED] // [REMOVED] console.log("Generating embeddings...");
     const validDocuments = documents.filter(
       (doc): doc is NonNullable<typeof doc> => doc !== null
     );
     const embeddingResults = await embeddings.embedDocuments(
       validDocuments.map((doc) => doc.pageContent)
     );
-    console.log(`Generated ${embeddingResults.length} embeddings`);
+    // [REMOVED] // [REMOVED] console.log(`Generated ${embeddingResults.length} embeddings`);
 
     // Insert documents with embeddings directly
-    console.log("Adding documents to vector store...");
+    // [REMOVED] // [REMOVED] console.log("Adding documents to vector store...");
     const documentsToInsert = validDocuments.map((doc, i) => ({
       embedding: embeddingResults[i],
       metadata: doc.metadata,
@@ -113,7 +113,7 @@ export async function vectorizeResearchFile(
       throw new Error("Documents were not added to the vector store");
     }
 
-    console.log(`✓ Successfully vectorized ${addedCount} chunks`);
+    // [REMOVED] // [REMOVED] console.log(`✓ Successfully vectorized ${addedCount} chunks`);
   } catch (error) {
     console.error("Error vectorizing research file:", error);
     throw error;
@@ -126,8 +126,8 @@ export async function searchResearchVectors(
   limit: number = 5
 ): Promise<ResearchChunk[]> {
   try {
-    console.log(`\nSearching vectors for car ${carId}`);
-    console.log(`Query: "${query}"`);
+    // [REMOVED] // [REMOVED] console.log(`\nSearching vectors for car ${carId}`);
+    // [REMOVED] // [REMOVED] console.log(`Query: "${query}"`);
 
     const db = await getDatabase();
 
@@ -141,7 +141,7 @@ export async function searchResearchVectors(
     );
 
     // Generate embedding for the query
-    console.log("Generating query embedding...");
+    // [REMOVED] // [REMOVED] console.log("Generating query embedding...");
     const queryEmbedding = await embeddings.embedQuery(query);
 
     // Perform vector search using MongoDB Atlas
@@ -184,12 +184,12 @@ export async function searchResearchVectors(
       .aggregate(pipeline)
       .toArray();
 
-    console.log(`Found ${searchResults.length} relevant chunks`);
+    // [REMOVED] // [REMOVED] console.log(`Found ${searchResults.length} relevant chunks`);
 
     // Log a preview of the results
     if (searchResults.length > 0) {
-      console.log("\nTop result preview:");
-      console.log("Score:", searchResults[0].score);
+      // [REMOVED] // [REMOVED] console.log("\nTop result preview:");
+      // [REMOVED] // [REMOVED] console.log("Score:", searchResults[0].score);
       console.log(
         "Content:",
         searchResults[0].pageContent.substring(0, 200) + "..."
@@ -215,7 +215,7 @@ export async function deleteResearchVectors(fileId: string): Promise<void> {
     await db.collection(COLLECTION_NAME).deleteMany({
       "metadata.fileId": fileId,
     });
-    console.log(`Deleted vectors for file ${fileId}`);
+    // [REMOVED] // [REMOVED] console.log(`Deleted vectors for file ${fileId}`);
   } catch (error) {
     console.error("Error deleting research vectors:", error);
     throw error;

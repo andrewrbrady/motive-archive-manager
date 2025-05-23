@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 // Add more comprehensive error handling for the session route
 export async function GET(req: NextRequest) {
   try {
-    console.log("NextAuth session handler called:", req.url);
+    // [REMOVED] // [REMOVED] console.log("NextAuth session handler called:", req.url);
 
     // Log out key environment variables (excluding sensitive data)
     console.log("Auth environment check:", {
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 // Add POST method with similar error handling
 export async function POST(req: NextRequest) {
   try {
-    console.log("NextAuth session POST handler called:", req.url);
+    // [REMOVED] // [REMOVED] console.log("NextAuth session POST handler called:", req.url);
     return await handlers.POST(req);
   } catch (error: any) {
     console.error("Error in NextAuth session POST handler:", error);

@@ -54,7 +54,7 @@ const fetchWithTimeout = async (url: string, options = {}, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
 
-  console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
+  // [REMOVED] // [REMOVED] console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
   const timeoutId = setTimeout(() => {
     console.warn(`Request to ${url} timed out after ${timeout}ms`);
     controller.abort();
@@ -294,12 +294,12 @@ export default function RawAssetsTab() {
 
       // Queue batch fetches without causing immediate API calls
       if (carIds.size) {
-        console.log(`Prefetching ${carIds.size} car labels`);
+        // [REMOVED] // [REMOVED] console.log(`Prefetching ${carIds.size} car labels`);
         fetchCarLabels(Array.from(carIds));
       }
 
       if (driveIds.size) {
-        console.log(`Prefetching ${driveIds.size} hard drive labels`);
+        // [REMOVED] // [REMOVED] console.log(`Prefetching ${driveIds.size} hard drive labels`);
         fetchDriveLabels(Array.from(driveIds));
       }
     },
@@ -329,7 +329,7 @@ export default function RawAssetsTab() {
 
         // Use an increasing timeout based on retry attempts
         const timeout = 30000 + fetchAttempts * 15000; // Increased timeouts: 30s, 45s, 60s
-        console.log(`Using timeout of ${timeout}ms for this request`);
+        // [REMOVED] // [REMOVED] console.log(`Using timeout of ${timeout}ms for this request`);
 
         // Get the current URL search parameters
         const hardDriveId = getParam("hardDriveId") || "";
@@ -345,7 +345,7 @@ export default function RawAssetsTab() {
           queryUrl += `&hardDriveId=${encodeURIComponent(hardDriveId)}`;
         }
 
-        console.log("Fetching from URL:", queryUrl);
+        // [REMOVED] // [REMOVED] console.log("Fetching from URL:", queryUrl);
 
         // Use the fetchWithTimeout function
         const response = await fetchWithTimeout(queryUrl, {}, timeout);
@@ -360,17 +360,17 @@ export default function RawAssetsTab() {
         console.timeEnd(timerName);
 
         // Log the API response structure to help debug
-        console.log("Raw Assets API Response structure:", Object.keys(data));
-        console.log("Raw Assets meta:", data.meta);
+        // [REMOVED] // [REMOVED] console.log("Raw Assets API Response structure:", Object.keys(data));
+        // [REMOVED] // [REMOVED] console.log("Raw Assets meta:", data.meta);
 
         // Log debug info if available
         if (data.debug) {
-          console.log("Raw assets API debug info:", data.debug);
+          // [REMOVED] // [REMOVED] console.log("Raw assets API debug info:", data.debug);
         }
 
         // Add better data validation before setting state
         const assetsList = Array.isArray(data.data) ? data.data : [];
-        console.log(`Received ${assetsList.length} raw assets`);
+        // [REMOVED] // [REMOVED] console.log(`Received ${assetsList.length} raw assets`);
 
         // Add defensive check to ensure each asset has required properties
         const sanitizedAssets = assetsList.map((asset: any) => ({
@@ -449,7 +449,7 @@ export default function RawAssetsTab() {
           setLoading(true);
           const nextAttempt = fetchAttempts + 1;
           setFetchAttempts(nextAttempt);
-          console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
+          // [REMOVED] // [REMOVED] console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
 
           // Exponential backoff for retries with jitter for resource errors
           // Add extra backoff time for resource errors
@@ -508,7 +508,7 @@ export default function RawAssetsTab() {
   const fetchAssetById = useCallback(
     async (assetId: string) => {
       try {
-        console.log(`Fetching specific asset by ID: ${assetId}`);
+        // [REMOVED] // [REMOVED] console.log(`Fetching specific asset by ID: ${assetId}`);
         const response = await fetch(`/api/raw/${assetId}`);
 
         if (!response.ok) {
@@ -589,7 +589,7 @@ export default function RawAssetsTab() {
     if (!selectedAssetId) {
       // If no asset selected in URL and modal is open, close it
       if (isEditModalOpen && !isEdit) {
-        console.log("Closing edit modal due to URL parameter changes");
+        // [REMOVED] // [REMOVED] console.log("Closing edit modal due to URL parameter changes");
         setIsEditModalOpen(false);
       }
       return;
@@ -612,7 +612,7 @@ export default function RawAssetsTab() {
           // Only set the asset data if the edit modal is not already open
           // This prevents overwriting the current edit with stale data
           if (!isEditModalOpen) {
-            console.log("Opening edit modal for asset:", asset._id);
+            // [REMOVED] // [REMOVED] console.log("Opening edit modal for asset:", asset._id);
             const rawAssetData: RawAssetData = {
               _id: asset._id as unknown as ObjectId,
               date: asset.date,
@@ -639,16 +639,16 @@ export default function RawAssetsTab() {
             updatedAt: asset.updatedAt,
           });
           setIsDetailsModalOpen(true);
-          console.log("Opening details modal for asset:", asset._id);
+          // [REMOVED] // [REMOVED] console.log("Opening details modal for asset:", asset._id);
         }
       } else {
-        console.log("Asset not found in loaded assets, fetching from API");
+        // [REMOVED] // [REMOVED] console.log("Asset not found in loaded assets, fetching from API");
         // Asset not found in currently loaded assets, fetch it directly
         fetchAssetById(selectedAssetId);
       }
     } else {
       // If assets aren't loaded yet, fetch the specific asset
-      console.log("Assets not loaded yet, fetching specific asset");
+      // [REMOVED] // [REMOVED] console.log("Assets not loaded yet, fetching specific asset");
       fetchAssetById(selectedAssetId);
     }
   }, [assets, getParam, isEditModalOpen, isDetailsModalOpen]); // Removed fetchAssetById from dependencies
@@ -792,7 +792,7 @@ export default function RawAssetsTab() {
 
       // Remove from local state
       setAssets((prev) => prev.filter((a) => a._id !== assetId));
-      console.log(`Asset ${assetId} deleted successfully`);
+      // [REMOVED] // [REMOVED] console.log(`Asset ${assetId} deleted successfully`);
     } catch (error) {
       console.error(`Error deleting asset ${assetId}:`, error);
       alert(
@@ -868,7 +868,7 @@ export default function RawAssetsTab() {
         });
 
         const result = await response.json();
-        console.log("Server response:", result); // Debug log
+        // [REMOVED] // [REMOVED] console.log("Server response:", result); // Debug log
 
         if (!response.ok) {
           // Get the error message from the server response if available
@@ -939,7 +939,7 @@ export default function RawAssetsTab() {
         // Close the modal
         handleCloseModal();
 
-        console.log("Asset updated successfully:", updatedData);
+        // [REMOVED] // [REMOVED] console.log("Asset updated successfully:", updatedData);
       } catch (error) {
         console.error("Error updating asset:", error);
         // Show the actual error message from the server
@@ -982,7 +982,7 @@ export default function RawAssetsTab() {
         handleCloseAddAsset();
         fetchAssets();
 
-        console.log("Asset added successfully");
+        // [REMOVED] // [REMOVED] console.log("Asset added successfully");
       } catch (error) {
         console.error("Error adding asset:", error);
         alert(

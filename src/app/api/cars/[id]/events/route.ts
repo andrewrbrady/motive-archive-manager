@@ -19,11 +19,11 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
     const carId = id;
-    console.log("Fetching events for car ID:", carId); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Fetching events for car ID:", carId); // Debug log
 
     const eventModel = new EventModel(db);
     const events = await eventModel.findByCarId(carId);
-    console.log("Found events from database:", events); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Found events from database:", events); // Debug log
 
     // Transform the events to match the Event interface
     const transformedEvents = events.map((event) => ({
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       isAllDay: event.is_all_day || false,
     }));
 
-    console.log("Transformed events:", transformedEvents); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
     return NextResponse.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching events:", error);
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     const data = await request.json();
     const eventModel = new EventModel(db);
 
-    console.log("Creating event with data:", data); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Creating event with data:", data); // Debug log
 
     // Create event object matching DbEvent type
     const event = {
@@ -80,10 +80,10 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    console.log("Transformed event data:", event); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Transformed event data:", event); // Debug log
 
     const newEventId = await eventModel.create(event);
-    console.log("Created event with ID:", newEventId); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Created event with ID:", newEventId); // Debug log
 
     // Update the car's eventIds array
     const updateFilter: UpdateFilter<Car> = {

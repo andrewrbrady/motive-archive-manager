@@ -125,14 +125,14 @@ export function SimpleImageGallery({
     }
     try {
       const payload = { cloudflareIds: [cloudflareId] };
-      console.log("Sending DELETE payload to /api/cloudflare/images:", payload);
+      // [REMOVED] // [REMOVED] console.log("Sending DELETE payload to /api/cloudflare/images:", payload);
       const res = await fetch("/api/cloudflare/images", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const result = await res.json();
-      console.log("Delete response from /api/cloudflare/images:", result);
+      // [REMOVED] // [REMOVED] console.log("Delete response from /api/cloudflare/images:", result);
       if (!res.ok || !result.success) {
         throw new Error(result.error || JSON.stringify(result));
       }

@@ -193,7 +193,7 @@ function safeJsonParse(text: string, defaultValue: any = {}): any {
     return JSON.parse(cleanJson);
   } catch (error) {
     console.error("JSON Parse Error:", error);
-    console.debug("Failed to parse text:", text);
+    // [REMOVED] // [REMOVED] console.debug("Failed to parse text:", text);
     return defaultValue;
   }
 }
@@ -209,7 +209,7 @@ async function retryOpenAICall<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        console.log(`Retry attempt ${attempt} for OpenAI API call`);
+        // [REMOVED] // [REMOVED] console.log(`Retry attempt ${attempt} for OpenAI API call`);
         // Exponential backoff
         await new Promise((resolve) =>
           setTimeout(resolve, delay * Math.pow(2, attempt - 1))
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
   console.time("analyze-image-total");
   try {
     const { imageUrl, vehicleInfo } = await request.json();
-    console.log("Analyzing image:", imageUrl);
+    // [REMOVED] // [REMOVED] console.log("Analyzing image:", imageUrl);
     console.log(
       "Vehicle info:",
       vehicleInfo
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
     const model = "gpt-4o-mini"; // Use mini model for faster response
 
     const response = await retryOpenAICall(async () => {
-      console.log(`Making OpenAI API request with model: ${model}`);
+      // [REMOVED] // [REMOVED] console.log(`Making OpenAI API request with model: ${model}`);
       return openai.chat.completions.create({
         model: model,
         messages: [

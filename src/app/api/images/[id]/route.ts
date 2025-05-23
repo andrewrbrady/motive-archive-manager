@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const segments = url.pathname.split("/");
     id = segments[segments.length - 1];
 
-    console.log(`[Image API] GET request for image ID: ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`[Image API] GET request for image ID: ${id}`);
 
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     // Try to use getDatabase first for pool connection
     let db;
     try {
-      console.log(`[Image API] Connecting to database using getDatabase()`);
+      // [REMOVED] // [REMOVED] console.log(`[Image API] Connecting to database using getDatabase()`);
       db = await getDatabase();
     } catch (dbError) {
       console.error(
@@ -44,22 +44,22 @@ export async function GET(request: Request) {
       db = client.db(DB_NAME);
     }
 
-    console.log(`[Image API] Fetching image with ID: ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`[Image API] Fetching image with ID: ${id}`);
 
     // Find the image in the database
     const image = await db.collection("images").findOne({ _id: objectId });
 
     if (!image) {
-      console.log(`[Image API] Image not found with ID: ${id}`);
+      // [REMOVED] // [REMOVED] console.log(`[Image API] Image not found with ID: ${id}`);
 
       // Try finding by cloudflareId as fallback
-      console.log(`[Image API] Trying to find image by cloudflareId: ${id}`);
+      // [REMOVED] // [REMOVED] console.log(`[Image API] Trying to find image by cloudflareId: ${id}`);
       const imageByCloudflareId = await db.collection("images").findOne({
         cloudflareId: id,
       });
 
       if (imageByCloudflareId) {
-        console.log(`[Image API] Found image by cloudflareId: ${id}`);
+        // [REMOVED] // [REMOVED] console.log(`[Image API] Found image by cloudflareId: ${id}`);
 
         // Format the image URL with appropriate variant based on metadata
         const variant = determineImageVariant(imageByCloudflareId);
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
 
     try {
       imageUrl = getFormattedImageUrl(image.url, variant);
-      console.log(`[Image API] Formatted URL for image ${id}: ${imageUrl}`);
+      // [REMOVED] // [REMOVED] console.log(`[Image API] Formatted URL for image ${id}: ${imageUrl}`);
     } catch (urlError) {
       console.error(`[Image API] Error formatting URL: ${urlError}`);
       imageUrl =
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
       variant,
     };
 
-    console.log(`[Image API] Successfully returning image data for ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`[Image API] Successfully returning image data for ${id}`);
     return createStaticResponse(response);
   } catch (error) {
     console.error(`[Image API] Error processing image ${id}:`, error);

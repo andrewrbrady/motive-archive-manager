@@ -52,7 +52,7 @@ export default function UserManagement() {
     const syncSession = async () => {
       try {
         if (process.env.NODE_ENV !== "production") {
-          console.log("Refreshing session from Firebase Auth...");
+          // [REMOVED] // [REMOVED] console.log("Refreshing session from Firebase Auth...");
         }
         const refreshResponse = await fetch("/api/auth/refresh-session");
         const refreshData = await refreshResponse.json();
@@ -117,7 +117,7 @@ export default function UserManagement() {
       }
 
       if (process.env.NODE_ENV !== "production") {
-        console.log("Fetching users from:", url.toString());
+        // [REMOVED] // [REMOVED] console.log("Fetching users from:", url.toString());
       }
 
       // Make the request directly - authentication will be handled by Next.js session
@@ -127,13 +127,13 @@ export default function UserManagement() {
 
       // Log the response status
       if (process.env.NODE_ENV !== "production") {
-        console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
       }
 
       // If the main endpoint fails, try a fallback approach
       if (!response.ok) {
         if (process.env.NODE_ENV !== "production") {
-          console.log("Primary endpoint failed, trying fallback approach...");
+          // [REMOVED] // [REMOVED] console.log("Primary endpoint failed, trying fallback approach...");
         }
 
         // Don't show an error toast on initial load - just inform the user about the issue
@@ -203,7 +203,7 @@ export default function UserManagement() {
         setLastId(data.lastId);
 
         if (process.env.NODE_ENV !== "production") {
-          console.log(`Loaded ${data.users.length} users`);
+          // [REMOVED] // [REMOVED] console.log(`Loaded ${data.users.length} users`);
         }
       } else {
         console.error("Invalid response format:", data);

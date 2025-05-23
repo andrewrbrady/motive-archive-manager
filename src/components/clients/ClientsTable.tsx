@@ -61,7 +61,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      console.log("Fetching clients with filters:", filters);
+      // [REMOVED] // [REMOVED] console.log("Fetching clients with filters:", filters);
 
       // Build query params
       const params = new URLSearchParams({
@@ -80,7 +80,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
       }
 
       const data = await response.json();
-      console.log("Received clients data:", data);
+      // [REMOVED] // [REMOVED] console.log("Received clients data:", data);
 
       setClients(data.clients || []);
       setTotalPages(data.totalPages || 1);

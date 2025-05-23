@@ -17,8 +17,8 @@ export function cleanupUrlParameters(
 ): URLSearchParams {
   // Create a new URLSearchParams object to avoid mutating the input
   const params = new URLSearchParams(currentParams.toString());
-  console.log("Cleaning up URL parameters for context:", context);
-  console.log("Before cleanup:", params.toString());
+  // [REMOVED] // [REMOVED] console.log("Cleaning up URL parameters for context:", context);
+  // [REMOVED] // [REMOVED] console.log("Before cleanup:", params.toString());
 
   // AGGRESSIVE CLEANUP: Special case for template parameter
   // If we're not in a template context, ALWAYS remove the template parameter immediately
@@ -96,7 +96,7 @@ export function cleanupUrlParameters(
   // Remove parameters that aren't allowed in this context
   Array.from(params.keys()).forEach((key) => {
     if (!allowedParams.includes(key)) {
-      console.log(`Removing parameter ${key} from context ${context}`);
+      // [REMOVED] // [REMOVED] console.log(`Removing parameter ${key} from context ${context}`);
       params.delete(key);
     }
   });
@@ -107,11 +107,11 @@ export function cleanupUrlParameters(
     context !== "tab:scripts" &&
     params.has("template")
   ) {
-    console.log("FINAL CHECK: Removing persistent template parameter");
+    // [REMOVED] // [REMOVED] console.log("FINAL CHECK: Removing persistent template parameter");
     params.delete("template");
   }
 
-  console.log("After cleanup:", params.toString());
+  // [REMOVED] // [REMOVED] console.log("After cleanup:", params.toString());
   return params;
 }
 

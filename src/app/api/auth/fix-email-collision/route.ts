@@ -7,25 +7,25 @@ export async function GET(request: Request) {
     const email = "andrew@andrewrbrady.com";
     const googleUid = "110131084707533797446";
 
-    console.log(`Attempting to resolve email collision for: ${email}`);
+    // [REMOVED] // [REMOVED] console.log(`Attempting to resolve email collision for: ${email}`);
 
     // Try to find the existing user by email
     let existingUser;
     try {
       existingUser = await adminAuth.getUserByEmail(email);
-      console.log("Found existing user:", existingUser.uid);
+      // [REMOVED] // [REMOVED] console.log("Found existing user:", existingUser.uid);
 
       // Check if this is already the same UID as the Google account
       if (existingUser.uid === googleUid) {
-        console.log("User already has the correct UID, just updating claims");
+        // [REMOVED] // [REMOVED] console.log("User already has the correct UID, just updating claims");
       } else {
-        console.log("User exists with different UID. Need to handle linking.");
-        console.log("Existing UID:", existingUser.uid);
-        console.log("Google UID:", googleUid);
+        // [REMOVED] // [REMOVED] console.log("User exists with different UID. Need to handle linking.");
+        // [REMOVED] // [REMOVED] console.log("Existing UID:", existingUser.uid);
+        // [REMOVED] // [REMOVED] console.log("Google UID:", googleUid);
         // This requires manual migration or account linking
       }
     } catch (error) {
-      console.log(`No existing user found with email ${email}`);
+      // [REMOVED] // [REMOVED] console.log(`No existing user found with email ${email}`);
       return NextResponse.json(
         {
           error: "No user found with that email",
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       creativeRoles: [],
       status: "active",
     });
-    console.log("Admin claims set for user:", existingUser.uid);
+    // [REMOVED] // [REMOVED] console.log("Admin claims set for user:", existingUser.uid);
 
     // Update Firestore document
     await adminDb
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         },
         { merge: true }
       );
-    console.log("Firestore document updated with admin privileges");
+    // [REMOVED] // [REMOVED] console.log("Firestore document updated with admin privileges");
 
     return NextResponse.json({
       success: true,

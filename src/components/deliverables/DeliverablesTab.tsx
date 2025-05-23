@@ -110,14 +110,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        console.log("DeliverablesTab: Starting to fetch users...");
+        // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Starting to fetch users...");
         const response = await fetch("/api/users");
         if (!response.ok) {
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
 
-        console.log("DeliverablesTab: Raw API response:", data);
+        // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Raw API response:", data);
         console.log(
           "Fetched users in DeliverablesTab:",
           Array.isArray(data) ? data.length : "not an array"
@@ -129,8 +129,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           const activeUsers = data.filter(
             (user: User) => user.status === "active"
           );
-          console.log("DeliverablesTab: Active users:", activeUsers.length);
-          console.log("DeliverablesTab: Sample user:", activeUsers[0]);
+          // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Active users:", activeUsers.length);
+          // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Sample user:", activeUsers[0]);
           setAllUsers(activeUsers);
 
           // For backward compatibility, still set the editors list
@@ -138,7 +138,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           const editors = activeUsers.filter((user: User) =>
             user.creativeRoles.includes("video_editor")
           );
-          console.log("DeliverablesTab: Editors:", editors.length);
+          // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Editors:", editors.length);
           setUsers(editors);
         } else {
           console.error("Unexpected API response structure:", data);
@@ -188,7 +188,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       if (!response.ok) {
         // If the deliverable was not found, don't show an error, just refresh the list
         if (response.status === 404) {
-          console.log("Deliverable not found, refreshing list");
+          // [REMOVED] // [REMOVED] console.log("Deliverable not found, refreshing list");
           fetchDeliverables();
           return;
         }
@@ -433,13 +433,13 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         }
       }
 
-      console.log("DeliverablesTab: Making API request...");
+      // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Making API request...");
       console.log(
         "DeliverablesTab: URL:",
         `/api/cars/${id}/deliverables/${deliverableId}`
       );
-      console.log("DeliverablesTab: Payload:", updatePayload);
-      console.log("DeliverablesTab: Field:", field, "Value:", value);
+      // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Payload:", updatePayload);
+      // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Field:", field, "Value:", value);
 
       const response = await fetch(
         `/api/cars/${id}/deliverables/${deliverableId}`,
@@ -452,8 +452,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         }
       );
 
-      console.log("DeliverablesTab: Response status:", response.status);
-      console.log("DeliverablesTab: Response ok:", response.ok);
+      // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Response status:", response.status);
+      // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Response ok:", response.ok);
 
       if (!response.ok) {
         if (response.status === 404) {

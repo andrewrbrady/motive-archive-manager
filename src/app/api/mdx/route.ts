@@ -15,9 +15,9 @@ interface MDXDocument {
 // GET /api/mdx - Get all MDX files
 export async function GET() {
   try {
-    console.log("MDX API - Connecting to MongoDB...");
+    // [REMOVED] // [REMOVED] console.log("MDX API - Connecting to MongoDB...");
     const { db } = await connectToDatabase();
-    console.log("MDX API - MongoDB connected, fetching files...");
+    // [REMOVED] // [REMOVED] console.log("MDX API - MongoDB connected, fetching files...");
 
     // Get files directly from MongoDB collection
     const files = await db
@@ -37,7 +37,7 @@ export async function GET() {
     });
 
     // Get content for each file from S3
-    console.log("MDX API - Fetching content from S3...");
+    // [REMOVED] // [REMOVED] console.log("MDX API - Fetching content from S3...");
     const filesWithContent = await Promise.all(
       files.map(async (file) => {
         try {

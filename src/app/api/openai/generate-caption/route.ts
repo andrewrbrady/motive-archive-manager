@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
     if (clientInfo && clientInfo.includeInCaption && clientInfo.handle) {
       clientHandleInstruction = `
 - Be sure to mention the client/dealer handle in the caption: ${clientInfo.handle}`;
-      console.log("Adding client handle instruction:", clientHandleInstruction);
+      // [REMOVED] // [REMOVED] console.log("Adding client handle instruction:", clientHandleInstruction);
     }
 
     // Add description to the prompt instructions

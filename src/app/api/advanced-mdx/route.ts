@@ -28,9 +28,9 @@ interface AdvancedMDXDocument extends WithId<Document> {
 // GET /api/advanced-mdx - Get all advanced MDX files
 export async function GET() {
   try {
-    console.log("Advanced MDX API - Connecting to MongoDB...");
+    // [REMOVED] // [REMOVED] console.log("Advanced MDX API - Connecting to MongoDB...");
     const { db } = await connectToDatabase();
-    console.log("Advanced MDX API - MongoDB connected, fetching files...");
+    // [REMOVED] // [REMOVED] console.log("Advanced MDX API - MongoDB connected, fetching files...");
 
     // Get files directly from MongoDB collection
     const files = await db
@@ -39,10 +39,10 @@ export async function GET() {
       .sort({ updatedAt: -1 })
       .toArray();
 
-    console.log(`Advanced MDX API - Found ${files.length} files in MongoDB`);
+    // [REMOVED] // [REMOVED] console.log(`Advanced MDX API - Found ${files.length} files in MongoDB`);
 
     // Get content for each file from S3
-    console.log("Advanced MDX API - Fetching content from S3...");
+    // [REMOVED] // [REMOVED] console.log("Advanced MDX API - Fetching content from S3...");
     const filesWithContent = await Promise.all(
       files.map(async (file) => {
         try {

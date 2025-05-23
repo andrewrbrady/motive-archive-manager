@@ -17,12 +17,12 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`Attempting to import Google user: ${email} (${uid})`);
+    // [REMOVED] // [REMOVED] console.log(`Attempting to import Google user: ${email} (${uid})`);
 
     // Check if user already exists
     try {
       const existingUser = await adminAuth.getUser(uid);
-      console.log(`User already exists: ${existingUser.uid}`);
+      // [REMOVED] // [REMOVED] console.log(`User already exists: ${existingUser.uid}`);
 
       // No need to import again
       return NextResponse.json({
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       }
     );
 
-    console.log(`User imported successfully: ${uid}`);
+    // [REMOVED] // [REMOVED] console.log(`User imported successfully: ${uid}`);
 
     // Set custom claims
     await adminAuth.setCustomUserClaims(uid, {

@@ -239,7 +239,7 @@ export const useDeleteImages = (carId: string, queryClient: QueryClient) => {
       cloudflareIds?: string[];
       deleteFromStorage?: boolean;
     }) => {
-      console.log(`Deleting ${imageIds.length} images (MongoDB IDs)`, imageIds);
+      // [REMOVED] // [REMOVED] console.log(`Deleting ${imageIds.length} images (MongoDB IDs)`, imageIds);
 
       // If cloudflareIds array is empty, use the imageIds array as-is
       // If it's provided, use that specific array for deletion from storage
@@ -268,7 +268,7 @@ export const useDeleteImages = (carId: string, queryClient: QueryClient) => {
           isUserInitiated: true,
         };
 
-        console.log("Sending deletion payload:", payload);
+        // [REMOVED] // [REMOVED] console.log("Sending deletion payload:", payload);
 
         // Use a timeout to prevent hanging requests
         const controller = new AbortController();
@@ -310,7 +310,7 @@ export const useDeleteImages = (carId: string, queryClient: QueryClient) => {
 
           // Parse response
           const data = await response.json();
-          console.log("Delete successful:", data);
+          // [REMOVED] // [REMOVED] console.log("Delete successful:", data);
           return data;
         } catch (error) {
           console.error("Error in delete operation:", error);

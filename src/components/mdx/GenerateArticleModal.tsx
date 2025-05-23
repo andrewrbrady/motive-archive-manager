@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { logger } from "@/lib/logger";
 
 interface GenerateArticleModalProps {
   isOpen: boolean;
@@ -110,24 +111,27 @@ export default function GenerateArticleModal({
 
     try {
       setIsGenerating(true);
-      console.log("Starting article generation for:", title);
-      console.log("Selected car ID:", selectedCarId);
-      console.log("User guidance:", guidance);
+      logger.debug("Starting article generation", {
+        title,
+        selectedCarId,
+        guidance,
+      });
 
       // Get car details if a car is selected
       let carDetails = null;
       if (selectedCarId !== "none") {
-        console.log("Attempting to fetch car details for ID:", selectedCarId);
+        logger.debug("Attempting to fetch car details", {
+          carId: selectedCarId,
+        });
         try {
           carDetails = await getCarSpecifications(selectedCarId);
-          console.log("Successfully fetched car details:", carDetails);
+          logger.debug("Successfully fetched car details", {
+            carId: selectedCarId,
+            hasCarDetails: !!carDetails,
+            availableFields: carDetails ? Object.keys(carDetails) : [],
+          });
 
           if (carDetails) {
-            console.log(
-              "Available car detail fields:",
-              Object.keys(carDetails)
-            );
-
             // Log which fields have actual data
             const fieldsWithData = Object.entries(carDetails)
               .filter(
@@ -137,12 +141,15 @@ export default function GenerateArticleModal({
                   Object.keys(value).length > 0
               )
               .map(([key]) => key);
-            console.log("Fields with data:", fieldsWithData);
+            logger.debug("Car details fields with data", { fieldsWithData });
           } else {
-            console.log("No car details available");
+            logger.warn("No car details available");
           }
         } catch (error) {
-          console.error("Error fetching car specifications:", error);
+          logger.error("Error fetching car specifications", {
+            error,
+            selectedCarId,
+          });
 
           // Create more comprehensive fallback car details from the selected car in the dropdown
           if (carsData?.cars) {
@@ -150,11 +157,15 @@ export default function GenerateArticleModal({
               (car) => car._id === selectedCarId
             );
             if (selectedCar) {
-              console.log("Selected car from dropdown:", selectedCar);
-              console.log(
-                "Available fields in dropdown data:",
-                Object.keys(selectedCar)
-              );
+              logger.debug("Creating fallback car details", {
+                selectedCar: {
+                  id: selectedCar._id,
+                  year: selectedCar.year,
+                  make: selectedCar.make,
+                  model: selectedCar.model,
+                },
+                availableFields: Object.keys(selectedCar),
+              });
 
               // Create a minimal fallback car details object with only the essential fields
               carDetails = {
@@ -163,26 +174,19 @@ export default function GenerateArticleModal({
                 model: selectedCar.model,
               };
 
-              console.log(
-                "Created fallback car details from dropdown data:",
-                carDetails
-              );
+              logger.debug("Created fallback car details", { carDetails });
             } else {
-              console.log(
-                "Could not find selected car in carsData, selectedCarId:",
-                selectedCarId
-              );
-              console.log(
-                "Available cars:",
-                carsData.cars.map((c) => ({
+              logger.warn("Could not find selected car in carsData", {
+                selectedCarId,
+                availableCars: carsData.cars.map((c) => ({
                   id: c._id,
                   make: c.make,
                   model: c.model,
-                }))
-              );
+                })),
+              });
             }
           } else {
-            console.log("No carsData available for fallback");
+            logger.warn("No carsData available for fallback");
           }
 
           toast({
@@ -193,7 +197,7 @@ export default function GenerateArticleModal({
           });
         }
       } else {
-        console.log("No car selected, skipping car details fetch");
+        logger.debug("No car selected, skipping car details fetch");
       }
 
       // Prepare request payload
@@ -207,10 +211,15 @@ export default function GenerateArticleModal({
         maxTokens,
       };
 
-      console.log(
-        "Sending article generation request with payload:",
-        JSON.stringify(payload, null, 2)
-      );
+      logger.debug("Sending article generation request", {
+        title,
+        articleType,
+        hasGuidance: !!guidance.trim(),
+        hasCarId: selectedCarId !== "none",
+        hasCarDetails: !!carDetails,
+        temperature,
+        maxTokens,
+      });
 
       // Call the article generation API
       const response = await fetch("/api/copywriting/article/generate", {
@@ -221,19 +230,23 @@ export default function GenerateArticleModal({
         body: JSON.stringify(payload),
       });
 
-      console.log("Article generation API response status:", response.status);
+      logger.debug("Article generation API response", {
+        status: response.status,
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("API error response:", errorData);
+        logger.error("API error response", {
+          errorData,
+          status: response.status,
+        });
         throw new Error(errorData.error || "Failed to generate article");
       }
 
       const data = await response.json();
-      console.log(
-        "Received generated content length:",
-        data.content?.length || 0
-      );
+      logger.debug("Received generated content", {
+        contentLength: data.content?.length || 0,
+      });
 
       // Set the generated content
       setContent(data.content);
@@ -243,7 +256,7 @@ export default function GenerateArticleModal({
         description: "Article generated successfully",
       });
     } catch (error) {
-      console.error("Error generating article:", error);
+      logger.error("Error generating article", { error });
       toast({
         title: "Error",
         description: "Failed to generate article. Please try again.",
@@ -283,7 +296,7 @@ export default function GenerateArticleModal({
       setMaxTokens(2000);
       onClose();
     } catch (error) {
-      console.error("Error generating article:", error);
+      logger.error("Error submitting article", { error });
       toast({
         title: "Error",
         description: "Failed to generate article. Please try again.",
@@ -504,12 +517,11 @@ export default function GenerateArticleModal({
                                 "bg-accent text-accent-foreground"
                             )}
                             onClick={() => {
-                              console.log("Car selected:", {
+                              logger.debug("Car selected from dropdown", {
                                 id: car._id,
                                 year: car.year,
                                 make: car.make,
                                 model: car.model,
-                                details: car,
                               });
                               setSelectedCarId(car._id);
                               setCarSearchQuery("");

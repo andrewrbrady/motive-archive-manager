@@ -50,12 +50,12 @@ export default function ClientDetailsPage({ params }: any) {
 
   const fetchClientCars = useCallback(async () => {
     try {
-      console.log("Fetching cars for client:", params.id);
+      // [REMOVED] // [REMOVED] console.log("Fetching cars for client:", params.id);
       const response = await fetch(`/api/clients/${params.id}/cars`);
       if (!response.ok) throw new Error("Failed to fetch client's cars");
       const data = await response.json();
-      console.log("Received cars data:", data);
-      console.log("First car details:", data[0]);
+      // [REMOVED] // [REMOVED] console.log("Received cars data:", data);
+      // [REMOVED] // [REMOVED] console.log("First car details:", data[0]);
       setCars(data);
     } catch (error) {
       console.error("Error fetching client's cars:", error);
@@ -73,7 +73,7 @@ export default function ClientDetailsPage({ params }: any) {
   }, [params.id, fetchClient, fetchClientCars]);
 
   useEffect(() => {
-    console.log("Current cars state:", cars);
+    // [REMOVED] // [REMOVED] console.log("Current cars state:", cars);
   }, [cars]);
 
   if (loading) {

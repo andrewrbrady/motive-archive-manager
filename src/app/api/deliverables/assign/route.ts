@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("Received assignment request:", body);
+    // [REMOVED] // [REMOVED] console.log("Received assignment request:", body);
 
     // Connect to MongoDB
     await dbConnect();
@@ -62,17 +62,17 @@ export async function POST(req: NextRequest) {
       // Explicitly unassigning
       deliverable.firebase_uid = "";
       deliverable.editor = "Unassigned";
-      console.log("Unassigning deliverable:", deliverableId);
+      // [REMOVED] // [REMOVED] console.log("Unassigning deliverable:", deliverableId);
     } else if (userId) {
       try {
         // If we already have the editor name from the client, use it
         if (finalEditorName) {
-          console.log(`Using provided editor name: ${finalEditorName}`);
+          // [REMOVED] // [REMOVED] console.log(`Using provided editor name: ${finalEditorName}`);
           deliverable.firebase_uid = userId;
           deliverable.editor = finalEditorName;
         } else {
           // Try looking up the user in multiple data sources
-          console.log(`Looking up user with ID: ${userId}`);
+          // [REMOVED] // [REMOVED] console.log(`Looking up user with ID: ${userId}`);
 
           // Check if this is a Firebase UID
           const userDoc = await adminDb.collection("users").doc(userId).get();
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
             const userData = userDoc.data();
             finalEditorName = userData?.name || "Unknown User";
 
-            console.log(`Found user in Firebase: ${finalEditorName}`);
+            // [REMOVED] // [REMOVED] console.log(`Found user in Firebase: ${finalEditorName}`);
 
             // Update deliverable with user info
             deliverable.firebase_uid = userId;
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
             if (mongoUser) {
               // Found in MongoDB
               finalEditorName = mongoUser.name;
-              console.log(`Found user in MongoDB: ${finalEditorName}`);
+              // [REMOVED] // [REMOVED] console.log(`Found user in MongoDB: ${finalEditorName}`);
 
               deliverable.firebase_uid = mongoUser.uid || userId;
               deliverable.editor = finalEditorName;
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
               if (!firebaseUsers.empty) {
                 const userData = firebaseUsers.docs[0].data();
                 finalEditorName = userData?.name || "Unknown User";
-                console.log(`Found user by uid field: ${finalEditorName}`);
+                // [REMOVED] // [REMOVED] console.log(`Found user by uid field: ${finalEditorName}`);
 
                 deliverable.firebase_uid = userId;
                 deliverable.editor = finalEditorName;
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
     try {
       // Use simpler save options to avoid write concern errors
       const saveResult = await deliverable.save();
-      console.log("Deliverable save successful:", saveResult._id);
+      // [REMOVED] // [REMOVED] console.log("Deliverable save successful:", saveResult._id);
     } catch (error) {
       console.error("Error saving deliverable:", error);
       const errorMessage =

@@ -19,11 +19,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Email Outline Modification Input:");
-    console.log("Current Outline:", currentOutline);
-    console.log("Email Type:", emailType || "Not specified");
-    console.log("Car ID:", carId || "Not specified");
-    console.log("Modification Request:", modifications);
+    // [REMOVED] // [REMOVED] console.log("Email Outline Modification Input:");
+    // [REMOVED] // [REMOVED] console.log("Current Outline:", currentOutline);
+    // [REMOVED] // [REMOVED] console.log("Email Type:", emailType || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Car ID:", carId || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Modification Request:", modifications);
 
     // Get car information if carId is provided
     let carInfo = null;

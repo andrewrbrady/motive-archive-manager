@@ -127,7 +127,7 @@ export async function GET(request: Request) {
 
           query = queryConditions.length > 0 ? { $or: queryConditions } : {};
 
-          console.log("Hard drives query:", JSON.stringify(query, null, 2));
+          // [REMOVED] // [REMOVED] console.log("Hard drives query:", JSON.stringify(query, null, 2));
         }
       } catch (error) {
         console.error("Error parsing IDs parameter:", error);
@@ -143,7 +143,7 @@ export async function GET(request: Request) {
       ];
     }
 
-    console.log("Executing query:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] console.log("Executing query:", JSON.stringify(query, null, 2));
 
     // Get count for pagination
     const totalCount = await hardDrivesCollection.countDocuments(query);
@@ -192,7 +192,7 @@ export async function GET(request: Request) {
     }));
 
     console.timeEnd("hard-drives-api-fetch");
-    console.log(`Returned ${formattedDrives.length} hard drives`);
+    // [REMOVED] // [REMOVED] console.log(`Returned ${formattedDrives.length} hard drives`);
 
     // Return in both formats to support different client needs
     return NextResponse.json({

@@ -29,7 +29,7 @@ export async function sendEmail(options: EmailOptions) {
     // Send email
     const result = await sgMail.send(msg);
 
-    console.log("Email sent successfully");
+    // [REMOVED] // [REMOVED] console.log("Email sent successfully");
 
     return {
       success: true,

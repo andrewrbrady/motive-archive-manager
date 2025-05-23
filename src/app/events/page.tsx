@@ -132,7 +132,7 @@ export default function EventsPage() {
     newStatus: EventStatus
   ) => {
     try {
-      console.log("Updating status:", { eventId, carId, newStatus }); // Debug log
+      // [REMOVED] // [REMOVED] console.log("Updating status:", { eventId, carId, newStatus }); // Debug log
       const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     // Handle filtering by Firebase UID
     if (firebaseUid) {
       searchQuery.firebase_uid = firebaseUid;
-      console.log("Filtering by firebase_uid:", firebaseUid);
+      // [REMOVED] // [REMOVED] console.log("Filtering by firebase_uid:", firebaseUid);
     }
 
     // Handle search criteria
@@ -98,10 +98,10 @@ export async function GET(request: NextRequest) {
       [sortField]: sortDirection === "desc" ? -1 : 1,
     };
 
-    console.log("Search query:", searchQuery);
-    console.log("Sort object:", sortObject);
-    console.log("Dashboard API - Database name:", db.databaseName);
-    console.log("Dashboard API - Querying collection: deliverables");
+    // [REMOVED] // [REMOVED] console.log("Search query:", searchQuery);
+    // [REMOVED] // [REMOVED] console.log("Sort object:", sortObject);
+    // [REMOVED] // [REMOVED] console.log("Dashboard API - Database name:", db.databaseName);
+    // [REMOVED] // [REMOVED] console.log("Dashboard API - Querying collection: deliverables");
 
     // Get paginated, filtered, and sorted deliverables
     const deliverables = await db
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
-    console.log("Found deliverables:", deliverables.length);
+    // [REMOVED] // [REMOVED] console.log("Found deliverables:", deliverables.length);
     console.log(
       "Dashboard API - Sample deliverable IDs:",
       deliverables.slice(0, 5).map((d) => d._id)
@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
             .toArray()
         : [];
 
-    console.log("Cars found:", cars.length);
+    // [REMOVED] // [REMOVED] console.log("Cars found:", cars.length);
 
     // Convert ObjectId to string for primaryImageId to make comparison easier in frontend
     const carsWithStringIds = cars.map((car) => {

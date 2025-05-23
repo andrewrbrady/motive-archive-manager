@@ -24,12 +24,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Email Send Request:");
-    console.log("Subject:", subject);
-    console.log("From:", `${fromName} <${fromEmail}>`);
-    console.log("To:", toEmail);
-    console.log("Email Type:", emailType || "Not specified");
-    console.log("Test Mode:", testMode ? "Yes" : "No");
+    // [REMOVED] // [REMOVED] console.log("Email Send Request:");
+    // [REMOVED] // [REMOVED] console.log("Subject:", subject);
+    // [REMOVED] // [REMOVED] console.log("From:", `${fromName} <${fromEmail}>`);
+    // [REMOVED] // [REMOVED] console.log("To:", toEmail);
+    // [REMOVED] // [REMOVED] console.log("Email Type:", emailType || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Test Mode:", testMode ? "Yes" : "No");
 
     // Build the email message
     const msg = {

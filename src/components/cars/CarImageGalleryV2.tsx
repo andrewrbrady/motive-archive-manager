@@ -394,7 +394,7 @@ export function CarImageGalleryV2({
       // Don't process empty file selection
       if (files.length === 0) return;
 
-      console.log(`Starting upload of ${files.length} files`);
+      // [REMOVED] // [REMOVED] console.log(`Starting upload of ${files.length} files`);
 
       // Create initial progress tracking for all files
       const progressMap = new Map(

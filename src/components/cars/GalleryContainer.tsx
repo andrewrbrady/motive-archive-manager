@@ -125,7 +125,7 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
   const handlePrimaryImageChange = React.useCallback(
     async (imageId: string) => {
       try {
-        console.log(`Setting primary image ID to: ${imageId} for car ${carId}`);
+        // [REMOVED] // [REMOVED] console.log(`Setting primary image ID to: ${imageId} for car ${carId}`);
 
         const response = await fetch(`/api/cars/${carId}/thumbnail`, {
           method: "PATCH",

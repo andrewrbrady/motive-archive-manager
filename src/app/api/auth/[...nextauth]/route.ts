@@ -19,7 +19,7 @@ function logOAuthConfig() {
 // Wrap handlers in try-catch blocks for better error handling
 export async function GET(req: NextRequest) {
   try {
-    console.log("NextAuth GET handler called:", req.url);
+    // [REMOVED] // [REMOVED] console.log("NextAuth GET handler called:", req.url);
     logOAuthConfig();
     return await handlers.GET(req);
   } catch (error: any) {
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("NextAuth POST handler called:", req.url);
+    // [REMOVED] // [REMOVED] console.log("NextAuth POST handler called:", req.url);
     logOAuthConfig();
     return await handlers.POST(req);
   } catch (error: any) {

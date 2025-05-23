@@ -26,11 +26,11 @@ import Gallery from "@/components/mdx/Gallery";
 const MDXEditor = dynamic(
   () => {
     if (process.env.NODE_ENV !== "production") {
-      console.log("Dynamically importing MDXEditor in MDXTab");
+      // [REMOVED] // [REMOVED] console.log("Dynamically importing MDXEditor in MDXTab");
     }
     return import("@/components/MDXEditor").then((mod) => {
       if (process.env.NODE_ENV !== "production") {
-        console.log("MDXEditor module loaded in MDXTab:", mod);
+        // [REMOVED] // [REMOVED] console.log("MDXEditor module loaded in MDXTab:", mod);
       }
       if (!mod.default) {
         console.error(
@@ -129,7 +129,7 @@ export default function MDXTab() {
           throw new Error(data.error || "Failed to load MDX files");
         }
 
-        console.log("MDXTab - Received files from API:", data.files);
+        // [REMOVED] // [REMOVED] console.log("MDXTab - Received files from API:", data.files);
 
         // Ensure each file has the required properties
         const processedFiles = data.files.map((file: any) => ({
@@ -140,7 +140,7 @@ export default function MDXTab() {
           frontmatter: file.frontmatter || {},
         }));
 
-        console.log("MDXTab - Processed files:", processedFiles);
+        // [REMOVED] // [REMOVED] console.log("MDXTab - Processed files:", processedFiles);
         setFiles(processedFiles);
       } catch (error) {
         console.error("Error loading MDX files:", error);
@@ -609,7 +609,7 @@ cover: ""
 
                   {files.map((file) => {
                     if (process.env.NODE_ENV !== "production") {
-                      console.log("Rendering file:", file);
+                      // [REMOVED] // [REMOVED] console.log("Rendering file:", file);
                     }
                     return (
                       <div
@@ -622,7 +622,7 @@ cover: ""
                       >
                         <button
                           onClick={() => {
-                            console.log("Selecting file:", file);
+                            // [REMOVED] // [REMOVED] console.log("Selecting file:", file);
                             setSelectedFile(file);
                           }}
                           className="w-full text-left flex items-center gap-2"

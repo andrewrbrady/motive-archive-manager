@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Article Outline Modification Input:");
-    console.log("Current Outline:", currentOutline);
-    console.log("Modification Request:", modifications);
+    // [REMOVED] // [REMOVED] console.log("Article Outline Modification Input:");
+    // [REMOVED] // [REMOVED] console.log("Current Outline:", currentOutline);
+    // [REMOVED] // [REMOVED] console.log("Modification Request:", modifications);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo",

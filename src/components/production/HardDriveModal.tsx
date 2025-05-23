@@ -37,7 +37,7 @@ export default function HardDriveModal({
   onSave,
   drive,
 }: HardDriveModalProps) {
-  console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
+  // [REMOVED] // [REMOVED] console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
 
   // Add a local state to track if we should render directly without relying on URL params
   const [forceRender, setForceRender] = useState(false);
@@ -45,10 +45,10 @@ export default function HardDriveModal({
   // If the parent says the modal should be open, but we don't see it, force render
   useEffect(() => {
     if (isOpen && !forceRender) {
-      console.log("Setting forceRender to true because isOpen is true");
+      // [REMOVED] // [REMOVED] console.log("Setting forceRender to true because isOpen is true");
       setForceRender(true);
     } else if (!isOpen && forceRender) {
-      console.log("Setting forceRender to false because isOpen is false");
+      // [REMOVED] // [REMOVED] console.log("Setting forceRender to false because isOpen is false");
       setForceRender(false);
     }
   }, [isOpen, forceRender]);
@@ -435,7 +435,7 @@ export default function HardDriveModal({
 
   // If we're using forced rendering, render directly without the UrlModal wrapper
   if (forceRender) {
-    console.log("HardDriveModal using direct rendering due to forceRender");
+    // [REMOVED] // [REMOVED] console.log("HardDriveModal using direct rendering due to forceRender");
     return (
       <div className="fixed inset-0 bg-[hsl(var(--background))]/95 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
         <div className="bg-[hsl(var(--background))] p-6 rounded-lg shadow-xl max-w-4xl w-full mx-4 border border-[hsl(var(--border))] relative">
@@ -445,7 +445,7 @@ export default function HardDriveModal({
             </h2>
             <button
               onClick={() => {
-                console.log("Direct modal close button clicked");
+                // [REMOVED] // [REMOVED] console.log("Direct modal close button clicked");
                 onClose();
               }}
               className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] ml-auto"
@@ -750,7 +750,7 @@ export default function HardDriveModal({
       paramName={drive ? "editDrive" : "createDrive"}
       paramValue={drive ? drive._id?.toString() : "true"}
       onClose={() => {
-        console.log("UrlModal onClose triggered");
+        // [REMOVED] // [REMOVED] console.log("UrlModal onClose triggered");
         onClose();
       }}
       title={drive ? "Edit Hard Drive" : "Add New Hard Drive"}

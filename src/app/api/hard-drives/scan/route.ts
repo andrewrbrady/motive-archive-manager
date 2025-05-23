@@ -8,8 +8,8 @@ import path from "path";
 export async function POST(request: Request) {
   try {
     const { drivePath, driveId } = await request.json();
-    console.log("Scanning drive path:", drivePath);
-    console.log("Drive ID (raw):", driveId);
+    // [REMOVED] // [REMOVED] console.log("Scanning drive path:", drivePath);
+    // [REMOVED] // [REMOVED] console.log("Drive ID (raw):", driveId);
 
     if (!drivePath || !driveId) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     let objectId;
     try {
       objectId = typeof driveId === "string" ? new ObjectId(driveId) : driveId;
-      console.log("Converted to ObjectId:", objectId.toString());
+      // [REMOVED] // [REMOVED] console.log("Converted to ObjectId:", objectId.toString());
     } catch (error) {
       console.error("Failed to convert drive ID to ObjectId:", error);
       return NextResponse.json(
@@ -43,17 +43,17 @@ export async function POST(request: Request) {
 
     // Try to find the drive in the hard_drives collection
     const drive = await db.collection("hard_drives").findOne({ _id: objectId });
-    console.log("Drive found in 'hard_drives' collection:", !!drive);
+    // [REMOVED] // [REMOVED] console.log("Drive found in 'hard_drives' collection:", !!drive);
 
     if (!drive) {
-      console.log("No drive found with ObjectId:", objectId.toString());
+      // [REMOVED] // [REMOVED] console.log("No drive found with ObjectId:", objectId.toString());
       return NextResponse.json(
         { error: "Drive not found in database" },
         { status: 404 }
       );
     }
 
-    console.log("Found drive:", drive._id.toString());
+    // [REMOVED] // [REMOVED] console.log("Found drive:", drive._id.toString());
 
     // Get root level folders
     const folders = await fs.readdir(drivePath, { withFileTypes: true });
@@ -67,18 +67,18 @@ export async function POST(request: Request) {
         (dirent) => dirent.isDirectory() && /^\d{6}$/.test(dirent.name) // Match YYMMDD pattern
       )
       .map((dirent) => dirent.name);
-    console.log("Date pattern folders:", datePatternFolders);
+    // [REMOVED] // [REMOVED] console.log("Date pattern folders:", datePatternFolders);
 
     // Find raw assets with matching date patterns
     const matchingRawAssets = await db
       .collection("raw_assets")
       .find({ date: { $in: datePatternFolders } })
       .toArray();
-    console.log("Matching raw assets:", matchingRawAssets.length);
+    // [REMOVED] // [REMOVED] console.log("Matching raw assets:", matchingRawAssets.length);
 
     // Get current rawAssets array or initialize empty array
     const currentRawAssets = drive.rawAssets || [];
-    console.log("Current raw assets:", currentRawAssets.length);
+    // [REMOVED] // [REMOVED] console.log("Current raw assets:", currentRawAssets.length);
 
     // Add new IDs that aren't already in the array
     const updatedRawAssets = Array.from(
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         ...matchingRawAssets.map((asset) => asset._id.toString()),
       ])
     ).map((id) => new ObjectId(id));
-    console.log("Updated raw assets:", updatedRawAssets.length);
+    // [REMOVED] // [REMOVED] console.log("Updated raw assets:", updatedRawAssets.length);
 
     // Update both the drive and raw assets
     const updatePromises = [

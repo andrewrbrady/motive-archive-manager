@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     if (makeAdmin && !roles.includes("admin")) {
       roles = [...roles, "admin"];
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Adding admin role to user`);
+        // [REMOVED] // [REMOVED] console.log(`Adding admin role to user`);
       }
     }
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     if (userDoc.exists) {
       if (process.env.NODE_ENV !== "production") {
-        console.log(`User exists in Firestore`);
+        // [REMOVED] // [REMOVED] console.log(`User exists in Firestore`);
       }
       const firestoreData = userDoc.data() || {};
 
@@ -83,12 +83,12 @@ export async function POST(request: Request) {
       );
 
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Updated Firestore document`);
+        // [REMOVED] // [REMOVED] console.log(`Updated Firestore document`);
       }
     } else {
       // Create Firestore document if it doesn't exist
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Creating new Firestore document`);
+        // [REMOVED] // [REMOVED] console.log(`Creating new Firestore document`);
       }
 
       await userDocRef.set({
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       });
 
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Created Firestore document`);
+        // [REMOVED] // [REMOVED] console.log(`Created Firestore document`);
       }
     }
 
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
     });
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(`Updated custom claims`);
+      // [REMOVED] // [REMOVED] console.log(`Updated custom claims`);
     }
 
     return NextResponse.json({
@@ -202,7 +202,7 @@ export async function GET(request: Request) {
     if (makeAdmin && !roles.includes("admin")) {
       roles = [...roles, "admin"];
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Adding admin role to user`);
+        // [REMOVED] // [REMOVED] console.log(`Adding admin role to user`);
       }
     }
 
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
 
     if (userDoc.exists) {
       if (process.env.NODE_ENV !== "production") {
-        console.log(`User exists in Firestore`);
+        // [REMOVED] // [REMOVED] console.log(`User exists in Firestore`);
       }
       const firestoreData = userDoc.data() || {};
 
@@ -239,12 +239,12 @@ export async function GET(request: Request) {
       );
 
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Updated Firestore document`);
+        // [REMOVED] // [REMOVED] console.log(`Updated Firestore document`);
       }
     } else {
       // Create Firestore document if it doesn't exist
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Creating new Firestore document`);
+        // [REMOVED] // [REMOVED] console.log(`Creating new Firestore document`);
       }
 
       await userDocRef.set({
@@ -259,7 +259,7 @@ export async function GET(request: Request) {
       });
 
       if (process.env.NODE_ENV !== "production") {
-        console.log(`Created Firestore document`);
+        // [REMOVED] // [REMOVED] console.log(`Created Firestore document`);
       }
     }
 
@@ -271,7 +271,7 @@ export async function GET(request: Request) {
     });
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(`Updated custom claims`);
+      // [REMOVED] // [REMOVED] console.log(`Updated custom claims`);
     }
 
     return NextResponse.json({

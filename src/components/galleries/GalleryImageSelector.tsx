@@ -158,7 +158,7 @@ export function GalleryImageSelector({
 
   // Filter cars based on search query
   const filteredCars = React.useMemo(() => {
-    console.log("Filtering cars with query:", carSearchQuery);
+    // [REMOVED] // [REMOVED] console.log("Filtering cars with query:", carSearchQuery);
     if (!carsData?.cars) return [];
     const filtered = carsData.cars.filter((car) => {
       if (!carSearchQuery) return true;
@@ -166,13 +166,13 @@ export function GalleryImageSelector({
       const searchTerms = carSearchQuery.toLowerCase().split(" ");
       return searchTerms.every((term) => searchStr.includes(term));
     });
-    console.log("Filtered cars result:", filtered);
+    // [REMOVED] // [REMOVED] console.log("Filtered cars result:", filtered);
     return filtered;
   }, [carsData?.cars, carSearchQuery]);
 
   // Sort cars by year (newest first), then make, then model
   const sortedCars = React.useMemo(() => {
-    console.log("Sorting filtered cars");
+    // [REMOVED] // [REMOVED] console.log("Sorting filtered cars");
     return [...filteredCars].sort((a, b) => {
       // Sort by year descending
       if (a.year !== b.year) return b.year - a.year;
@@ -218,7 +218,7 @@ export function GalleryImageSelector({
   // Handle filter changes
   const handleFilterChange = useCallback(
     (key: string, value: string | null) => {
-      console.log("handleFilterChange called with:", { key, value });
+      // [REMOVED] // [REMOVED] console.log("handleFilterChange called with:", { key, value });
       // Create new URLSearchParams with current values
       const newSearchParams = new URLSearchParams(searchParams.toString());
 
@@ -234,7 +234,7 @@ export function GalleryImageSelector({
         newSearchParams.set("page", "1");
       }
 
-      console.log("Updating URL with new params:", newSearchParams.toString());
+      // [REMOVED] // [REMOVED] console.log("Updating URL with new params:", newSearchParams.toString());
       // Update URL without refreshing the page
       router.replace(`${pathname}?${newSearchParams.toString()}`, {
         scroll: false,
@@ -297,7 +297,7 @@ export function GalleryImageSelector({
             <Popover
               open={carSearchOpen}
               onOpenChange={(open) => {
-                console.log("Popover onOpenChange:", open);
+                // [REMOVED] // [REMOVED] console.log("Popover onOpenChange:", open);
                 setCarSearchOpen(open);
               }}
             >
@@ -308,7 +308,7 @@ export function GalleryImageSelector({
                   aria-expanded={carSearchOpen}
                   className="w-full justify-between"
                   onClick={() => {
-                    console.log("PopoverTrigger Button clicked");
+                    // [REMOVED] // [REMOVED] console.log("PopoverTrigger Button clicked");
                   }}
                 >
                   {currentCarName}
@@ -327,21 +327,21 @@ export function GalleryImageSelector({
                   );
                 }}
                 onEscapeKeyDown={() => {
-                  console.log("PopoverContent escape key pressed");
+                  // [REMOVED] // [REMOVED] console.log("PopoverContent escape key pressed");
                 }}
               >
                 <Command
                   className="w-full rounded-lg bg-background"
                   shouldFilter={false}
                   onKeyDown={(e) => {
-                    console.log("Command onKeyDown:", e.key);
+                    // [REMOVED] // [REMOVED] console.log("Command onKeyDown:", e.key);
                   }}
                 >
                   <CommandInput
                     placeholder="Search cars..."
                     value={carSearchQuery}
                     onValueChange={(value) => {
-                      console.log("CommandInput value changed:", value);
+                      // [REMOVED] // [REMOVED] console.log("CommandInput value changed:", value);
                       setCarSearchQuery(value);
                     }}
                     className="h-9 border-none focus:ring-0"
@@ -352,19 +352,19 @@ export function GalleryImageSelector({
                   <CommandGroup
                     className="max-h-[300px] overflow-y-auto p-1"
                     onClick={(e) => {
-                      console.log("CommandGroup clicked");
+                      // [REMOVED] // [REMOVED] console.log("CommandGroup clicked");
                     }}
                   >
                     <CommandItem
                       value="all"
                       onSelect={() => {
-                        console.log("All Cars CommandItem onSelect triggered");
+                        // [REMOVED] // [REMOVED] console.log("All Cars CommandItem onSelect triggered");
                         handleFilterChange("carId", "all");
                         setCarSearchOpen(false);
                         setCarSearchQuery("");
                       }}
                       onClick={(e) => {
-                        console.log("CommandItem All Cars clicked");
+                        // [REMOVED] // [REMOVED] console.log("CommandItem All Cars clicked");
                         e.stopPropagation();
                       }}
                       className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
@@ -391,7 +391,7 @@ export function GalleryImageSelector({
                           setCarSearchQuery("");
                         }}
                         onClick={(e) => {
-                          console.log("CommandItem car clicked:", car);
+                          // [REMOVED] // [REMOVED] console.log("CommandItem car clicked:", car);
                           e.stopPropagation();
                         }}
                         className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"

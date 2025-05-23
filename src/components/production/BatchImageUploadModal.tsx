@@ -121,9 +121,9 @@ export function BatchImageUploadModal({
       }
       // Otherwise upload the file using the uploadToCloudflare function
       else if (file) {
-        console.log(`Starting upload for ${file.name}`);
+        // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
         const result = await uploadToCloudflare(file);
-        console.log(`Upload successful:`, result);
+        // [REMOVED] // [REMOVED] console.log(`Upload successful:`, result);
         imageUrl = result.url;
       }
 

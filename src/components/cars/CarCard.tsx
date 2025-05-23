@@ -18,7 +18,7 @@ interface CarCardProps {
 
 export default function CarCard({ car, currentSearchParams }: CarCardProps) {
   if (process.env.NODE_ENV !== "production") {
-    console.log("CarCard: Component rendering with car:", car._id);
+    // [REMOVED] // [REMOVED] console.log("CarCard: Component rendering with car:", car._id);
     console.log("CarCard: Full car data:", {
       id: car._id,
       hasMake: !!car.make,

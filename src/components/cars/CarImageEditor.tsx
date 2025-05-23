@@ -92,7 +92,7 @@ export default function CarImageEditor({
         });
 
         const responseData = await response.json();
-        console.log("Database update response:", responseData);
+        // [REMOVED] // [REMOVED] console.log("Database update response:", responseData);
 
         if (!response.ok) {
           console.error(
@@ -100,7 +100,7 @@ export default function CarImageEditor({
             responseData
           );
         } else {
-          console.log("Successfully saved image to database");
+          // [REMOVED] // [REMOVED] console.log("Successfully saved image to database");
         }
       } catch (error) {
         console.error("Error updating database:", error);

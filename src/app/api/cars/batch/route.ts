@@ -55,14 +55,14 @@ export async function GET(request: Request) {
 
     // Count total cars in the database for debugging
     const totalCarsCount = await carsCollection.countDocuments({});
-    console.log(`Total cars in the database: ${totalCarsCount}`);
+    // [REMOVED] // [REMOVED] console.log(`Total cars in the database: ${totalCarsCount}`);
 
     // DEBUG: Sample some cars to understand their structure
     const sampleCars = await carsCollection.find({}).limit(2).toArray();
     if (sampleCars.length > 0) {
-      console.log("Sample car ID type:", typeof sampleCars[0]._id);
-      console.log("Sample car ID:", sampleCars[0]._id);
-      console.log("Sample car fields:", Object.keys(sampleCars[0]).join(", "));
+      // [REMOVED] // [REMOVED] console.log("Sample car ID type:", typeof sampleCars[0]._id);
+      // [REMOVED] // [REMOVED] console.log("Sample car ID:", sampleCars[0]._id);
+      // [REMOVED] // [REMOVED] console.log("Sample car fields:", Object.keys(sampleCars[0]).join(", "));
     }
 
     // Try an alternate lookup approach
@@ -107,7 +107,7 @@ export async function GET(request: Request) {
       `Found ${foundCars.length} cars directly out of ${ids.length} requested IDs`
     );
     if (notFoundIds.length > 0) {
-      console.log(`IDs not found: ${notFoundIds.join(", ")}`);
+      // [REMOVED] // [REMOVED] console.log(`IDs not found: ${notFoundIds.join(", ")}`);
     }
 
     // If we found all cars via direct lookup, skip the batch query

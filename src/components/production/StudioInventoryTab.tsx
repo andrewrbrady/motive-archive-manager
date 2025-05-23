@@ -391,7 +391,7 @@ export default function StudioInventoryTab() {
 
   const handleAddItem = async (newItem: Omit<StudioInventoryItem, "id">) => {
     try {
-      console.log("Sending to API:", newItem);
+      // [REMOVED] // [REMOVED] console.log("Sending to API:", newItem);
 
       // Ensure required fields are present
       if (!newItem.name || !newItem.category || !newItem.model) {

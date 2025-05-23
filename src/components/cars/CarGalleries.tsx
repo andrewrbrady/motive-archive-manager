@@ -118,12 +118,12 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   // Fetch car data with attached galleries - memoized to prevent unnecessary calls
   const fetchCarGalleries = useCallback(async () => {
     try {
-      console.log(`[CarGalleries] Fetching car galleries for car ${carId}`);
+      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Fetching car galleries for car ${carId}`);
       const response = await fetch(`/api/cars/${carId}?includeGalleries=true`);
       if (!response.ok) throw new Error("Failed to fetch car galleries");
       const car = await response.json();
-      console.log(`[CarGalleries] Raw API response:`, car);
-      console.log(`[CarGalleries] Car galleryIds from API:`, car.galleryIds);
+      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Raw API response:`, car);
+      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Car galleryIds from API:`, car.galleryIds);
       console.log(
         `[CarGalleries] Car galleries array from API:`,
         car.galleries
@@ -197,19 +197,19 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
         }
 
         const result = await response.json();
-        console.log(`[CarGalleries] API response:`, result);
-        console.log(`[CarGalleries] Response galleryIds:`, result.galleryIds);
+        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] API response:`, result);
+        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Response galleryIds:`, result.galleryIds);
         console.log(
           `[CarGalleries] Response gallery count:`,
           result.galleryIds?.length || 0
         );
 
         // Add a small delay to ensure the database update is complete
-        console.log(`[CarGalleries] Waiting 500ms before refetch...`);
+        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Waiting 500ms before refetch...`);
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Refresh attached galleries to get the latest state
-        console.log(`[CarGalleries] Refetching car galleries...`);
+        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Refetching car galleries...`);
         await fetchCarGalleries();
 
         toast.success(
@@ -232,7 +232,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   // Attach gallery with proper state management
   const attachGallery = useCallback(
     async (galleryId: string) => {
-      console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
+      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
 
       // Prevent double-clicking using Set operations
       if (operationInProgress.has(galleryId) || isUpdating) {
@@ -244,7 +244,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
       // Check if already attached
       if (attachedGalleries.some((g) => g._id === galleryId)) {
-        console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
+        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
         toast.info("Gallery is already attached");
         return;
       }
@@ -286,7 +286,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   // Detach gallery with proper state management
   const detachGallery = useCallback(
     async (galleryId: string) => {
-      console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
+      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
 
       // Prevent double-clicking using Set operations
       if (operationInProgress.has(galleryId) || isUpdating) {
@@ -298,7 +298,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
       // Check if actually attached
       if (!attachedGalleries.some((g) => g._id === galleryId)) {
-        console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
+        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
         toast.info("Gallery is not attached");
         return;
       }

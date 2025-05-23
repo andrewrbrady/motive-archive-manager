@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Article Instructions Generation Input:", prompt);
+    // [REMOVED] // [REMOVED] console.log("Article Instructions Generation Input:", prompt);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo",

@@ -156,7 +156,7 @@ export async function uploadToCloudflare(
   formData.append("itemId", "inventory-item"); // Add a default itemId that the endpoint requires
 
   try {
-    console.log("Sending request to /api/upload");
+    // [REMOVED] // [REMOVED] console.log("Sending request to /api/upload");
     const response = await fetch("/api/upload", {
       method: "POST",
       body: formData,
@@ -178,7 +178,7 @@ export async function uploadToCloudflare(
     }
 
     const result = await response.json();
-    console.log("Upload response:", result);
+    // [REMOVED] // [REMOVED] console.log("Upload response:", result);
 
     // Extract image ID either from result.id or from imageUrl path
     const imageId =
@@ -196,7 +196,7 @@ export async function uploadToCloudflare(
     // Ensure the URL is properly constructed with /public at the end
     const imageUrl = result.imageUrl || `${baseUrl}/public`;
 
-    console.log("Final image URL:", imageUrl);
+    // [REMOVED] // [REMOVED] console.log("Final image URL:", imageUrl);
 
     return {
       id: imageId,
@@ -240,14 +240,14 @@ export function getFormattedImageUrl(
 
   // Log original URL for debugging only in development
   if (process.env.NODE_ENV === "development") {
-    console.log(`Formatting image URL: ${url} with variant: ${variant}`);
+    // [REMOVED] // [REMOVED] console.log(`Formatting image URL: ${url} with variant: ${variant}`);
   }
 
   try {
     // Handle relative URLs by returning them as-is
     if (url.startsWith("/")) {
       if (process.env.NODE_ENV === "development") {
-        console.log(`Detected relative URL: ${url}, returning as-is`);
+        // [REMOVED] // [REMOVED] console.log(`Detected relative URL: ${url}, returning as-is`);
       }
       return url;
     }
@@ -262,7 +262,7 @@ export function getFormattedImageUrl(
       // If it's already a complete URL but not from Cloudflare, return as-is
       if (url.startsWith("http")) {
         if (process.env.NODE_ENV === "development") {
-          console.log(`Non-Cloudflare URL detected (kept as-is): ${url}`);
+          // [REMOVED] // [REMOVED] console.log(`Non-Cloudflare URL detected (kept as-is): ${url}`);
         }
         return url;
       }
@@ -310,7 +310,7 @@ export function getFormattedImageUrl(
 
         const fixedUrl = `https://imagedelivery.net/${accountHash}/${imageId}/${variant}`;
         if (process.env.NODE_ENV === "development") {
-          console.log(`Fixed malformed URL: ${url} -> ${fixedUrl}`);
+          // [REMOVED] // [REMOVED] console.log(`Fixed malformed URL: ${url} -> ${fixedUrl}`);
         }
         return fixedUrl;
       }
@@ -328,13 +328,13 @@ export function getFormattedImageUrl(
     const alreadyFormatted = url.match(new RegExp(`^${baseUrl}/${variant}$`));
     if (alreadyFormatted) {
       if (process.env.NODE_ENV === "development") {
-        console.log(`URL already correctly formatted: ${url}`);
+        // [REMOVED] // [REMOVED] console.log(`URL already correctly formatted: ${url}`);
       }
       return url;
     }
 
     if (process.env.NODE_ENV === "development") {
-      console.log(`Formatted image URL: ${url} -> ${formattedUrl}`);
+      // [REMOVED] // [REMOVED] console.log(`Formatted image URL: ${url} -> ${formattedUrl}`);
     }
     return formattedUrl;
   } catch (error) {

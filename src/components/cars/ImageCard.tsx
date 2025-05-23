@@ -61,7 +61,7 @@ export function ImageCard({
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
-    console.log("Delete button clicked for image:", image);
+    // [REMOVED] // [REMOVED] console.log("Delete button clicked for image:", image);
     e.stopPropagation();
     if (!onDelete) return;
     setIsDeleting(true);
@@ -83,7 +83,7 @@ export function ImageCard({
   };
 
   if (onDelete) {
-    console.log("Rendering delete button for image:", image);
+    // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
   }
 
   return (

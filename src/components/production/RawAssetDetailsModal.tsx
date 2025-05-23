@@ -36,7 +36,7 @@ export default function RawAssetDetailsModal({
   const handleDriveClick = (driveId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("Navigating to hard drive:", driveId);
+    // [REMOVED] // [REMOVED] console.log("Navigating to hard drive:", driveId);
 
     // First close the current modal to prevent any state conflicts
     onClose();
@@ -62,12 +62,12 @@ export default function RawAssetDetailsModal({
       }
     });
 
-    console.log("Setting URL directly to:", url.toString());
+    // [REMOVED] // [REMOVED] console.log("Setting URL directly to:", url.toString());
     window.history.pushState({}, "", url.toString());
 
     // Finally update the Next.js router state to keep it in sync
     setTimeout(() => {
-      console.log("Updating Next.js router for hard drive:", driveId);
+      // [REMOVED] // [REMOVED] console.log("Updating Next.js router for hard drive:", driveId);
       updateParams(
         {
           tab: "hard-drives",
@@ -87,7 +87,7 @@ export default function RawAssetDetailsModal({
           clearOthers: false, // Important: Keep existing parameters to maintain context
         }
       );
-      console.log("Next.js router update completed for hard drive");
+      // [REMOVED] // [REMOVED] console.log("Next.js router update completed for hard drive");
     }, 200); // Increased timeout for better reliability
   };
 
@@ -275,7 +275,7 @@ export default function RawAssetDetailsModal({
             </h3>
             <button
               onClick={() => {
-                console.log("Editing asset:", asset._id);
+                // [REMOVED] // [REMOVED] console.log("Editing asset:", asset._id);
 
                 // First update the URL directly for immediate effect
                 const url = new URL(window.location.href);
@@ -301,7 +301,7 @@ export default function RawAssetDetailsModal({
                   }
                 });
 
-                console.log("Setting URL directly to:", url.toString());
+                // [REMOVED] // [REMOVED] console.log("Setting URL directly to:", url.toString());
                 window.history.pushState({}, "", url.toString());
 
                 // Then close the current modal

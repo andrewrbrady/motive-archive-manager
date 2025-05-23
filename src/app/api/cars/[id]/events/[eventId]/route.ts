@@ -47,7 +47,7 @@ export async function PUT(request: Request) {
     const eventObjectId = new ObjectId(eventId);
     const data = await request.json();
 
-    console.log("Updating event with data:", data); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Updating event with data:", data); // Debug log
 
     // Ensure assignees is always an array
     const assignees = Array.isArray(data.assignees) ? data.assignees : [];
@@ -64,18 +64,18 @@ export async function PUT(request: Request) {
       updated_at: new Date(), // Ensure proper Date object
     };
 
-    console.log("Mapped updates:", mappedUpdates); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Mapped updates:", mappedUpdates); // Debug log
 
     const success = await eventModel.update(eventObjectId, mappedUpdates);
 
     if (!success) {
-      console.log("Event not found or update failed"); // Debug log
+      // [REMOVED] // [REMOVED] console.log("Event not found or update failed"); // Debug log
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     // Fetch the updated event to verify changes
     const updatedEvent = await eventModel.findById(eventObjectId);
-    console.log("Updated event:", updatedEvent); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Updated event:", updatedEvent); // Debug log
 
     return NextResponse.json({
       success: true,

@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Email Instructions Generation Input:", prompt);
-    console.log("Email Type:", emailType || "Not specified");
-    console.log("Car ID:", carId || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Email Instructions Generation Input:", prompt);
+    // [REMOVED] // [REMOVED] console.log("Email Type:", emailType || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Car ID:", carId || "Not specified");
 
     // Get car information if carId is provided
     let carInfo = null;

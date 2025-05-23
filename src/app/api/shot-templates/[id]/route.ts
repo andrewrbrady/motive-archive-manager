@@ -11,13 +11,13 @@ export async function GET(request: Request) {
     const id = segments[segments.length - 1];
 
     const { db } = await connectToDatabase();
-    console.log("GET request for template ID:", id);
+    // [REMOVED] // [REMOVED] console.log("GET request for template ID:", id);
 
     // Check if the ID is a valid ObjectId
     let query;
     try {
       query = { _id: new ObjectId(id) };
-      console.log("Valid ObjectId, using query:", query);
+      // [REMOVED] // [REMOVED] console.log("Valid ObjectId, using query:", query);
     } catch (error) {
       console.error("Invalid ObjectId format:", error);
       return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
@@ -26,14 +26,14 @@ export async function GET(request: Request) {
     const template = await db.collection("shotTemplates").findOne(query);
 
     if (!template) {
-      console.log("Template not found for ID:", id);
+      // [REMOVED] // [REMOVED] console.log("Template not found for ID:", id);
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }
       );
     }
 
-    console.log("Template found:", template._id.toString());
+    // [REMOVED] // [REMOVED] console.log("Template found:", template._id.toString());
     return NextResponse.json({
       ...template,
       id: template._id.toString(),
@@ -55,13 +55,13 @@ export async function PUT(request: Request) {
 
     const { db } = await connectToDatabase();
     const data = await request.json();
-    console.log("PUT request for template ID:", id);
+    // [REMOVED] // [REMOVED] console.log("PUT request for template ID:", id);
 
     // Check if the ID is a valid ObjectId
     let objectId;
     try {
       objectId = new ObjectId(id);
-      console.log("Valid ObjectId:", objectId);
+      // [REMOVED] // [REMOVED] console.log("Valid ObjectId:", objectId);
     } catch (error) {
       console.error("Invalid ObjectId format:", error);
       return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
@@ -93,7 +93,7 @@ export async function PUT(request: Request) {
     );
 
     if (result.matchedCount === 0) {
-      console.log("Template not found for update:", id);
+      // [REMOVED] // [REMOVED] console.log("Template not found for update:", id);
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }
@@ -132,13 +132,13 @@ export async function DELETE(request: Request) {
     const id = segments[segments.length - 1];
 
     const { db } = await connectToDatabase();
-    console.log("DELETE request for template ID:", id);
+    // [REMOVED] // [REMOVED] console.log("DELETE request for template ID:", id);
 
     // Check if the ID is a valid ObjectId
     let objectId;
     try {
       objectId = new ObjectId(id);
-      console.log("Valid ObjectId:", objectId);
+      // [REMOVED] // [REMOVED] console.log("Valid ObjectId:", objectId);
     } catch (error) {
       console.error("Invalid ObjectId format:", error);
       return NextResponse.json({ error: "Invalid ID format" }, { status: 400 });
@@ -161,7 +161,7 @@ export async function DELETE(request: Request) {
     });
 
     if (result.deletedCount === 0) {
-      console.log("Template not found for deletion:", id);
+      // [REMOVED] // [REMOVED] console.log("Template not found for deletion:", id);
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }

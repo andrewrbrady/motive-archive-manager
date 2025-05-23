@@ -7,7 +7,7 @@ export const maxDuration = 300;
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  console.log("[API] Images upload called");
+  // [REMOVED] // [REMOVED] console.log("[API] Images upload called");
 
   try {
     const formData = await request.formData();
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    console.log(`Processing ${files.length} files for upload`);
+    // [REMOVED] // [REMOVED] console.log(`Processing ${files.length} files for upload`);
 
     const uploadedImages = [];
     const now = new Date().toISOString();

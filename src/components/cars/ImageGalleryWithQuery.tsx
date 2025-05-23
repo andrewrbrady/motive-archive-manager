@@ -204,7 +204,7 @@ export function ImageGalleryWithQuery({
       try {
         isLoadingRef.current = true;
         setLoadingImageIds((prev) => new Set([...prev, imageId]));
-        console.log(`Fetching image details for ${imageId}`);
+        // [REMOVED] // [REMOVED] console.log(`Fetching image details for ${imageId}`);
 
         const response = await fetch(`/api/images/${imageId}`);
         if (!isMountedRef.current) return;
@@ -226,7 +226,7 @@ export function ImageGalleryWithQuery({
 
           // Ensure the URL is properly formatted before updating the cache
           const formattedUrl = getFormattedImageUrl(imageData.url);
-          console.log(`Formatted URL for ${imageId}: ${formattedUrl}`);
+          // [REMOVED] // [REMOVED] console.log(`Formatted URL for ${imageId}: ${formattedUrl}`);
 
           // Update the query data without triggering a refetch
           queryClient.setQueryData(
@@ -343,7 +343,7 @@ export function ImageGalleryWithQuery({
       isMountedRef.current &&
       !loadedImageDetailsRef.current.has(currentImageId)
     ) {
-      console.log(`Loading current image: ${currentImageId}`);
+      // [REMOVED] // [REMOVED] console.log(`Loading current image: ${currentImageId}`);
       loadImageDetails(currentImageId);
     }
   }, [currentImageId, images, loadImageDetails]);
@@ -610,7 +610,7 @@ export function ImageGalleryWithQuery({
   // Handle image loading
   const handleImageLoad = useCallback((imageId: string) => {
     if (!isMountedRef.current) return;
-    console.log(`Image loaded successfully: ${imageId}`);
+    // [REMOVED] // [REMOVED] console.log(`Image loaded successfully: ${imageId}`);
     setLoadedImages((prev) => new Set([...prev, imageId]));
   }, []);
 
@@ -1400,7 +1400,7 @@ export function ImageGalleryWithQuery({
               const value = e.target.value;
               setSearchQuery(value);
               // TODO: Implement search functionality
-              console.log("Search query:", value);
+              // [REMOVED] // [REMOVED] console.log("Search query:", value);
             }}
           />
         </div>

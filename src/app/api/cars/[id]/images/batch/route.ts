@@ -25,7 +25,7 @@ interface CarDocument {
 
 // Add OPTIONS handler to make the endpoint testable
 export async function OPTIONS(request: Request) {
-  console.log("======== BATCH OPTIONS REQUEST RECEIVED ========");
+  // [REMOVED] // [REMOVED] console.log("======== BATCH OPTIONS REQUEST RECEIVED ========");
   return new NextResponse(null, {
     status: 204,
     headers: {
@@ -40,9 +40,9 @@ export async function OPTIONS(request: Request) {
  * Improved DELETE handler for batch image deletion - handles both UUID and ObjectId formats
  */
 export async function DELETE(request: Request) {
-  console.log("======== BATCH IMAGE DELETION API CALLED ========");
-  console.log("Request URL:", request.url);
-  console.log("Request method:", request.method);
+  // [REMOVED] // [REMOVED] console.log("======== BATCH IMAGE DELETION API CALLED ========");
+  // [REMOVED] // [REMOVED] console.log("Request URL:", request.url);
+  // [REMOVED] // [REMOVED] console.log("Request method:", request.method);
   console.log(
     "Request headers:",
     Object.fromEntries([...request.headers.entries()])
@@ -53,11 +53,11 @@ export async function DELETE(request: Request) {
     const segments = url.pathname.split("/");
     const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/images/batch
 
-    console.log("Car ID from URL params:", carId);
+    // [REMOVED] // [REMOVED] console.log("Car ID from URL params:", carId);
 
     // Parse request body
     const requestData = await request.json();
-    console.log("Request data:", JSON.stringify(requestData, null, 2));
+    // [REMOVED] // [REMOVED] console.log("Request data:", JSON.stringify(requestData, null, 2));
 
     // Extract and validate image IDs from request
     const {
@@ -66,8 +66,8 @@ export async function DELETE(request: Request) {
       deleteFromStorage = false,
     } = requestData;
 
-    console.log("Received imageIds:", imageIds);
-    console.log("Received cloudflareIds:", cloudflareIds);
+    // [REMOVED] // [REMOVED] console.log("Received imageIds:", imageIds);
+    // [REMOVED] // [REMOVED] console.log("Received cloudflareIds:", cloudflareIds);
 
     // Validate car ID
     let carObjectId: ObjectId;
@@ -105,11 +105,11 @@ export async function DELETE(request: Request) {
       ],
     };
 
-    console.log("MongoDB query:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] console.log("MongoDB query:", JSON.stringify(query, null, 2));
 
     // Find images to delete
     const imagesToDelete = await imagesCollection.find(query).toArray();
-    console.log("Found images to delete:", imagesToDelete);
+    // [REMOVED] // [REMOVED] console.log("Found images to delete:", imagesToDelete);
 
     // Track results
     const results = {
@@ -130,7 +130,7 @@ export async function DELETE(request: Request) {
       "MongoDB IDs to delete:",
       imageIdsToDelete.map((id) => id.toString())
     );
-    console.log("Cloudflare IDs to delete:", cloudflareIdsToDelete);
+    // [REMOVED] // [REMOVED] console.log("Cloudflare IDs to delete:", cloudflareIdsToDelete);
 
     try {
       // 1. First, update the car document to remove image references
@@ -144,7 +144,7 @@ export async function DELETE(request: Request) {
       );
 
       results.removedFromCar = updateResult.modifiedCount > 0;
-      console.log("Car update result:", updateResult);
+      // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
 
       // 2. Then, delete from MongoDB images collection
       const deleteResult = await imagesCollection.deleteMany({
@@ -152,7 +152,7 @@ export async function DELETE(request: Request) {
       });
 
       results.deletedFromMongoDB = deleteResult.deletedCount || 0;
-      console.log("MongoDB delete result:", deleteResult);
+      // [REMOVED] // [REMOVED] console.log("MongoDB delete result:", deleteResult);
 
       // 3. Finally, delete from Cloudflare if requested
       if (deleteFromStorage && cloudflareIdsToDelete.length > 0) {
@@ -165,7 +165,7 @@ export async function DELETE(request: Request) {
 
         for (const cloudflareId of cloudflareIdsToDelete) {
           try {
-            console.log(`Deleting image ${cloudflareId} from Cloudflare`);
+            // [REMOVED] // [REMOVED] console.log(`Deleting image ${cloudflareId} from Cloudflare`);
             const response = await fetch(
               `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1/${cloudflareId}`,
               {

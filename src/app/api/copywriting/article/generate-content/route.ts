@@ -26,9 +26,9 @@ export async function POST(request: NextRequest) {
 
     const currentSection = currentOutline[currentStep];
 
-    console.log("Article Content Generation Input:");
-    console.log("Generating content for section:", currentSection);
-    console.log("Current step:", currentStep, "of", currentOutline.length);
+    // [REMOVED] // [REMOVED] console.log("Article Content Generation Input:");
+    // [REMOVED] // [REMOVED] console.log("Generating content for section:", currentSection);
+    // [REMOVED] // [REMOVED] console.log("Current step:", currentStep, "of", currentOutline.length);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo",

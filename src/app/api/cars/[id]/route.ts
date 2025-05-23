@@ -198,7 +198,7 @@ export async function GET(request: Request) {
 
     // If including galleries, handle them appropriately
     if (includeGalleries === "true") {
-      console.log("[CarAPI] Including galleries in response");
+      // [REMOVED] // [REMOVED] console.log("[CarAPI] Including galleries in response");
 
       // Convert string galleryIds to ObjectIds for proper lookup
       pipeline.push({
@@ -231,7 +231,7 @@ export async function GET(request: Request) {
         },
       });
 
-      console.log("[CarAPI] Added gallery ObjectId conversion to pipeline");
+      // [REMOVED] // [REMOVED] console.log("[CarAPI] Added gallery ObjectId conversion to pipeline");
 
       // Lookup galleries using the converted ObjectIds - simplified and more robust
       pipeline.push({
@@ -251,7 +251,7 @@ export async function GET(request: Request) {
         },
       });
 
-      console.log("[CarAPI] Added gallery lookup to pipeline");
+      // [REMOVED] // [REMOVED] console.log("[CarAPI] Added gallery lookup to pipeline");
 
       // Add thumbnail images in a separate, safer lookup
       pipeline.push({
@@ -287,7 +287,7 @@ export async function GET(request: Request) {
         },
       });
 
-      console.log("[CarAPI] Added thumbnail processing to pipeline");
+      // [REMOVED] // [REMOVED] console.log("[CarAPI] Added thumbnail processing to pipeline");
 
       // Clean up temporary fields
       pipeline.push({
@@ -297,7 +297,7 @@ export async function GET(request: Request) {
         },
       });
 
-      console.log("[CarAPI] Cleaned up temporary fields from pipeline");
+      // [REMOVED] // [REMOVED] console.log("[CarAPI] Cleaned up temporary fields from pipeline");
     }
 
     // Add projection if fields were specified
@@ -312,7 +312,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    console.log("[CarAPI] Car found:", car._id);
+    // [REMOVED] // [REMOVED] console.log("[CarAPI] Car found:", car._id);
     if (includeGalleries === "true") {
       console.log(
         "[CarAPI] Raw galleries from aggregation:",
@@ -325,7 +325,7 @@ export async function GET(request: Request) {
 
       // Populate thumbnail images for galleries if they exist
       if (car.galleries && car.galleries.length > 0) {
-        console.log("[CarAPI] Populating thumbnail images for galleries");
+        // [REMOVED] // [REMOVED] console.log("[CarAPI] Populating thumbnail images for galleries");
 
         // Get all first image IDs from galleries
         const thumbnailImageIds = car.galleries
@@ -374,7 +374,7 @@ export async function GET(request: Request) {
             return gallery;
           });
 
-          console.log("[CarAPI] Updated galleries with thumbnail images");
+          // [REMOVED] // [REMOVED] console.log("[CarAPI] Updated galleries with thumbnail images");
         }
       }
     }
@@ -581,13 +581,13 @@ export async function DELETE(request: Request) {
     client = await getMongoClient();
     const db = client.db(DB_NAME);
 
-    console.log(`Deleting car with ID: ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`Deleting car with ID: ${id}`);
     const result = await db.collection("cars").deleteOne({
       _id: objectId,
     });
 
     if (result.deletedCount === 0) {
-      console.log(`Car not found with ID: ${id}`);
+      // [REMOVED] // [REMOVED] console.log(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
@@ -600,7 +600,7 @@ export async function DELETE(request: Request) {
     );
   } finally {
     if (client) {
-      console.log(`Closing MongoDB connection for car`);
+      // [REMOVED] // [REMOVED] console.log(`Closing MongoDB connection for car`);
       await client.close();
     }
   }
@@ -615,8 +615,8 @@ export async function PATCH(request: Request) {
     const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
 
     if (process.env.NODE_ENV !== "production") {
-      console.log("\n=== CAR UPDATE API CALLED ===");
-      console.log("Car ID:", id);
+      // [REMOVED] // [REMOVED] console.log("\n=== CAR UPDATE API CALLED ===");
+      // [REMOVED] // [REMOVED] console.log("Car ID:", id);
     }
 
     const updates = await request.json();
@@ -664,17 +664,17 @@ export async function PATCH(request: Request) {
       // Handle galleryIds field specifically
       if (key === "galleryIds") {
         if (process.env.NODE_ENV !== "production") {
-          console.log(`\n=== GALLERY IDS UPDATE ===`);
+          // [REMOVED] // [REMOVED] console.log(`\n=== GALLERY IDS UPDATE ===`);
           console.log(
             "Received galleryIds count:",
             Array.isArray(value) ? value.length : "not array"
           );
-          console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
+          // [REMOVED] // [REMOVED] console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
         }
 
         if (!Array.isArray(value)) {
           if (process.env.NODE_ENV !== "production") {
-            console.log("galleryIds is not an array, setting to empty array");
+            // [REMOVED] // [REMOVED] console.log("galleryIds is not an array, setting to empty array");
           }
           acc[key] = [];
           return acc;
@@ -686,7 +686,7 @@ export async function PATCH(request: Request) {
             .filter((id) => {
               const isValid = id && ObjectId.isValid(id.toString());
               if (!isValid && process.env.NODE_ENV !== "production") {
-                console.log(`Invalid gallery ID filtered out`);
+                // [REMOVED] // [REMOVED] console.log(`Invalid gallery ID filtered out`);
               }
               return isValid;
             })
@@ -696,8 +696,8 @@ export async function PATCH(request: Request) {
             });
 
           if (process.env.NODE_ENV !== "production") {
-            console.log(`Final galleryIds count: ${validGalleryIds.length}`);
-            console.log(`=== END GALLERY IDS UPDATE ===\n`);
+            // [REMOVED] // [REMOVED] console.log(`Final galleryIds count: ${validGalleryIds.length}`);
+            // [REMOVED] // [REMOVED] console.log(`=== END GALLERY IDS UPDATE ===\n`);
           }
           acc[key] = validGalleryIds;
         } catch (error) {
@@ -797,9 +797,9 @@ export async function PATCH(request: Request) {
     cleanedUpdates.updatedAt = new Date();
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(`\n=== DATABASE UPDATE ===`);
-      console.log("Car ID:", objectId);
-      console.log("Update fields count:", Object.keys(cleanedUpdates).length);
+      // [REMOVED] // [REMOVED] console.log(`\n=== DATABASE UPDATE ===`);
+      // [REMOVED] // [REMOVED] console.log("Car ID:", objectId);
+      // [REMOVED] // [REMOVED] console.log("Update fields count:", Object.keys(cleanedUpdates).length);
     }
 
     // Perform the update with cleaned data
@@ -817,12 +817,12 @@ export async function PATCH(request: Request) {
     }
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(`Database update successful`);
+      // [REMOVED] // [REMOVED] console.log(`Database update successful`);
       console.log(
         "Updated car galleryIds count:",
         result.galleryIds?.length || 0
       );
-      console.log(`=== END DATABASE UPDATE ===\n`);
+      // [REMOVED] // [REMOVED] console.log(`=== END DATABASE UPDATE ===\n`);
     }
 
     // Convert to plain object to ensure it's JSON serializable
@@ -834,7 +834,7 @@ export async function PATCH(request: Request) {
         model: serializedCar.model,
         hasVin: !!serializedCar.vin,
       });
-      console.log("\n=== CAR UPDATE COMPLETED ===\n");
+      // [REMOVED] // [REMOVED] console.log("\n=== CAR UPDATE COMPLETED ===\n");
     }
 
     return NextResponse.json(serializedCar);

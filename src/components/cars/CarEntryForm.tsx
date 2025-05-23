@@ -194,7 +194,7 @@ export default function CarEntryForm({
           throw new Error(`Failed to fetch clients: ${response.statusText}`);
         }
         const data = await response.json();
-        console.log("Fetched clients:", data);
+        // [REMOVED] // [REMOVED] console.log("Fetched clients:", data);
         setClients(data.clients || []);
       } catch (error) {
         console.error("Error fetching clients:", error);
@@ -351,7 +351,7 @@ export default function CarEntryForm({
     const errorCodes = String(data.error.code)
       .split(",")
       .map((code) => code.trim());
-    console.log("Processing error codes:", errorCodes);
+    // [REMOVED] // [REMOVED] console.log("Processing error codes:", errorCodes);
 
     // Check if we have position-specific errors
     const positionErrors = data.validationStatus?.possibleValues
@@ -509,7 +509,7 @@ export default function CarEntryForm({
     }
 
     if (process.env.NODE_ENV !== "production") {
-      console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
+      // [REMOVED] // [REMOVED] console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
     }
     setIsDecodingVinWithCorrections(true);
 
@@ -608,8 +608,8 @@ export default function CarEntryForm({
         doors: data.doors || formData.doors,
       } as typeof formData;
 
-      console.log("Dimensions data received:", data.dimensions);
-      console.log("Updated dimensions in form:", updatedFormData.dimensions);
+      // [REMOVED] // [REMOVED] console.log("Dimensions data received:", data.dimensions);
+      // [REMOVED] // [REMOVED] console.log("Updated dimensions in form:", updatedFormData.dimensions);
 
       // Add AI analysis insights if available
       if ("aiAnalysis" in data) {

@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
 
     const currentSection = currentOutline[currentStep];
 
-    console.log("Email Content Generation Input:");
-    console.log("Generating content for section:", currentSection);
-    console.log("Email Type:", emailType || "Not specified");
-    console.log("Car ID:", carId || "Not specified");
-    console.log("Current step:", currentStep, "of", currentOutline.length);
+    // [REMOVED] // [REMOVED] console.log("Email Content Generation Input:");
+    // [REMOVED] // [REMOVED] console.log("Generating content for section:", currentSection);
+    // [REMOVED] // [REMOVED] console.log("Email Type:", emailType || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Car ID:", carId || "Not specified");
+    // [REMOVED] // [REMOVED] console.log("Current step:", currentStep, "of", currentOutline.length);
 
     // Get car information if carId is provided
     let carInfo = null;

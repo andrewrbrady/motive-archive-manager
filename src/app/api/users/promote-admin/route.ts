@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
-    console.log(`🔧 Promoting user ${userId} to admin...`);
+    // [REMOVED] // [REMOVED] console.log(`🔧 Promoting user ${userId} to admin...`);
 
     // Update Firebase Auth custom claims
     await adminAuth.setCustomUserClaims(userId, {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       });
 
-    console.log(`✅ Successfully promoted user ${userId} to admin`);
+    // [REMOVED] // [REMOVED] console.log(`✅ Successfully promoted user ${userId} to admin`);
 
     return NextResponse.json({
       success: true,

@@ -177,7 +177,7 @@ export default function HardDriveDetails({ params }: any) {
             return null;
           }
           const data = await res.json();
-          console.log(`Asset data for ${id}:`, data);
+          // [REMOVED] // [REMOVED] console.log(`Asset data for ${id}:`, data);
 
           // Determine asset type from metadata or extension if available
           let assetType = "Unknown";
@@ -229,7 +229,7 @@ export default function HardDriveDetails({ params }: any) {
 
       const results = await Promise.all(promises);
       const validAssets = results.filter(Boolean) as RawAsset[];
-      console.log("All transformed assets:", validAssets);
+      // [REMOVED] // [REMOVED] console.log("All transformed assets:", validAssets);
       setAssets(validAssets);
     } catch (err) {
       console.error("Error fetching raw assets:", err);

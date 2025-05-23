@@ -63,12 +63,12 @@ export class EventModel {
   }
 
   async findByCarId(carId: string) {
-    console.log("Finding events for car ID:", carId); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Finding events for car ID:", carId); // Debug log
     const events = await this.collection
       .find({ car_id: carId })
       .sort({ scheduled_date: 1 })
       .toArray();
-    console.log("Found events:", events); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Found events:", events); // Debug log
     return events;
   }
 
@@ -114,7 +114,7 @@ export class EventModel {
 
   async update(id: ObjectId, updates: Partial<DbEvent>): Promise<boolean> {
     try {
-      console.log("Updating event:", id, "with updates:", updates); // Debug log
+      // [REMOVED] // [REMOVED] console.log("Updating event:", id, "with updates:", updates); // Debug log
 
       // Validate assignees if present
       if (updates.assignees !== undefined) {
@@ -140,7 +140,7 @@ export class EventModel {
         }
       );
 
-      console.log("Update result:", result); // Debug log
+      // [REMOVED] // [REMOVED] console.log("Update result:", result); // Debug log
 
       return result.matchedCount > 0;
     } catch (error) {

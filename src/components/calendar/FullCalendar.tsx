@@ -289,8 +289,8 @@ export function FullCalendarComponent({
 
         // Update to use the correct API path structure with carId
         const apiUrl = `/api/cars/${carId}/events/${eventData.resource.id}`;
-        console.log("Updating event with data:", updatedEvent);
-        console.log("PUT request to:", apiUrl);
+        // [REMOVED] // [REMOVED] console.log("Updating event with data:", updatedEvent);
+        // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {
           method: "PUT",
@@ -301,7 +301,7 @@ export function FullCalendarComponent({
         });
 
         // Log the response status
-        console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -312,7 +312,7 @@ export function FullCalendarComponent({
         }
 
         const result = await response.json();
-        console.log("Updated event result:", result);
+        // [REMOVED] // [REMOVED] console.log("Updated event result:", result);
 
         toast.success("Event updated");
 
@@ -352,7 +352,7 @@ export function FullCalendarComponent({
 
         // Update to use the correct API path structure with carId
         const apiUrl = `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`;
-        console.log("PUT request to:", apiUrl);
+        // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {
           method: "PUT",
@@ -363,7 +363,7 @@ export function FullCalendarComponent({
         });
 
         // Log the response status
-        console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -374,7 +374,7 @@ export function FullCalendarComponent({
         }
 
         const result = await response.json();
-        console.log("Updated deliverable result:", result);
+        // [REMOVED] // [REMOVED] console.log("Updated deliverable result:", result);
 
         toast.success("Deliverable updated");
 
@@ -414,8 +414,8 @@ export function FullCalendarComponent({
 
         // Update to use the correct API path structure with carId
         const apiUrl = `/api/cars/${carId}/events/${eventData.resource.id}`;
-        console.log("Updating event with data:", updatedEvent);
-        console.log("PUT request to:", apiUrl);
+        // [REMOVED] // [REMOVED] console.log("Updating event with data:", updatedEvent);
+        // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {
           method: "PUT",
@@ -426,7 +426,7 @@ export function FullCalendarComponent({
         });
 
         // Log the response status
-        console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -437,7 +437,7 @@ export function FullCalendarComponent({
         }
 
         const result = await response.json();
-        console.log("Updated event result:", result);
+        // [REMOVED] // [REMOVED] console.log("Updated event result:", result);
 
         toast.success("Event updated");
 

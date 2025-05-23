@@ -95,12 +95,12 @@ export async function PUT(request: Request) {
     // For admin operations, verify admin authentication
     if (!isNewUserRegistration) {
       // Check authentication and authorization
-      console.log("Attempting admin operation - checking authorization");
+      // [REMOVED] // [REMOVED] console.log("Attempting admin operation - checking authorization");
       const session = await auth();
 
       // Check if user is authenticated and has admin role
       if (!session || !session.user || !session.user.roles.includes("admin")) {
-        console.log("Unauthorized access attempt:", session?.user?.email);
+        // [REMOVED] // [REMOVED] console.log("Unauthorized access attempt:", session?.user?.email);
         return NextResponse.json(
           { error: "Unauthorized access" },
           { status: 403 }

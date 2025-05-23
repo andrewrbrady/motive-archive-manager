@@ -14,7 +14,7 @@ export default function TestMongoDBPage() {
     setError(null);
 
     try {
-      console.log("Testing MongoDB connection to:", url);
+      // [REMOVED] // [REMOVED] console.log("Testing MongoDB connection to:", url);
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -25,7 +25,7 @@ export default function TestMongoDBPage() {
 
       const data = await response.json();
       setResult(data);
-      console.log("MongoDB test result:", data);
+      // [REMOVED] // [REMOVED] console.log("MongoDB test result:", data);
     } catch (err) {
       console.error("Error testing MongoDB:", err);
       setError(err instanceof Error ? err.message : String(err));

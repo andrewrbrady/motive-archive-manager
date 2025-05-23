@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = userDoc.data();
-    console.log("Current user data:", userData);
+    // [REMOVED] // [REMOVED] console.log("Current user data:", userData);
 
     // Get current roles
     const currentRoles = userData?.roles || [];
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log("Updating roles from", currentRoles, "to", updatedRoles);
+    // [REMOVED] // [REMOVED] console.log("Updating roles from", currentRoles, "to", updatedRoles);
 
     // Update Firestore
     await adminDb.collection("users").doc(userId).update({
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       status: userData?.status || "active",
     });
 
-    console.log("Successfully updated user roles for", userId);
+    // [REMOVED] // [REMOVED] console.log("Successfully updated user roles for", userId);
 
     return NextResponse.json({
       message: "User roles updated successfully",

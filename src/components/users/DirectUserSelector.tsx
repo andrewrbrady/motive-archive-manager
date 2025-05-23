@@ -101,7 +101,7 @@ function DirectUserSelector({
         throw new Error(`Failed to fetch users: ${response.status}`);
 
       const data = await response.json();
-      console.log(`Fetched ${data.length} users`);
+      // [REMOVED] // [REMOVED] console.log(`Fetched ${data.length} users`);
 
       // Filter out OAuth IDs (long numeric strings)
       const filteredUsers = data
@@ -171,7 +171,7 @@ function DirectUserSelector({
       return;
     }
 
-    console.log(`Selecting user: ${userName} (${userId})`);
+    // [REMOVED] // [REMOVED] console.log(`Selecting user: ${userName} (${userId})`);
 
     // Update internal state
     setSelectedUserId(userId);
@@ -187,7 +187,7 @@ function DirectUserSelector({
 
   // Handle unassign
   const handleClearSelection = () => {
-    console.log("Clearing selection");
+    // [REMOVED] // [REMOVED] console.log("Clearing selection");
 
     // Update internal state
     setSelectedUserId(null);

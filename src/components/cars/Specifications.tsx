@@ -130,13 +130,13 @@ interface SpecificationItemProps {
 
 const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
   // Add detailed logging for each specification item
-  console.log(`\n=== ${label} Specification Item Debug ===`);
-  console.log("Raw value:", JSON.stringify(value, null, 2));
-  console.log("Unit:", unit);
-  console.log("Value type:", typeof value);
+  // [REMOVED] // [REMOVED] console.log(`\n=== ${label} Specification Item Debug ===`);
+  // [REMOVED] // [REMOVED] console.log("Raw value:", JSON.stringify(value, null, 2));
+  // [REMOVED] // [REMOVED] console.log("Unit:", unit);
+  // [REMOVED] // [REMOVED] console.log("Value type:", typeof value);
 
   if (value === null || value === undefined || value === "") {
-    console.log(`${label}: Skipping null/undefined/empty value`);
+    // [REMOVED] // [REMOVED] console.log(`${label}: Skipping null/undefined/empty value`);
     return null;
   }
 
@@ -151,10 +151,10 @@ const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
 
     if ("$numberInt" in value && value.$numberInt !== null) {
       displayValue = Number(value.$numberInt);
-      console.log(`${label}: Extracted $numberInt:`, displayValue);
+      // [REMOVED] // [REMOVED] console.log(`${label}: Extracted $numberInt:`, displayValue);
     } else if ("$numberDouble" in value && value.$numberDouble !== null) {
       displayValue = Number(value.$numberDouble);
-      console.log(`${label}: Extracted $numberDouble:`, displayValue);
+      // [REMOVED] // [REMOVED] console.log(`${label}: Extracted $numberDouble:`, displayValue);
     } else if ("value" in value && value.value !== null) {
       // Handle nested value object (e.g. dimensions.gvwr.value)
       const nestedValue = value.value;
@@ -166,7 +166,7 @@ const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
       if (nestedValue && typeof nestedValue === "object") {
         if ("$numberInt" in nestedValue && nestedValue.$numberInt !== null) {
           displayValue = Number(nestedValue.$numberInt);
-          console.log(`${label}: Extracted nested $numberInt:`, displayValue);
+          // [REMOVED] // [REMOVED] console.log(`${label}: Extracted nested $numberInt:`, displayValue);
         } else if (
           "$numberDouble" in nestedValue &&
           nestedValue.$numberDouble !== null
@@ -179,7 +179,7 @@ const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
         }
       } else if (nestedValue !== null) {
         displayValue = nestedValue;
-        console.log(`${label}: Using nested value directly:`, displayValue);
+        // [REMOVED] // [REMOVED] console.log(`${label}: Using nested value directly:`, displayValue);
       }
     }
   }
@@ -366,7 +366,7 @@ const Specifications = ({
     setIsSaving(true);
     try {
       await onSave(localSpecs);
-      console.log("Save successful");
+      // [REMOVED] // [REMOVED] console.log("Save successful");
     } catch (error) {
       console.error("Error saving specifications:", error);
       toast.error("Failed to save specifications");

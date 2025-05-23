@@ -43,7 +43,7 @@ const GalleryUploader: React.FC<GalleryUploaderProps> = ({
   const displayPercent = total > 0 && doneCount === total ? 100 : percent;
 
   // Debug log
-  console.log("displayPercent", displayPercent, "progress", progress);
+  // [REMOVED] // [REMOVED] console.log("displayPercent", displayPercent, "progress", progress);
 
   const overallStatus = React.useMemo(() => {
     if (uploaderErrorHook || localError) return "error";

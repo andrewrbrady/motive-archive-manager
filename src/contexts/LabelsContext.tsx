@@ -111,7 +111,7 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
 
         const data = await response.json();
         if (process.env.NODE_ENV !== "production") {
-          console.log("Car labels API response structure:", Object.keys(data));
+          // [REMOVED] // [REMOVED] console.log("Car labels API response structure:", Object.keys(data));
           console.log(
             "Received labels for cars:",
             Object.keys(data.labels || {}).length
@@ -121,7 +121,7 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
             Object.keys(data.labels || {}).slice(0, 3)
           );
           if (data.debug) {
-            console.log("API debug info:", data.debug);
+            // [REMOVED] // [REMOVED] console.log("API debug info:", data.debug);
           }
         }
 

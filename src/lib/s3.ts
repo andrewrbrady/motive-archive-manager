@@ -213,7 +213,7 @@ export function generateS3Key(carId: string, filename: string) {
 
 export async function getMDXFile(s3Key: string): Promise<string> {
   try {
-    console.log("S3 - Fetching MDX file:", { s3Key, bucket: BUCKET_NAME });
+    // [REMOVED] // [REMOVED] console.log("S3 - Fetching MDX file:", { s3Key, bucket: BUCKET_NAME });
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: s3Key,
@@ -225,7 +225,7 @@ export async function getMDXFile(s3Key: string): Promise<string> {
     }
 
     const content = await response.Body.transformToString();
-    console.log("S3 - Successfully fetched MDX file content");
+    // [REMOVED] // [REMOVED] console.log("S3 - Successfully fetched MDX file content");
     return content;
   } catch (error) {
     console.error("S3 - Error fetching MDX file:", {
@@ -243,7 +243,7 @@ export async function uploadMDXFile(
   content: string
 ): Promise<string> {
   try {
-    console.log("S3 - Uploading MDX file:", { filename });
+    // [REMOVED] // [REMOVED] console.log("S3 - Uploading MDX file:", { filename });
     const timestamp = Date.now();
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "-");
     const key = `mdx/${sanitizedFilename.replace(/\.([^.]+)$/, `-${timestamp}.$1`)}`;
@@ -256,7 +256,7 @@ export async function uploadMDXFile(
     });
 
     await s3Client.send(command);
-    console.log("S3 - Successfully uploaded MDX file:", { key });
+    // [REMOVED] // [REMOVED] console.log("S3 - Successfully uploaded MDX file:", { key });
     return key;
   } catch (error) {
     console.error("S3 - Error uploading MDX file:", {

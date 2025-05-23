@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // User is authenticated
     const userId = session.user.id;
-    console.log(`Attempting to sync session for user: ${userId}`);
+    // [REMOVED] // [REMOVED] console.log(`Attempting to sync session for user: ${userId}`);
 
     try {
       // Get Firebase Auth user data
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
       // Get custom claims
       const claims = firebaseUser.customClaims || {};
-      console.log("Firebase Auth custom claims:", claims);
+      // [REMOVED] // [REMOVED] console.log("Firebase Auth custom claims:", claims);
 
       // Return the updated claims
       return NextResponse.json({

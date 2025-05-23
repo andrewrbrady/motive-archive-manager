@@ -42,7 +42,7 @@ export async function assignDeliverable(
 
     // Parse the response
     const responseData = await response.json();
-    console.log("Assignment response:", responseData);
+    // [REMOVED] // [REMOVED] console.log("Assignment response:", responseData);
 
     // Check if the response was successful
     if (!response.ok) {

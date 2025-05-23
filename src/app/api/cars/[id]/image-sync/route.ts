@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/image-sync
 
-    console.log(`Image sync request for car ID: ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`Image sync request for car ID: ${id}`);
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    console.log(`Found car: ${car._id}`);
+    // [REMOVED] // [REMOVED] console.log(`Found car: ${car._id}`);
 
     if (
       !car.imageIds ||
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       .filter((imgId: string) => ObjectId.isValid(imgId))
       .map((imgId: string) => new ObjectId(imgId));
 
-    console.log(`Converted ${imageObjectIds.length} image IDs to ObjectIds`);
+    // [REMOVED] // [REMOVED] console.log(`Converted ${imageObjectIds.length} image IDs to ObjectIds`);
 
     // 3. Find all existing images that match these IDs
     const existingImages = await db
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       (imgId: string) => !existingImageIds.has(imgId)
     );
 
-    console.log(`Missing image IDs count: ${missingImageIds.length}`);
+    // [REMOVED] // [REMOVED] console.log(`Missing image IDs count: ${missingImageIds.length}`);
 
     if (missingImageIds.length === 0) {
       return NextResponse.json({
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       updatedAt: now,
     }));
 
-    console.log(`Created ${dummyImages.length} dummy image records`);
+    // [REMOVED] // [REMOVED] console.log(`Created ${dummyImages.length} dummy image records`);
 
     try {
       // 6. Insert the dummy image documents

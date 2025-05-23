@@ -156,7 +156,7 @@ export default function ProductionClient() {
   }, [activeTab]);
 
   const handleTabChange = (value: string) => {
-    console.log("ProductionClient: Tab changed to:", value);
+    // [REMOVED] // [REMOVED] console.log("ProductionClient: Tab changed to:", value);
 
     // Immediately update the component state
     setActiveTab(value);
@@ -173,7 +173,7 @@ export default function ProductionClient() {
 
     // If switching to a non-template tab, explicitly remove the template parameter
     if (!isTemplateTab) {
-      console.log("ProductionClient: Removing template parameter from URL");
+      // [REMOVED] // [REMOVED] console.log("ProductionClient: Removing template parameter from URL");
       updates.template = null; // This will remove the template parameter
     }
 
@@ -197,7 +197,7 @@ export default function ProductionClient() {
 
     // If we're on a non-template tab but template parameter exists, remove it
     if (!isTemplateTab && template) {
-      console.log("Cleanup effect: Removing template parameter from URL");
+      // [REMOVED] // [REMOVED] console.log("Cleanup effect: Removing template parameter from URL");
       updateParams(
         { template: null },
         { preserveParams: ["tab"], clearOthers: false }
@@ -257,7 +257,7 @@ export default function ProductionClient() {
   const isTemplateTab = activeTab === "shot-lists" || activeTab === "scripts";
 
   // Log to help with debugging
-  console.log("Active Tab:", activeTab, "Is Template Tab:", isTemplateTab);
+  // [REMOVED] // [REMOVED] console.log("Active Tab:", activeTab, "Is Template Tab:", isTemplateTab);
 
   return (
     <div className="min-h-screen bg-background">

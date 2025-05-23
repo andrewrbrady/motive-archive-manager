@@ -138,9 +138,9 @@ function shouldForceNewConnection(): boolean {
 // For Mongoose ORM connection (used by models)
 export async function dbConnect() {
   try {
-    console.log("MongoDB - Attempting connection...");
+    // [REMOVED] // [REMOVED] console.log("MongoDB - Attempting connection...");
     if (mongoose.connection.readyState >= 1) {
-      console.log("MongoDB - Already connected");
+      // [REMOVED] // [REMOVED] console.log("MongoDB - Already connected");
       return;
     }
 
@@ -171,7 +171,7 @@ let clientPromise: Promise<MongoClient> | null = null;
 // Create a cached MongoDB connection
 function initializeConnection() {
   if (!global._mongoClientPromise || shouldForceNewConnection()) {
-    console.log("Initializing MongoDB connection");
+    // [REMOVED] // [REMOVED] console.log("Initializing MongoDB connection");
     global._mongoClientPromise = createMongoClient();
   }
   clientPromise = global._mongoClientPromise;
@@ -182,7 +182,7 @@ initializeConnection();
 
 // Robust connection creation function with retry logic
 function createMongoClient(): Promise<MongoClient> {
-  console.log("Creating new MongoDB client connection to database:", DB_NAME);
+  // [REMOVED] // [REMOVED] console.log("Creating new MongoDB client connection to database:", DB_NAME);
   console.log("MongoDB connection options:", {
     maxPoolSize: options.maxPoolSize,
     minPoolSize: options.minPoolSize,
@@ -208,7 +208,7 @@ function createMongoClient(): Promise<MongoClient> {
 
     const attemptConnection = () => {
       attempts++;
-      console.log(`Connection attempt ${attempts}/${maxAttempts}...`);
+      // [REMOVED] // [REMOVED] console.log(`Connection attempt ${attempts}/${maxAttempts}...`);
 
       if (!client) {
         console.error("Client object is null, recreating");
@@ -254,7 +254,7 @@ function createMongoClient(): Promise<MongoClient> {
           // If we haven't reached max attempts, try again with backoff
           if (attempts < maxAttempts) {
             const backoffDelay = Math.min(Math.pow(2, attempts) * 100, 3000);
-            console.log(`Retrying in ${backoffDelay}ms...`);
+            // [REMOVED] // [REMOVED] console.log(`Retrying in ${backoffDelay}ms...`);
             setTimeout(attemptConnection, backoffDelay);
           } else {
             console.error(`Failed to connect after ${maxAttempts} attempts`);
@@ -282,7 +282,7 @@ export async function getMongoClient(
   // If too many recent attempts, force a new connection
   if (global._connectionAttempts > 7) {
     // Reduced from 10 for faster connection reset
-    console.log("Too many connection attempts detected. Resetting connection.");
+    // [REMOVED] // [REMOVED] console.log("Too many connection attempts detected. Resetting connection.");
     global._mongoClientPromise = null;
     clientPromise = null;
     client = null;
@@ -295,14 +295,14 @@ export async function getMongoClient(
   try {
     // If we should force a new connection, clear the cached promise
     if (shouldForceNewConnection() || !clientPromise) {
-      console.log("Creating fresh MongoDB connection");
+      // [REMOVED] // [REMOVED] console.log("Creating fresh MongoDB connection");
       global._mongoClientPromise = createMongoClient();
       clientPromise = global._mongoClientPromise;
     }
 
     // Ensure there's a valid clientPromise
     if (!clientPromise) {
-      console.log("No valid client promise, creating new one");
+      // [REMOVED] // [REMOVED] console.log("No valid client promise, creating new one");
       clientPromise = createMongoClient();
     }
 
@@ -312,7 +312,7 @@ export async function getMongoClient(
     // Test the connection with a ping
     try {
       await connectedClient.db("admin").command({ ping: 1 });
-      console.log("MongoDB connection verified with ping");
+      // [REMOVED] // [REMOVED] console.log("MongoDB connection verified with ping");
 
       // Reset attempt counter on success
       global._connectionAttempts = 0;
@@ -327,7 +327,7 @@ export async function getMongoClient(
 
       // If we still have retries, try again
       if (global._connectionAttempts <= maxRetries) {
-        console.log("Retrying after ping failure");
+        // [REMOVED] // [REMOVED] console.log("Retrying after ping failure");
         clientPromise = createMongoClient();
         return await clientPromise;
       }
@@ -375,7 +375,7 @@ export async function validateConnection(): Promise<boolean> {
     console.timeEnd("mongodb-validate");
 
     if (result && result.ok === 1) {
-      console.log("MongoDB connection validated successfully");
+      // [REMOVED] // [REMOVED] console.log("MongoDB connection validated successfully");
       return true;
     } else {
       console.error(
@@ -408,7 +408,7 @@ export async function connectToDatabase() {
 
     // Run a simple ping to verify connection is responsive
     await db.command({ ping: 1 });
-    console.log("Database ping successful");
+    // [REMOVED] // [REMOVED] console.log("Database ping successful");
 
     return { client, db };
   } catch (err) {
@@ -431,7 +431,7 @@ dbConnect().catch(console.error);
         const client = await clientPromise;
         await client.close();
       }
-      console.log("MongoDB connections closed.");
+      // [REMOVED] // [REMOVED] console.log("MongoDB connections closed.");
       process.exit(0);
     } catch (err) {
       console.error("Error closing MongoDB connections:", err);

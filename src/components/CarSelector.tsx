@@ -139,9 +139,9 @@ export default function CarSelector({
   };
 
   const handleRemove = (carId: string) => {
-    console.log("Removing car with ID:", carId);
+    // [REMOVED] // [REMOVED] console.log("Removing car with ID:", carId);
     const updatedCars = selectedCars.filter((car) => car._id !== carId);
-    console.log("Updated car list:", updatedCars);
+    // [REMOVED] // [REMOVED] console.log("Updated car list:", updatedCars);
     onSelect(updatedCars);
   };
 

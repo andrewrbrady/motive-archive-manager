@@ -36,10 +36,10 @@ export async function GET(request: NextRequest) {
   try {
     // Check admin access
     const session = await auth();
-    console.log("Session for getUser:", session?.user);
+    // [REMOVED] // [REMOVED] console.log("Session for getUser:", session?.user);
 
     if (!session?.user?.roles?.includes("admin")) {
-      console.log("Unauthorized access attempt:", session?.user);
+      // [REMOVED] // [REMOVED] console.log("Unauthorized access attempt:", session?.user);
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 403 }
@@ -83,10 +83,10 @@ export async function PUT(request: NextRequest) {
   try {
     // Check admin access
     const session = await auth();
-    console.log("Session for updateUser:", session?.user);
+    // [REMOVED] // [REMOVED] console.log("Session for updateUser:", session?.user);
 
     if (!session?.user?.roles?.includes("admin")) {
-      console.log("Unauthorized access attempt:", session?.user);
+      // [REMOVED] // [REMOVED] console.log("Unauthorized access attempt:", session?.user);
       return NextResponse.json(
         { error: "Unauthorized access" },
         { status: 403 }

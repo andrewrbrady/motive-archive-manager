@@ -28,9 +28,9 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`Processing search request for car ${carId}`);
-    console.log(`Query: "${query}"`);
-    console.log(`Using model: ${model}`);
+    // [REMOVED] // [REMOVED] console.log(`Processing search request for car ${carId}`);
+    // [REMOVED] // [REMOVED] console.log(`Query: "${query}"`);
+    // [REMOVED] // [REMOVED] console.log(`Using model: ${model}`);
 
     const { results, answer } = await hybridSearch(query, carId, model);
 

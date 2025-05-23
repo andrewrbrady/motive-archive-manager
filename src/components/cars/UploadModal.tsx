@@ -61,10 +61,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     try {
       await onUpload(files, {
         onProgress: (file: File, progress: number) => {
-          console.log(`Progress for ${file.name}: ${progress}%`);
+          // [REMOVED] // [REMOVED] console.log(`Progress for ${file.name}: ${progress}%`);
         },
         onSuccess: (file: File) => {
-          console.log(`Upload complete for ${file.name}`);
+          // [REMOVED] // [REMOVED] console.log(`Upload complete for ${file.name}`);
         },
         onError: (file: File, error: Error) => {
           console.error(`Upload failed for ${file.name}:`, error);

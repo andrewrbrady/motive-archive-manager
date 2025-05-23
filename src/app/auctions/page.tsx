@@ -30,7 +30,7 @@ interface PageProps {
 
 export default async function AuctionsPage({ searchParams }: PageProps) {
   const params = await Promise.resolve(searchParams);
-  console.log("Page - Search Params:", params);
+  // [REMOVED] // [REMOVED] console.log("Page - Search Params:", params);
 
   const page = Number(params.page) || 1;
   const pageSize = Number(params.pageSize) || 24;
@@ -76,7 +76,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
     filters.maxYear = parseInt(params.maxYear);
   }
 
-  console.log("Page - Filters:", filters);
+  // [REMOVED] // [REMOVED] console.log("Page - Filters:", filters);
 
   // Fetch auctions, makes, and platforms
   const [auctionsData, makes, platforms] = await Promise.all([

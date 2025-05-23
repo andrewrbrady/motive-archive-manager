@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    console.log("[API] MongoDB query:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] console.log("[API] MongoDB query:", JSON.stringify(query, null, 2));
 
     const db = await getDatabase();
     const imagesCollection = db.collection("images");

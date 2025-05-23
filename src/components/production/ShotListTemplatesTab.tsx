@@ -275,7 +275,7 @@ export default function ShotListTemplatesTab({
         updatedAt: selectedTemplate.updatedAt,
       });
 
-      console.log("Selected template shots:", selectedTemplate.shots.length);
+      // [REMOVED] // [REMOVED] console.log("Selected template shots:", selectedTemplate.shots.length);
       console.log(
         "viewModeShotFileInputRefs initialized:",
         viewModeShotFileInputRefs.current
@@ -377,7 +377,7 @@ export default function ShotListTemplatesTab({
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      console.log("Deleting template with ID:", templateId);
+      // [REMOVED] // [REMOVED] console.log("Deleting template with ID:", templateId);
       const response = await fetch(`/api/shot-templates/${templateId}`, {
         method: "DELETE",
         headers: {
@@ -555,7 +555,7 @@ export default function ShotListTemplatesTab({
 
       // Use the same endpoint format as handleSubmit
       const endpoint = `/api/shot-templates/${selectedTemplate.id}`;
-      console.log("Using endpoint:", endpoint);
+      // [REMOVED] // [REMOVED] console.log("Using endpoint:", endpoint);
 
       // First check if the template ID is valid
       fetch(`/api/shot-templates/${selectedTemplate.id}`)
@@ -702,9 +702,9 @@ export default function ShotListTemplatesTab({
     e: React.ChangeEvent<HTMLInputElement>,
     index: number
   ) => {
-    console.log("handleViewModeShotThumbnailUpload called with index:", index);
-    console.log("Files:", e.target.files);
-    console.log("Selected template:", selectedTemplate);
+    // [REMOVED] // [REMOVED] console.log("handleViewModeShotThumbnailUpload called with index:", index);
+    // [REMOVED] // [REMOVED] console.log("Files:", e.target.files);
+    // [REMOVED] // [REMOVED] console.log("Selected template:", selectedTemplate);
 
     if (!e.target.files || !e.target.files[0] || !selectedTemplate) {
       console.error("Missing files or selected template");
@@ -752,7 +752,7 @@ export default function ShotListTemplatesTab({
 
       // Use the same endpoint format as handleSubmit
       const endpoint = `/api/shot-templates/${selectedTemplate.id}`;
-      console.log("Using endpoint:", endpoint);
+      // [REMOVED] // [REMOVED] console.log("Using endpoint:", endpoint);
 
       // Update the template on the server using PUT with only the necessary fields
       const putResponse = await fetch(endpoint, {

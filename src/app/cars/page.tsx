@@ -48,15 +48,15 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       // Server-side: Use absolute URL
       const baseUrl = getBaseUrl();
       url = `${baseUrl}/api/cars/simple?${queryParams.toString()}`;
-      console.log("Server-side cars URL:", url);
+      // [REMOVED] // [REMOVED] console.log("Server-side cars URL:", url);
     } else {
       // Client-side: Use relative URL
       url = `/api/cars/simple?${queryParams.toString()}`;
-      console.log("Client-side cars URL:", url);
+      // [REMOVED] // [REMOVED] console.log("Client-side cars URL:", url);
     }
 
     // Fetch with better error handling
-    console.log("Fetching cars from:", url);
+    // [REMOVED] // [REMOVED] console.log("Fetching cars from:", url);
     const response = await fetch(url, {
       cache: "no-store",
     });
@@ -125,7 +125,7 @@ export default async function CarsPage(props: any) {
       }
     });
 
-    console.log("Applying filters:", filters);
+    // [REMOVED] // [REMOVED] console.log("Applying filters:", filters);
 
     const [{ cars, totalPages, currentPage, totalCount }, makes, clients] =
       await Promise.all([

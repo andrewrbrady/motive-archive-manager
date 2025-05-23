@@ -247,19 +247,19 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      console.log("MDXEditor useEffect - setting mounted to true");
+      // [REMOVED] // [REMOVED] console.log("MDXEditor useEffect - setting mounted to true");
     }
     setMounted(true);
     return () => {
       if (process.env.NODE_ENV !== "production") {
-        console.log("MDXEditor cleanup");
+        // [REMOVED] // [REMOVED] console.log("MDXEditor cleanup");
       }
     };
   }, []);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     if (process.env.NODE_ENV !== "production") {
-      console.log("Editor mounted");
+      // [REMOVED] // [REMOVED] console.log("Editor mounted");
     }
     editorRef.current = editor;
     monacoRef.current = monaco;
@@ -298,21 +298,21 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
     const initializeVim = async () => {
       try {
         if (process.env.NODE_ENV !== "production") {
-          console.log("Initializing Vim mode...");
+          // [REMOVED] // [REMOVED] console.log("Initializing Vim mode...");
         }
         const vim = await import("monaco-vim");
 
         // Cleanup any existing vim mode
         if (vimModeRef.current) {
           if (process.env.NODE_ENV !== "production") {
-            console.log("Disposing existing Vim mode");
+            // [REMOVED] // [REMOVED] console.log("Disposing existing Vim mode");
           }
           vimModeRef.current.dispose();
         }
 
         // Initialize new vim mode
         if (process.env.NODE_ENV !== "production") {
-          console.log("Creating new Vim mode instance");
+          // [REMOVED] // [REMOVED] console.log("Creating new Vim mode instance");
         }
         const vimMode = vim.initVimMode(
           editorRef.current,
@@ -320,7 +320,7 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
         );
         vimModeRef.current = vimMode;
         if (process.env.NODE_ENV !== "production") {
-          console.log("Vim mode initialized successfully");
+          // [REMOVED] // [REMOVED] console.log("Vim mode initialized successfully");
         }
       } catch (error) {
         console.error("Error initializing Vim mode:", error);
@@ -332,7 +332,7 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
     return () => {
       if (vimModeRef.current) {
         if (process.env.NODE_ENV !== "production") {
-          console.log("Cleaning up Vim mode");
+          // [REMOVED] // [REMOVED] console.log("Cleaning up Vim mode");
         }
         vimModeRef.current.dispose();
         vimModeRef.current = null;
@@ -378,7 +378,7 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
   useEffect(() => {
     if (!value) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("MDXEditor: No value provided");
+        // [REMOVED] // [REMOVED] console.log("MDXEditor: No value provided");
       }
       return;
     }
@@ -386,7 +386,7 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
     const compileMdx = async () => {
       try {
         if (process.env.NODE_ENV !== "production") {
-          console.log("Starting MDX compilation");
+          // [REMOVED] // [REMOVED] console.log("Starting MDX compilation");
         }
         const { frontmatter, content } = parseFrontmatter(value);
         if (process.env.NODE_ENV !== "production") {
@@ -406,7 +406,7 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
         });
 
         if (process.env.NODE_ENV !== "production") {
-          console.log("MDX compilation successful");
+          // [REMOVED] // [REMOVED] console.log("MDX compilation successful");
         }
         setMdxContent({ ...mdxSource, frontmatter });
       } catch (error) {
@@ -673,7 +673,7 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
 
   if (!mounted) {
     if (process.env.NODE_ENV !== "production") {
-      console.log("MDXEditor not mounted yet");
+      // [REMOVED] // [REMOVED] console.log("MDXEditor not mounted yet");
     }
     return (
       <div className="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!title || typeof title !== "string") {
-      console.log("Invalid title:", title);
+      // [REMOVED] // [REMOVED] console.log("Invalid title:", title);
       return NextResponse.json(
         { error: "Title is required and must be a string" },
         { status: 400 }
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!articleType || typeof articleType !== "string") {
-      console.log("Invalid articleType:", articleType);
+      // [REMOVED] // [REMOVED] console.log("Invalid articleType:", articleType);
       return NextResponse.json(
         { error: "Article type is required and must be a string" },
         { status: 400 }
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Construct the prompt based on the article type and car details
     let prompt = `Create an engaging MDX article about ${title}. `;
-    console.log("Base prompt:", prompt);
+    // [REMOVED] // [REMOVED] console.log("Base prompt:", prompt);
 
     if (articleType === "listing") {
       prompt +=
@@ -117,12 +117,12 @@ export async function POST(request: NextRequest) {
       prompt +=
         "Format this as a general informative article about the vehicle. ";
     }
-    console.log("Prompt with article type:", prompt);
+    // [REMOVED] // [REMOVED] console.log("Prompt with article type:", prompt);
 
     // Add user guidance if provided
     if (guidance) {
       prompt += `\n\nThe user has provided the following guidance for this article: "${guidance}". Please follow these instructions carefully.`;
-      console.log("Added user guidance to prompt");
+      // [REMOVED] // [REMOVED] console.log("Added user guidance to prompt");
     }
 
     // Add car details to the prompt if available
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         const carBasics =
           `${carDetails.year || ""} ${carDetails.make || ""} ${carDetails.model || ""}`.trim();
         prompt += `\n\nThis article is about a ${carBasics}. Please use your knowledge to create compelling content about this vehicle model, even though detailed specifications aren't available.`;
-        console.log("Added minimal car details to prompt:", carBasics);
+        // [REMOVED] // [REMOVED] console.log("Added minimal car details to prompt:", carBasics);
       } else {
         // We have comprehensive car details
         console.log(
@@ -142,11 +142,11 @@ export async function POST(request: NextRequest) {
         prompt += `\n\nUse the following car details in your article:\n${JSON.stringify(carDetails, null, 2)}`;
       }
     } else {
-      console.log("No car details available for the prompt");
+      // [REMOVED] // [REMOVED] console.log("No car details available for the prompt");
     }
 
     // Add formatting instructions for MDX with a reference example
-    console.log("Adding MDX formatting instructions");
+    // [REMOVED] // [REMOVED] console.log("Adding MDX formatting instructions");
     prompt += `\n\nPlease format the article in MDX with appropriate frontmatter and components.
 
 Here's an example of the MDX format I'm looking for:
@@ -188,10 +188,10 @@ Important:
 
 Return ONLY the MDX content with no additional explanation or commentary.`;
 
-    console.log("Final prompt length:", prompt.length);
+    // [REMOVED] // [REMOVED] console.log("Final prompt length:", prompt.length);
 
     // Call the Anthropic API
-    console.log("Calling Anthropic API with model: claude-3-7-sonnet-20250219");
+    // [REMOVED] // [REMOVED] console.log("Calling Anthropic API with model: claude-3-7-sonnet-20250219");
     console.log(
       `Using temperature: ${temperature || 0.7}, maxTokens: ${maxTokens || 4000}`
     );

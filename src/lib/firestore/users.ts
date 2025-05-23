@@ -44,12 +44,12 @@ export interface UserWithAuth extends FirestoreUser {
  */
 export async function getUserById(uid: string): Promise<FirestoreUser | null> {
   try {
-    console.log(`Looking up user with ID: ${uid}`);
+    // [REMOVED] // [REMOVED] console.log(`Looking up user with ID: ${uid}`);
 
     const userDoc = await adminDb.collection("users").doc(uid).get();
 
     if (userDoc.exists) {
-      console.log(`Found user with UID: ${uid}`);
+      // [REMOVED] // [REMOVED] console.log(`Found user with UID: ${uid}`);
       const userData = userDoc.data()!;
 
       return {
@@ -70,7 +70,7 @@ export async function getUserById(uid: string): Promise<FirestoreUser | null> {
       };
     }
 
-    console.log(`No user found with ID: ${uid}`);
+    // [REMOVED] // [REMOVED] console.log(`No user found with ID: ${uid}`);
     return null;
   } catch (error) {
     console.error("Error getting user by ID:", error);
@@ -133,7 +133,7 @@ export async function listUsers(
   startAfter?: any
 ): Promise<{ users: FirestoreUser[]; lastDoc: any }> {
   try {
-    console.log("Listing users from Firestore");
+    // [REMOVED] // [REMOVED] console.log("Listing users from Firestore");
 
     // Build query
     let query = adminDb.collection("users").orderBy("name", "asc");
@@ -171,7 +171,7 @@ export async function listUsers(
       });
     });
 
-    console.log(`Found ${users.length} users`);
+    // [REMOVED] // [REMOVED] console.log(`Found ${users.length} users`);
 
     return {
       users,

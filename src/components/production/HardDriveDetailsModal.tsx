@@ -81,7 +81,7 @@ export default function HardDriveDetailsModal({
   onClose,
   onDriveUpdate,
 }: HardDriveDetailsModalProps) {
-  console.log("HardDriveDetailsModal rendered with driveId:", driveId);
+  // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal rendered with driveId:", driveId);
 
   const [drive, setDrive] = useState<HardDrive | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<RawAssetData | null>(null);
@@ -111,25 +111,25 @@ export default function HardDriveDetailsModal({
   // Check URL parameters on mount and when they change
   useEffect(() => {
     const driveParam = getParam("drive");
-    console.log("HardDriveDetailsModal - URL drive parameter:", driveParam);
+    // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - URL drive parameter:", driveParam);
 
     if (driveParam) {
-      console.log("HardDriveDetailsModal - Setting isModalOpen to true");
+      // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - Setting isModalOpen to true");
       setIsModalOpen(true);
     } else {
-      console.log("HardDriveDetailsModal - Setting isModalOpen to false");
+      // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - Setting isModalOpen to false");
       setIsModalOpen(false);
     }
   }, [getParam]);
 
   // Log when isModalOpen changes
   useEffect(() => {
-    console.log("HardDriveDetailsModal - isModalOpen changed to:", isModalOpen);
+    // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - isModalOpen changed to:", isModalOpen);
   }, [isModalOpen]);
 
   // Handle opening raw asset details
   const handleAssetClick = (asset: RawAsset) => {
-    console.log("Navigating to raw asset:", asset._id);
+    // [REMOVED] // [REMOVED] console.log("Navigating to raw asset:", asset._id);
 
     // First close the current modal to prevent any state conflicts
     if (onClose) {
@@ -157,12 +157,12 @@ export default function HardDriveDetailsModal({
       }
     });
 
-    console.log("Setting URL directly to:", url.toString());
+    // [REMOVED] // [REMOVED] console.log("Setting URL directly to:", url.toString());
     window.history.pushState({}, "", url.toString());
 
     // Finally update the Next.js router state to keep it in sync
     setTimeout(() => {
-      console.log("Updating Next.js router for raw asset:", asset._id);
+      // [REMOVED] // [REMOVED] console.log("Updating Next.js router for raw asset:", asset._id);
       updateParams(
         {
           tab: "raw-assets",
@@ -182,7 +182,7 @@ export default function HardDriveDetailsModal({
           clearOthers: false, // Keep existing parameters to maintain context
         }
       );
-      console.log("Next.js router update completed for raw asset");
+      // [REMOVED] // [REMOVED] console.log("Next.js router update completed for raw asset");
     }, 100); // Reduced timeout for faster response
   };
 
@@ -276,13 +276,13 @@ export default function HardDriveDetailsModal({
   // Handle saving edit changes
   const handleSaveEdit = async () => {
     // Implementation of save functionality
-    console.log("Saving changes:", editFormData);
+    // [REMOVED] // [REMOVED] console.log("Saving changes:", editFormData);
   };
 
   // Handle scanning for assets
   const handleScan = async () => {
     // Implementation of scan functionality
-    console.log("Scanning for assets");
+    // [REMOVED] // [REMOVED] console.log("Scanning for assets");
   };
 
   // Get status color based on drive status
@@ -328,7 +328,7 @@ export default function HardDriveDetailsModal({
 
   // Fetch drive details when driveId changes
   useEffect(() => {
-    console.log("useEffect triggered with driveId:", driveId);
+    // [REMOVED] // [REMOVED] console.log("useEffect triggered with driveId:", driveId);
 
     // Get the current drive parameter from URL
     const urlDriveParam = getParam("drive");
@@ -350,10 +350,10 @@ export default function HardDriveDetailsModal({
       if (!drive || drive._id !== effectiveDriveId) {
         fetchDriveDetails();
       } else {
-        console.log("Already have data for drive:", effectiveDriveId);
+        // [REMOVED] // [REMOVED] console.log("Already have data for drive:", effectiveDriveId);
       }
     } else {
-      console.log("No drive ID available, resetting drive state");
+      // [REMOVED] // [REMOVED] console.log("No drive ID available, resetting drive state");
       setDrive(null);
     }
   }, [driveId, shouldRefetch, getParam, drive]);
@@ -391,12 +391,12 @@ export default function HardDriveDetailsModal({
     }
 
     try {
-      console.log("fetchDriveDetails started for driveId:", effectiveDriveId);
+      // [REMOVED] // [REMOVED] console.log("fetchDriveDetails started for driveId:", effectiveDriveId);
       setError(null);
       setIsLoading(true);
 
       const response = await fetch(`/api/hard-drives/${effectiveDriveId}`);
-      console.log("API response status:", response.status);
+      // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -404,7 +404,7 @@ export default function HardDriveDetailsModal({
       }
 
       const data = await response.json();
-      console.log("Drive data received:", data);
+      // [REMOVED] // [REMOVED] console.log("Drive data received:", data);
 
       // Validate that the data has the expected structure
       if (!data || typeof data !== "object") {
@@ -417,7 +417,7 @@ export default function HardDriveDetailsModal({
       }
 
       setDrive(data);
-      console.log("Drive state set:", data);
+      // [REMOVED] // [REMOVED] console.log("Drive state set:", data);
     } catch (error) {
       console.error("Error fetching drive details:", error);
       setError(
@@ -425,7 +425,7 @@ export default function HardDriveDetailsModal({
       );
     } finally {
       setIsLoading(false);
-      console.log("fetchDriveDetails completed, isLoading set to false");
+      // [REMOVED] // [REMOVED] console.log("fetchDriveDetails completed, isLoading set to false");
     }
   };
 
@@ -440,7 +440,7 @@ export default function HardDriveDetailsModal({
 
   // Get the current drive parameter directly from the URL
   const currentDriveParam = getParam("drive");
-  console.log("Current drive parameter from URL:", currentDriveParam);
+  // [REMOVED] // [REMOVED] console.log("Current drive parameter from URL:", currentDriveParam);
 
   // Check if the modal should be visible based on the URL parameter or the driveId prop
   const shouldBeVisible = !!currentDriveParam || !!driveId;
@@ -463,7 +463,7 @@ export default function HardDriveDetailsModal({
 
   // Use the driveId prop if available, otherwise use the URL parameter
   const effectiveDriveId = driveId || currentDriveParam;
-  console.log("Using effective driveId:", effectiveDriveId);
+  // [REMOVED] // [REMOVED] console.log("Using effective driveId:", effectiveDriveId);
 
   return (
     <UrlModal

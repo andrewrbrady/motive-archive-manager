@@ -68,7 +68,7 @@ async function callWithRateLimit<T>(
     return await fn();
   } catch (error) {
     if (error instanceof Error && error.message.includes("429")) {
-      console.log("Rate limit hit, waiting before retry...");
+      // [REMOVED] // [REMOVED] console.log("Rate limit hit, waiting before retry...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return callWithRateLimit(fn, model);
     }
@@ -138,7 +138,7 @@ async function semanticSearch(
       .find({ carId })
       .toArray();
 
-    console.log(`Found ${documents.length} documents for car ${carId}`);
+    // [REMOVED] // [REMOVED] console.log(`Found ${documents.length} documents for car ${carId}`);
 
     // Filter out documents without embeddings and calculate similarity scores
     const results = documents
@@ -146,7 +146,7 @@ async function semanticSearch(
         const hasEmbedding =
           Array.isArray(doc.embedding) && doc.embedding.length > 0;
         if (!hasEmbedding) {
-          console.log(`Document ${doc._id} missing embedding, regenerating...`);
+          // [REMOVED] // [REMOVED] console.log(`Document ${doc._id} missing embedding, regenerating...`);
           // Regenerate embedding for this document
           regenerateEmbedding(doc).catch(console.error);
         }
@@ -249,7 +249,7 @@ async function generateEmbeddingForChunk(chunk: string): Promise<number[]> {
     if (error instanceof Error) {
       console.error("Error generating embedding for chunk:", error.message);
       if (error.message.includes("maximum context length")) {
-        console.log("Splitting chunk further due to token limit...");
+        // [REMOVED] // [REMOVED] console.log("Splitting chunk further due to token limit...");
         const smallerChunks = chunkContent(
           chunk,
           Math.floor(chunk.length * 0.75)
@@ -279,7 +279,7 @@ async function regenerateEmbedding(doc: any): Promise<void> {
 
     // Check if document has content
     if (!doc.content) {
-      console.log(`Document ${doc._id} missing content, fetching from API...`);
+      // [REMOVED] // [REMOVED] console.log(`Document ${doc._id} missing content, fetching from API...`);
       try {
         // Construct proper URL with origin for server-side fetch
         const origin =
@@ -310,11 +310,11 @@ async function regenerateEmbedding(doc: any): Promise<void> {
       return;
     }
 
-    console.log(`Generating embedding for document ${doc._id}...`);
+    // [REMOVED] // [REMOVED] console.log(`Generating embedding for document ${doc._id}...`);
 
     // Split content into chunks if it's large
     const chunks = chunkContent(doc.content, 6000);
-    console.log(`Split document into ${chunks.length} chunks`);
+    // [REMOVED] // [REMOVED] console.log(`Split document into ${chunks.length} chunks`);
 
     // Generate embeddings for each chunk
     const chunkEmbeddings = await Promise.all(
@@ -344,7 +344,7 @@ async function regenerateEmbedding(doc: any): Promise<void> {
       }
     );
 
-    console.log(`Successfully regenerated embedding for document ${doc._id}`);
+    // [REMOVED] // [REMOVED] console.log(`Successfully regenerated embedding for document ${doc._id}`);
   } catch (error) {
     console.error(
       `Failed to regenerate embedding for document ${doc._id}:`,
@@ -490,9 +490,9 @@ export async function hybridSearch(
   const db = await getDatabase();
 
   try {
-    console.log(`Performing hybrid search for car ${carId}`);
-    console.log(`Query: "${query}"`);
-    console.log(`Using model: ${model}`);
+    // [REMOVED] // [REMOVED] console.log(`Performing hybrid search for car ${carId}`);
+    // [REMOVED] // [REMOVED] console.log(`Query: "${query}"`);
+    // [REMOVED] // [REMOVED] console.log(`Using model: ${model}`);
 
     // Process searches in parallel but with a smaller batch size
     const BATCH_SIZE = 10; // Process 10 documents at a time
@@ -589,7 +589,7 @@ export async function hybridSearch(
       keywordResults,
       topSemanticResults
     );
-    console.log(`Found ${mergedResults.length} total results`);
+    // [REMOVED] // [REMOVED] console.log(`Found ${mergedResults.length} total results`);
 
     // Generate answer if we have results, but limit the context size
     let answer: string | undefined;
@@ -598,7 +598,7 @@ export async function hybridSearch(
         // Only use top 3 results for answer generation to reduce processing time
         const limitedResults = mergedResults.slice(0, 3);
         answer = await generateAnswer(query, limitedResults, model);
-        console.log("Successfully generated answer");
+        // [REMOVED] // [REMOVED] console.log("Successfully generated answer");
       } catch (error) {
         console.error("Failed to generate answer:", error);
       }
@@ -627,7 +627,7 @@ export async function prepareResearchContent(
 
     // Split content into chunks if it's large
     const chunks = chunkContent(content, 6000);
-    console.log(`Split document into ${chunks.length} chunks`);
+    // [REMOVED] // [REMOVED] console.log(`Split document into ${chunks.length} chunks`);
 
     // Generate embeddings for each chunk
     const chunkEmbeddings = await Promise.all(
@@ -660,7 +660,7 @@ export async function prepareResearchContent(
       }
     );
 
-    console.log(`Successfully prepared research content for ${fileName}`);
+    // [REMOVED] // [REMOVED] console.log(`Successfully prepared research content for ${fileName}`);
   } catch (error) {
     console.error("Error preparing research content:", error);
     throw error;

@@ -73,7 +73,7 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
     });
 
     if (status === "unauthenticated" && !isRedirecting) {
-      console.log("AdminGuard: User is unauthenticated, redirecting to signin");
+      // [REMOVED] // [REMOVED] console.log("AdminGuard: User is unauthenticated, redirecting to signin");
       setIsRedirecting(true);
       router.push("/auth/signin");
     } else if (

@@ -264,7 +264,7 @@ export default function ImageUploadWithContext({
           }
         }
       );
-      console.log("Upload complete!");
+      // [REMOVED] // [REMOVED] console.log("Upload complete!");
       refreshImages();
     } catch (error) {
       console.error("Error uploading images:", error);
@@ -283,8 +283,8 @@ export default function ImageUploadWithContext({
   };
 
   const handleDeleteImage = async (imageId: string, filename: string) => {
-    console.log(`=========== handleDeleteImage CALLED ===========`);
-    console.log(`Image ID: ${imageId}, Filename: ${filename}`);
+    // [REMOVED] // [REMOVED] console.log(`=========== handleDeleteImage CALLED ===========`);
+    // [REMOVED] // [REMOVED] console.log(`Image ID: ${imageId}, Filename: ${filename}`);
 
     setIsDeleting(true);
     setShowNotification(true);
@@ -311,7 +311,7 @@ export default function ImageUploadWithContext({
 
       // Call the context's deleteImage method
       await context.deleteImage(carId, imageId, (status: any) => {
-        console.log(`Received status update:`, status);
+        // [REMOVED] // [REMOVED] console.log(`Received status update:`, status);
         setDeleteStatus((prev) =>
           prev.map((item) =>
             item.imageId === imageId ? { ...item, ...status } : item
@@ -319,10 +319,10 @@ export default function ImageUploadWithContext({
         );
       });
 
-      console.log(`context.deleteImage completed successfully`);
+      // [REMOVED] // [REMOVED] console.log(`context.deleteImage completed successfully`);
 
       // Refresh the image gallery after deletion
-      console.log(`Refreshing images after successful deletion`);
+      // [REMOVED] // [REMOVED] console.log(`Refreshing images after successful deletion`);
       setTimeout(() => {
         refreshImages();
       }, 1000);
@@ -336,7 +336,7 @@ export default function ImageUploadWithContext({
         )
       );
     } finally {
-      console.log(`handleDeleteImage processing complete`);
+      // [REMOVED] // [REMOVED] console.log(`handleDeleteImage processing complete`);
     }
   };
 
@@ -350,7 +350,7 @@ export default function ImageUploadWithContext({
   };
 
   const handleDeleteSingleImage = async (imageId: string, filename: string) => {
-    console.log(`[DEBUG] Directly deleting image with ID ${imageId}`);
+    // [REMOVED] // [REMOVED] console.log(`[DEBUG] Directly deleting image with ID ${imageId}`);
     await handleDeleteImage(imageId, filename);
   };
 
@@ -435,7 +435,7 @@ export default function ImageUploadWithContext({
       // Make the API request to update the primary image
       // The API will convert the string to ObjectId before storing
       const requestBody = JSON.stringify({ primaryImageId: imageId });
-      console.log(`Request body: ${requestBody}`);
+      // [REMOVED] // [REMOVED] console.log(`Request body: ${requestBody}`);
 
       const response = await fetch(`/api/cars/${carId}/thumbnail`, {
         method: "PUT",
@@ -472,7 +472,7 @@ export default function ImageUploadWithContext({
       let responseData;
       try {
         responseData = await response.json();
-        console.log("API response data:", responseData);
+        // [REMOVED] // [REMOVED] console.log("API response data:", responseData);
       } catch (parseError) {
         console.warn(
           "Could not parse response as JSON, but request was successful"

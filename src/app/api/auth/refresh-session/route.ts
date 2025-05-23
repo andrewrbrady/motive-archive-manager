@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // User is authenticated
     const userId = session.user.id;
-    console.log(`Refreshing session for user: ${userId}`);
+    // [REMOVED] // [REMOVED] console.log(`Refreshing session for user: ${userId}`);
 
     try {
       // First try to find the user in Firestore
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
       if (firestoreDoc.exists) {
         const userData = firestoreDoc.data() || {};
-        console.log("Found Firestore user data:", userData);
+        // [REMOVED] // [REMOVED] console.log("Found Firestore user data:", userData);
 
         // Create refreshed session with Firestore data
         const refreshedSession = {
@@ -52,13 +52,13 @@ export async function GET(request: NextRequest) {
       }
 
       // If not found in Firestore, try Firebase Auth as fallback
-      console.log("User not found in Firestore, trying Firebase Auth");
+      // [REMOVED] // [REMOVED] console.log("User not found in Firestore, trying Firebase Auth");
 
       try {
         const firebaseUser = await adminAuth.getUser(userId);
         const claims = firebaseUser.customClaims || {};
 
-        console.log("Firebase Auth custom claims:", claims);
+        // [REMOVED] // [REMOVED] console.log("Firebase Auth custom claims:", claims);
 
         // Create refreshed session with Firebase Auth claims
         const refreshedSession = {

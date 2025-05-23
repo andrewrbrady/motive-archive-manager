@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
 
-    console.log(`GET images for car with ID: ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`GET images for car with ID: ${id}`);
 
     // Parse query parameters
     const page = parseInt(url.searchParams.get("page") || "1");
@@ -64,16 +64,16 @@ export async function GET(request: Request) {
     const side = url.searchParams.get("side");
 
     if (!ObjectId.isValid(id)) {
-      console.log(`Invalid car ID format: ${id}`);
+      // [REMOVED] // [REMOVED] console.log(`Invalid car ID format: ${id}`);
       return NextResponse.json(
         { error: "Invalid car ID format" },
         { status: 400 }
       );
     }
 
-    console.log("Getting MongoDB database directly using getDatabase...");
+    // [REMOVED] // [REMOVED] console.log("Getting MongoDB database directly using getDatabase...");
     const db = await getDatabase();
-    console.log("Successfully connected to database");
+    // [REMOVED] // [REMOVED] console.log("Successfully connected to database");
 
     const carObjectId = new ObjectId(id);
 
@@ -97,15 +97,15 @@ export async function GET(request: Request) {
     }
 
     // First, check if the car exists and if it has imageIds
-    console.log(`Checking if car exists with ID: ${id}`);
+    // [REMOVED] // [REMOVED] console.log(`Checking if car exists with ID: ${id}`);
     const car = await db.collection("cars").findOne({ _id: carObjectId });
 
     if (!car) {
-      console.log(`Car not found with ID: ${id}`);
+      // [REMOVED] // [REMOVED] console.log(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    console.log(`Found car with ${car.imageIds?.length || 0} imageIds`);
+    // [REMOVED] // [REMOVED] console.log(`Found car with ${car.imageIds?.length || 0} imageIds`);
 
     // Count total existing images for pagination metadata
     const totalImages = await db.collection("images").countDocuments(query);
@@ -130,11 +130,11 @@ export async function GET(request: Request) {
         .map((imgId: string) => {
           try {
             if (!imgId) {
-              console.log("Found empty imageId, skipping");
+              // [REMOVED] // [REMOVED] console.log("Found empty imageId, skipping");
               return null;
             }
 
-            console.log(`Processing imageId: ${imgId}`);
+            // [REMOVED] // [REMOVED] console.log(`Processing imageId: ${imgId}`);
             let imgObjectId;
 
             if (ObjectId.isValid(imgId)) {
@@ -187,7 +187,7 @@ export async function GET(request: Request) {
         } catch (error: any) {
           // Some inserts might fail due to duplicate keys, which is fine
           if (error.code === 11000) {
-            console.log("Some documents already exist (duplicate key error)");
+            // [REMOVED] // [REMOVED] console.log("Some documents already exist (duplicate key error)");
           } else {
             console.error("Error creating image documents:", error);
           }
@@ -207,7 +207,7 @@ export async function GET(request: Request) {
       .limit(limit)
       .toArray();
 
-    console.log(`Found ${images.length} images to return`);
+    // [REMOVED] // [REMOVED] console.log(`Found ${images.length} images to return`);
 
     // Process images with our utility function
     const processedImages = images.map((img) => ({
@@ -220,7 +220,7 @@ export async function GET(request: Request) {
 
     // In development, log useful debugging info
     if (process.env.NODE_ENV === "development") {
-      console.log(`Found ${processedImages.length} images for car ${id}`);
+      // [REMOVED] // [REMOVED] console.log(`Found ${processedImages.length} images for car ${id}`);
       console.log(
         `Pagination info: page=${page}, limit=${limit}, total=${totalImages}, pages=${Math.ceil(
           Math.max(totalImages, images.length) / limit
@@ -257,7 +257,7 @@ export async function POST(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
 
-    console.log("Processing request for car ID:", id);
+    // [REMOVED] // [REMOVED] console.log("Processing request for car ID:", id);
 
     const formData = await request.formData();
     const imageData = formData.get("imageData");
@@ -275,7 +275,7 @@ export async function POST(request: Request) {
       imageId,
       metadata = {},
     } = JSON.parse(imageData as string) as ImageData;
-    console.log("Received image data:", { imageUrl, imageId });
+    // [REMOVED] // [REMOVED] console.log("Received image data:", { imageUrl, imageId });
 
     const db = await getDatabase();
     const carsCollection = db.collection<CarDocument>("cars");
@@ -330,7 +330,7 @@ export async function POST(request: Request) {
       updateDoc
     );
 
-    console.log("MongoDB update result:", result);
+    // [REMOVED] // [REMOVED] console.log("MongoDB update result:", result);
 
     if (result.matchedCount === 0) {
       console.error("Car not found with ID:", id);
@@ -360,7 +360,7 @@ export async function POST(request: Request) {
       ])
       .next();
 
-    console.log("Updated car document:", updatedCar);
+    // [REMOVED] // [REMOVED] console.log("Updated car document:", updatedCar);
 
     return NextResponse.json(updatedCar);
   } catch (error) {
@@ -383,7 +383,7 @@ export async function DELETE(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
 
-    console.log("Processing image deletion for car ID:", id);
+    // [REMOVED] // [REMOVED] console.log("Processing image deletion for car ID:", id);
 
     // Parse the request data
     const requestData = await request.json().catch((e) => {
@@ -399,10 +399,10 @@ export async function DELETE(request: Request) {
       isUserInitiated: bodyUserInitiated,
     } = requestData || {};
 
-    console.log("MongoDB ObjectIds to delete:", imageIds);
-    console.log("Cloudflare IDs to delete:", cloudflareIds);
-    console.log("Delete from storage:", deleteFromStorage);
-    console.log("User initiated (from body):", bodyUserInitiated);
+    // [REMOVED] // [REMOVED] console.log("MongoDB ObjectIds to delete:", imageIds);
+    // [REMOVED] // [REMOVED] console.log("Cloudflare IDs to delete:", cloudflareIds);
+    // [REMOVED] // [REMOVED] console.log("Delete from storage:", deleteFromStorage);
+    // [REMOVED] // [REMOVED] console.log("User initiated (from body):", bodyUserInitiated);
 
     // Get MongoDB client and start session
     const client = await getMongoClient();
@@ -411,14 +411,14 @@ export async function DELETE(request: Request) {
 
     try {
       session = client.startSession();
-      console.log("MongoDB session started");
+      // [REMOVED] // [REMOVED] console.log("MongoDB session started");
 
       // Start a transaction
       let result = null;
 
       try {
         session.startTransaction();
-        console.log("Transaction started");
+        // [REMOVED] // [REMOVED] console.log("Transaction started");
 
         // Convert carId to ObjectId
         const carObjectId = new ObjectId(id);
@@ -477,12 +477,12 @@ export async function DELETE(request: Request) {
           query.cloudflareId = { $in: cloudflareIds };
         }
 
-        console.log("Image lookup query:", JSON.stringify(query));
+        // [REMOVED] // [REMOVED] console.log("Image lookup query:", JSON.stringify(query));
 
         // Find all matching image documents
         imageDocs = await db.collection("images").find(query).toArray();
 
-        console.log(`Found ${imageDocs.length} image documents to delete`);
+        // [REMOVED] // [REMOVED] console.log(`Found ${imageDocs.length} image documents to delete`);
 
         // Extract the ObjectIds from the found documents
         const foundImageObjectIds = imageDocs.map((doc) => doc._id);
@@ -512,18 +512,18 @@ export async function DELETE(request: Request) {
           { session }
         );
 
-        console.log("Car update result:", updateResult);
+        // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
 
         // Delete the image documents
         const deleteImagesResult = await db
           .collection("images")
           .deleteMany({ _id: { $in: foundImageObjectIds } }, { session });
 
-        console.log("Delete images result:", deleteImagesResult);
+        // [REMOVED] // [REMOVED] console.log("Delete images result:", deleteImagesResult);
 
         // Commit the transaction
         await session.commitTransaction();
-        console.log("Transaction committed successfully");
+        // [REMOVED] // [REMOVED] console.log("Transaction committed successfully");
 
         // Delete from Cloudflare if requested
         const cloudflareResults: any[] = [];
@@ -614,7 +614,7 @@ export async function DELETE(request: Request) {
         // Abort transaction on error
         if (session.inTransaction()) {
           await session.abortTransaction();
-          console.log("Transaction aborted due to error");
+          // [REMOVED] // [REMOVED] console.log("Transaction aborted due to error");
         }
         throw txError;
       }
@@ -622,7 +622,7 @@ export async function DELETE(request: Request) {
       // End session if it exists
       if (session) {
         await session.endSession();
-        console.log("MongoDB session ended");
+        // [REMOVED] // [REMOVED] console.log("MongoDB session ended");
       }
     }
   } catch (error) {

@@ -116,7 +116,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
             JSON.stringify(userData.creativeRoles))
       ) {
         try {
-          console.log("Refreshing session due to role changes");
+          // [REMOVED] // [REMOVED] console.log("Refreshing session due to role changes");
           await fetch("/api/auth/refresh-session");
         } catch (refreshError) {
           console.error("Error refreshing session:", refreshError);

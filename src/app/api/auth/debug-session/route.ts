@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   try {
     // Get the current session
     const session = await auth();
-    console.log("Current session:", JSON.stringify(session, null, 2));
+    // [REMOVED] // [REMOVED] console.log("Current session:", JSON.stringify(session, null, 2));
 
     // If there's no session or user, return early
     if (!session || !session.user) {
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         "Firebase Auth User:",
         JSON.stringify(firebaseAuthUser, null, 2)
       );
-      console.log("Auth Claims:", JSON.stringify(authClaims, null, 2));
+      // [REMOVED] // [REMOVED] console.log("Auth Claims:", JSON.stringify(authClaims, null, 2));
     } catch (error) {
       console.error("Error fetching Firebase Auth user:", error);
     }
@@ -49,9 +49,9 @@ export async function GET(request: Request) {
       const userDoc = await adminDb.collection("users").doc(userId).get();
       if (userDoc.exists) {
         firestoreUser = userDoc.data();
-        console.log("Firestore User:", JSON.stringify(firestoreUser, null, 2));
+        // [REMOVED] // [REMOVED] console.log("Firestore User:", JSON.stringify(firestoreUser, null, 2));
       } else {
-        console.log("No Firestore document found for user:", userId);
+        // [REMOVED] // [REMOVED] console.log("No Firestore document found for user:", userId);
       }
     } catch (error) {
       console.error("Error fetching Firestore user:", error);
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
           status: firestoreUser.status || "active",
         });
 
-        console.log("Fixed admin claims for user");
+        // [REMOVED] // [REMOVED] console.log("Fixed admin claims for user");
       }
     }
 

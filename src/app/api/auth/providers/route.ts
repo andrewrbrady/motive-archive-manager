@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 // Add error handling for the providers route
 export async function GET(req: NextRequest) {
   try {
-    console.log("NextAuth providers handler called:", req.url);
+    // [REMOVED] // [REMOVED] console.log("NextAuth providers handler called:", req.url);
 
     return await handlers.GET(req);
   } catch (error: any) {

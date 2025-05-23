@@ -131,7 +131,7 @@ export const useGalleryState = (carId: string) => {
       const url = new URL(`/api/cars/${carId}`, window.location.origin);
       url.searchParams.set("includeImages", "true");
       if (process.env.NODE_ENV !== "production") {
-        console.log("Fetching gallery data from:", url.pathname);
+        // [REMOVED] // [REMOVED] console.log("Fetching gallery data from:", url.pathname);
       }
 
       const response = await fetch(url.toString());
@@ -179,7 +179,7 @@ export const useGalleryState = (carId: string) => {
       }));
 
       if (process.env.NODE_ENV !== "production") {
-        console.log("Gallery state updated successfully");
+        // [REMOVED] // [REMOVED] console.log("Gallery state updated successfully");
       }
     } catch (error) {
       console.error("Error synchronizing gallery state:", error);

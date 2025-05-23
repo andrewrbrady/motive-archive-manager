@@ -32,7 +32,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
-      console.log("Fetching events for car:", carId);
+      // [REMOVED] // [REMOVED] console.log("Fetching events for car:", carId);
       const response = await fetch(`/api/cars/${carId}/events`);
 
       if (!response.ok) {
@@ -42,7 +42,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
       }
 
       const data = await response.json();
-      console.log("Received events data:", data);
+      // [REMOVED] // [REMOVED] console.log("Received events data:", data);
       setEvents(data);
     } catch (error) {
       console.error("Error fetching events:", error);

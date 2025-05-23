@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       96 // Maximum page size
     );
 
-    console.log("Simple cars API request:", { page, pageSize });
+    // [REMOVED] // [REMOVED] console.log("Simple cars API request:", { page, pageSize });
 
     // Get database instance using the utility function
     const db = await getDatabase();
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log("Query filters:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] console.log("Query filters:", JSON.stringify(query, null, 2));
 
     try {
       // Count total cars for pagination
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
       }));
 
       // Log what we're sending back
-      console.log(`Returning ${processedCars.length} cars with images`);
+      // [REMOVED] // [REMOVED] console.log(`Returning ${processedCars.length} cars with images`);
 
       return NextResponse.json({
         cars: processedCars,

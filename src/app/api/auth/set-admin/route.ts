@@ -23,11 +23,11 @@ export async function GET(request: Request) {
       const userRecord = await adminAuth.getUser(uid);
       userExists = true;
       if (process.env.NODE_ENV !== "production") {
-        console.log("User exists in Firebase Auth");
+        // [REMOVED] // [REMOVED] console.log("User exists in Firebase Auth");
       }
     } catch (error) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("User not found in Firebase Auth, creating...");
+        // [REMOVED] // [REMOVED] console.log("User not found in Firebase Auth, creating...");
       }
       // Create the user if they don't exist
       await adminAuth.createUser({
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
         emailVerified: true,
       });
       if (process.env.NODE_ENV !== "production") {
-        console.log("User created in Firebase Auth");
+        // [REMOVED] // [REMOVED] console.log("User created in Firebase Auth");
       }
     }
 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       status: "active",
     });
     if (process.env.NODE_ENV !== "production") {
-      console.log("Admin claims set for user");
+      // [REMOVED] // [REMOVED] console.log("Admin claims set for user");
     }
 
     // Update or create Firestore document
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
         { merge: true }
       );
     if (process.env.NODE_ENV !== "production") {
-      console.log("Firestore document updated with admin privileges");
+      // [REMOVED] // [REMOVED] console.log("Firestore document updated with admin privileges");
     }
 
     return NextResponse.json({

@@ -57,9 +57,9 @@ export default function EnhancedUserSelector({
   }: UseQueryResult<FirestoreUser[], Error> = useQuery({
     queryKey: ["users"],
     queryFn: async (): Promise<FirestoreUser[]> => {
-      console.log("Fetching all users");
+      // [REMOVED] // [REMOVED] console.log("Fetching all users");
       const fetchedUsers = await getUsers();
-      console.log("Fetched users:", fetchedUsers);
+      // [REMOVED] // [REMOVED] console.log("Fetched users:", fetchedUsers);
 
       // Only filter out OAuth IDs and inactive users
       const filteredUsers = fetchedUsers.filter((user: FirestoreUser) => {
@@ -68,7 +68,7 @@ export default function EnhancedUserSelector({
         return !hasOAuthId && isActive;
       });
 
-      console.log("Filtered users:", filteredUsers);
+      // [REMOVED] // [REMOVED] console.log("Filtered users:", filteredUsers);
       return filteredUsers;
     },
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
