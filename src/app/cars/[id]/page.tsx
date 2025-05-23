@@ -3,7 +3,9 @@
 import React, {
   useState,
   useEffect,
-  useTransition as useReactTransition,
+  useTransition,
+  useCallback,
+  useMemo,
 } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 // import Navbar from "@/components/layout/navbar"; // Removed Navbar import
@@ -35,79 +37,188 @@ export default function CarPage() {
   const searchParams = useSearchParams();
   const id = params?.id?.toString();
 
-  // All state declarations at the top level
-  const [activeTab, setActiveTab] = useState<string>(
-    searchParams?.get("tab")?.toString() ||
+  // Consolidated state
+  const [state, setState] = useState({
+    activeTab:
+      searchParams?.get("tab")?.toString() ||
       (typeof window !== "undefined" && window.location.hash
         ? window.location.hash.slice(1)
-        : "gallery")
-  );
-  const [car, setCar] = useState<ExtendedCar | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasScrolled, setHasScrolled] = useState(false);
-  const [isPending, startTransition] = useReactTransition();
+        : "gallery"),
+    car: null as ExtendedCar | null,
+    isLoading: true,
+    error: null as string | null,
+    hasScrolled: false,
+  });
 
-  // All useEffect declarations at the top level
-  useEffect(() => {
-    if (!id) {
-      router.push("/cars");
-      return;
+  // Use React 19 transition for better performance
+  const [isPending, startTransition] = useTransition();
+
+  // Memoized tab items to prevent unnecessary re-renders
+  const tabItems = useMemo(() => {
+    if (!id) return [];
+
+    return [
+      {
+        value: "gallery",
+        label: "Image Gallery",
+        content: <GalleryContainer carId={id} />,
+      },
+      {
+        value: "car-galleries",
+        label: "Attached Galleries",
+        content: <CarGalleries carId={id} />,
+      },
+      {
+        value: "specs",
+        label: "Specifications",
+        content: <SpecificationsStandalone carId={id} />,
+      },
+      {
+        value: "shoots",
+        label: "Photo Shoots",
+        content: <PhotoShoots carId={id} />,
+      },
+      {
+        value: "shot-lists",
+        label: "Shot Lists",
+        content: <ShotList carId={id} />,
+      },
+      {
+        value: "scripts",
+        label: "Scripts",
+        content: <Scripts carId={id} />,
+      },
+      {
+        value: "bat",
+        label: "BaT Listing",
+        content: <BaTListingGenerator carId={id} />,
+      },
+      {
+        value: "captions",
+        label: "Social Media",
+        content: <CaptionGenerator carId={id} />,
+      },
+      {
+        value: "service",
+        label: "Service History",
+        content: <ServiceHistoryTab carId={id} />,
+      },
+      {
+        value: "research",
+        label: "Research",
+        content: <ResearchFiles carId={id} />,
+      },
+      {
+        value: "documentation",
+        label: "Documentation",
+        content: <DocumentationFiles carId={id} />,
+      },
+      {
+        value: "article",
+        label: "Article",
+        content: <ArticleGenerator carId={id} />,
+      },
+      {
+        value: "deliverables",
+        label: "Deliverables",
+        content: <DeliverablesTab carId={id} />,
+      },
+      {
+        value: "events",
+        label: "Events",
+        content: <EventsTab carId={id} />,
+      },
+      {
+        value: "calendar",
+        label: "Calendar",
+        content: <FullCalendarTab carId={id} />,
+      },
+    ];
+  }, [id]);
+
+  // Optimized car data fetcher
+  const fetchCarData = useCallback(async () => {
+    if (!id) return null;
+
+    try {
+      const response = await fetch(`/api/cars/${id}`);
+      if (!response.ok) throw new Error("Failed to fetch car data");
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching car data:", error);
+      throw error;
     }
-  }, [id, router]);
-
-  useEffect(() => {
-    const refreshCarData = async () => {
-      if (!id) return;
-      try {
-        const response = await fetch(`/api/cars/${id}`);
-        if (!response.ok) throw new Error("Failed to refresh car data");
-        const data = await response.json();
-        setCar(data);
-      } catch (error) {
-        console.error("Error refreshing car data:", error);
-      }
-    };
-    refreshCarData();
   }, [id]);
 
+  // Consolidated effect for initial setup and car data fetching
   useEffect(() => {
-    const fetchCarData = async () => {
-      if (!id) return;
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/cars/${id}`);
-        if (!response.ok) throw new Error("Failed to fetch car data");
-        const data = await response.json();
-        setCar(data);
-      } catch (error) {
-        console.error("Error fetching car data:", error);
-        setError("Failed to load car data");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchCarData();
-  }, [id]);
+    let isMounted = true;
 
+    const initialize = async () => {
+      if (!id) {
+        router.push("/cars");
+        return;
+      }
+
+      startTransition(async () => {
+        try {
+          setState((prev) => ({ ...prev, isLoading: true, error: null }));
+          const carData = await fetchCarData();
+
+          if (isMounted) {
+            setState((prev) => ({
+              ...prev,
+              car: carData,
+              isLoading: false,
+              error: null,
+            }));
+          }
+        } catch (error) {
+          if (isMounted) {
+            setState((prev) => ({
+              ...prev,
+              error: "Failed to load car data",
+              isLoading: false,
+            }));
+          }
+        }
+      });
+    };
+
+    initialize();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, router, fetchCarData, startTransition]);
+
+  // Scroll handler with throttling
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      setHasScrolled(window.scrollY > 0);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          setState((prev) => ({
+            ...prev,
+            hasScrolled: window.scrollY > 0,
+          }));
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    window.addEventListener("scroll", handleScroll);
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    if (!car) return;
-    // Additional car-related effects
-  }, [car]);
-
   // Return early if no ID
   if (!id) {
-    router.push("/cars");
     return null;
   }
+
+  const { car, isLoading, error, hasScrolled } = state;
 
   return (
     <AuthGuard>
@@ -131,84 +242,8 @@ export default function CarPage() {
 
               {/* Always render tabs - each tab handles its own loading state */}
               <CustomTabs
-                items={[
-                  {
-                    value: "gallery",
-                    label: "Image Gallery",
-                    content: <GalleryContainer carId={id} />,
-                  },
-                  {
-                    value: "car-galleries",
-                    label: "Attached Galleries",
-                    content: <CarGalleries carId={id} />,
-                  },
-                  {
-                    value: "specs",
-                    label: "Specifications",
-                    content: <SpecificationsStandalone carId={id} />,
-                  },
-                  {
-                    value: "shoots",
-                    label: "Photo Shoots",
-                    content: <PhotoShoots carId={id} />,
-                  },
-                  {
-                    value: "shot-lists",
-                    label: "Shot Lists",
-                    content: <ShotList carId={id} />,
-                  },
-                  {
-                    value: "scripts",
-                    label: "Scripts",
-                    content: <Scripts carId={id} />,
-                  },
-                  {
-                    value: "bat",
-                    label: "BaT Listing",
-                    content: <BaTListingGenerator carId={id} />,
-                  },
-                  {
-                    value: "captions",
-                    label: "Social Media",
-                    content: <CaptionGenerator carId={id} />,
-                  },
-                  {
-                    value: "service",
-                    label: "Service History",
-                    content: <ServiceHistoryTab carId={id} />,
-                  },
-                  {
-                    value: "research",
-                    label: "Research",
-                    content: <ResearchFiles carId={id} />,
-                  },
-                  {
-                    value: "documentation",
-                    label: "Documentation",
-                    content: <DocumentationFiles carId={id} />,
-                  },
-                  {
-                    value: "article",
-                    label: "Article",
-                    content: <ArticleGenerator carId={id} />,
-                  },
-                  {
-                    value: "deliverables",
-                    label: "Deliverables",
-                    content: <DeliverablesTab carId={id} />,
-                  },
-                  {
-                    value: "events",
-                    label: "Events",
-                    content: <EventsTab carId={id} />,
-                  },
-                  {
-                    value: "calendar",
-                    label: "Calendar",
-                    content: <FullCalendarTab carId={id} />,
-                  },
-                ]}
-                defaultValue={activeTab}
+                items={tabItems}
+                defaultValue={state.activeTab}
                 basePath={`/cars/${id}`}
               />
             </>

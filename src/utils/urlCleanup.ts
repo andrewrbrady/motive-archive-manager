@@ -5,37 +5,30 @@
  * by defining which parameters are valid in each context.
  */
 
-/**
- * Clean up URL parameters based on the current context
- * @param currentParams Current URL parameters
- * @param context Current context (e.g., 'tab:hard-drives')
- * @returns Cleaned URLSearchParams object
- */
-export function cleanupUrlParameters(
-  currentParams: URLSearchParams,
-  context: string
-): URLSearchParams {
-  // Create a new URLSearchParams object to avoid mutating the input
-  const params = new URLSearchParams(currentParams.toString());
-  // [REMOVED] // [REMOVED] console.log("Cleaning up URL parameters for context:", context);
-  // [REMOVED] // [REMOVED] console.log("Before cleanup:", params.toString());
+// Cache for context mappings to improve performance
+const contextMapCache = new Map<string, string[]>();
 
-  // AGGRESSIVE CLEANUP: Special case for template parameter
-  // If we're not in a template context, ALWAYS remove the template parameter immediately
-  if (context !== "tab:shot-lists" && context !== "tab:scripts") {
-    if (params.has("template")) {
-      console.log(
-        "AGGRESSIVE CLEANUP: Removing template parameter immediately for non-template tab"
-      );
-      params.delete("template");
-    }
-  }
-
-  // Define parameter contexts - which parameters are valid in each context
-  const contextMap: Record<string, string[]> = {
-    // Tab contexts
+// Define parameter contexts - which parameters are valid in each context
+const getContextMap = (): Record<string, string[]> => {
+  return {
+    // Car page tab contexts
+    "tab:gallery": ["tab"],
+    "tab:car-galleries": ["tab"],
+    "tab:specs": ["tab"],
+    "tab:shoots": ["tab"],
     "tab:shot-lists": ["tab", "template"],
     "tab:scripts": ["tab", "template"],
+    "tab:bat": ["tab"],
+    "tab:captions": ["tab"],
+    "tab:service": ["tab"],
+    "tab:research": ["tab"],
+    "tab:documentation": ["tab"],
+    "tab:article": ["tab"],
+    "tab:deliverables": ["tab"],
+    "tab:events": ["tab"],
+    "tab:calendar": ["tab"],
+
+    // Inventory tab contexts
     "tab:raw-assets": [
       "tab",
       "page",
@@ -81,37 +74,63 @@ export function cleanupUrlParameters(
     // Default context - only preserve tab parameter
     default: ["tab"],
   };
+};
 
-  // Get allowed parameters for the current context
-  const allowedParams = contextMap[context] || contextMap["default"];
+/**
+ * Clean up URL parameters based on the current context
+ * @param currentParams Current URL parameters
+ * @param context Current context (e.g., 'tab:hard-drives')
+ * @returns Cleaned URLSearchParams object
+ */
+export function cleanupUrlParameters(
+  currentParams: URLSearchParams,
+  context: string
+): URLSearchParams {
+  // Create a new URLSearchParams object to avoid mutating the input
+  const params = new URLSearchParams(currentParams.toString());
+
+  // Fast path: if no params, return early
+  if (params.size === 0) {
+    return params;
+  }
+
+  // AGGRESSIVE CLEANUP: Special case for template parameter
+  // If we're not in a template context, ALWAYS remove the template parameter immediately
+  const isTemplateContext =
+    context === "tab:shot-lists" || context === "tab:scripts";
+  if (!isTemplateContext && params.has("template")) {
+    params.delete("template");
+  }
+
+  // Get allowed parameters for the current context with caching
+  let allowedParams = contextMapCache.get(context);
+  if (!allowedParams) {
+    const contextMap = getContextMap();
+    allowedParams = contextMap[context] || contextMap["default"];
+    contextMapCache.set(context, allowedParams);
+  }
 
   // Special case for the hard-drives tab which seems problematic
   if (context === "tab:hard-drives" && params.has("template")) {
-    console.log(
-      "SPECIAL CASE: Forcibly removing template parameter from hard-drives tab"
-    );
     params.delete("template");
   }
 
-  // Remove parameters that aren't allowed in this context
-  Array.from(params.keys()).forEach((key) => {
+  // Batch removal of invalid parameters
+  const keysToRemove: string[] = [];
+  for (const key of params.keys()) {
     if (!allowedParams.includes(key)) {
-      // [REMOVED] // [REMOVED] console.log(`Removing parameter ${key} from context ${context}`);
-      params.delete(key);
+      keysToRemove.push(key);
     }
-  });
+  }
+
+  // Remove all invalid parameters in one pass
+  keysToRemove.forEach((key) => params.delete(key));
 
   // One final check to ensure template is gone in non-template contexts
-  if (
-    context !== "tab:shot-lists" &&
-    context !== "tab:scripts" &&
-    params.has("template")
-  ) {
-    // [REMOVED] // [REMOVED] console.log("FINAL CHECK: Removing persistent template parameter");
+  if (!isTemplateContext && params.has("template")) {
     params.delete("template");
   }
 
-  // [REMOVED] // [REMOVED] console.log("After cleanup:", params.toString());
   return params;
 }
 
@@ -134,24 +153,32 @@ export function getCurrentContext(params: URLSearchParams): string {
   const addAsset = params.get("addAsset");
   const item = params.get("item");
 
-  // Check for modal contexts
+  // Check for modal contexts (order matters for specificity)
   if (asset && edit === "true") {
     return "modal:asset-edit";
-  } else if (asset) {
+  }
+  if (asset) {
     return "modal:asset-details";
-  } else if (drive) {
+  }
+  if (drive) {
     return "modal:drive-details";
-  } else if (kit && edit === "true") {
+  }
+  if (kit && edit === "true") {
     return "modal:kit-edit";
-  } else if (kit && mode) {
+  }
+  if (kit && mode) {
     return "modal:kit-checkout";
-  } else if (kit) {
+  }
+  if (kit) {
     return "modal:kit-details";
-  } else if (createDrive) {
+  }
+  if (createDrive) {
     return "modal:create-drive";
-  } else if (addAsset) {
+  }
+  if (addAsset) {
     return "modal:add-asset";
-  } else if (item) {
+  }
+  if (item) {
     return "modal:item-details";
   }
 

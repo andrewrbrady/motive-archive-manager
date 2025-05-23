@@ -70,7 +70,6 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
   // Use refs to prevent unnecessary re-renders
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const lastSearchRef = useRef("");
 
   // Navigate to gallery page
   const navigateToGallery = useCallback(
@@ -92,67 +91,59 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
     [navigateToGallery]
   );
 
-  // Stable search handler that doesn't cause re-renders
+  // Search handler
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchTerm(value);
-
-      // Clear existing timeout
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-
-      // Only update if the value actually changed and debounce it
-      if (value !== lastSearchRef.current) {
-        lastSearchRef.current = value;
-        searchTimeoutRef.current = setTimeout(() => {
-          // Trigger the search after debounce
-          setSearchTerm(value); // This will trigger the useEffect
-        }, 300);
-      }
     },
     []
   );
 
-  // Fetch car data with attached galleries - memoized to prevent unnecessary calls
+  // Fetch car galleries using the original working endpoint
   const fetchCarGalleries = useCallback(async () => {
+    if (!carId) return;
+
     try {
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Fetching car galleries for car ${carId}`);
       const response = await fetch(`/api/cars/${carId}?includeGalleries=true`);
-      if (!response.ok) throw new Error("Failed to fetch car galleries");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch car galleries");
+      }
+
       const car = await response.json();
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Raw API response:`, car);
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Car galleryIds from API:`, car.galleryIds);
-      console.log(
-        `[CarGalleries] Car galleries array from API:`,
-        car.galleries
-      );
-      console.log(
-        `[CarGalleries] Fetched ${car.galleries?.length || 0} attached galleries:`,
-        car.galleries?.map((g: Gallery) => ({ id: g._id, name: g.name }))
-      );
+      console.log("[CarGalleries] Car galleries from API:", car.galleries);
+
       setAttachedGalleries(car.galleries || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[CarGalleries] Error fetching car galleries:", error);
-      toast.error("Failed to load attached galleries");
+      toast.error("Failed to fetch attached galleries");
+      setAttachedGalleries([]);
     }
   }, [carId]);
 
-  // Fetch all available galleries - memoized and stable
-  const fetchAvailableGalleries = useCallback(async (search?: string) => {
+  const fetchAvailableGalleries = useCallback(async (search = "") => {
     try {
-      const params = new URLSearchParams();
-      if (search) params.append("search", search);
-      params.append("limit", "50");
+      const url = new URL("/api/galleries", window.location.origin);
+      if (search) {
+        url.searchParams.set("search", search);
+      }
 
-      const response = await fetch(`/api/galleries?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch galleries");
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch galleries");
+      }
+
       const data = await response.json();
       setAvailableGalleries(data.galleries || []);
-    } catch (error) {
-      console.error("[CarGalleries] Error fetching galleries:", error);
-      toast.error("Failed to load available galleries");
+    } catch (error: any) {
+      console.error(
+        "[CarGalleries] Error fetching available galleries:",
+        error
+      );
+      toast.error("Failed to fetch available galleries");
+      setAvailableGalleries([]);
     }
   }, []);
 
@@ -345,22 +336,32 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
     return availableGalleries.filter((g) => !attachedIds.has(g._id));
   }, [attachedGalleries, availableGalleries]);
 
-  // Load initial data
+  // Load data when carId changes
   useEffect(() => {
+    if (!carId) return;
+
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchCarGalleries(), fetchAvailableGalleries()]);
-      setIsLoading(false);
+      try {
+        await Promise.all([fetchCarGalleries(), fetchAvailableGalleries("")]);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
     loadData();
   }, [carId, fetchCarGalleries, fetchAvailableGalleries]);
 
   // Handle search with debouncing
   useEffect(() => {
-    fetchAvailableGalleries(searchTerm);
-  }, [fetchAvailableGalleries, searchTerm]);
+    const timeoutId = setTimeout(() => {
+      fetchAvailableGalleries(searchTerm);
+    }, 300);
 
-  // Cleanup timeout on unmount
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, fetchAvailableGalleries]);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {

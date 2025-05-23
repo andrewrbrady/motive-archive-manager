@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 
 export type GalleryMode = "editing" | "viewing";
@@ -99,6 +99,10 @@ const initialState: GalleryState = {
 export const useGalleryState = (carId: string) => {
   const [state, setState] = useState<GalleryState>(initialState);
 
+  // Use ref to prevent duplicate requests
+  const isLoadingRef = useRef(false);
+
+  // Stable normalize function
   const normalizeImageData = useCallback((image: any): NormalizedImage => {
     return {
       id: image.id || image._id,
@@ -119,57 +123,26 @@ export const useGalleryState = (carId: string) => {
   }, []);
 
   const synchronizeGalleryState = useCallback(async () => {
-    if (!carId) return;
+    if (!carId || isLoadingRef.current) return;
 
     try {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Starting gallery state synchronization", {
-          carId: carId.substring(0, 8) + "***",
-        });
-      }
+      isLoadingRef.current = true;
+      setState((prev) => ({ ...prev, isSyncing: true, error: null }));
 
       const url = new URL(`/api/cars/${carId}`, window.location.origin);
       url.searchParams.set("includeImages", "true");
-      if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("Fetching gallery data from:", url.pathname);
-      }
 
       const response = await fetch(url.toString());
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Gallery data response:", {
-          status: response.status,
-          ok: response.ok,
-          statusText: response.statusText,
-        });
-      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch car data: ${response.statusText}`);
       }
 
       const data = await response.json();
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Received gallery data:", {
-          hasData: !!data,
-          hasImages: !!data.images,
-          imageCount: data.images?.length || 0,
-          hasPrimaryImageId: !!data.primaryImageId,
-        });
-      }
-
-      // Normalize the image data
       const normalizedImages: NormalizedImage[] = (data.images || []).map(
         normalizeImageData
       );
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log("Normalized images:", {
-          count: normalizedImages.length,
-          hasPrimaryId: !!data.primaryImageId,
-        });
-      }
-
-      // Update state
       setState((prev) => ({
         ...prev,
         images: normalizedImages,
@@ -177,11 +150,7 @@ export const useGalleryState = (carId: string) => {
         isSyncing: false,
         error: null,
       }));
-
-      if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("Gallery state updated successfully");
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error synchronizing gallery state:", error);
       setState((prev) => ({
         ...prev,
@@ -189,24 +158,29 @@ export const useGalleryState = (carId: string) => {
         isSyncing: false,
         error: error as Error,
       }));
+    } finally {
+      isLoadingRef.current = false;
     }
   }, [carId, normalizeImageData]);
 
   const handleModeTransition = useCallback(
     async (targetMode: GalleryMode) => {
-      if (state.pendingChanges.size > 0 && targetMode === "viewing") {
-        const shouldDiscard = window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        );
-        if (!shouldDiscard) {
-          return;
+      setState((prev) => {
+        if (prev.pendingChanges.size > 0 && targetMode === "viewing") {
+          const shouldDiscard = window.confirm(
+            "You have unsaved changes. Do you want to discard them?"
+          );
+          if (!shouldDiscard) {
+            return prev;
+          }
         }
-      }
+        return { ...prev, mode: targetMode };
+      });
 
-      setState((prev) => ({ ...prev, mode: targetMode }));
+      // Refresh data when switching modes
       await synchronizeGalleryState();
     },
-    [state.pendingChanges, synchronizeGalleryState]
+    [synchronizeGalleryState]
   );
 
   const updateFilters = useCallback((newFilters: Record<string, string>) => {
@@ -230,9 +204,12 @@ export const useGalleryState = (carId: string) => {
     });
   }, []);
 
+  // Load data when carId changes
   useEffect(() => {
-    synchronizeGalleryState();
-  }, [synchronizeGalleryState]);
+    if (carId) {
+      synchronizeGalleryState();
+    }
+  }, [carId, synchronizeGalleryState]);
 
   return {
     state,

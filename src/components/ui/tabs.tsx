@@ -33,6 +33,8 @@ const TabsTrigger = React.forwardRef<
       "data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:pb-1 relative",
       "data-[state=inactive]:text-[hsl(var(--muted-foreground))]",
       "hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))]",
+      "select-none touch-manipulation cursor-pointer",
+      "active:scale-[0.98] transition-transform duration-100",
       className
     )}
     {...props}

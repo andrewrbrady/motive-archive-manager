@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cleanupUrlParameters } from "@/utils/urlCleanup";
@@ -30,53 +30,92 @@ export function CustomTabs({
   const searchParams = useSearchParams();
   const tabParam = searchParams?.get(paramName);
 
+  // Simplified refs - only track URL updates to prevent loops
+  const urlUpdateTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastUrlUpdateRef = useRef<string>("");
+
   // Use the URL parameter if available, otherwise use the defaultValue or the first tab
   const initialTab = tabParam || defaultValue || items[0]?.value;
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Update URL when tab changes
-  const handleTabChange = (value: string) => {
-    // Immediately update component state
-    setActiveTab(value);
+  // Simplified URL update function with shorter debounce
+  const updateUrl = useCallback(
+    (value: string) => {
+      // Skip if we just updated to this value
+      if (lastUrlUpdateRef.current === value) return;
 
-    // Create a new URLSearchParams object from the current search params
-    const params = new URLSearchParams(searchParams?.toString() || "");
+      // Clear any pending URL updates
+      if (urlUpdateTimeoutRef.current) {
+        clearTimeout(urlUpdateTimeoutRef.current);
+      }
 
-    // Check for template parameter when switching to non-template tabs
-    const hasTemplateParam = params.has("template");
-    const isTemplateTab = value === "shot-lists" || value === "scripts";
+      // Shorter debounce for more responsive feel
+      urlUpdateTimeoutRef.current = setTimeout(() => {
+        try {
+          lastUrlUpdateRef.current = value;
 
-    // Update the tab parameter
-    params.set(paramName, value);
+          // Create a new URLSearchParams object from the current search params
+          const params = new URLSearchParams(searchParams?.toString() || "");
 
-    // When switching to a non-template tab, explicitly remove template parameter
-    if (hasTemplateParam && !isTemplateTab) {
-      console.log(
-        "CustomTabs: Removing template parameter when switching to non-template tab:",
-        value
-      );
-      params.delete("template");
-    }
+          // Check for template parameter when switching to non-template tabs
+          const hasTemplateParam = params.has("template");
+          const isTemplateTab = value === "shot-lists" || value === "scripts";
 
-    // Apply context-based cleanup to the parameters
-    const context = `tab:${value}`;
-    const cleanedParams = cleanupUrlParameters(params, context);
+          // Update the tab parameter
+          params.set(paramName, value);
 
-    console.log(
-      "CustomTabs: Navigating to tab with params:",
-      cleanedParams.toString()
-    );
+          // When switching to a non-template tab, explicitly remove template parameter
+          if (hasTemplateParam && !isTemplateTab) {
+            params.delete("template");
+          }
 
-    // Use the cleaned parameters and force a navigation
-    router.push(`${basePath}?${cleanedParams.toString()}`, { scroll: false });
-  };
+          // Apply context-based cleanup to the parameters
+          const context = `tab:${value}`;
+          const cleanedParams = cleanupUrlParameters(params, context);
 
-  // Sync with URL parameters on initial load and when URL changes
+          // Use the cleaned parameters
+          router.push(`${basePath}?${cleanedParams.toString()}`, {
+            scroll: false,
+          });
+        } catch (error) {
+          console.error("Error updating URL:", error);
+        }
+      }, 50); // Reduced from 150ms to 50ms for more responsive feel
+    },
+    [searchParams, paramName, basePath, router]
+  );
+
+  // Simplified tab change handler with immediate UI response
+  const handleTabChange = useCallback(
+    (value: string) => {
+      // Immediately update component state for instant UI feedback
+      setActiveTab(value);
+
+      // Update URL with minimal debouncing
+      updateUrl(value);
+    },
+    [updateUrl]
+  );
+
+  // Sync with URL parameters but only when URL actually changes
   useEffect(() => {
-    if (tabParam && tabParam !== activeTab) {
+    if (
+      tabParam &&
+      tabParam !== activeTab &&
+      tabParam !== lastUrlUpdateRef.current
+    ) {
       setActiveTab(tabParam);
     }
   }, [tabParam, activeTab]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (urlUpdateTimeoutRef.current) {
+        clearTimeout(urlUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Tabs
@@ -90,7 +129,7 @@ export function CustomTabs({
           <TabsTrigger
             key={item.value}
             value={item.value}
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium relative transition-all duration-300 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-transparent data-[state=active]:bg-transparent data-[state=active]:text-[hsl(var(--foreground))] data-[state=active]:border-[hsl(var(--border))] data-[state=active]:shadow-sm data-[state=inactive]:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))] hover:border-[hsl(var(--border))]/50 hover:-translate-y-0.5 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[hsl(var(--primary))] after:scale-x-0 after:origin-center after:transition-transform after:duration-300 hover:after:scale-x-100 data-[state=active]:after:scale-x-100 mb-1"
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium relative transition-all duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-transparent data-[state=active]:bg-transparent data-[state=active]:text-[hsl(var(--foreground))] data-[state=active]:border-[hsl(var(--border))] data-[state=active]:shadow-sm data-[state=inactive]:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))] hover:border-[hsl(var(--border))]/50 hover:-translate-y-0.5 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[hsl(var(--primary))] after:scale-x-0 after:origin-center after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=active]:after:scale-x-100 mb-1"
           >
             {item.label}
           </TabsTrigger>
