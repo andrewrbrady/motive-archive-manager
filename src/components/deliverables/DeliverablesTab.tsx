@@ -41,7 +41,7 @@ interface EditingCell {
 }
 
 interface User {
-  _id: string;
+  uid: string;
   name: string;
   email: string;
   roles: string[];
@@ -110,12 +110,14 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        console.log("DeliverablesTab: Starting to fetch users...");
         const response = await fetch("/api/users");
         if (!response.ok) {
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
 
+        console.log("DeliverablesTab: Raw API response:", data);
         console.log(
           "Fetched users in DeliverablesTab:",
           Array.isArray(data) ? data.length : "not an array"
@@ -127,6 +129,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           const activeUsers = data.filter(
             (user: User) => user.status === "active"
           );
+          console.log("DeliverablesTab: Active users:", activeUsers.length);
+          console.log("DeliverablesTab: Sample user:", activeUsers[0]);
           setAllUsers(activeUsers);
 
           // For backward compatibility, still set the editors list
@@ -134,6 +138,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           const editors = activeUsers.filter((user: User) =>
             user.creativeRoles.includes("video_editor")
           );
+          console.log("DeliverablesTab: Editors:", editors.length);
           setUsers(editors);
         } else {
           console.error("Unexpected API response structure:", data);
@@ -145,8 +150,11 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       }
     };
 
-    fetchUsers();
-  }, []);
+    // Only fetch if we don't already have users
+    if (allUsers.length === 0) {
+      fetchUsers();
+    }
+  }, []); // Remove allUsers.length from dependency to prevent re-fetching
 
   const handleDelete = async (deliverableId: string) => {
     if (!confirm("Are you sure you want to delete this deliverable?")) {
@@ -407,6 +415,32 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       // Convert duration to number
       const processedValue = field === "duration" ? parseInt(value) : value;
 
+      // Prepare the update payload
+      let updatePayload: any = {
+        [field]: processedValue,
+        updated_at: new Date(),
+      };
+
+      // Special handling for editor field - also update firebase_uid
+      if (field === "editor") {
+        const selectedUser = allUsers.find((user) => user.uid === value);
+        if (selectedUser) {
+          updatePayload = {
+            editor: selectedUser.name, // Store the name for display
+            firebase_uid: selectedUser.uid, // Store the UID for filtering
+            updated_at: new Date(),
+          };
+        }
+      }
+
+      console.log("DeliverablesTab: Making API request...");
+      console.log(
+        "DeliverablesTab: URL:",
+        `/api/cars/${id}/deliverables/${deliverableId}`
+      );
+      console.log("DeliverablesTab: Payload:", updatePayload);
+      console.log("DeliverablesTab: Field:", field, "Value:", value);
+
       const response = await fetch(
         `/api/cars/${id}/deliverables/${deliverableId}`,
         {
@@ -414,12 +448,12 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            [field]: processedValue,
-            updated_at: new Date(),
-          }),
+          body: JSON.stringify(updatePayload),
         }
       );
+
+      console.log("DeliverablesTab: Response status:", response.status);
+      console.log("DeliverablesTab: Response ok:", response.ok);
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -428,20 +462,62 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           fetchDeliverables();
           return;
         }
-        throw new Error("Failed to update deliverable");
+        const errorText = await response.text();
+        console.error("DeliverablesTab: API error response:", errorText);
+        throw new Error(
+          `Failed to update deliverable: ${response.status} ${errorText}`
+        );
       }
 
-      // Only update the state if the API call was successful
-      setDeliverables((prevDeliverables) =>
-        prevDeliverables.map((d) =>
-          d._id === deliverable._id ? { ...d, [field]: processedValue } : d
-        )
-      );
+      // Update the state appropriately
+      if (field === "editor") {
+        const selectedUser = allUsers.find((user) => user.uid === value);
+        if (selectedUser) {
+          setDeliverables((prevDeliverables) =>
+            prevDeliverables.map((d) =>
+              d._id === deliverable._id
+                ? {
+                    ...d,
+                    editor: selectedUser.name,
+                    firebase_uid: selectedUser.uid,
+                  }
+                : d
+            )
+          );
+        }
+      } else {
+        // Only update the state if the API call was successful
+        setDeliverables((prevDeliverables) =>
+          prevDeliverables.map((d) =>
+            d._id === deliverable._id ? { ...d, [field]: processedValue } : d
+          )
+        );
+      }
 
       toast.success("Updated successfully");
     } catch (error) {
-      console.error("Error updating deliverable:", error);
-      toast.error("Failed to update");
+      console.error("DeliverablesTab: Error in handleFieldChange:", error);
+
+      // Type guard for error handling
+      const err = error as Error;
+      console.error("DeliverablesTab: Error details:", {
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+      });
+
+      // Check if it's a network error
+      if (
+        error instanceof TypeError &&
+        err.message.includes("Failed to fetch")
+      ) {
+        console.error("DeliverablesTab: Network error detected");
+        toast.error(
+          "Network error: Please check your connection and try again"
+        );
+      } else {
+        toast.error(`Failed to update: ${err.message}`);
+      }
       fetchDeliverables();
     }
   };
@@ -487,20 +563,84 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         { value: "done", label: "Done" },
       ];
     } else if (field === "editor") {
-      options = getRelevantUsers(deliverable.type).map((user) => ({
-        value: user.name,
-        label: user.name,
-        key: user._id || user.name,
-      }));
+      const relevantUsers = getRelevantUsers(deliverable.type);
+
+      // Group users by name to detect duplicates
+      const usersByName = relevantUsers.reduce(
+        (acc, user) => {
+          if (!acc[user.name]) {
+            acc[user.name] = [];
+          }
+          acc[user.name].push(user);
+          return acc;
+        },
+        {} as Record<string, User[]>
+      );
+
+      options = relevantUsers.map((user) => {
+        const usersWithSameName = usersByName[user.name];
+        const isDuplicate = usersWithSameName.length > 1;
+
+        // If there are duplicate names, show email in parentheses
+        const label = isDuplicate ? `${user.name} (${user.email})` : user.name;
+
+        return {
+          value: user.uid, // Use UID as value to ensure uniqueness
+          label: label,
+          key: user.uid,
+        };
+      });
     }
 
-    const currentOption = options.find((opt) => opt.value === value);
-    const currentLabel = currentOption?.label || value;
+    // For editor field, handle both UID-based and name-based values (backward compatibility)
+    let currentValue = value;
+    let currentLabel = value;
+
+    if (field === "editor") {
+      // Check if we have a firebase_uid to use as the value
+      const firebaseUid = (deliverable as any).firebase_uid;
+
+      if (firebaseUid) {
+        // Use the firebase_uid as the value and find the user for the label
+        currentValue = firebaseUid;
+        const currentUser = allUsers.find((user) => user.uid === firebaseUid);
+        if (currentUser) {
+          const usersWithSameName = allUsers.filter(
+            (u) => u.name === currentUser.name
+          );
+          const isDuplicate = usersWithSameName.length > 1;
+          currentLabel = isDuplicate
+            ? `${currentUser.name} (${currentUser.email})`
+            : currentUser.name;
+        } else {
+          // Fallback to stored editor name if user not found
+          currentLabel = value;
+        }
+      } else {
+        // Legacy format: try to find by name but don't auto-update
+        const currentUser = allUsers.find((user) => user.name === value);
+        if (currentUser) {
+          currentValue = currentUser.uid;
+          const usersWithSameName = allUsers.filter(
+            (u) => u.name === currentUser.name
+          );
+          const isDuplicate = usersWithSameName.length > 1;
+          currentLabel = isDuplicate
+            ? `${currentUser.name} (${currentUser.email})`
+            : currentUser.name;
+        } else {
+          // If we can't find the user, show the stored value
+          currentLabel = value;
+        }
+      }
+    } else {
+      const currentOption = options.find((opt) => opt.value === value);
+      currentLabel = currentOption?.label || value;
+    }
 
     return (
       <Select
-        defaultValue={value}
-        value={value}
+        value={currentValue}
         onValueChange={(newValue) => {
           handleFieldChange(deliverable, field, newValue);
         }}

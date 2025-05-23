@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Deliverable, IDeliverable } from "@/models/Deliverable";
 import { dbConnect } from "@/lib/mongodb";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,8 +26,10 @@ export async function GET(request: NextRequest) {
     // Build search query
     const searchQuery: any = {};
 
+    // Handle search first
+    let searchCriteria = null;
     if (search) {
-      searchQuery.$or = [
+      searchCriteria = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
       ];
@@ -48,6 +51,11 @@ export async function GET(request: NextRequest) {
     if (firebaseUid) {
       searchQuery.firebase_uid = firebaseUid;
       console.log("Filtering by firebase_uid:", firebaseUid);
+    }
+
+    // Handle search criteria
+    if (searchCriteria) {
+      searchQuery.$or = searchCriteria;
     }
 
     if (carId) {
@@ -92,6 +100,8 @@ export async function GET(request: NextRequest) {
 
     console.log("Search query:", searchQuery);
     console.log("Sort object:", sortObject);
+    console.log("Dashboard API - Database name:", db.databaseName);
+    console.log("Dashboard API - Querying collection: deliverables");
 
     // Get paginated, filtered, and sorted deliverables
     const deliverables = await db
@@ -103,6 +113,10 @@ export async function GET(request: NextRequest) {
       .toArray();
 
     console.log("Found deliverables:", deliverables.length);
+    console.log(
+      "Dashboard API - Sample deliverable IDs:",
+      deliverables.slice(0, 5).map((d) => d._id)
+    );
 
     // Get car details for each deliverable
     const validCarIds = deliverables

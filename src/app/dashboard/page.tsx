@@ -66,15 +66,44 @@ function DashboardInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  console.log("Dashboard: Component mounted/updated");
+  console.log("Dashboard: Session status:", {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    hasUserId: !!session?.user?.id,
+    userId: session?.user?.id,
+    userEmail: session?.user?.email,
+    userName: session?.user?.name,
+  });
+
   const fetchUserDeliverables = async () => {
-    if (!session?.user?.id) return;
+    console.log("Dashboard: fetchUserDeliverables - checking session");
+    console.log("Dashboard: session?.user?.id =", session?.user?.id);
+
+    if (!session?.user?.id) {
+      console.log("Dashboard: No session user ID, returning early");
+      return;
+    }
+
+    console.log(
+      "Dashboard: fetchUserDeliverables called with user ID:",
+      session.user.id
+    );
+    console.log("Dashboard: user details:", {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+    });
 
     setIsLoading(true);
     try {
       const url = new URL("/api/deliverables", window.location.origin);
       url.searchParams.append("firebase_uid", session.user.id);
-      url.searchParams.append("sortField", "edit_deadline");
-      url.searchParams.append("sortDirection", "asc");
+      url.searchParams.append("sortField", "updated_at");
+      url.searchParams.append("sortDirection", "desc");
+      url.searchParams.append("limit", "100");
+
+      console.log("Dashboard: API URL:", url.toString());
 
       const response = await fetch(url.toString());
       if (!response.ok) {
@@ -84,6 +113,15 @@ function DashboardInner() {
       }
 
       const data: DeliverableResponse = await response.json();
+      console.log("Dashboard: API response:", {
+        deliverableCount: data.deliverables?.length || 0,
+        pagination: data.pagination,
+      });
+      console.log("Dashboard: Full API response data:", data);
+      console.log(
+        "Dashboard: First few deliverables:",
+        data.deliverables?.slice(0, 3)
+      );
       setDeliverables(data.deliverables);
     } catch (error) {
       console.error("Error in fetchUserDeliverables:", error);
@@ -94,8 +132,17 @@ function DashboardInner() {
   };
 
   useEffect(() => {
+    console.log("Dashboard: useEffect triggered", {
+      hasSessionUserId: !!session?.user?.id,
+      sessionUserId: session?.user?.id,
+      refreshTrigger,
+    });
+
     if (session?.user?.id) {
+      console.log("Dashboard: Calling fetchUserDeliverables");
       fetchUserDeliverables();
+    } else {
+      console.log("Dashboard: Not calling fetchUserDeliverables - no user ID");
     }
   }, [session?.user?.id, refreshTrigger]);
 
@@ -203,201 +250,241 @@ function DashboardInner() {
             </TabsList>
 
             <TabsContent value="active" className="mt-2">
-              <div className="space-y-4">
-                {Object.entries(groupedActiveDeliverables).map(
-                  ([carId, { car, deliverables }]) => (
-                    <div
-                      key={carId}
-                      className="rounded-md border border-border overflow-hidden"
-                    >
-                      {/* Car Header */}
-                      <div className="py-3 px-3 border-b border-border">
-                        <div className="flex items-center gap-3">
-                          <Link href={`/cars/${car._id?.toString()}`}>
-                            <CarAvatar
-                              primaryImageId={car.primaryImageId}
-                              entityName={`${car.year} ${car.make} ${car.model}`}
-                              size="md"
-                            />
-                          </Link>
-                          <div>
-                            <p className="text-base font-medium">
-                              {car.year} {car.make} {car.model}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {deliverables.length} active deliverable
-                              {deliverables.length !== 1 ? "s" : ""}
-                            </p>
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Loading your deliverables...
+                    </p>
+                  </div>
+                </div>
+              ) : Object.keys(groupedActiveDeliverables).length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No active deliverables assigned to you.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Check back later or contact your project manager.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(groupedActiveDeliverables).map(
+                    ([carId, { car, deliverables }]) => (
+                      <div
+                        key={carId}
+                        className="rounded-md border border-border overflow-hidden"
+                      >
+                        {/* Car Header */}
+                        <div className="py-3 px-3 border-b border-border">
+                          <div className="flex items-center gap-3">
+                            <Link href={`/cars/${car._id?.toString()}`}>
+                              <CarAvatar
+                                primaryImageId={car.primaryImageId}
+                                entityName={`${car.year} ${car.make} ${car.model}`}
+                                size="md"
+                              />
+                            </Link>
+                            <div>
+                              <p className="text-base font-medium">
+                                {car.year} {car.make} {car.model}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {deliverables.length} active deliverable
+                                {deliverables.length !== 1 ? "s" : ""}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Deliverables Table */}
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="hover:bg-transparent">
-                            <TableHead className="py-1.5 pl-6 pr-2 text-xs font-medium">
-                              Title
-                            </TableHead>
-                            <TableHead className="py-1.5 px-2 text-xs font-medium">
-                              Platform
-                            </TableHead>
-                            <TableHead className="py-1.5 px-2 text-xs font-medium">
-                              Type
-                            </TableHead>
-                            <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap">
-                              Edit Deadline
-                            </TableHead>
-                            <TableHead className="w-[90px] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
-                              Status
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {deliverables.map((deliverable) => (
-                            <TableRow
-                              key={deliverable._id?.toString()}
-                              className="hover:bg-muted/50"
-                            >
-                              <TableCell className="py-1.5 pl-6 pr-2 text-sm font-medium">
-                                {deliverable.title}
-                              </TableCell>
-                              <TableCell className="py-1.5 px-2 text-xs">
-                                {deliverable.platform}
-                              </TableCell>
-                              <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
-                                {deliverable.type}
-                                {deliverable.duration &&
-                                  ` • ${deliverable.duration}s`}
-                                {deliverable.aspect_ratio &&
-                                  ` • ${deliverable.aspect_ratio}`}
-                              </TableCell>
-                              <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
-                                {new Date(
-                                  deliverable.edit_deadline
-                                ).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className="py-1.5 pl-2 pr-3 text-right">
-                                <StatusSelector
-                                  deliverableId={
-                                    deliverable._id?.toString() || ""
-                                  }
-                                  initialStatus={deliverable.status}
-                                  onStatusChange={(newStatus) =>
-                                    handleStatusChange(
-                                      deliverable._id?.toString() || "",
-                                      newStatus
-                                    )
-                                  }
-                                />
-                              </TableCell>
+                        {/* Deliverables Table */}
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="py-1.5 pl-6 pr-2 text-xs font-medium">
+                                Title
+                              </TableHead>
+                              <TableHead className="py-1.5 px-2 text-xs font-medium">
+                                Platform
+                              </TableHead>
+                              <TableHead className="py-1.5 px-2 text-xs font-medium">
+                                Type
+                              </TableHead>
+                              <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap">
+                                Edit Deadline
+                              </TableHead>
+                              <TableHead className="w-[90px] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
+                                Status
+                              </TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )
-                )}
-              </div>
+                          </TableHeader>
+                          <TableBody>
+                            {deliverables.map((deliverable) => (
+                              <TableRow
+                                key={deliverable._id?.toString()}
+                                className="hover:bg-muted/50"
+                              >
+                                <TableCell className="py-1.5 pl-6 pr-2 text-sm font-medium">
+                                  {deliverable.title}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2 text-xs">
+                                  {deliverable.platform}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
+                                  {deliverable.type}
+                                  {deliverable.duration &&
+                                    ` • ${deliverable.duration}s`}
+                                  {deliverable.aspect_ratio &&
+                                    ` • ${deliverable.aspect_ratio}`}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
+                                  {new Date(
+                                    deliverable.edit_deadline
+                                  ).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="py-1.5 pl-2 pr-3 text-right">
+                                  <StatusSelector
+                                    deliverableId={
+                                      deliverable._id?.toString() || ""
+                                    }
+                                    initialStatus={deliverable.status}
+                                    onStatusChange={(newStatus) =>
+                                      handleStatusChange(
+                                        deliverable._id?.toString() || "",
+                                        newStatus
+                                      )
+                                    }
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="completed" className="mt-2">
-              <div className="space-y-4">
-                {Object.entries(groupedCompletedDeliverables).map(
-                  ([carId, { car, deliverables }]) => (
-                    <div
-                      key={carId}
-                      className="rounded-md border border-border overflow-hidden"
-                    >
-                      {/* Car Header */}
-                      <div className="py-3 px-3 border-b border-border">
-                        <div className="flex items-center gap-3">
-                          <Link href={`/cars/${car._id?.toString()}`}>
-                            <CarAvatar
-                              primaryImageId={car.primaryImageId}
-                              entityName={`${car.year} ${car.make} ${car.model}`}
-                              size="md"
-                            />
-                          </Link>
-                          <div>
-                            <p className="text-base font-medium">
-                              {car.year} {car.make} {car.model}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {deliverables.length} completed deliverable
-                              {deliverables.length !== 1 ? "s" : ""}
-                            </p>
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Loading your deliverables...
+                    </p>
+                  </div>
+                </div>
+              ) : Object.keys(groupedCompletedDeliverables).length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No completed deliverables.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Completed work will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(groupedCompletedDeliverables).map(
+                    ([carId, { car, deliverables }]) => (
+                      <div
+                        key={carId}
+                        className="rounded-md border border-border overflow-hidden"
+                      >
+                        {/* Car Header */}
+                        <div className="py-3 px-3 border-b border-border">
+                          <div className="flex items-center gap-3">
+                            <Link href={`/cars/${car._id?.toString()}`}>
+                              <CarAvatar
+                                primaryImageId={car.primaryImageId}
+                                entityName={`${car.year} ${car.make} ${car.model}`}
+                                size="md"
+                              />
+                            </Link>
+                            <div>
+                              <p className="text-base font-medium">
+                                {car.year} {car.make} {car.model}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {deliverables.length} completed deliverable
+                                {deliverables.length !== 1 ? "s" : ""}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Deliverables Table */}
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="hover:bg-transparent">
-                            <TableHead className="py-1.5 pl-6 pr-2 text-xs font-medium">
-                              Title
-                            </TableHead>
-                            <TableHead className="py-1.5 px-2 text-xs font-medium">
-                              Platform
-                            </TableHead>
-                            <TableHead className="py-1.5 px-2 text-xs font-medium">
-                              Type
-                            </TableHead>
-                            <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap">
-                              Edit Deadline
-                            </TableHead>
-                            <TableHead className="w-[90px] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
-                              Status
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {deliverables.map((deliverable) => (
-                            <TableRow
-                              key={deliverable._id?.toString()}
-                              className="hover:bg-muted/50"
-                            >
-                              <TableCell className="py-1.5 pl-6 pr-2 text-sm font-medium">
-                                {deliverable.title}
-                              </TableCell>
-                              <TableCell className="py-1.5 px-2 text-xs">
-                                {deliverable.platform}
-                              </TableCell>
-                              <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
-                                {deliverable.type}
-                                {deliverable.duration &&
-                                  ` • ${deliverable.duration}s`}
-                                {deliverable.aspect_ratio &&
-                                  ` • ${deliverable.aspect_ratio}`}
-                              </TableCell>
-                              <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
-                                {new Date(
-                                  deliverable.edit_deadline
-                                ).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className="py-1.5 pl-2 pr-3 text-right">
-                                <StatusSelector
-                                  deliverableId={
-                                    deliverable._id?.toString() || ""
-                                  }
-                                  initialStatus={deliverable.status}
-                                  onStatusChange={(newStatus) =>
-                                    handleStatusChange(
-                                      deliverable._id?.toString() || "",
-                                      newStatus
-                                    )
-                                  }
-                                />
-                              </TableCell>
+                        {/* Deliverables Table */}
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="py-1.5 pl-6 pr-2 text-xs font-medium">
+                                Title
+                              </TableHead>
+                              <TableHead className="py-1.5 px-2 text-xs font-medium">
+                                Platform
+                              </TableHead>
+                              <TableHead className="py-1.5 px-2 text-xs font-medium">
+                                Type
+                              </TableHead>
+                              <TableHead className="py-1.5 px-2 text-xs font-medium whitespace-nowrap">
+                                Edit Deadline
+                              </TableHead>
+                              <TableHead className="w-[90px] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
+                                Status
+                              </TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )
-                )}
-              </div>
+                          </TableHeader>
+                          <TableBody>
+                            {deliverables.map((deliverable) => (
+                              <TableRow
+                                key={deliverable._id?.toString()}
+                                className="hover:bg-muted/50"
+                              >
+                                <TableCell className="py-1.5 pl-6 pr-2 text-sm font-medium">
+                                  {deliverable.title}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2 text-xs">
+                                  {deliverable.platform}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
+                                  {deliverable.type}
+                                  {deliverable.duration &&
+                                    ` • ${deliverable.duration}s`}
+                                  {deliverable.aspect_ratio &&
+                                    ` • ${deliverable.aspect_ratio}`}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2 text-xs whitespace-nowrap">
+                                  {new Date(
+                                    deliverable.edit_deadline
+                                  ).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className="py-1.5 pl-2 pr-3 text-right">
+                                  <StatusSelector
+                                    deliverableId={
+                                      deliverable._id?.toString() || ""
+                                    }
+                                    initialStatus={deliverable.status}
+                                    onStatusChange={(newStatus) =>
+                                      handleStatusChange(
+                                        deliverable._id?.toString() || "",
+                                        newStatus
+                                      )
+                                    }
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

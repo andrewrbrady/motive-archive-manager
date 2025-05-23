@@ -15,38 +15,6 @@ let userCache: FirestoreUser[] | null = null;
 let lastFetchTime: number | null = null;
 
 /**
- * Check if a user is an OAuth user based on their provider data
- */
-async function isOAuthUser(uid: string): Promise<boolean> {
-  try {
-    const userRecord = await adminAuth.getUser(uid);
-
-    // Check if user has any OAuth providers
-    const hasOAuthProvider = userRecord.providerData.some(
-      (provider) =>
-        provider.providerId !== "password" && provider.providerId !== "email"
-    );
-
-    if (hasOAuthProvider) {
-      logger.debug({
-        message: "User identified as OAuth user",
-        uid,
-        providers: userRecord.providerData.map((p) => p.providerId),
-      });
-    }
-
-    return hasOAuthProvider;
-  } catch (error) {
-    logger.error({
-      message: "Error checking OAuth status",
-      uid,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
-}
-
-/**
  * Get all users from Firestore with caching
  */
 export async function getUsers(
@@ -115,28 +83,48 @@ export async function getUsers(
       count: allUsers.length,
     });
 
-    // Filter out OAuth users and inactive users
-    const filteredUsers = [];
-    for (const user of allUsers) {
+    // Filter out problematic OAuth IDs (long numeric strings and UUIDs)
+    // Only include users with proper Firebase Auth UIDs and active status
+    const filteredUsers = allUsers.filter((user) => {
+      if (!user.uid) return false;
+
+      // Filter out inactive users
       if (user.status !== "active") {
         logger.debug({
           message: "Filtering out inactive user",
-          uid: user.uid,
+          userId: user.uid,
+          userName: user.name,
+          status: user.status,
         });
-        continue;
+        return false;
       }
 
-      const isOAuth = await isOAuthUser(user.uid);
-      if (isOAuth) {
+      // Filter out long numeric OAuth IDs (like 115667720852671300123)
+      if (/^\d{15,}$/.test(user.uid)) {
         logger.debug({
-          message: "Filtering out OAuth user",
-          uid: user.uid,
+          message: "Filtering out user with long numeric OAuth ID",
+          userId: user.uid,
+          userName: user.name,
         });
-        continue;
+        return false;
       }
 
-      filteredUsers.push(user);
-    }
+      // Filter out UUID format OAuth IDs (like dc7fe9cd-1f34-4c9d-84cb-f967e2064448)
+      if (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          user.uid
+        )
+      ) {
+        logger.debug({
+          message: "Filtering out user with UUID OAuth ID",
+          userId: user.uid,
+          userName: user.name,
+        });
+        return false;
+      }
+
+      return true;
+    });
 
     logger.info({
       message: "Users after filtering",
@@ -225,3 +213,6 @@ export async function removeCachedUser(userId: string): Promise<void> {
 
   userCache = userCache.filter((user) => user.uid !== userId);
 }
+
+// Invalidate cache immediately to ensure changes take effect
+invalidateUserCache();

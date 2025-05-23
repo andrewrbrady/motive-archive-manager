@@ -22,6 +22,7 @@ import { toast } from "react-hot-toast";
 import { Deliverable, Platform, DeliverableType } from "@/types/deliverable";
 import { format } from "date-fns";
 import UserSelector from "@/components/users/UserSelector";
+import { useUsers } from "@/hooks/useUsers";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
@@ -32,6 +33,7 @@ export default function EditDeliverableForm({
   deliverable,
   onDeliverableUpdated,
 }: EditDeliverableFormProps) {
+  const { data: users = [] } = useUsers();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState(deliverable.title);
@@ -39,9 +41,26 @@ export default function EditDeliverableForm({
   const [type, setType] = useState<DeliverableType>(deliverable.type);
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
-  const [editorId, setEditorId] = useState<string | null>(
-    deliverable.firebase_uid || null
-  );
+
+  // Helper function to find user UID from name (for legacy data)
+  const findUserUidFromName = (editorName: string): string | null => {
+    if (!editorName || !users.length) return null;
+    const user = users.find((u) => u.name === editorName);
+    return user ? user.uid : null;
+  };
+
+  // Initialize editor data - try firebase_uid first, then try to find UID from name
+  const getInitialEditorId = (): string | null => {
+    if (deliverable.firebase_uid) {
+      return deliverable.firebase_uid;
+    }
+    if (deliverable.editor) {
+      return findUserUidFromName(deliverable.editor);
+    }
+    return null;
+  };
+
+  const [editorId, setEditorId] = useState<string | null>(getInitialEditorId());
   const [editorName, setEditorName] = useState(deliverable.editor || "");
 
   // Helper function to safely format dates
@@ -71,12 +90,12 @@ export default function EditDeliverableForm({
       setType(deliverable.type);
       setDuration(deliverable.duration);
       setAspectRatio(deliverable.aspect_ratio);
-      setEditorId(deliverable.firebase_uid || null);
+      setEditorId(getInitialEditorId());
       setEditorName(deliverable.editor || "");
       setEditDeadline(safeFormatDate(deliverable.edit_deadline));
       setReleaseDate(safeFormatDate(deliverable.release_date));
     }
-  }, [deliverable]);
+  }, [deliverable, users]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

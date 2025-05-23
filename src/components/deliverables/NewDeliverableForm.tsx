@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -18,17 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { Platform, DeliverableType } from "@/types/deliverable";
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  creativeRoles: string[];
-  status: string;
-}
+import { FirestoreUser } from "@/types/firebase";
 
 interface Car {
   _id: string;
@@ -56,23 +48,29 @@ export default function NewDeliverableForm({
   const [editor, setEditor] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCarId, setSelectedCarId] = useState(carId || "");
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        console.log("NewDeliverableForm: Starting to fetch users...");
         const response = await fetch("/api/users");
         if (!response.ok) {
           throw new Error("Failed to fetch users");
         }
         const data = await response.json();
 
+        console.log("NewDeliverableForm: Raw API response:", data);
+        console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
+
         if (Array.isArray(data)) {
           const activeUsers = data.filter(
-            (user: User) => user.status === "active"
+            (user: FirestoreUser) => user.status === "active"
           );
+          console.log("NewDeliverableForm: Active users:", activeUsers.length);
+          console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
           setUsers(activeUsers);
         } else {
           console.error("Unexpected API response structure:", data);
@@ -84,7 +82,10 @@ export default function NewDeliverableForm({
       }
     };
 
-    fetchUsers();
+    // Only fetch users if we don't already have them
+    if (users.length === 0) {
+      fetchUsers();
+    }
 
     // Only fetch cars if no carId was provided
     if (!carId) {
@@ -102,9 +103,11 @@ export default function NewDeliverableForm({
         }
       };
 
-      fetchCars();
+      if (cars.length === 0) {
+        fetchCars();
+      }
     }
-  }, [carId]);
+  }, []); // Remove dependencies to prevent re-fetching
 
   const resetForm = () => {
     setTitle("");
@@ -142,6 +145,13 @@ export default function NewDeliverableForm({
 
     const deliverableCarId = carId || selectedCarId;
 
+    // Find the selected user to get both name and firebase_uid
+    const selectedUser = users.find((user) => user.uid === editor);
+    if (!selectedUser) {
+      toast.error("Please select a valid editor");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await fetch(
@@ -157,7 +167,9 @@ export default function NewDeliverableForm({
             type,
             duration,
             aspect_ratio: aspectRatio,
-            editor,
+            editor: selectedUser.name, // Store the name for display
+            firebase_uid: selectedUser.uid, // Store the UID for filtering
+            status: "not_started", // Default status
             edit_deadline: new Date(editDeadline),
             release_date: new Date(releaseDate),
             car_id: deliverableCarId,
@@ -235,8 +247,8 @@ export default function NewDeliverableForm({
               Platform
             </label>
             <Select
-              value={platform}
-              onValueChange={(value: Platform) => setPlatform(value)}
+              value={platform || ""}
+              onValueChange={(value) => setPlatform(value as Platform)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select platform" />
@@ -272,8 +284,8 @@ export default function NewDeliverableForm({
               Type
             </label>
             <Select
-              value={type}
-              onValueChange={(value: DeliverableType) => setType(value)}
+              value={type || ""}
+              onValueChange={(value) => setType(value as DeliverableType)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select type" />
@@ -359,7 +371,7 @@ export default function NewDeliverableForm({
               </SelectTrigger>
               <SelectContent>
                 {users.map((user) => (
-                  <SelectItem key={user._id} value={user._id}>
+                  <SelectItem key={user.uid} value={user.uid}>
                     {user.name}
                   </SelectItem>
                 ))}

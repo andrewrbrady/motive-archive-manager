@@ -2,46 +2,49 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId, UpdateFilter } from "mongodb";
 import { Deliverable } from "@/types/deliverable";
-
-interface Car {
-  _id: ObjectId;
-  deliverableIds: ObjectId[];
-}
+import { Car } from "@/types/car";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/deliverables
+    const resolvedParams = await params;
+    console.log("Car-specific API - Querying for car ID:", resolvedParams.id);
 
     const db = await getDatabase();
-    const carId = new ObjectId(id);
+    console.log("Car-specific API - Database name:", db.databaseName);
+    console.log("Car-specific API - Querying collection: deliverables");
 
-    // Get the car's deliverable references
-    const car = await db.collection<Car>("cars").findOne({ _id: carId });
-    if (!car) {
-      return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    // Validate that the id is a proper MongoDB ObjectId
+    if (!/^[0-9a-fA-F]{24}$/.test(resolvedParams.id)) {
+      console.error("Invalid car ID format:", resolvedParams.id);
+      return NextResponse.json(
+        { error: "Invalid car ID format" },
+        { status: 400 }
+      );
     }
 
-    // Get all deliverables for this car
     const deliverables = await db
       .collection("deliverables")
-      .find({ car_id: carId })
-      .sort({ created_at: -1 })
+      .find({ car_id: new ObjectId(resolvedParams.id) })
+      .sort({ edit_deadline: 1 })
       .toArray();
+
+    console.log("Car-specific API - Found deliverables:", deliverables.length);
+    console.log(
+      "Car-specific API - Deliverable IDs:",
+      deliverables.map((d) => d._id)
+    );
+    console.log("Car-specific API - Sample deliverable:", deliverables[0]);
 
     return NextResponse.json(deliverables);
   } catch (error) {
-    console.error("Error fetching deliverables:", error);
+    console.error("Error fetching deliverables for car:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch deliverables",
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -67,12 +70,12 @@ export async function POST(request: Request) {
     // Insert the deliverable
     const result = await db.collection("deliverables").insertOne(deliverable);
 
-    // Update the car's deliverable references with proper typing
-    const updateFilter: UpdateFilter<Car> = {
-      $push: { deliverableIds: result.insertedId },
+    // Update the car's deliverable references with proper typing - convert ObjectId to string
+    const updateFilter = {
+      $push: { deliverableIds: result.insertedId.toString() },
     };
 
-    await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
+    await db.collection("cars").updateOne({ _id: carId }, updateFilter as any);
 
     return NextResponse.json({
       _id: result.insertedId,
@@ -172,12 +175,12 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Remove the reference from the car with proper typing
-    const updateFilter: UpdateFilter<Car> = {
-      $pull: { deliverableIds: deliverableObjectId },
+    // Remove the reference from the car with proper typing - convert ObjectId to string
+    const updateFilter = {
+      $pull: { deliverableIds: deliverableObjectId.toString() },
     };
 
-    await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
+    await db.collection("cars").updateOne({ _id: carId }, updateFilter as any);
 
     return NextResponse.json({ success: true });
   } catch (error) {
