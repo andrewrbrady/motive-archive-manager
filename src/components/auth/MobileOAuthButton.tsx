@@ -51,50 +51,15 @@ export function MobileOAuthButton({
     setIsLoading(true);
 
     try {
-      if (isMobile) {
-        // For mobile devices, use direct redirect without JavaScript navigation
-        // This avoids popup blockers and works better with mobile browsers
-        await signIn("google", {
-          callbackUrl,
-          redirect: true, // Use direct redirect on mobile
-        });
-      } else {
-        // For desktop, use the existing approach with JavaScript navigation
-        const result = await signIn("google", {
-          callbackUrl,
-          redirect: false,
-        });
-
-        if (result?.error) {
-          throw new Error(result.error);
-        }
-
-        if (result?.url) {
-          const url = new URL(result.url, window.location.origin);
-          if (url.origin === window.location.origin) {
-            window.location.href = url.pathname + url.search;
-          } else {
-            window.location.href = result.url;
-          }
-        } else {
-          window.location.href = callbackUrl;
-        }
-      }
+      // Use direct redirect for both mobile and desktop
+      // This approach is working perfectly on mobile, so let's use it everywhere
+      await signIn("google", {
+        callbackUrl,
+        redirect: true, // Use direct redirect for all devices
+      });
     } catch (error: any) {
       console.error("Google sign-in error:", error);
       setIsLoading(false);
-
-      // On mobile, if the JavaScript approach fails, try direct redirect as fallback
-      if (isMobile) {
-        try {
-          await signIn("google", {
-            callbackUrl,
-            redirect: true,
-          });
-        } catch (fallbackError) {
-          console.error("Fallback sign-in also failed:", fallbackError);
-        }
-      }
     }
   };
 
