@@ -43,15 +43,16 @@ export const authConfig: NextAuthConfig = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
-          prompt: "select_account",
+          prompt: "consent",
           access_type: "offline",
           response_type: "code",
+          include_granted_scopes: "true",
         },
       },
+      checks: ["pkce", "state"],
     }),
   ],
   session: {
-    // Use JWT-based sessions for better compatibility with Edge runtime
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
@@ -62,6 +63,8 @@ export const authConfig: NextAuthConfig = {
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
+      // Enhanced redirect handling for mobile browsers
+
       // Allow relative callback URLs within the same origin
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;
@@ -69,6 +72,11 @@ export const authConfig: NextAuthConfig = {
 
       // Allow callback URLs on the same origin
       if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+
+      // For OAuth callbacks, ensure proper mobile handling
+      if (url.includes("/api/auth/callback")) {
         return url;
       }
 
@@ -438,6 +446,45 @@ export const authConfig: NextAuthConfig = {
   debug: process.env.NODE_ENV === "development",
   trustHost: true,
   basePath: "/api/auth",
+  useSecureCookies: process.env.NODE_ENV === "production",
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax", // Changed from "strict" for better mobile compatibility
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+      },
+    },
+    callbackUrl: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.callback-url"
+          : "next-auth.callback-url",
+      options: {
+        sameSite: "lax", // Better mobile compatibility
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Host-next-auth.csrf-token"
+          : "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax", // Better mobile compatibility
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
 };
 
 export default authConfig;
