@@ -17,17 +17,19 @@ interface CarCardProps {
 }
 
 export default function CarCard({ car, currentSearchParams }: CarCardProps) {
-  console.log("CarCard: Component rendering with car:", car._id);
-  console.log("CarCard: Full car data:", {
-    id: car._id,
-    make: car.make,
-    model: car.model,
-    imageIds: car.imageIds,
-    images: car.images,
-    primaryImageId: car.primaryImageId,
-    hasImageIds: Boolean(car.imageIds?.length),
-    hasImages: Boolean(car.images),
-  });
+  if (process.env.NODE_ENV !== "production") {
+    console.log("CarCard: Component rendering with car:", car._id);
+    console.log("CarCard: Full car data:", {
+      id: car._id,
+      hasMake: !!car.make,
+      hasModel: !!car.model,
+      imageIdsCount: car.imageIds?.length || 0,
+      imagesCount: car.images?.length || 0,
+      hasPrimaryImageId: !!car.primaryImageId,
+      hasImageIds: Boolean(car.imageIds?.length),
+      hasImages: Boolean(car.images),
+    });
+  }
 
   const [primaryImage, setPrimaryImage] = useState<{
     id?: string;

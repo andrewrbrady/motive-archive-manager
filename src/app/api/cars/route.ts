@@ -16,7 +16,17 @@ export async function POST(request: NextRequest) {
   try {
     const db = await getDatabase();
     const data = await request.json();
-    console.log("Creating car with data:", JSON.stringify(data, null, 2));
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Creating car with data:", {
+        make: data.make,
+        model: data.model,
+        year: data.year,
+        hasVin: !!data.vin,
+        hasClientData: !!data.clientId,
+        fieldsCount: Object.keys(data).length,
+      });
+    }
 
     // Ensure dimensions are properly structured
     if (data.dimensions) {
@@ -48,10 +58,21 @@ export async function POST(request: NextRequest) {
     });
     const car = await db.collection("cars").findOne({ _id: result.insertedId });
 
-    console.log("Created car:", JSON.stringify(car, null, 2));
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Created car:", {
+        id: car?._id,
+        make: car?.make,
+        model: car?.model,
+        year: car?.year,
+        hasVin: !!car?.vin,
+      });
+    }
     return NextResponse.json(car, { status: 201 });
   } catch (error) {
-    console.error("Error creating car:", error);
+    console.error(
+      "Error creating car:",
+      (error as Error).message || "Unknown error"
+    );
     return NextResponse.json(
       { error: "Failed to create car" },
       { status: 500 }

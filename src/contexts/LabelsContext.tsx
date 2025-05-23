@@ -85,47 +85,52 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       try {
-        // Use the batch endpoint instead of the main cars endpoint
-        console.log(`Fetching car labels for IDs: ${uncachedIds.join(", ")}`);
-        const response = await fetch(
-          `/api/cars/batch?ids=${uncachedIds.join(",")}`
-        );
-
-        // Log the full URL to help with debugging
-        console.log(
-          `API Request URL: /api/cars/batch?ids=${uncachedIds.join(",")}`
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch car labels: ${response.statusText} (${response.status})`
+        if (process.env.NODE_ENV !== "production") {
+          console.log(
+            `Fetching car labels for IDs: ${uncachedIds.map((id) => id.substring(0, 8) + "***").join(", ")}`
           );
         }
 
+        const response = await fetch("/api/cars/labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ carIds: uncachedIds }),
+        });
+
+        if (process.env.NODE_ENV !== "production") {
+          console.log(
+            "Car labels API response:",
+            response.status,
+            response.statusText
+          );
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch car labels: ${response.statusText}`);
+        }
+
         const data = await response.json();
-
-        // Enhanced logging to debug API response structure
-        console.log("Car labels API response structure:", Object.keys(data));
-        console.log(
-          "Cars array type:",
-          Array.isArray(data.cars) ? "array" : typeof data.cars
-        );
-        console.log(
-          "Cars count:",
-          Array.isArray(data.cars) ? data.cars.length : "not an array"
-        );
-
-        // Log debug info if provided
-        if (data.debug) {
-          console.log("API debug info:", data.debug);
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Car labels API response structure:", Object.keys(data));
+          console.log(
+            "Received labels for cars:",
+            Object.keys(data.labels || {}).length
+          );
+          console.log(
+            "Labels data sample:",
+            Object.keys(data.labels || {}).slice(0, 3)
+          );
+          if (data.debug) {
+            console.log("API debug info:", data.debug);
+          }
         }
 
         // Handle both response formats: {cars: []} and {data: []}
         const carsArray = Array.isArray(data.cars)
           ? data.cars
           : Array.isArray(data.data)
-          ? data.data
-          : [];
+            ? data.data
+            : [];
 
         if (carsArray.length === 0) {
           console.warn("No cars returned from API for IDs:", uncachedIds);

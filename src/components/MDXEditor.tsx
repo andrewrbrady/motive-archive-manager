@@ -205,12 +205,14 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
   onSave,
   onInsertGallery,
 }: MDXEditorProps) => {
-  console.log("MDXEditor component initializing with props:", {
-    hasValue: !!value,
-    hasOnChange: !!onChange,
-    hasOnSave: !!onSave,
-    hasOnInsertGallery: !!onInsertGallery,
-  });
+  if (process.env.NODE_ENV !== "production") {
+    console.log("MDXEditor component initializing with props:", {
+      hasValue: !!value,
+      hasOnChange: !!onChange,
+      hasOnSave: !!onSave,
+      hasOnInsertGallery: !!onInsertGallery,
+    });
+  }
 
   const [mounted, setMounted] = useState(false);
   const [mdxContent, setMdxContent] = useState<any>(null);
@@ -244,15 +246,21 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
-    console.log("MDXEditor useEffect - setting mounted to true");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("MDXEditor useEffect - setting mounted to true");
+    }
     setMounted(true);
     return () => {
-      console.log("MDXEditor cleanup");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MDXEditor cleanup");
+      }
     };
   }, []);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
-    console.log("Editor mounted");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Editor mounted");
+    }
     editorRef.current = editor;
     monacoRef.current = monaco;
     setIsEditorReady(true);
@@ -277,33 +285,43 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
   // Single useEffect for Vim mode initialization
   useEffect(() => {
     if (!isEditorReady || !editorRef.current || !statusBarRef.current) {
-      console.log("Not ready for Vim initialization:", {
-        isEditorReady,
-        hasEditor: !!editorRef.current,
-        hasStatusBar: !!statusBarRef.current,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Not ready for Vim initialization:", {
+          isEditorReady,
+          hasEditor: !!editorRef.current,
+          hasStatusBar: !!statusBarRef.current,
+        });
+      }
       return;
     }
 
     const initializeVim = async () => {
       try {
-        console.log("Initializing Vim mode...");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Initializing Vim mode...");
+        }
         const vim = await import("monaco-vim");
 
         // Cleanup any existing vim mode
         if (vimModeRef.current) {
-          console.log("Disposing existing Vim mode");
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Disposing existing Vim mode");
+          }
           vimModeRef.current.dispose();
         }
 
         // Initialize new vim mode
-        console.log("Creating new Vim mode instance");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Creating new Vim mode instance");
+        }
         const vimMode = vim.initVimMode(
           editorRef.current,
           statusBarRef.current
         );
         vimModeRef.current = vimMode;
-        console.log("Vim mode initialized successfully");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Vim mode initialized successfully");
+        }
       } catch (error) {
         console.error("Error initializing Vim mode:", error);
       }
@@ -313,7 +331,9 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
 
     return () => {
       if (vimModeRef.current) {
-        console.log("Cleaning up Vim mode");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Cleaning up Vim mode");
+        }
         vimModeRef.current.dispose();
         vimModeRef.current = null;
       }
@@ -357,18 +377,24 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
 
   useEffect(() => {
     if (!value) {
-      console.log("MDXEditor: No value provided");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MDXEditor: No value provided");
+      }
       return;
     }
 
     const compileMdx = async () => {
       try {
-        console.log("Starting MDX compilation");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Starting MDX compilation");
+        }
         const { frontmatter, content } = parseFrontmatter(value);
-        console.log("Parsed MDX:", {
-          hasFrontmatter: !!frontmatter,
-          contentLength: content.length,
-        });
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Parsed MDX:", {
+            hasFrontmatter: !!frontmatter,
+            contentLength: content.length,
+          });
+        }
 
         const mdxSource = await serialize(content, {
           mdxOptions: {
@@ -379,7 +405,9 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
           scope: frontmatter,
         });
 
-        console.log("MDX compilation successful");
+        if (process.env.NODE_ENV !== "production") {
+          console.log("MDX compilation successful");
+        }
         setMdxContent({ ...mdxSource, frontmatter });
       } catch (error) {
         console.error("Error compiling MDX:", error);
@@ -644,7 +672,9 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
   };
 
   if (!mounted) {
-    console.log("MDXEditor not mounted yet");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("MDXEditor not mounted yet");
+    }
     return (
       <div className="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">
         <p className="text-gray-500">Loading editor...</p>
@@ -652,11 +682,13 @@ export const MDXEditor: React.FC<MDXEditorProps> = ({
     );
   }
 
-  console.log("MDXEditor rendering with state:", {
-    isMounted: mounted,
-    hasMdxContent: !!mdxContent,
-    hasEditorRef: !!editorRef.current,
-  });
+  if (process.env.NODE_ENV !== "production") {
+    console.log("MDXEditor rendering with state:", {
+      isMounted: mounted,
+      hasMdxContent: !!mdxContent,
+      hasEditorRef: !!editorRef.current,
+    });
+  }
 
   return (
     <div className="h-full flex flex-col">

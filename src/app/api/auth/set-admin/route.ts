@@ -11,16 +11,24 @@ export async function GET(request: Request) {
     const uid = "115667720852671300123"; // This is your Google account ID from the logs
     const email = "andrewbradyonline@gmail.com"; // Your email from the logs
 
-    console.log(`Setting admin privileges for ${email} (${uid})`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        `Setting admin privileges for ${email.substring(0, 3)}*** (${uid.substring(0, 8)}***)`
+      );
+    }
 
     // Check if user exists in Firebase Auth
     let userExists = false;
     try {
       const userRecord = await adminAuth.getUser(uid);
       userExists = true;
-      console.log("User exists in Firebase Auth:", userRecord.uid);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("User exists in Firebase Auth");
+      }
     } catch (error) {
-      console.log("User not found in Firebase Auth, creating...");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("User not found in Firebase Auth, creating...");
+      }
       // Create the user if they don't exist
       await adminAuth.createUser({
         uid: uid,
@@ -30,7 +38,9 @@ export async function GET(request: Request) {
           "https://lh3.googleusercontent.com/a/ACg8ocKAeSJCajl-FF0471bHXVbl3uchPR7prOox3BMeOPgTqa3W_yVa=s96-c",
         emailVerified: true,
       });
-      console.log("User created in Firebase Auth");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("User created in Firebase Auth");
+      }
     }
 
     // Set admin claims
@@ -39,7 +49,9 @@ export async function GET(request: Request) {
       creativeRoles: [],
       status: "active",
     });
-    console.log("Admin claims set for user");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Admin claims set for user");
+    }
 
     // Update or create Firestore document
     await adminDb
@@ -58,7 +70,9 @@ export async function GET(request: Request) {
         },
         { merge: true }
       );
-    console.log("Firestore document updated with admin privileges");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Firestore document updated with admin privileges");
+    }
 
     return NextResponse.json({
       success: true,
@@ -70,9 +84,12 @@ export async function GET(request: Request) {
       },
     });
   } catch (error: any) {
-    console.error("Error setting admin privileges:", error);
+    console.error(
+      "Error setting admin privileges:",
+      (error as Error).message || "Unknown error"
+    );
     return NextResponse.json(
-      { error: error.message || "Failed to set admin privileges" },
+      { error: (error as Error).message || "Failed to set admin privileges" },
       { status: 500 }
     );
   }

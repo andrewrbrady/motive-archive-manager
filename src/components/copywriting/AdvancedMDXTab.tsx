@@ -135,7 +135,9 @@ interface GallerySelectionDialogProps {
 }
 
 export default function AdvancedMDXTab() {
-  console.log("AdvancedMDXTab rendering");
+  if (process.env.NODE_ENV !== "production") {
+    console.log("AdvancedMDXTab rendering");
+  }
   const [files, setFiles] = useState<AdvancedMDXFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<AdvancedMDXFile | null>(
     null

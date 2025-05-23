@@ -440,7 +440,18 @@ export function ArticleGenerator({ carId }: ArticleGeneratorProps) {
         lengthPreference: lengthPreference,
       };
 
-      // console.log("Generating article with payload:", JSON.stringify(payload, null, 2));
+      // Removed sensitive payload logging - only log non-sensitive summary in development
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Generating article with payload summary:", {
+          carId: carDetails._id.substring(0, 8) + "***",
+          hasPromptText: !!selectedArticlePrompt.prompt,
+          aiModel: selectedArticlePrompt.aiModel,
+          llmProvider: selectedArticlePrompt.llmProvider,
+          hasCarData: !!carDataForPrompt,
+          additionalContextLength: additionalContext?.length || 0,
+          lengthPreference: lengthPreference,
+        });
+      }
 
       const response = await fetch(
         `/api/cars/${carDetails._id}/article/generate`,

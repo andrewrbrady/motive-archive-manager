@@ -32,11 +32,13 @@ async function fixAdminClaims() {
   const adminUid = "G46fdpqaufe7bmhluKAhakVM44e2";
 
   try {
-    console.log(`1. Checking Firebase Auth user: ${adminEmail}`);
+    console.log(
+      `1. Checking Firebase Auth user: ${adminEmail.substring(0, 3)}***`
+    );
 
     // Get the Firebase Auth user
     const authUser = await adminAuth.getUser(adminUid);
-    console.log(`   ✅ Found Firebase Auth user: ${authUser.uid}`);
+    console.log(`   ✅ Found Firebase Auth user`);
     console.log(`   Current custom claims:`, authUser.customClaims || "None");
 
     // Get the Firestore user document
@@ -77,7 +79,10 @@ async function fixAdminClaims() {
     console.log(`   3. Sign back in`);
     console.log(`   4. You should now have admin access`);
   } catch (error) {
-    console.error(`\n❌ Error fixing admin claims:`, error);
+    console.error(
+      `\n❌ Error fixing admin claims:`,
+      (error as Error).message || "Unknown error"
+    );
     process.exit(1);
   }
 }

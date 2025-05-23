@@ -47,9 +47,9 @@ async function migrateAndrewBradyDeliverables() {
     const correctFirebaseUid = andrewDoc.docs[0].id;
 
     console.log(
-      `Found Andrew Brady in Firestore with UID: ${correctFirebaseUid}`
+      `Found Andrew Brady in Firestore with UID: ${correctFirebaseUid.substring(0, 8)}***`
     );
-    console.log(`Email: ${andrewData.email}`);
+    console.log(`Email: ${andrewData.email.substring(0, 3)}***`);
     console.log(`Name: ${andrewData.name}`);
 
     // Process each deliverable
@@ -83,7 +83,7 @@ async function migrateAndrewBradyDeliverables() {
           updated++;
           console.log(
             `Updated deliverable "${deliverable.title}" (${deliverable._id}) ` +
-              `from UID ${deliverable.firebase_uid} to ${correctFirebaseUid}`
+              `from UID ***${deliverable.firebase_uid?.toString().slice(-8)} to ***${correctFirebaseUid.slice(-8)}`
           );
         } else {
           console.log(`No changes made to deliverable ${deliverable._id}`);
@@ -92,7 +92,7 @@ async function migrateAndrewBradyDeliverables() {
       } catch (error) {
         console.error(
           `Error processing deliverable ${deliverable._id}:`,
-          error
+          (error as Error).message || "Unknown error"
         );
         errors++;
       }

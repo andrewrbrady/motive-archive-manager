@@ -135,67 +135,75 @@ function generateOAuthCallbackUrl(): string {
 }
 
 function main() {
-  console.log("🔍 OAuth Configuration Validation\n");
-  console.log("=".repeat(50));
-
-  let hasErrors = false;
-  let hasWarnings = false;
-
-  // Check each configuration item
-  for (const check of CONFIG_CHECKS) {
-    const result = validateConfig(check);
-    console.log(`${result.message}`);
-
-    if (result.value) {
-      console.log(`   Value: ${result.value}`);
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Validating OAuth configuration...");
     }
 
-    console.log(`   Description: ${check.description}\n`);
+    // Check required environment variables
+    const requiredVars = [
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "NEXTAUTH_SECRET",
+      "NEXTAUTH_URL",
+    ];
 
-    if (!result.valid) {
-      hasErrors = true;
-    } else if (result.message.includes("⚠️")) {
-      hasWarnings = true;
+    const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+
+    if (missingVars.length > 0) {
+      console.error("Missing required environment variables:");
+      missingVars.forEach((varName) => {
+        console.error(`  - ${varName}`);
+      });
+      process.exit(1);
     }
-  }
 
-  // Special validation for auth secrets
-  const hasNextAuthSecret = !!process.env.NEXTAUTH_SECRET;
-  const hasAuthSecret = !!process.env.AUTH_SECRET;
+    if (process.env.NODE_ENV !== "production") {
+      console.log("✅ All required environment variables are present");
+      console.log("OAuth configuration validation completed successfully");
+    }
 
-  if (!hasNextAuthSecret && !hasAuthSecret) {
-    console.log(
-      "❌ Missing authentication secret: Set either NEXTAUTH_SECRET or AUTH_SECRET"
-    );
-    hasErrors = true;
-  }
+    // Validate Google OAuth configuration format
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  console.log("=".repeat(50));
-  console.log("📋 Configuration Summary\n");
+    if (!googleClientId?.endsWith(".googleusercontent.com")) {
+      console.error("❌ GOOGLE_CLIENT_ID format appears invalid");
+      process.exit(1);
+    }
 
-  // Environment info
-  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`Vercel Environment: ${process.env.VERCEL_ENV || "N/A"}`);
-  console.log(`Base URL: ${process.env.NEXTAUTH_URL || "Not set"}`);
-  console.log(`OAuth Callback URL: ${generateOAuthCallbackUrl()}\n`);
+    if (googleClientSecret && googleClientSecret.length < 20) {
+      console.error("❌ GOOGLE_CLIENT_SECRET appears too short");
+      process.exit(1);
+    }
 
-  // Google OAuth Console Instructions
-  console.log("🔧 Google OAuth Console Setup:");
-  console.log("1. Go to https://console.cloud.google.com/");
-  console.log("2. Navigate to APIs & Services > Credentials");
-  console.log("3. Add this redirect URI to your OAuth 2.0 Client:");
-  console.log(`   ${generateOAuthCallbackUrl()}\n`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("✅ Google OAuth configuration format validation passed");
+    }
 
-  // Results
-  if (hasErrors) {
-    console.log("❌ Configuration has errors that must be fixed");
+    // Validate NextAuth configuration
+    const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+    const nextAuthUrl = process.env.NEXTAUTH_URL;
+
+    if (nextAuthSecret && nextAuthSecret.length < 32) {
+      console.error("❌ NEXTAUTH_SECRET should be at least 32 characters long");
+      process.exit(1);
+    }
+
+    if (nextAuthUrl && !nextAuthUrl.startsWith("http")) {
+      console.error("❌ NEXTAUTH_URL should start with http:// or https://");
+      process.exit(1);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("✅ NextAuth configuration validation passed");
+      console.log(
+        "🎉 All OAuth configuration validations completed successfully!"
+      );
+    }
+  } catch (error) {
+    console.error("Error validating OAuth configuration:", error);
     process.exit(1);
-  } else if (hasWarnings) {
-    console.log("⚠️  Configuration has warnings but should work");
-    process.exit(0);
-  } else {
-    console.log("✅ Configuration looks good!");
-    process.exit(0);
   }
 }
 

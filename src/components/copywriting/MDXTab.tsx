@@ -25,9 +25,13 @@ import Gallery from "@/components/mdx/Gallery";
 // Dynamically import MDXEditor with no SSR
 const MDXEditor = dynamic(
   () => {
-    console.log("Dynamically importing MDXEditor in MDXTab");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Dynamically importing MDXEditor in MDXTab");
+    }
     return import("@/components/MDXEditor").then((mod) => {
-      console.log("MDXEditor module loaded in MDXTab:", mod);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("MDXEditor module loaded in MDXTab:", mod);
+      }
       if (!mod.default) {
         console.error(
           "MDXEditor default export is undefined in the module:",
@@ -604,7 +608,9 @@ cover: ""
                   </div>
 
                   {files.map((file) => {
-                    console.log("Rendering file:", file);
+                    if (process.env.NODE_ENV !== "production") {
+                      console.log("Rendering file:", file);
+                    }
                     return (
                       <div
                         key={file._id || file.filename}

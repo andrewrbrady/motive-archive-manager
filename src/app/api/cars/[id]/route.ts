@@ -611,14 +611,23 @@ export async function PATCH(request: Request) {
   let client;
   try {
     const url = new URL(request.url);
-    const segments = url.pathname.split("/");
+    const segments = url.pathname.split("/").filter(Boolean);
     const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
 
-    console.log("\n=== CAR UPDATE API CALLED ===");
-    console.log("Car ID:", id);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("\n=== CAR UPDATE API CALLED ===");
+      console.log("Car ID:", id);
+    }
 
     const updates = await request.json();
-    console.log("\nReceived Updates:", JSON.stringify(updates, null, 2));
+    if (process.env.NODE_ENV !== "production") {
+      console.log("\nReceived Updates:", {
+        fieldsCount: Object.keys(updates).length,
+        hasGalleryIds: !!updates.galleryIds,
+        hasClientData: !!updates.client,
+        hasSpecifications: !!updates.specifications,
+      });
+    }
 
     // Remove _id from updates to prevent MongoDB error
     const { _id, ...updatesWithoutId } = updates;
@@ -654,12 +663,19 @@ export async function PATCH(request: Request) {
 
       // Handle galleryIds field specifically
       if (key === "galleryIds") {
-        console.log(`\n=== GALLERY IDS UPDATE ===`);
-        console.log("Received galleryIds:", value);
-        console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`\n=== GALLERY IDS UPDATE ===`);
+          console.log(
+            "Received galleryIds count:",
+            Array.isArray(value) ? value.length : "not array"
+          );
+          console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
+        }
 
         if (!Array.isArray(value)) {
-          console.log("galleryIds is not an array, setting to empty array");
+          if (process.env.NODE_ENV !== "production") {
+            console.log("galleryIds is not an array, setting to empty array");
+          }
           acc[key] = [];
           return acc;
         }
@@ -669,24 +685,27 @@ export async function PATCH(request: Request) {
           const validGalleryIds = value
             .filter((id) => {
               const isValid = id && ObjectId.isValid(id.toString());
-              if (!isValid) {
-                console.log(`Invalid gallery ID filtered out: ${id}`);
+              if (!isValid && process.env.NODE_ENV !== "production") {
+                console.log(`Invalid gallery ID filtered out`);
               }
               return isValid;
             })
             .map((id) => {
               const objectId = new ObjectId(id.toString());
-              console.log(`Converted gallery ID: ${id} -> ${objectId}`);
               return objectId;
             });
 
-          console.log(`Final galleryIds array:`, validGalleryIds);
-          console.log(`Gallery count: ${validGalleryIds.length}`);
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`Final galleryIds count: ${validGalleryIds.length}`);
+            console.log(`=== END GALLERY IDS UPDATE ===\n`);
+          }
           acc[key] = validGalleryIds;
-          console.log(`=== END GALLERY IDS UPDATE ===\n`);
         } catch (error) {
-          console.error("Error converting gallery IDs:", error);
-          throw new Error(`Invalid gallery ID format in: ${value}`);
+          console.error(
+            "Error converting gallery IDs:",
+            (error as Error).message
+          );
+          throw new Error(`Invalid gallery ID format in array`);
         }
         return acc;
       }
@@ -751,7 +770,12 @@ export async function PATCH(request: Request) {
       return acc;
     }, {});
 
-    console.log("\nCleaned Updates:", JSON.stringify(cleanedUpdates, null, 2));
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "\nCleaned Updates field count:",
+        Object.keys(cleanedUpdates).length
+      );
+    }
 
     client = await getMongoClient();
     const db = client.db(DB_NAME);
@@ -772,9 +796,11 @@ export async function PATCH(request: Request) {
     // Update the updatedAt timestamp
     cleanedUpdates.updatedAt = new Date();
 
-    console.log(`\n=== DATABASE UPDATE ===`);
-    console.log("Car ID:", objectId);
-    console.log("Updates to apply:", JSON.stringify(cleanedUpdates, null, 2));
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`\n=== DATABASE UPDATE ===`);
+      console.log("Car ID:", objectId);
+      console.log("Update fields count:", Object.keys(cleanedUpdates).length);
+    }
 
     // Perform the update with cleaned data
     const result = await db
@@ -790,23 +816,33 @@ export async function PATCH(request: Request) {
       throw new Error("Failed to update car");
     }
 
-    console.log(`Database update successful`);
-    console.log("Updated car galleryIds:", result.galleryIds);
-    console.log("Gallery count in DB:", result.galleryIds?.length || 0);
-    console.log(`=== END DATABASE UPDATE ===\n`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Database update successful`);
+      console.log(
+        "Updated car galleryIds count:",
+        result.galleryIds?.length || 0
+      );
+      console.log(`=== END DATABASE UPDATE ===\n`);
+    }
 
     // Convert to plain object to ensure it's JSON serializable
     const serializedCar = convertToPlainObject(result);
-    console.log("\nUpdated Car State:", JSON.stringify(serializedCar, null, 2));
-    console.log("\n=== CAR UPDATE COMPLETED ===\n");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("\nUpdated Car State:", {
+        id: serializedCar._id,
+        make: serializedCar.make,
+        model: serializedCar.model,
+        hasVin: !!serializedCar.vin,
+      });
+      console.log("\n=== CAR UPDATE COMPLETED ===\n");
+    }
 
     return NextResponse.json(serializedCar);
   } catch (error) {
     console.error("\n=== CAR UPDATE ERROR ===");
-    console.error("Error details:", error);
     console.error(
-      "Stack trace:",
-      error instanceof Error ? error.stack : "No stack trace available"
+      "Error details:",
+      (error as Error).message || "Unknown error"
     );
     console.error("\n=========================\n");
 

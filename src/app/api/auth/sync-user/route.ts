@@ -23,9 +23,11 @@ export async function POST(request: Request) {
         authUser = await adminAuth.getUserByEmail(email);
       }
 
-      console.log(
-        `Found user in Firebase Auth: ${authUser.uid} (${authUser.email})`
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          `Found user in Firebase Auth: ${authUser.uid.substring(0, 8)}*** (${authUser.email?.substring(0, 3)}***)`
+        );
+      }
     } catch (error) {
       return NextResponse.json(
         { error: "User not found in Firebase Authentication" },
@@ -43,7 +45,9 @@ export async function POST(request: Request) {
     const makeAdmin = data.makeAdmin === true;
     if (makeAdmin && !roles.includes("admin")) {
       roles = [...roles, "admin"];
-      console.log(`Adding admin role to user ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Adding admin role to user`);
+      }
     }
 
     // Check if user exists in Firestore
@@ -51,7 +55,9 @@ export async function POST(request: Request) {
     const userDoc = await userDocRef.get();
 
     if (userDoc.exists) {
-      console.log(`User exists in Firestore: ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`User exists in Firestore`);
+      }
       const firestoreData = userDoc.data() || {};
 
       // Get roles from Firestore (might be more accurate)
@@ -76,10 +82,14 @@ export async function POST(request: Request) {
         { merge: true }
       );
 
-      console.log(`Updated Firestore document for ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Updated Firestore document`);
+      }
     } else {
       // Create Firestore document if it doesn't exist
-      console.log(`Creating new Firestore document for ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Creating new Firestore document`);
+      }
 
       await userDocRef.set({
         email: authUser.email || email,
@@ -92,7 +102,9 @@ export async function POST(request: Request) {
         updatedAt: new Date(),
       });
 
-      console.log(`Created Firestore document for ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Created Firestore document`);
+      }
     }
 
     // Update custom claims in Firebase Auth
@@ -102,7 +114,9 @@ export async function POST(request: Request) {
       status: "active",
     });
 
-    console.log(`Updated custom claims for ${authUser.uid}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Updated custom claims`);
+    }
 
     return NextResponse.json({
       success: true,
@@ -116,9 +130,12 @@ export async function POST(request: Request) {
       note: "You must sign out and sign back in for changes to take effect",
     });
   } catch (error: any) {
-    console.error("Error synchronizing user:", error);
+    console.error(
+      "Error synchronizing user:",
+      (error as Error).message || "Unknown error"
+    );
     return NextResponse.json(
-      { error: error.message || "Failed to synchronize user" },
+      { error: (error as Error).message || "Failed to synchronize user" },
       { status: 500 }
     );
   }
@@ -163,9 +180,11 @@ export async function GET(request: Request) {
         throw new Error("Either uid or email is required");
       }
 
-      console.log(
-        `Found user in Firebase Auth: ${authUser.uid} (${authUser.email})`
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          `Found user in Firebase Auth: ${authUser.uid.substring(0, 8)}*** (${authUser.email?.substring(0, 3)}***)`
+        );
+      }
     } catch (error) {
       return NextResponse.json(
         { error: "User not found in Firebase Authentication" },
@@ -182,7 +201,9 @@ export async function GET(request: Request) {
     // Add admin role if requested
     if (makeAdmin && !roles.includes("admin")) {
       roles = [...roles, "admin"];
-      console.log(`Adding admin role to user ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Adding admin role to user`);
+      }
     }
 
     // Check if user exists in Firestore
@@ -190,7 +211,9 @@ export async function GET(request: Request) {
     const userDoc = await userDocRef.get();
 
     if (userDoc.exists) {
-      console.log(`User exists in Firestore: ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`User exists in Firestore`);
+      }
       const firestoreData = userDoc.data() || {};
 
       // Get roles from Firestore (might be more accurate)
@@ -215,10 +238,14 @@ export async function GET(request: Request) {
         { merge: true }
       );
 
-      console.log(`Updated Firestore document for ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Updated Firestore document`);
+      }
     } else {
       // Create Firestore document if it doesn't exist
-      console.log(`Creating new Firestore document for ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Creating new Firestore document`);
+      }
 
       await userDocRef.set({
         email: authUser.email || email,
@@ -231,7 +258,9 @@ export async function GET(request: Request) {
         updatedAt: new Date(),
       });
 
-      console.log(`Created Firestore document for ${authUser.uid}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`Created Firestore document`);
+      }
     }
 
     // Update custom claims in Firebase Auth
@@ -241,7 +270,9 @@ export async function GET(request: Request) {
       status: "active",
     });
 
-    console.log(`Updated custom claims for ${authUser.uid}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Updated custom claims`);
+    }
 
     return NextResponse.json({
       success: true,
@@ -257,9 +288,12 @@ export async function GET(request: Request) {
       signoutUrl: "/api/auth/signout",
     });
   } catch (error: any) {
-    console.error("Error synchronizing user:", error);
+    console.error(
+      "Error synchronizing user:",
+      (error as Error).message || "Unknown error"
+    );
     return NextResponse.json(
-      { error: error.message || "Failed to synchronize user" },
+      { error: (error as Error).message || "Failed to synchronize user" },
       { status: 500 }
     );
   }

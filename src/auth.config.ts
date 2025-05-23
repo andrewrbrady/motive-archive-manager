@@ -13,27 +13,28 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
-// Log critical environment variables
-console.log("NextAuth Environment Check:");
-console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
-console.log(
-  "- NEXTAUTH_SECRET:",
-  process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
-);
-console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
-console.log(
-  "- GOOGLE_CLIENT_ID:",
-  process.env.GOOGLE_CLIENT_ID
-    ? `Set (${process.env.GOOGLE_CLIENT_ID.length} chars)`
-    : "Not set"
-);
-console.log(
-  "- GOOGLE_CLIENT_SECRET:",
-  process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
-);
-console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
-console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
-console.log("- NODE_ENV:", process.env.NODE_ENV || "Not set");
+// Debug logging for environment variables (only in development)
+if (process.env.NODE_ENV !== "production") {
+  console.log("Authentication Environment Check:");
+  console.log(
+    "- NEXTAUTH_SECRET:",
+    process.env.NEXTAUTH_SECRET ? "Set" : "Not set"
+  );
+  console.log("- AUTH_SECRET:", process.env.AUTH_SECRET ? "Set" : "Not set");
+  console.log(
+    "- GOOGLE_CLIENT_ID:",
+    process.env.GOOGLE_CLIENT_ID
+      ? `Set (${process.env.GOOGLE_CLIENT_ID.length} chars)`
+      : "Not set"
+  );
+  console.log(
+    "- GOOGLE_CLIENT_SECRET:",
+    process.env.GOOGLE_CLIENT_SECRET ? "Set" : "Not set"
+  );
+  console.log("- VERCEL_URL:", process.env.VERCEL_URL || "Not set");
+  console.log("- VERCEL_ENV:", process.env.VERCEL_ENV || "Not set");
+  console.log("- NODE_ENV:", process.env.NODE_ENV || "Not set");
+}
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -75,16 +76,18 @@ export const authConfig: NextAuthConfig = {
       return `${baseUrl}/dashboard`;
     },
     async jwt({ token, user, account, trigger, session }) {
-      console.log("JWT callback - input data:", {
-        hasToken: !!token,
-        hasUser: !!user,
-        hasAccount: !!account,
-        trigger,
-        tokenData: token,
-        userData: user,
-        accountData: account,
-        sessionData: session,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("JWT callback - input data:", {
+          hasToken: !!token,
+          hasUser: !!user,
+          hasAccount: !!account,
+          trigger,
+          hasTokenData: !!token,
+          hasUserData: !!user,
+          hasAccountData: !!account,
+          hasSessionData: !!session,
+        });
+      }
 
       // Initial sign in
       if (account && user) {
@@ -92,10 +95,12 @@ export const authConfig: NextAuthConfig = {
         if (account.provider === "google") {
           try {
             const firebaseUser = await adminAuth.getUserByEmail(user.email!);
-            console.log("Found Firebase user for Google sign-in:", {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-            });
+            if (process.env.NODE_ENV !== "production") {
+              console.log("Found Firebase user for Google sign-in:", {
+                hasUid: !!firebaseUser.uid,
+                hasEmail: !!firebaseUser.email,
+              });
+            }
 
             // Set the Firebase UID in the token
             token.firebase_uid = firebaseUser.uid;
@@ -106,16 +111,18 @@ export const authConfig: NextAuthConfig = {
             token.creativeRoles = claims.creativeRoles || [];
             token.status = claims.status || "active";
 
-            console.log("Updated token with Firebase data:", {
-              firebase_uid: token.firebase_uid,
-              roles: token.roles,
-              creativeRoles: token.creativeRoles,
-              status: token.status,
-            });
+            if (process.env.NODE_ENV !== "production") {
+              console.log("Updated token with Firebase data:", {
+                hasFirebaseUid: !!token.firebase_uid,
+                rolesCount: token.roles?.length || 0,
+                creativeRolesCount: token.creativeRoles?.length || 0,
+                status: token.status,
+              });
+            }
           } catch (error) {
             console.error(
               "Error getting Firebase user in JWT callback:",
-              error
+              (error as any).message || "Unknown error"
             );
             // Set default values
             token.roles = ["user"];
@@ -140,13 +147,18 @@ export const authConfig: NextAuthConfig = {
             token.creativeRoles = claims.creativeRoles || [];
             token.status = claims.status || "active";
 
-            console.log("Refreshed claims in token:", {
-              firebase_uid: token.firebase_uid,
-              roles: token.roles,
-              creativeRoles: token.creativeRoles,
-            });
+            if (process.env.NODE_ENV !== "production") {
+              console.log("Refreshed claims in token:", {
+                hasFirebaseUid: !!token.firebase_uid,
+                rolesCount: token.roles?.length || 0,
+                creativeRolesCount: token.creativeRoles?.length || 0,
+              });
+            }
           } catch (error) {
-            console.error("Error refreshing Firebase claims:", error);
+            console.error(
+              "Error refreshing Firebase claims:",
+              (error as any).message || "Unknown error"
+            );
           }
         } else if (session.roles || session.creativeRoles || session.status) {
           if (session.roles) token.roles = session.roles;
@@ -162,18 +174,19 @@ export const authConfig: NextAuthConfig = {
       // Add error handling for undefined token or session
       if (!session || !session.user) {
         console.error(
-          "Session or session.user is undefined in session callback",
-          JSON.stringify({ session, token })
+          "Session or session.user is undefined in session callback"
         );
         return session;
       }
 
-      console.log("Session callback - input data:", {
-        hasSession: !!session,
-        hasToken: !!token,
-        tokenData: token,
-        sessionData: session,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Session callback - input data:", {
+          hasSession: !!session,
+          hasToken: !!token,
+          hasTokenData: !!token,
+          hasSessionData: !!session,
+        });
+      }
 
       // Pass Firebase custom claims from token to session
       if (token) {
@@ -183,17 +196,20 @@ export const authConfig: NextAuthConfig = {
         session.user.creativeRoles = token.creativeRoles || [];
         session.user.status = token.status || "active";
 
-        console.log("Session callback - updated session:", {
-          userId: session.user.id,
-          roles: session.user.roles,
-          creativeRoles: session.user.creativeRoles,
-          status: session.user.status,
-        });
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Session callback - updated session:", {
+            hasUserId: !!session.user.id,
+            rolesCount: session.user.roles?.length || 0,
+            creativeRolesCount: session.user.creativeRoles?.length || 0,
+            status: session.user.status,
+          });
+        }
       } else {
-        console.warn("Token is undefined in session callback, using defaults", {
-          session,
-          token,
-        });
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            "Token is undefined in session callback, using defaults"
+          );
+        }
         // Set default values
         session.user.roles = ["user"];
         session.user.creativeRoles = [];
@@ -213,18 +229,21 @@ export const authConfig: NextAuthConfig = {
             return false;
           }
 
-          console.log(`🔍 Processing Google sign-in for email: ${email}`);
+          if (process.env.NODE_ENV !== "production") {
+            console.log(
+              `🔍 Processing Google sign-in for email: ${email.substring(0, 3)}***`
+            );
+          }
 
           // First try to find existing user by email
           try {
             const existingUser = await adminAuth.getUserByEmail(email);
-            console.log(
-              `✅ Found existing Firebase user with email ${email}:`,
-              {
-                uid: existingUser.uid,
-                providerData: existingUser.providerData,
-              }
-            );
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`✅ Found existing Firebase user`, {
+                hasUid: !!existingUser.uid,
+                providerCount: existingUser.providerData?.length || 0,
+              });
+            }
 
             // Update custom claims if needed
             const claims = existingUser.customClaims || {};
@@ -234,9 +253,9 @@ export const authConfig: NextAuthConfig = {
                 creativeRoles: [],
                 status: "active",
               });
-              console.log(
-                `🔧 Updated claims for existing user: ${existingUser.uid}`
-              );
+              if (process.env.NODE_ENV !== "production") {
+                console.log(`🔧 Updated claims for existing user`);
+              }
             }
 
             // Ensure Firestore document exists
@@ -261,27 +280,22 @@ export const authConfig: NextAuthConfig = {
                   createdAt: new Date(),
                   updatedAt: new Date(),
                 });
-              console.log(
-                `📄 Created Firestore document for existing user: ${existingUser.uid}`
-              );
+              if (process.env.NODE_ENV !== "production") {
+                console.log(`📄 Created Firestore document for existing user`);
+              }
             }
 
             return true;
           } catch (error: any) {
-            console.log(
-              `❌ Firebase Auth error for ${email}:`,
-              error.code,
-              error.message
-            );
-            console.log(`Full error details:`, {
-              code: error.code,
-              message: error.message,
-              stack: error.stack,
-            });
+            if (process.env.NODE_ENV !== "production") {
+              console.log(`❌ Firebase Auth error:`, error.code, error.message);
+            }
 
             // User doesn't exist in Firebase Auth
             if (error.code === "auth/user-not-found") {
-              console.log(`🆕 Creating new Firebase user for email: ${email}`);
+              if (process.env.NODE_ENV !== "production") {
+                console.log(`🆕 Creating new Firebase user`);
+              }
 
               // Check if this user was invited
               const inviteDocId = `invited_${email.replace(/[.@]/g, "_")}`;
@@ -308,14 +322,15 @@ export const authConfig: NextAuthConfig = {
                   status: "active", // Change from 'invited' to 'active'
                   accountType: inviteData.accountType || "personal",
                 };
-                console.log(
-                  `📧 Found invitation for ${email}, using invited data:`,
-                  userData
-                );
+                if (process.env.NODE_ENV !== "production") {
+                  console.log(`📧 Found invitation, using invited data`);
+                }
               } else {
-                console.log(
-                  `📧 No invitation found for ${email}, using default user data`
-                );
+                if (process.env.NODE_ENV !== "production") {
+                  console.log(
+                    `📧 No invitation found, using default user data`
+                  );
+                }
               }
 
               try {
@@ -333,9 +348,9 @@ export const authConfig: NextAuthConfig = {
                 }
 
                 const newUser = await adminAuth.createUser(createUserData);
-                console.log(
-                  `🔥 Created new Firebase Auth user: ${newUser.uid}`
-                );
+                if (process.env.NODE_ENV !== "production") {
+                  console.log(`🔥 Created new Firebase Auth user`);
+                }
 
                 // Set custom claims
                 await adminAuth.setCustomUserClaims(newUser.uid, {
@@ -343,7 +358,9 @@ export const authConfig: NextAuthConfig = {
                   creativeRoles: userData.creativeRoles,
                   status: userData.status,
                 });
-                console.log(`🎫 Set custom claims for: ${newUser.uid}`);
+                if (process.env.NODE_ENV !== "production") {
+                  console.log(`🎫 Set custom claims for new user`);
+                }
 
                 // Create Firestore document
                 await adminDb
@@ -362,9 +379,9 @@ export const authConfig: NextAuthConfig = {
                     createdAt: new Date(),
                     updatedAt: new Date(),
                   });
-                console.log(
-                  `📄 Created Firestore document for: ${newUser.uid}`
-                );
+                if (process.env.NODE_ENV !== "production") {
+                  console.log(`📄 Created Firestore document for new user`);
+                }
 
                 // Clean up invitation document if it existed
                 if (inviteDoc.exists) {
@@ -372,19 +389,19 @@ export const authConfig: NextAuthConfig = {
                     .collection("invited_users")
                     .doc(inviteDocId)
                     .delete();
-                  console.log(`🧹 Cleaned up invitation document for ${email}`);
+                  if (process.env.NODE_ENV !== "production") {
+                    console.log(`🧹 Cleaned up invitation document`);
+                  }
                 }
 
-                console.log(`✅ Successfully created new user: ${newUser.uid}`);
+                if (process.env.NODE_ENV !== "production") {
+                  console.log(`✅ Successfully created new user`);
+                }
                 return true;
               } catch (createError: any) {
-                console.error(
-                  `❌ CRITICAL: Failed to create new user for ${email}:`
-                );
+                console.error(`❌ CRITICAL: Failed to create new user:`);
                 console.error(`Error code: ${createError.code}`);
                 console.error(`Error message: ${createError.message}`);
-                console.error(`Full error:`, createError);
-                console.error(`Stack trace:`, createError.stack);
 
                 // Temporarily allow sign-in even if user creation fails (for debugging)
                 // This ensures we can see the detailed error logs
@@ -393,7 +410,7 @@ export const authConfig: NextAuthConfig = {
             } else {
               // For any other Firebase Auth error, log it but allow sign in
               console.error(
-                `❌ Other Firebase Auth error for ${email}:`,
+                `❌ Other Firebase Auth error:`,
                 error.code,
                 error.message
               );
@@ -403,10 +420,15 @@ export const authConfig: NextAuthConfig = {
         }
 
         // For non-Google providers
-        console.log(`🔍 Non-Google provider sign-in: ${account?.provider}`);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`🔍 Non-Google provider sign-in: ${account?.provider}`);
+        }
         return true;
       } catch (error) {
-        console.error(`❌ Critical error in signIn callback:`, error);
+        console.error(
+          `❌ Critical error in signIn callback:`,
+          (error as any).message || "Unknown error"
+        );
         // Still allow sign-in even if there was an error
         // This prevents users from being locked out due to database issues
         return true;

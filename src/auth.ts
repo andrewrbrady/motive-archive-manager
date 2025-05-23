@@ -65,11 +65,13 @@ const extendedAuthConfig = {
           session.user.status = (token.status as string) || "active";
         }
 
-        console.log("Session updated with latest claims:", {
-          userId: session.user.id,
-          roles: session.user.roles,
-          status: session.user.status,
-        });
+        if (process.env.NODE_ENV !== "production") {
+          console.log("Session updated with latest claims:", {
+            hasUserId: !!session.user.id,
+            rolesCount: session.user.roles?.length || 0,
+            status: session.user.status,
+          });
+        }
       } catch (error) {
         console.error("Error updating session:", error);
         // Ensure session has minimum required data

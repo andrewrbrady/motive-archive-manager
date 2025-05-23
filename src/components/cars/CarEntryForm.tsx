@@ -508,7 +508,9 @@ export default function CarEntryForm({
       return;
     }
 
-    console.log("Starting VIN decode for:", correctedVin);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
+    }
     setIsDecodingVinWithCorrections(true);
 
     // Create a loading toast that we can update
@@ -523,7 +525,14 @@ export default function CarEntryForm({
       const response = await fetch(`/api/vin?vin=${correctedVin}`);
       const data: VINResponse = await response.json();
 
-      console.log("Received VIN decode response:", data);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Received VIN decode response:", {
+          hasMake: !!data.make,
+          hasModel: !!data.model,
+          hasYear: !!data.year,
+          hasError: !!data.error,
+        });
+      }
 
       // Handle errors and decide whether to continue
       if (data.error && handleVinError(data, toastId)) {
@@ -531,7 +540,14 @@ export default function CarEntryForm({
       }
 
       toast.loading("Processing vehicle information...", { id: toastId });
-      console.log("Previous form data:", formData);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Previous form data:", {
+          hasMake: !!formData.make,
+          hasModel: !!formData.model,
+          hasVin: !!formData.vin,
+          fieldsCount: Object.keys(formData).length,
+        });
+      }
 
       // Update form data with decoded information
       const updatedFormData = {
@@ -598,7 +614,6 @@ export default function CarEntryForm({
       // Add AI analysis insights if available
       if ("aiAnalysis" in data) {
         toast.loading("Processing AI insights...", { id: toastId });
-        // Update description with AI insights
         const highlights = Object.entries(data.aiAnalysis || {})
           .filter(([_, info]) => info.confidence === "confirmed")
           .map(([_, info]) => info.value)
@@ -610,7 +625,14 @@ export default function CarEntryForm({
         }
       }
 
-      console.log("Updated form data:", updatedFormData);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Updated form data:", {
+          hasMake: !!updatedFormData.make,
+          hasModel: !!updatedFormData.model,
+          hasVin: !!updatedFormData.vin,
+          fieldsCount: Object.keys(updatedFormData).length,
+        });
+      }
       setFormData(updatedFormData);
 
       // Show success message with summary
@@ -619,7 +641,10 @@ export default function CarEntryForm({
         { id: toastId }
       );
     } catch (error) {
-      console.error("Error decoding VIN:", error);
+      console.error(
+        "Error decoding VIN:",
+        (error as Error).message || "Unknown error"
+      );
       toast.error("Failed to decode VIN", { id: toastId });
     } finally {
       setIsDecodingVinWithCorrections(false);
@@ -637,7 +662,12 @@ export default function CarEntryForm({
       return;
     }
 
-    console.log("Starting VIN decode without corrections for:", formData.vin);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        "Starting VIN decode without corrections for:",
+        `***${formData.vin.slice(-4)}`
+      );
+    }
     setIsDecodingVinWithoutCorrections(true);
 
     const toastId = `decode-no-correct-${Date.now()}`;
@@ -651,7 +681,14 @@ export default function CarEntryForm({
       const response = await fetch(`/api/vin?vin=${formData.vin}`);
       const data: VINResponse = await response.json();
 
-      console.log("Received VIN decode response:", data);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Received VIN decode response:", {
+          hasMake: !!data.make,
+          hasModel: !!data.model,
+          hasYear: !!data.year,
+          hasError: !!data.error,
+        });
+      }
 
       // Handle errors and decide whether to continue
       if (data.error && handleVinError(data, toastId)) {
@@ -659,7 +696,14 @@ export default function CarEntryForm({
       }
 
       toast.loading("Processing vehicle information...", { id: toastId });
-      console.log("Previous form data:", formData);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Previous form data:", {
+          hasMake: !!formData.make,
+          hasModel: !!formData.model,
+          hasVin: !!formData.vin,
+          fieldsCount: Object.keys(formData).length,
+        });
+      }
 
       // Update form data with decoded information
       const updatedFormData = {
@@ -732,7 +776,14 @@ export default function CarEntryForm({
         }
       }
 
-      console.log("Updated form data:", updatedFormData);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Updated form data:", {
+          hasMake: !!updatedFormData.make,
+          hasModel: !!updatedFormData.model,
+          hasVin: !!updatedFormData.vin,
+          fieldsCount: Object.keys(updatedFormData).length,
+        });
+      }
       setFormData(updatedFormData);
 
       toast.success(
@@ -742,7 +793,10 @@ export default function CarEntryForm({
         }
       );
     } catch (error) {
-      console.error("Error decoding VIN:", error);
+      console.error(
+        "Error decoding VIN:",
+        (error as Error).message || "Unknown error"
+      );
       toast.error("Failed to decode VIN", { id: toastId });
     } finally {
       setIsDecodingVinWithoutCorrections(false);

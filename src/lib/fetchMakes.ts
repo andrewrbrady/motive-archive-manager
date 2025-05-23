@@ -18,14 +18,19 @@ export async function fetchMakes() {
   try {
     const db = await getDatabase();
 
-    console.log("Fetching makes from MongoDB...");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Fetching makes from MongoDB...");
+    }
+
     const makes = await db
       .collection("makes")
       .find({ active: true })
       .sort({ name: 1 })
       .toArray();
 
-    console.log(`Successfully fetched ${makes.length} makes`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Successfully fetched ${makes.length} makes`);
+    }
 
     return makes.map((make) => ({
       _id: make._id instanceof ObjectId ? make._id.toString() : make._id,

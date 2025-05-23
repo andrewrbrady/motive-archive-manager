@@ -121,19 +121,26 @@ export default function GenerateArticleModal({
         try {
           carDetails = await getCarSpecifications(selectedCarId);
           console.log("Successfully fetched car details:", carDetails);
-          console.log("Available car detail fields:", Object.keys(carDetails));
 
-          // Log which fields have actual data
-          const fieldsWithData = Object.entries(carDetails)
-            .filter(
-              ([_, value]) =>
-                value !== undefined &&
-                value !== null &&
-                value !== "" &&
-                (typeof value !== "object" || Object.keys(value).length > 0)
-            )
-            .map(([key]) => key);
-          console.log("Fields with actual data:", fieldsWithData);
+          if (carDetails) {
+            console.log(
+              "Available car detail fields:",
+              Object.keys(carDetails)
+            );
+
+            // Log which fields have actual data
+            const fieldsWithData = Object.entries(carDetails)
+              .filter(
+                ([_, value]) =>
+                  value &&
+                  typeof value === "object" &&
+                  Object.keys(value).length > 0
+              )
+              .map(([key]) => key);
+            console.log("Fields with data:", fieldsWithData);
+          } else {
+            console.log("No car details available");
+          }
         } catch (error) {
           console.error("Error fetching car specifications:", error);
 

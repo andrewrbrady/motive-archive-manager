@@ -17,10 +17,15 @@ export async function fetchPlatforms() {
 
     const db = client.db("motive_archive");
 
-    console.log("Fetching platforms from MongoDB...");
+    if (process.env.NODE_ENV !== "production") {
+      console.log("Fetching platforms from MongoDB...");
+    }
+
     const platforms = await db.collection("platforms").find({}).toArray();
 
-    console.log(`Successfully fetched ${platforms.length} platforms`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Successfully fetched ${platforms.length} platforms`);
+    }
 
     return platforms.map((platform) => ({
       _id: platform._id.toString(),

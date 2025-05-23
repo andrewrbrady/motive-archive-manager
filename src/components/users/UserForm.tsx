@@ -66,11 +66,17 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         updateType: "roles",
       };
 
-      console.log("Submitting user data:", {
-        isEdit: !!user,
-        userId: user?.uid,
-        userData,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log("Submitting user data:", {
+          isEdit: !!user,
+          hasUserId: !!user?.uid,
+          hasName: !!userData.name,
+          hasEmail: !!userData.email,
+          rolesCount: userData.roles?.length || 0,
+          creativeRolesCount: userData.creativeRoles?.length || 0,
+          status: userData.status,
+        });
+      }
 
       // Determine if we're updating an existing user or creating a new one
       const userId = user?.uid;
@@ -88,12 +94,18 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("API error:", errorData);
+        console.error("API error:", errorData?.error || "Unknown error");
         throw new Error(errorData?.error || "Failed to save user");
       }
 
       const responseData = await response.json();
-      console.log("API response:", responseData);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("API response:", {
+          success: !!responseData,
+          hasUid: !!responseData.uid,
+          hasId: !!responseData._id,
+        });
+      }
 
       // If we're editing a user with roles or creativeRoles changes,
       // immediately refresh the session to synchronize the claims

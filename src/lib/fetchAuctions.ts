@@ -2,6 +2,15 @@ import { cache } from "react";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Auction, AuctionFilters, AuctionsResponse } from "@/types/auction";
+import {
+  startOfDay,
+  endOfDay,
+  startOfTomorrow,
+  endOfTomorrow,
+  startOfWeek,
+  endOfWeek,
+  addWeeks,
+} from "date-fns";
 
 export type { AuctionFilters, Auction };
 
@@ -14,9 +23,10 @@ interface MongoQuery {
     $lte?: number;
   };
   end_date?: {
-    $ne: null;
-    $gte: Date;
-    $lte: Date;
+    $ne?: null;
+    $gte?: Date;
+    $lte?: Date;
+    $lt?: Date;
   };
   no_reserve?: boolean;
   $or?: Array<{ [key: string]: { $regex: string; $options: string } }>;
@@ -88,38 +98,44 @@ export const fetchAuctions = cache(async function fetchAuctions(
     }
 
     // Handle end date filter
-    if (filters.endDate) {
+    if (filters.endDate && filters.endDate !== "all") {
       const now = new Date();
-      const endDateTime = new Date(now); // Clone current date
-
       switch (filters.endDate) {
-        case "24h":
-          endDateTime.setHours(now.getHours() + 24);
+        case "today":
+          query.end_date = {
+            $gte: startOfDay(now),
+            $lte: endOfDay(now),
+          };
           break;
-        case "48h":
-          endDateTime.setHours(now.getHours() + 48);
+        case "tomorrow":
+          query.end_date = {
+            $gte: startOfTomorrow(),
+            $lte: endOfTomorrow(),
+          };
           break;
-        case "72h":
-          endDateTime.setHours(now.getHours() + 72);
+        case "this-week":
+          query.end_date = {
+            $gte: startOfDay(now),
+            $lte: endOfWeek(now),
+          };
           break;
-        case "1w":
-          endDateTime.setDate(now.getDate() + 7);
+        case "next-week":
+          query.end_date = {
+            $gte: startOfWeek(addWeeks(now, 1)),
+            $lte: endOfWeek(addWeeks(now, 1)),
+          };
           break;
-        case "2w":
-          endDateTime.setDate(now.getDate() + 14);
-          break;
-        case "1m":
-          endDateTime.setMonth(now.getMonth() + 1);
+        case "ended":
+          query.end_date = {
+            $lt: now,
+          };
           break;
         default:
-          console.warn("Unknown endDate option:", filters.endDate);
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("Unknown endDate option:", filters.endDate);
+          }
+          break;
       }
-
-      query.end_date = {
-        $ne: null,
-        $gte: now,
-        $lte: endDateTime,
-      };
     }
 
     // Handle noReserve filter
@@ -139,32 +155,42 @@ export const fetchAuctions = cache(async function fetchAuctions(
       });
     }
 
-    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
+    if (process.env.NODE_ENV !== "production") {
+      console.log("MongoDB Query:", JSON.stringify(query, null, 2));
+    }
 
-    const [auctions, total] = await Promise.all([
-      db
-        .collection("auctions")
-        .find(query)
-        .sort({ end_date: 1 })
-        .skip(skip)
-        .limit(pageSize)
-        .toArray(),
-      db.collection("auctions").countDocuments(query),
-    ]);
+    // Build the aggregation pipeline with default sorting
+    const pipeline = [
+      { $match: query },
+      { $sort: { end_date: -1 } }, // Default sort by end_date descending
+    ];
 
-    console.log(`Successfully fetched ${auctions.length} auctions`);
+    // Execute the query
+    const collection = db.collection<Auction>("auctions");
+    const cursor = collection.aggregate(pipeline);
+    const auctions = await cursor.toArray();
+
+    // Convert ObjectId fields to strings for JSON serialization
+    const serializedAuctions = auctions.map((auction) => ({
+      ...auction,
+      _id: auction._id.toString(),
+      platformId: auction.platformId?.toString(),
+    }));
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Successfully fetched ${auctions.length} auctions`);
+    }
 
     return {
-      auctions: auctions.map((auction) => ({
+      auctions: serializedAuctions.map((auction) => ({
         ...auction,
         _id: auction._id.toString(),
         platformId: auction.platformId?.toString() || "",
-        platform: auction.platform || { name: "Unknown", shortName: "UNK" },
       })) as Auction[],
-      total,
+      total: auctions.length,
       page,
       pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      totalPages: Math.ceil(auctions.length / pageSize),
     };
   } catch (error) {
     console.error("Error fetching auctions:", error);
