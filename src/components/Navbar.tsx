@@ -11,6 +11,8 @@ const protectedNavItems = [
   { href: "/production", label: "Production" },
   { href: "/inventory", label: "Inventory" },
   { href: "/cars", label: "Cars" },
+  { href: "/images", label: "Images" },
+  { href: "/galleries", label: "Galleries" },
 ];
 
 export function Navbar() {

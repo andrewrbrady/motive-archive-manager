@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,97 +63,289 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [operationInProgress, setOperationInProgress] = useState<Set<string>>(
+    new Set()
+  );
   const router = useRouter();
 
+  // Use refs to prevent unnecessary re-renders
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastSearchRef = useRef("");
+
   // Navigate to gallery page
-  const navigateToGallery = (galleryId: string) => {
-    router.push(`/galleries/${galleryId}`);
-  };
+  const navigateToGallery = useCallback(
+    (galleryId: string) => {
+      router.push(`/galleries/${galleryId}`);
+    },
+    [router]
+  );
 
   // Handle card click (navigate to gallery but prevent if clicking buttons)
-  const handleCardClick = (e: React.MouseEvent, galleryId: string) => {
-    // Don't navigate if clicking on buttons or other interactive elements
-    if ((e.target as HTMLElement).closest("button")) {
-      return;
-    }
-    navigateToGallery(galleryId);
-  };
+  const handleCardClick = useCallback(
+    (e: React.MouseEvent, galleryId: string) => {
+      // Don't navigate if clicking on buttons or interactive elements
+      if ((e.target as HTMLElement).closest("button")) {
+        return;
+      }
+      navigateToGallery(galleryId);
+    },
+    [navigateToGallery]
+  );
 
-  // Fetch car data with attached galleries
-  const fetchCarGalleries = async () => {
+  // Stable search handler that doesn't cause re-renders
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setSearchTerm(value);
+
+      // Clear existing timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      // Only update if the value actually changed and debounce it
+      if (value !== lastSearchRef.current) {
+        lastSearchRef.current = value;
+        searchTimeoutRef.current = setTimeout(() => {
+          // Trigger the search after debounce
+          setSearchTerm(value); // This will trigger the useEffect
+        }, 300);
+      }
+    },
+    []
+  );
+
+  // Fetch car data with attached galleries - memoized to prevent unnecessary calls
+  const fetchCarGalleries = useCallback(async () => {
     try {
+      console.log(`[CarGalleries] Fetching car galleries for car ${carId}`);
       const response = await fetch(`/api/cars/${carId}?includeGalleries=true`);
       if (!response.ok) throw new Error("Failed to fetch car galleries");
       const car = await response.json();
+      console.log(`[CarGalleries] Raw API response:`, car);
+      console.log(`[CarGalleries] Car galleryIds from API:`, car.galleryIds);
+      console.log(
+        `[CarGalleries] Car galleries array from API:`,
+        car.galleries
+      );
+      console.log(
+        `[CarGalleries] Fetched ${car.galleries?.length || 0} attached galleries:`,
+        car.galleries?.map((g: Gallery) => ({ id: g._id, name: g.name }))
+      );
       setAttachedGalleries(car.galleries || []);
     } catch (error) {
-      console.error("Error fetching car galleries:", error);
+      console.error("[CarGalleries] Error fetching car galleries:", error);
       toast.error("Failed to load attached galleries");
     }
-  };
+  }, [carId]);
 
-  // Fetch all available galleries with their thumbnail images
-  const fetchAvailableGalleries = async () => {
+  // Fetch all available galleries - memoized and stable
+  const fetchAvailableGalleries = useCallback(async (search?: string) => {
     try {
       const params = new URLSearchParams();
-      if (searchTerm) params.append("search", searchTerm);
-      params.append("limit", "50"); // Get more galleries for selection
+      if (search) params.append("search", search);
+      params.append("limit", "50");
 
       const response = await fetch(`/api/galleries?${params}`);
       if (!response.ok) throw new Error("Failed to fetch galleries");
       const data = await response.json();
       setAvailableGalleries(data.galleries || []);
     } catch (error) {
-      console.error("Error fetching galleries:", error);
+      console.error("[CarGalleries] Error fetching galleries:", error);
       toast.error("Failed to load available galleries");
     }
-  };
+  }, []);
 
-  // Update gallery attachments for the car
-  const updateGalleryAttachments = async (newGalleryIds: string[]) => {
-    try {
-      setIsUpdating(true);
+  // Update gallery attachments - improved with better state management
+  const updateGalleryAttachments = useCallback(
+    async (
+      newGalleryIds: string[],
+      operation: "attach" | "detach",
+      galleryId: string
+    ) => {
+      try {
+        setIsUpdating(true);
+        console.log(
+          `[CarGalleries] ${operation} operation - Updating gallery attachments:`,
+          {
+            carId,
+            currentGalleryIds: attachedGalleries.map((g) => g._id),
+            newGalleryIds,
+            operation,
+            galleryId,
+          }
+        );
 
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ galleryIds: newGalleryIds }),
-      });
+        const requestBody = { galleryIds: newGalleryIds };
+        console.log(
+          `[CarGalleries] Request body:`,
+          JSON.stringify(requestBody, null, 2)
+        );
 
-      if (!response.ok) throw new Error("Failed to update gallery attachments");
+        const response = await fetch(`/api/cars/${carId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
 
-      await fetchCarGalleries(); // Refresh attached galleries
-      toast.success("Gallery attachments updated successfully");
-    } catch (error) {
-      console.error("Error updating gallery attachments:", error);
-      toast.error("Failed to update gallery attachments");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error(`[CarGalleries] API error response:`, errorData);
+          throw new Error(
+            `Failed to update gallery attachments: ${response.status} ${response.statusText}`
+          );
+        }
 
-  // Attach gallery to car
-  const attachGallery = async (galleryId: string) => {
-    const currentGalleryIds = attachedGalleries.map((g) => g._id);
-    const updatedGalleryIds = [...currentGalleryIds, galleryId];
-    await updateGalleryAttachments(updatedGalleryIds);
-  };
+        const result = await response.json();
+        console.log(`[CarGalleries] API response:`, result);
+        console.log(`[CarGalleries] Response galleryIds:`, result.galleryIds);
+        console.log(
+          `[CarGalleries] Response gallery count:`,
+          result.galleryIds?.length || 0
+        );
 
-  // Remove gallery from car
-  const detachGallery = async (galleryId: string) => {
-    const currentGalleryIds = attachedGalleries.map((g) => g._id);
-    const updatedGalleryIds = currentGalleryIds.filter(
-      (id) => id !== galleryId
-    );
-    await updateGalleryAttachments(updatedGalleryIds);
-  };
+        // Add a small delay to ensure the database update is complete
+        console.log(`[CarGalleries] Waiting 500ms before refetch...`);
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-  // Get galleries that are not already attached
-  const getUnattachedGalleries = () => {
+        // Refresh attached galleries to get the latest state
+        console.log(`[CarGalleries] Refetching car galleries...`);
+        await fetchCarGalleries();
+
+        toast.success(
+          `Gallery ${operation === "attach" ? "attached" : "detached"} successfully`
+        );
+      } catch (error) {
+        console.error(
+          `[CarGalleries] Error during ${operation} operation:`,
+          error
+        );
+        toast.error(`Failed to ${operation} gallery`);
+        throw error;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [carId, attachedGalleries, fetchCarGalleries]
+  );
+
+  // Attach gallery with proper state management
+  const attachGallery = useCallback(
+    async (galleryId: string) => {
+      console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
+
+      // Prevent double-clicking using Set operations
+      if (operationInProgress.has(galleryId) || isUpdating) {
+        console.log(
+          `[CarGalleries] Attach operation already in progress for gallery ${galleryId}`
+        );
+        return;
+      }
+
+      // Check if already attached
+      if (attachedGalleries.some((g) => g._id === galleryId)) {
+        console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
+        toast.info("Gallery is already attached");
+        return;
+      }
+
+      try {
+        // Add to in-progress set
+        setOperationInProgress((prev) => new Set([...prev, galleryId]));
+
+        const currentGalleryIds = attachedGalleries.map((g) => g._id);
+        const updatedGalleryIds = [...currentGalleryIds, galleryId];
+
+        console.log(
+          `[CarGalleries] Attaching gallery ${galleryId}. Current: [${currentGalleryIds.join(", ")}], New: [${updatedGalleryIds.join(", ")}]`
+        );
+
+        await updateGalleryAttachments(updatedGalleryIds, "attach", galleryId);
+      } catch (error) {
+        console.error(
+          `[CarGalleries] Failed to attach gallery ${galleryId}:`,
+          error
+        );
+      } finally {
+        // Remove from in-progress set
+        setOperationInProgress((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(galleryId);
+          return newSet;
+        });
+      }
+    },
+    [
+      operationInProgress,
+      isUpdating,
+      attachedGalleries,
+      updateGalleryAttachments,
+    ]
+  );
+
+  // Detach gallery with proper state management
+  const detachGallery = useCallback(
+    async (galleryId: string) => {
+      console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
+
+      // Prevent double-clicking using Set operations
+      if (operationInProgress.has(galleryId) || isUpdating) {
+        console.log(
+          `[CarGalleries] Detach operation already in progress for gallery ${galleryId}`
+        );
+        return;
+      }
+
+      // Check if actually attached
+      if (!attachedGalleries.some((g) => g._id === galleryId)) {
+        console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
+        toast.info("Gallery is not attached");
+        return;
+      }
+
+      try {
+        // Add to in-progress set
+        setOperationInProgress((prev) => new Set([...prev, galleryId]));
+
+        const currentGalleryIds = attachedGalleries.map((g) => g._id);
+        const updatedGalleryIds = currentGalleryIds.filter(
+          (id) => id !== galleryId
+        );
+
+        console.log(
+          `[CarGalleries] Detaching gallery ${galleryId}. Current: [${currentGalleryIds.join(", ")}], New: [${updatedGalleryIds.join(", ")}]`
+        );
+
+        await updateGalleryAttachments(updatedGalleryIds, "detach", galleryId);
+      } catch (error) {
+        console.error(
+          `[CarGalleries] Failed to detach gallery ${galleryId}:`,
+          error
+        );
+      } finally {
+        // Remove from in-progress set
+        setOperationInProgress((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(galleryId);
+          return newSet;
+        });
+      }
+    },
+    [
+      operationInProgress,
+      isUpdating,
+      attachedGalleries,
+      updateGalleryAttachments,
+    ]
+  );
+
+  // Memoized unattached galleries to prevent unnecessary recalculations
+  const unattachedGalleries = useMemo(() => {
     const attachedIds = new Set(attachedGalleries.map((g) => g._id));
     return availableGalleries.filter((g) => !attachedIds.has(g._id));
-  };
+  }, [attachedGalleries, availableGalleries]);
 
+  // Load initial data
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -155,11 +353,21 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
       setIsLoading(false);
     };
     loadData();
-  }, [carId]);
+  }, [carId, fetchCarGalleries, fetchAvailableGalleries]);
 
+  // Handle search with debouncing
   useEffect(() => {
-    fetchAvailableGalleries();
-  }, [searchTerm]);
+    fetchAvailableGalleries(searchTerm);
+  }, [fetchAvailableGalleries, searchTerm]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -175,8 +383,6 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
       </div>
     );
   }
-
-  const unattachedGalleries = getUnattachedGalleries();
 
   return (
     <div className="space-y-6">
@@ -223,7 +429,10 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                           {/* Thumbnail */}
                           <div
                             className="relative w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-                            onClick={() => navigateToGallery(gallery._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToGallery(gallery._id);
+                            }}
                             title="Click to view gallery"
                           >
                             {gallery.thumbnailImage ? (
@@ -265,12 +474,27 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => detachGallery(gallery._id)}
-                                disabled={isUpdating}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  detachGallery(gallery._id);
+                                }}
+                                disabled={
+                                  isUpdating ||
+                                  operationInProgress.has(gallery._id)
+                                }
                                 className="text-destructive hover:text-destructive ml-2 flex-shrink-0"
                               >
-                                <Unlink className="h-4 w-4 mr-1" />
-                                Detach
+                                {operationInProgress.has(gallery._id) ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    Detaching...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Unlink className="h-4 w-4 mr-1" />
+                                    Detach
+                                  </>
+                                )}
                               </Button>
                             </div>
                           </div>
@@ -292,10 +516,12 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                   <div className="relative flex-1">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
+                      type="text"
                       placeholder="Search galleries..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={handleSearchChange}
                       className="pl-8"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -317,7 +543,10 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                           {/* Thumbnail */}
                           <div
                             className="relative w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-                            onClick={() => navigateToGallery(gallery._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToGallery(gallery._id);
+                            }}
                             title="Click to view gallery"
                           >
                             {gallery.thumbnailImage ? (
@@ -359,12 +588,27 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={(e) => attachGallery(gallery._id)}
-                                disabled={isUpdating}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  attachGallery(gallery._id);
+                                }}
+                                disabled={
+                                  isUpdating ||
+                                  operationInProgress.has(gallery._id)
+                                }
                                 className="ml-2 flex-shrink-0"
                               >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Attach
+                                {operationInProgress.has(gallery._id) ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    Attaching...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Attach
+                                  </>
+                                )}
                               </Button>
                             </div>
                           </div>

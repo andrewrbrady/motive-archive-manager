@@ -198,6 +198,8 @@ export async function GET(request: Request) {
 
     // If including galleries, handle them appropriately
     if (includeGalleries === "true") {
+      console.log("[CarAPI] Including galleries in response");
+
       // Convert string galleryIds to ObjectIds for proper lookup
       pipeline.push({
         $addFields: {
@@ -205,13 +207,33 @@ export async function GET(request: Request) {
             $map: {
               input: { $ifNull: ["$galleryIds", []] },
               as: "id",
-              in: { $toObjectId: "$$id" },
+              in: {
+                $cond: {
+                  if: { $type: "$$id" },
+                  then: { $toObjectId: "$$id" },
+                  else: null,
+                },
+              },
             },
           },
         },
       });
 
-      // Lookup galleries using the converted ObjectIds
+      // Clean up null values from the conversion
+      pipeline.push({
+        $addFields: {
+          galleryObjectIds: {
+            $filter: {
+              input: "$galleryObjectIds",
+              cond: { $ne: ["$$this", null] },
+            },
+          },
+        },
+      });
+
+      console.log("[CarAPI] Added gallery ObjectId conversion to pipeline");
+
+      // Lookup galleries using the converted ObjectIds - simplified and more robust
       pipeline.push({
         $lookup: {
           from: "galleries",
@@ -224,69 +246,58 @@ export async function GET(request: Request) {
                 },
               },
             },
-            // Add thumbnail image lookup for each gallery
-            {
-              $lookup: {
-                from: "images",
-                let: { firstImageId: { $arrayElemAt: ["$imageIds", 0] } },
-                pipeline: [
+          ],
+          as: "galleriesRaw",
+        },
+      });
+
+      console.log("[CarAPI] Added gallery lookup to pipeline");
+
+      // Add thumbnail images in a separate, safer lookup
+      pipeline.push({
+        $addFields: {
+          galleries: {
+            $map: {
+              input: "$galleriesRaw",
+              as: "gallery",
+              in: {
+                $mergeObjects: [
+                  "$$gallery",
                   {
-                    $match: {
-                      $expr: {
-                        $eq: ["$_id", "$$firstImageId"],
-                      },
-                    },
-                  },
-                ],
-                as: "thumbnailImages",
-              },
-            },
-            // Add thumbnailImage field
-            {
-              $addFields: {
-                thumbnailImage: {
-                  $let: {
-                    vars: {
-                      thumbImage: { $arrayElemAt: ["$thumbnailImages", 0] },
-                    },
-                    in: {
+                    thumbnailImage: {
                       $cond: {
-                        if: { $ne: ["$$thumbImage", null] },
+                        if: {
+                          $gt: [
+                            { $size: { $ifNull: ["$$gallery.imageIds", []] } },
+                            0,
+                          ],
+                        },
                         then: {
-                          _id: "$$thumbImage._id",
-                          url: "$$thumbImage.url",
+                          _id: { $arrayElemAt: ["$$gallery.imageIds", 0] },
+                          url: null, // We'll populate this later if needed
                         },
                         else: null,
                       },
                     },
                   },
-                },
+                ],
               },
             },
-            // Clean up the temporary thumbnailImages array
-            {
-              $project: {
-                thumbnailImages: 0,
-              },
-            },
-          ],
-          as: "galleries",
+          },
         },
       });
 
-      // Clean up temporary field
+      console.log("[CarAPI] Added thumbnail processing to pipeline");
+
+      // Clean up temporary fields
       pipeline.push({
         $project: {
           galleryObjectIds: 0,
-          ...Object.keys(projection).reduce(
-            (acc, key) => {
-              acc[key] = 1;
-              return acc;
-            },
-            {} as Record<string, number>
-          ),
+          galleriesRaw: 0,
         },
       });
+
+      console.log("[CarAPI] Cleaned up temporary fields from pipeline");
     }
 
     // Add projection if fields were specified
@@ -299,6 +310,73 @@ export async function GET(request: Request) {
 
     if (!car) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    }
+
+    console.log("[CarAPI] Car found:", car._id);
+    if (includeGalleries === "true") {
+      console.log(
+        "[CarAPI] Raw galleries from aggregation:",
+        car.galleries?.length || 0
+      );
+      console.log(
+        "[CarAPI] Gallery IDs in result:",
+        car.galleries?.map((g: any) => g._id.toString())
+      );
+
+      // Populate thumbnail images for galleries if they exist
+      if (car.galleries && car.galleries.length > 0) {
+        console.log("[CarAPI] Populating thumbnail images for galleries");
+
+        // Get all first image IDs from galleries
+        const thumbnailImageIds = car.galleries
+          .map((gallery: any) =>
+            gallery.imageIds && gallery.imageIds.length > 0
+              ? gallery.imageIds[0]
+              : null
+          )
+          .filter((id: any) => id !== null);
+
+        if (thumbnailImageIds.length > 0) {
+          console.log(
+            "[CarAPI] Looking up thumbnail images:",
+            thumbnailImageIds.length
+          );
+
+          // Fetch the thumbnail images
+          const thumbnailImages = await db
+            .collection("images")
+            .find({ _id: { $in: thumbnailImageIds } })
+            .toArray();
+
+          console.log(
+            "[CarAPI] Found thumbnail images:",
+            thumbnailImages.length
+          );
+
+          // Create a map for quick lookup
+          const imageMap = new Map(
+            thumbnailImages.map((img) => [img._id.toString(), img])
+          );
+
+          // Update galleries with proper thumbnail data
+          car.galleries = car.galleries.map((gallery: any) => {
+            if (gallery.imageIds && gallery.imageIds.length > 0) {
+              const firstImageId = gallery.imageIds[0].toString();
+              const thumbnailImage = imageMap.get(firstImageId);
+
+              if (thumbnailImage) {
+                gallery.thumbnailImage = {
+                  _id: thumbnailImage._id.toString(),
+                  url: thumbnailImage.url,
+                };
+              }
+            }
+            return gallery;
+          });
+
+          console.log("[CarAPI] Updated galleries with thumbnail images");
+        }
+      }
     }
 
     // Basic car data with defensive checks
@@ -551,14 +629,6 @@ export async function PATCH(request: Request) {
     >((acc, [key, value]) => {
       // Skip null or undefined values, but allow empty strings and zero values
       if (value === null || value === undefined) {
-        // Special case: preserve images and imageIds even if not in update
-        if (
-          (key === "images" || key === "imageIds") &&
-          existingCar &&
-          existingCar[key]
-        ) {
-          acc[key] = existingCar[key];
-        }
         return acc;
       }
 
@@ -584,7 +654,12 @@ export async function PATCH(request: Request) {
 
       // Handle galleryIds field specifically
       if (key === "galleryIds") {
+        console.log(`\n=== GALLERY IDS UPDATE ===`);
+        console.log("Received galleryIds:", value);
+        console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
+
         if (!Array.isArray(value)) {
+          console.log("galleryIds is not an array, setting to empty array");
           acc[key] = [];
           return acc;
         }
@@ -592,9 +667,23 @@ export async function PATCH(request: Request) {
         try {
           // Validate and convert gallery IDs to ObjectIds
           const validGalleryIds = value
-            .filter((id) => id && ObjectId.isValid(id.toString()))
-            .map((id) => new ObjectId(id.toString()));
+            .filter((id) => {
+              const isValid = id && ObjectId.isValid(id.toString());
+              if (!isValid) {
+                console.log(`Invalid gallery ID filtered out: ${id}`);
+              }
+              return isValid;
+            })
+            .map((id) => {
+              const objectId = new ObjectId(id.toString());
+              console.log(`Converted gallery ID: ${id} -> ${objectId}`);
+              return objectId;
+            });
+
+          console.log(`Final galleryIds array:`, validGalleryIds);
+          console.log(`Gallery count: ${validGalleryIds.length}`);
           acc[key] = validGalleryIds;
+          console.log(`=== END GALLERY IDS UPDATE ===\n`);
         } catch (error) {
           console.error("Error converting gallery IDs:", error);
           throw new Error(`Invalid gallery ID format in: ${value}`);
@@ -683,6 +772,10 @@ export async function PATCH(request: Request) {
     // Update the updatedAt timestamp
     cleanedUpdates.updatedAt = new Date();
 
+    console.log(`\n=== DATABASE UPDATE ===`);
+    console.log("Car ID:", objectId);
+    console.log("Updates to apply:", JSON.stringify(cleanedUpdates, null, 2));
+
     // Perform the update with cleaned data
     const result = await db
       .collection("cars")
@@ -696,6 +789,11 @@ export async function PATCH(request: Request) {
       console.error("Update failed - no document returned");
       throw new Error("Failed to update car");
     }
+
+    console.log(`Database update successful`);
+    console.log("Updated car galleryIds:", result.galleryIds);
+    console.log("Gallery count in DB:", result.galleryIds?.length || 0);
+    console.log(`=== END DATABASE UPDATE ===\n`);
 
     // Convert to plain object to ensure it's JSON serializable
     const serializedCar = convertToPlainObject(result);
