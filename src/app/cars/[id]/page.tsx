@@ -27,6 +27,7 @@ import ResearchFiles from "@/components/ResearchFiles";
 import DocumentationFiles from "@/components/DocumentationFiles";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import ServiceHistoryTab from "@/components/cars/ServiceHistoryTab";
+import CarGalleries from "@/components/cars/CarGalleries";
 
 export default function CarPage() {
   const params = useParams();
@@ -135,6 +136,11 @@ export default function CarPage() {
                     value: "gallery",
                     label: "Image Gallery",
                     content: <GalleryContainer carId={id} />,
+                  },
+                  {
+                    value: "car-galleries",
+                    label: "Attached Galleries",
+                    content: <CarGalleries carId={id} />,
                   },
                   {
                     value: "specs",

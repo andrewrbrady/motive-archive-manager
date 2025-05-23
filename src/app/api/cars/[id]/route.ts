@@ -17,6 +17,7 @@ interface Car {
   _id: ObjectId;
   documents: string[];
   imageIds: ObjectId[];
+  galleryIds?: ObjectId[];
   client?: string;
   clientInfo?: {
     _id: string;
@@ -95,6 +96,7 @@ export async function GET(request: Request) {
     const fieldsParam = url.searchParams.get("fields");
     const includeImages = url.searchParams.get("includeImages");
     const imageCategory = url.searchParams.get("imageCategory");
+    const includeGalleries = url.searchParams.get("includeGalleries");
 
     client = await getMongoClient();
     const db = client.db(DB_NAME);
@@ -115,6 +117,8 @@ export async function GET(request: Request) {
 
       // Always include imageIds for fallback
       projection["imageIds"] = 1;
+      // Always include galleryIds for fallback
+      projection["galleryIds"] = 1;
     }
 
     // Use aggregation to fetch car with selected fields and image strategy
@@ -192,6 +196,99 @@ export async function GET(request: Request) {
       });
     }
 
+    // If including galleries, handle them appropriately
+    if (includeGalleries === "true") {
+      // Convert string galleryIds to ObjectIds for proper lookup
+      pipeline.push({
+        $addFields: {
+          galleryObjectIds: {
+            $map: {
+              input: { $ifNull: ["$galleryIds", []] },
+              as: "id",
+              in: { $toObjectId: "$$id" },
+            },
+          },
+        },
+      });
+
+      // Lookup galleries using the converted ObjectIds
+      pipeline.push({
+        $lookup: {
+          from: "galleries",
+          let: { galleryIds: "$galleryObjectIds" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $in: ["$_id", "$$galleryIds"],
+                },
+              },
+            },
+            // Add thumbnail image lookup for each gallery
+            {
+              $lookup: {
+                from: "images",
+                let: { firstImageId: { $arrayElemAt: ["$imageIds", 0] } },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $eq: ["$_id", "$$firstImageId"],
+                      },
+                    },
+                  },
+                ],
+                as: "thumbnailImages",
+              },
+            },
+            // Add thumbnailImage field
+            {
+              $addFields: {
+                thumbnailImage: {
+                  $let: {
+                    vars: {
+                      thumbImage: { $arrayElemAt: ["$thumbnailImages", 0] },
+                    },
+                    in: {
+                      $cond: {
+                        if: { $ne: ["$$thumbImage", null] },
+                        then: {
+                          _id: "$$thumbImage._id",
+                          url: "$$thumbImage.url",
+                        },
+                        else: null,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            // Clean up the temporary thumbnailImages array
+            {
+              $project: {
+                thumbnailImages: 0,
+              },
+            },
+          ],
+          as: "galleries",
+        },
+      });
+
+      // Clean up temporary field
+      pipeline.push({
+        $project: {
+          galleryObjectIds: 0,
+          ...Object.keys(projection).reduce(
+            (acc, key) => {
+              acc[key] = 1;
+              return acc;
+            },
+            {} as Record<string, number>
+          ),
+        },
+      });
+    }
+
     // Add projection if fields were specified
     if (Object.keys(projection).length > 0 && includeImages !== "true") {
       pipeline.push({ $project: projection });
@@ -240,6 +337,8 @@ export async function GET(request: Request) {
       status: car.status || "available",
       imageIds: [],
       images: [],
+      galleryIds: [],
+      galleries: [],
       client: null,
       clientInfo: null,
       createdAt: "",
@@ -249,6 +348,12 @@ export async function GET(request: Request) {
     // Handle arrays with defensive checks
     if (Array.isArray(car.imageIds)) {
       standardizedCar.imageIds = car.imageIds
+        .filter((id) => id != null)
+        .map((id) => id?.toString() || "");
+    }
+
+    if (Array.isArray(car.galleryIds)) {
+      standardizedCar.galleryIds = car.galleryIds
         .filter((id) => id != null)
         .map((id) => id?.toString() || "");
     }
@@ -268,6 +373,29 @@ export async function GET(request: Request) {
               car.primaryImageId &&
               img._id.toString() === car.primaryImageId.toString(),
           },
+        }));
+    }
+
+    if (Array.isArray(car.galleries)) {
+      standardizedCar.galleries = car.galleries
+        .filter((gallery) => gallery != null)
+        .map((gallery) => ({
+          _id: gallery._id?.toString() || "",
+          name: gallery.name || "",
+          description: gallery.description,
+          imageIds: Array.isArray(gallery.imageIds)
+            ? gallery.imageIds
+                .map((id: any) => id?.toString() || "")
+                .filter(Boolean)
+            : [],
+          thumbnailImage: gallery.thumbnailImage
+            ? {
+                _id: gallery.thumbnailImage._id?.toString() || "",
+                url: getFormattedImageUrl(gallery.thumbnailImage.url),
+              }
+            : undefined,
+          createdAt: gallery.createdAt || "",
+          updatedAt: gallery.updatedAt || "",
         }));
     }
 
@@ -450,6 +578,26 @@ export async function PATCH(request: Request) {
             console.error("Error converting client ID:", error);
             throw new Error(`Invalid client ID format: ${value}`);
           }
+        }
+        return acc;
+      }
+
+      // Handle galleryIds field specifically
+      if (key === "galleryIds") {
+        if (!Array.isArray(value)) {
+          acc[key] = [];
+          return acc;
+        }
+
+        try {
+          // Validate and convert gallery IDs to ObjectIds
+          const validGalleryIds = value
+            .filter((id) => id && ObjectId.isValid(id.toString()))
+            .map((id) => new ObjectId(id.toString()));
+          acc[key] = validGalleryIds;
+        } catch (error) {
+          console.error("Error converting gallery IDs:", error);
+          throw new Error(`Invalid gallery ID format in: ${value}`);
         }
         return acc;
       }

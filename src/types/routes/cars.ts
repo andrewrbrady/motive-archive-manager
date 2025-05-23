@@ -153,6 +153,7 @@ export interface MongoDBCar {
   specifications?: Car["specifications"];
   features?: string[];
   imageIds: ObjectId[];
+  galleryIds?: ObjectId[];
   videos?: string[];
   documents: string[];
   status: string;
@@ -200,6 +201,19 @@ export interface StandardizedCar {
     url: string;
     filename: string;
     metadata: ImageMetadata;
+  }>;
+  galleryIds: string[];
+  galleries: Array<{
+    _id: string;
+    name: string;
+    description?: string;
+    imageIds: string[];
+    thumbnailImage?: {
+      _id: string;
+      url: string;
+    };
+    createdAt: string;
+    updatedAt: string;
   }>;
   videos?: string[];
   documents: string[];
