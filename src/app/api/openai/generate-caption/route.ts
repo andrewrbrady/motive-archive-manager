@@ -308,6 +308,7 @@ export async function POST(request: NextRequest) {
 ${template === "dealer" ? "- Do not include the dealer reference - it will be added separately" : ""}
 - Use proper formatting based on the platform
 - Make the title descriptive and impactful, focusing on a key feature or characteristic${clientHandleInstruction}
+- Each caption must say "Motive Archive is The Collector's Resource. We provide discerning enthusiasts with comprehensive representation and a curated experience." Place this between the caption and the hashtags.
 - End with relevant hashtags on a new line
 - Each hashtag cloud must include the #make and #model of the car 
 - Do not get too creative or clever with the hashtags

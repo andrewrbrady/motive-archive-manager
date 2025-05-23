@@ -11,7 +11,15 @@ import {
 } from "@/lib/hooks/query/useGalleries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Trash2, Save, ArrowLeft, Code } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  Save,
+  ArrowLeft,
+  Code,
+  DownloadCloud,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +38,7 @@ import { DraggableGalleryGrid } from "@/components/galleries/DraggableGalleryGri
 import { ImageData } from "@/app/images/columns";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageTitle } from "@/components/ui/PageTitle";
+import JSZip from "jszip";
 // import Footer from "@/components/layout/footer";
 
 export default function GalleryPage() {
@@ -44,6 +53,7 @@ export default function GalleryPage() {
     description: "",
   });
   const [isAddingImages, setIsAddingImages] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const queryClient = useQueryClient();
 
   // Initialize form when gallery data is loaded
@@ -182,6 +192,114 @@ export default function GalleryPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleDownloadAllImages = async () => {
+    if (!gallery || !gallery.images || gallery.images.length === 0) {
+      toast({
+        title: "No Images",
+        description: "There are no images in this gallery to download.",
+        variant: "default",
+      });
+      return;
+    }
+
+    if (isDownloading) return;
+    setIsDownloading(true);
+
+    toast({
+      title: "Preparing Zip File",
+      description: `Fetching and compressing images... This may take a moment.`,
+    });
+
+    const zip = new JSZip();
+    const imageMap = new Map(
+      gallery.images.map((img: ImageData) => [img._id, img])
+    );
+
+    const orderedImageIds = gallery.orderedImages?.length
+      ? gallery.orderedImages
+          .sort((a, b) => a.order - b.order)
+          .map((item) => item.id)
+      : gallery.imageIds;
+
+    const imagesToProcess = orderedImageIds
+      .map((id) => imageMap.get(id))
+      .filter((img): img is ImageData => !!img);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < imagesToProcess.length; i++) {
+      const image = imagesToProcess[i];
+      // Corrected URL format: append parameters directly to the image.url
+      const downloadUrl = `${image.url}w=3000,q=100`;
+      const filenameInZip =
+        image.filename || `gallery-image-${image._id.slice(-6)}-${i + 1}.jpg`;
+
+      try {
+        const response = await fetch(downloadUrl);
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch ${filenameInZip}: ${response.statusText}`
+          );
+        }
+        const blob = await response.blob();
+        zip.file(filenameInZip, blob);
+        successCount++;
+      } catch (err) {
+        errorCount++;
+        console.error(`Failed to fetch or add ${filenameInZip} to zip:`, err);
+        toast({
+          title: "Image Error",
+          description: `Skipping ${filenameInZip}. Check console for details.`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    if (successCount > 0) {
+      try {
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const zipFilename = `${gallery.name.replace(/\s+/g, "_") || "gallery"}_hq_images.zip`;
+
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = zipFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href); // Clean up the object URL
+
+        toast({
+          title: "Download Started",
+          description: `Zipped ${successCount} of ${imagesToProcess.length} images. Download of '${zipFilename}' has started.`,
+        });
+        if (errorCount > 0) {
+          toast({
+            title: "Download Incomplete",
+            description: `${errorCount} image(s) could not be processed. Check console for details.`,
+            variant: "default", // Changed from "warning" as it's not a valid variant
+          });
+        }
+      } catch (zipError) {
+        console.error("Failed to generate or download zip:", zipError);
+        toast({
+          title: "Zip Generation Failed",
+          description: "Could not create the zip file. Check console.",
+          variant: "destructive",
+        });
+      }
+    } else if (imagesToProcess.length > 0) {
+      toast({
+        title: "Zip Failed",
+        description: "No images could be added to the zip file.",
+        variant: "destructive",
+      });
+    }
+    // No toast for "No images to download" here, as it's handled at the beginning.
+
+    setIsDownloading(false);
   };
 
   if (isLoading) {
@@ -642,6 +760,19 @@ ${(() => {
                     </div>
                   </DialogContent>
                 </Dialog>
+
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadAllImages}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <DownloadCloud className="h-4 w-4 mr-2" />
+                  )}
+                  {isDownloading ? "Downloading..." : "Download All"}
+                </Button>
 
                 <Button
                   onClick={() => {
