@@ -40,7 +40,7 @@ export default function UserDetailModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{user ? "Edit User" : "Create New User"}</DialogTitle>
+          <DialogTitle>{user ? "Edit User" : "Invite User"}</DialogTitle>
         </DialogHeader>
 
         {user ? (
@@ -66,10 +66,16 @@ export default function UserDetailModal({
                 initialRoles={user.roles || []}
                 initialCreativeRoles={user.creativeRoles || []}
                 initialStatus={user.status || "active"}
-                onUpdate={() => {
-                  // For role updates, pass the existing user back
-                  // The parent component should refresh user data
-                  onUserUpdated(user);
+                onUpdate={(updatedUser) => {
+                  // If we have updated user data, use it; otherwise use existing user
+                  if (updatedUser) {
+                    onUserUpdated(updatedUser);
+                    // Close the modal after successful update to show changes
+                    onClose();
+                  } else {
+                    // Fallback: refresh user data by calling parent
+                    onUserUpdated(user);
+                  }
                 }}
               />
             </TabsContent>

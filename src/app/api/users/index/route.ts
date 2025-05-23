@@ -27,7 +27,7 @@ type CreateUserResponse = {
 
 /**
  * GET all users from Firestore
- * This is a simplified endpoint without pagination for backwards compatibility
+ * Returns paginated results with format expected by frontend
  */
 async function getUsers(request: NextRequest) {
   try {
@@ -51,14 +51,47 @@ async function getUsers(request: NextRequest) {
       );
     }
 
-    // Get users from Firestore
-    const usersSnapshot = await adminDb.collection("users").get();
-    const users = usersSnapshot.docs.map((doc) => ({
+    // Get pagination parameters from query string
+    const { searchParams } = new URL(request.url);
+    const startAfter = searchParams.get("startAfter");
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+
+    // Build query
+    let query = adminDb.collection("users").orderBy("createdAt", "desc");
+
+    // Apply pagination if startAfter is provided
+    if (startAfter) {
+      const startAfterDoc = await adminDb
+        .collection("users")
+        .doc(startAfter)
+        .get();
+      if (startAfterDoc.exists) {
+        query = query.startAfter(startAfterDoc);
+      }
+    }
+
+    // Limit the results
+    query = query.limit(limit + 1); // Get one extra to check if there are more
+
+    // Execute query
+    const usersSnapshot = await query.get();
+    const allUsers = usersSnapshot.docs.map((doc) => ({
       uid: doc.id,
       ...doc.data(),
     }));
 
-    return NextResponse.json(users);
+    // Check if there are more results
+    const hasMore = allUsers.length > limit;
+    const users = hasMore ? allUsers.slice(0, limit) : allUsers;
+    const lastId = users.length > 0 ? users[users.length - 1].uid : undefined;
+
+    // Return in the format expected by frontend
+    return NextResponse.json({
+      users,
+      hasMore,
+      lastId,
+      total: users.length,
+    });
   } catch (error: any) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
@@ -69,15 +102,14 @@ async function getUsers(request: NextRequest) {
 }
 
 /**
- * CREATE a new user in Firebase Auth and Firestore
+ * CREATE/INVITE a user for Google OAuth authentication
+ * Since we only use Google OAuth, this endpoint manages user invitations and roles
  */
-async function createUser(
-  request: NextRequest
-): Promise<NextResponse<CreateUserResponse | ErrorResponse>> {
+async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
   try {
     // Verify the user is authenticated and has admin privileges
     const session = await auth();
-    console.log("Session for createUser:", {
+    console.log("Session for inviteUser:", {
       sessionExists: !!session,
       userId: session?.user?.id,
       email: session?.user?.email,
@@ -94,87 +126,115 @@ async function createUser(
     const data = await request.json();
 
     // Validate required fields
-    if (!data.name || !data.email) {
+    if (!data.email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.email)) {
       return NextResponse.json(
-        { error: "Name and email are required" },
+        { error: "Invalid email format" },
         { status: 400 }
       );
     }
 
-    // Default password if not provided for new users
-    const password =
-      data.password ||
-      Math.random().toString(36).slice(-12) +
-        Math.random().toString(36).slice(-12);
+    console.log(`Processing user invitation for email: ${data.email}`);
 
-    console.log(`Creating new user with email: ${data.email}`);
+    // Check if user already exists in Firebase Auth
+    try {
+      const existingUser = await adminAuth.getUserByEmail(data.email);
 
-    // Create user in Firebase Auth
-    const userRecord = await adminAuth.createUser({
-      email: data.email,
-      password: password,
-      displayName: data.name,
-      disabled: false,
-    });
+      // User exists - update their roles/status
+      const now = new Date();
+      const roles = data.roles || ["user"];
+      const creativeRoles = data.creativeRoles || [];
+      const status = data.status || "active";
 
-    console.log(`Created user in Firebase Auth with UID: ${userRecord.uid}`);
+      // Update custom claims
+      await adminAuth.setCustomUserClaims(existingUser.uid, {
+        roles,
+        creativeRoles,
+        status,
+      });
 
-    // Set default values
-    const now = new Date();
-    const roles = data.roles || ["viewer"];
-    const creativeRoles = data.creativeRoles || [];
-    const status = data.status || "active";
+      // Update Firestore document
+      const userData = {
+        uid: existingUser.uid,
+        email: data.email,
+        name: data.name || existingUser.displayName || data.email.split("@")[0],
+        roles,
+        creativeRoles,
+        status,
+        accountType: data.accountType || "personal",
+        photoURL: existingUser.photoURL || null,
+        image: existingUser.photoURL || null,
+        bio: data.bio || null,
+        updatedAt: now,
+      };
 
-    // Set custom claims for user
-    await adminAuth.setCustomUserClaims(userRecord.uid, {
-      roles,
-      creativeRoles,
-      status,
-    });
+      await adminDb.collection("users").doc(existingUser.uid).update(userData);
 
-    console.log(`Set custom claims for user: ${userRecord.uid}`);
+      console.log(`Updated existing user: ${existingUser.uid}`);
 
-    // Create user document in Firestore
-    const userData = {
-      uid: userRecord.uid,
-      email: data.email,
-      name: data.name,
-      roles,
-      creativeRoles,
-      status,
-      accountType: data.accountType || "personal",
-      photoURL: data.photoURL || null,
-      bio: data.bio || null,
-      createdAt: now,
-      updatedAt: now,
-    };
+      return NextResponse.json({
+        ...userData,
+        message: "User updated successfully",
+        type: "updated",
+      });
+    } catch (error: any) {
+      if (error.code === "auth/user-not-found") {
+        // User doesn't exist - create placeholder record for invitation
+        const now = new Date();
+        const roles = data.roles || ["user"];
+        const creativeRoles = data.creativeRoles || [];
+        const status = "invited"; // Special status for invited users
 
-    await adminDb.collection("users").doc(userRecord.uid).set(userData);
+        // Create a placeholder document in Firestore with invited status
+        // The actual Firebase Auth user will be created when they sign in with Google
+        const invitedUserData = {
+          email: data.email,
+          name: data.name || data.email.split("@")[0],
+          roles,
+          creativeRoles,
+          status,
+          accountType: data.accountType || "personal",
+          bio: data.bio || null,
+          invitedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          invitedBy: session.user.email,
+        };
 
-    console.log(`Created user document in Firestore for: ${userRecord.uid}`);
+        // Use email as document ID for invited users (will be replaced with UID when they sign in)
+        const docId = `invited_${data.email.replace(/[.@]/g, "_")}`;
+        await adminDb
+          .collection("invited_users")
+          .doc(docId)
+          .set(invitedUserData);
 
-    return NextResponse.json({
-      ...userData,
-      message: "User created successfully",
-    } as CreateUserResponse);
+        console.log(`Created invitation for user: ${data.email}`);
+
+        return NextResponse.json({
+          ...invitedUserData,
+          id: docId,
+          message:
+            "User invitation created. They will be added to the system when they sign in with Google.",
+          type: "invited",
+        });
+      }
+
+      throw error; // Re-throw other errors
+    }
   } catch (error: any) {
-    console.error("Error creating user:", error);
+    console.error("Error processing user invitation:", error);
 
-    // Handle Firebase Auth errors
-    if (error.code === "auth/email-already-exists") {
-      return NextResponse.json(
-        { error: "Email already exists" },
-        { status: 400 }
-      );
-    }
-
-    // Handle other errors
     return NextResponse.json(
-      { error: error.message || "Failed to create user" },
+      { error: error.message || "Failed to process user invitation" },
       { status: 500 }
     );
   }
 }
 
 // Export the handlers directly, we'll use NextAuth session for authentication
-export { getUsers as GET, createUser as POST };
+export { getUsers as GET, inviteUser as POST };

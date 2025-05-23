@@ -128,9 +128,38 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      // Update user roles and permissions
-      const updatedUser = await updateUserRoles(userId, roles);
-      return NextResponse.json(updatedUser);
+      // Validate status if provided
+      if (status) {
+        const validStatuses = ["active", "inactive", "suspended"];
+        if (!validStatuses.includes(status)) {
+          return NextResponse.json(
+            { error: `Status must be one of: ${validStatuses.join(", ")}` },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Update Firebase Auth custom claims
+      await adminAuth.setCustomUserClaims(userId, {
+        roles,
+        creativeRoles: creativeRoles || [],
+        status: status || "active",
+      });
+
+      // Update user data in Firestore
+      await adminDb
+        .collection("users")
+        .doc(userId)
+        .update({
+          roles,
+          creativeRoles: creativeRoles || [],
+          status: status || "active",
+          updatedAt: new Date(),
+        });
+
+      // Get the updated user data
+      const updatedUser = await getUserWithAuth(userId);
+      return NextResponse.json({ user: updatedUser });
     } else if (data.updateType === "profile") {
       // Handle profile update
       const { profile } = data;

@@ -1,10 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { FirebaseError } from "firebase/app";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 // Import environment setup (this must be first)
@@ -52,71 +48,6 @@ export const authConfig: NextAuthConfig = {
         },
       },
     }),
-    Credentials({
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        try {
-          const userCredential = await signInWithEmailAndPassword(
-            auth,
-            credentials.email as string,
-            credentials.password as string
-          );
-
-          if (!userCredential.user) {
-            return null;
-          }
-
-          const idTokenResult = await userCredential.user.getIdTokenResult();
-          const uid = userCredential.user.uid;
-          const email = userCredential.user.email || "";
-          const displayName = userCredential.user.displayName;
-          const photoURL = userCredential.user.photoURL;
-
-          // Get custom claims from the token
-          const claims = idTokenResult.claims || {};
-          const roles = Array.isArray(claims.roles) ? claims.roles : ["user"];
-          const creativeRoles = Array.isArray(claims.creativeRoles)
-            ? claims.creativeRoles
-            : [];
-          const status =
-            typeof claims.status === "string" ? claims.status : "active";
-
-          return {
-            id: uid,
-            email,
-            name: displayName || email?.split("@")[0] || "User",
-            image: photoURL,
-            roles,
-            creativeRoles,
-            status,
-          };
-        } catch (error) {
-          console.error("Firebase auth error:", error);
-          // Handle specific Firebase errors
-          if (error instanceof FirebaseError) {
-            if (error.code === "auth/user-not-found") {
-              throw new Error("No user found with this email address.");
-            } else if (error.code === "auth/wrong-password") {
-              throw new Error("Invalid password.");
-            } else if (error.code === "auth/invalid-credential") {
-              throw new Error("Invalid email or password.");
-            } else if (error.code === "auth/user-disabled") {
-              throw new Error("This account has been disabled.");
-            } else {
-              throw new Error(error.message);
-            }
-          }
-          return null;
-        }
-      },
-    }),
   ],
   session: {
     // Use JWT-based sessions for better compatibility with Edge runtime
@@ -129,6 +60,20 @@ export const authConfig: NextAuthConfig = {
     signOut: "/auth/signout",
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Allow relative callback URLs within the same origin
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+
+      // Allow callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+
+      // Default to dashboard for external URLs or when no URL provided
+      return `${baseUrl}/dashboard`;
+    },
     async jwt({ token, user, account, trigger, session }) {
       console.log("JWT callback - input data:", {
         hasToken: !!token,
@@ -177,13 +122,6 @@ export const authConfig: NextAuthConfig = {
             token.creativeRoles = [];
             token.status = "active";
           }
-        }
-        // For credentials provider
-        else if (account.provider === "credentials") {
-          token.firebase_uid = user.id;
-          token.roles = user.roles || ["user"];
-          token.creativeRoles = user.creativeRoles || [];
-          token.status = user.status || "active";
         }
       }
 
@@ -275,15 +213,18 @@ export const authConfig: NextAuthConfig = {
             return false;
           }
 
-          console.log(`Processing Google sign-in for email: ${email}`);
+          console.log(`🔍 Processing Google sign-in for email: ${email}`);
 
           // First try to find existing user by email
           try {
             const existingUser = await adminAuth.getUserByEmail(email);
-            console.log(`Found existing Firebase user with email ${email}:`, {
-              uid: existingUser.uid,
-              providerData: existingUser.providerData,
-            });
+            console.log(
+              `✅ Found existing Firebase user with email ${email}:`,
+              {
+                uid: existingUser.uid,
+                providerData: existingUser.providerData,
+              }
+            );
 
             // Update custom claims if needed
             const claims = existingUser.customClaims || {};
@@ -294,7 +235,7 @@ export const authConfig: NextAuthConfig = {
                 status: "active",
               });
               console.log(
-                `Updated claims for existing user: ${existingUser.uid}`
+                `🔧 Updated claims for existing user: ${existingUser.uid}`
               );
             }
 
@@ -312,71 +253,160 @@ export const authConfig: NextAuthConfig = {
                   name: user.name || email.split("@")[0],
                   email: email,
                   image: user.image || "",
-                  roles: ["user"],
-                  creativeRoles: [],
-                  status: "active",
+                  photoURL: user.image || "",
+                  roles: claims.roles || ["user"],
+                  creativeRoles: claims.creativeRoles || [],
+                  status: claims.status || "active",
                   accountType: "personal",
                   createdAt: new Date(),
                   updatedAt: new Date(),
                 });
               console.log(
-                `Created Firestore document for existing user: ${existingUser.uid}`
+                `📄 Created Firestore document for existing user: ${existingUser.uid}`
               );
             }
 
             return true;
           } catch (error: any) {
+            console.log(
+              `❌ Firebase Auth error for ${email}:`,
+              error.code,
+              error.message
+            );
+            console.log(`Full error details:`, {
+              code: error.code,
+              message: error.message,
+              stack: error.stack,
+            });
+
             // User doesn't exist in Firebase Auth
             if (error.code === "auth/user-not-found") {
-              console.log(`Creating new Firebase user for email: ${email}`);
+              console.log(`🆕 Creating new Firebase user for email: ${email}`);
 
-              // Create new Firebase Auth user
-              const newUser = await adminAuth.createUser({
-                email: email,
-                emailVerified: true,
-                displayName: user.name || email.split("@")[0],
-                photoURL: user.image || "",
-                disabled: false,
-              });
+              // Check if this user was invited
+              const inviteDocId = `invited_${email.replace(/[.@]/g, "_")}`;
+              const inviteDoc = await adminDb
+                .collection("invited_users")
+                .doc(inviteDocId)
+                .get();
 
-              // Set custom claims
-              await adminAuth.setCustomUserClaims(newUser.uid, {
-                roles: ["user"],
-                creativeRoles: [],
+              let userData = {
+                name: user.name || email.split("@")[0],
+                roles: ["user"] as string[],
+                creativeRoles: [] as string[],
                 status: "active",
-              });
+                accountType: "personal",
+              };
 
-              // Create Firestore document
-              await adminDb
-                .collection("users")
-                .doc(newUser.uid)
-                .set({
-                  uid: newUser.uid,
-                  name: user.name || email.split("@")[0],
+              // If user was invited, use the invitation data
+              if (inviteDoc.exists) {
+                const inviteData = inviteDoc.data()!;
+                userData = {
+                  name: inviteData.name || user.name || email.split("@")[0],
+                  roles: inviteData.roles || ["user"],
+                  creativeRoles: inviteData.creativeRoles || [],
+                  status: "active", // Change from 'invited' to 'active'
+                  accountType: inviteData.accountType || "personal",
+                };
+                console.log(
+                  `📧 Found invitation for ${email}, using invited data:`,
+                  userData
+                );
+              } else {
+                console.log(
+                  `📧 No invitation found for ${email}, using default user data`
+                );
+              }
+
+              try {
+                // Create new Firebase Auth user
+                const createUserData: any = {
                   email: email,
-                  image: user.image || "",
-                  roles: ["user"],
-                  creativeRoles: [],
-                  status: "active",
-                  accountType: "personal",
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                });
+                  emailVerified: true,
+                  displayName: userData.name,
+                  disabled: false,
+                };
 
-              console.log(`Successfully created new user: ${newUser.uid}`);
+                // Only include photoURL if we have a valid image URL
+                if (user.image && user.image.trim() !== "") {
+                  createUserData.photoURL = user.image;
+                }
+
+                const newUser = await adminAuth.createUser(createUserData);
+                console.log(
+                  `🔥 Created new Firebase Auth user: ${newUser.uid}`
+                );
+
+                // Set custom claims
+                await adminAuth.setCustomUserClaims(newUser.uid, {
+                  roles: userData.roles,
+                  creativeRoles: userData.creativeRoles,
+                  status: userData.status,
+                });
+                console.log(`🎫 Set custom claims for: ${newUser.uid}`);
+
+                // Create Firestore document
+                await adminDb
+                  .collection("users")
+                  .doc(newUser.uid)
+                  .set({
+                    uid: newUser.uid,
+                    name: userData.name,
+                    email: email,
+                    image: user.image || "",
+                    photoURL: user.image || "",
+                    roles: userData.roles,
+                    creativeRoles: userData.creativeRoles,
+                    status: userData.status,
+                    accountType: userData.accountType,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  });
+                console.log(
+                  `📄 Created Firestore document for: ${newUser.uid}`
+                );
+
+                // Clean up invitation document if it existed
+                if (inviteDoc.exists) {
+                  await adminDb
+                    .collection("invited_users")
+                    .doc(inviteDocId)
+                    .delete();
+                  console.log(`🧹 Cleaned up invitation document for ${email}`);
+                }
+
+                console.log(`✅ Successfully created new user: ${newUser.uid}`);
+                return true;
+              } catch (createError: any) {
+                console.error(
+                  `❌ CRITICAL: Failed to create new user for ${email}:`
+                );
+                console.error(`Error code: ${createError.code}`);
+                console.error(`Error message: ${createError.message}`);
+                console.error(`Full error:`, createError);
+                console.error(`Stack trace:`, createError.stack);
+
+                // Temporarily allow sign-in even if user creation fails (for debugging)
+                // This ensures we can see the detailed error logs
+                return true;
+              }
+            } else {
+              // For any other Firebase Auth error, log it but allow sign in
+              console.error(
+                `❌ Other Firebase Auth error for ${email}:`,
+                error.code,
+                error.message
+              );
               return true;
             }
-
-            // For any other error, log it but allow sign in
-            console.error("Error in Firebase Auth operations:", error);
-            return true;
           }
         }
 
         // For non-Google providers
+        console.log(`🔍 Non-Google provider sign-in: ${account?.provider}`);
         return true;
       } catch (error) {
-        console.error("Error in signIn callback:", error);
+        console.error(`❌ Critical error in signIn callback:`, error);
         // Still allow sign-in even if there was an error
         // This prevents users from being locked out due to database issues
         return true;

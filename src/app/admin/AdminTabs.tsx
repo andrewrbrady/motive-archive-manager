@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import UserManagement from "@/components/users/UserManagement";
 import LocationsClient from "../locations/LocationsClient";
@@ -10,92 +8,284 @@ import ClientsContent from "@/app/admin/ClientsContent";
 import MakesContent from "@/app/admin/MakesContent";
 import CreativeRolesManagement from "@/components/users/CreativeRolesManagement";
 import { Loader2 } from "lucide-react";
-import { LoadingContainer } from "@/components/ui/loading";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import CaptionPromptsContent from "./CaptionPromptsContent";
 
 export default function AdminTabs() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState("users");
-  const [isLoading, setIsLoading] = useState(true);
+  const [oauthDebugData, setOauthDebugData] = useState<any>(null);
+  const [userDebugData, setUserDebugData] = useState<any>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
 
-  // Set initial tab based on URL query parameter
-  useEffect(() => {
-    const tabParam = searchParams?.get("tab");
-    if (
-      tabParam &&
-      ["users", "clients", "locations", "makes", "roles"].includes(tabParam)
-    ) {
-      setActiveTab(tabParam);
+  const fetchOAuthDebug = async () => {
+    setDebugLoading(true);
+    try {
+      const response = await fetch("/api/auth/debug-oauth");
+      const data = await response.json();
+      setOauthDebugData(data);
+    } catch (error) {
+      console.error("Error fetching OAuth debug:", error);
+    } finally {
+      setDebugLoading(false);
     }
-
-    // Simulate loading completion
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchParams]);
-
-  // Handle tab change - update both state and URL
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    setIsLoading(true);
-
-    // Update URL without reloading the page
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", value);
-
-    // Use router.replace to update URL without adding to history
-    router.replace(url.pathname + url.search, { scroll: false });
-
-    // Simulate loading completion after tab change
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
   };
 
-  // Render loading state or actual content based on isLoading state
-  const renderTabContent = (tabValue: string, component: React.ReactNode) => {
-    if (activeTab === tabValue && isLoading) {
-      return <LoadingContainer fullHeight />;
+  const debugUser = async () => {
+    if (!userEmail) return;
+
+    setDebugLoading(true);
+    try {
+      const response = await fetch(
+        `/api/auth/debug-oauth?user=${encodeURIComponent(userEmail)}`
+      );
+      const data = await response.json();
+      setUserDebugData(data.userDebugInfo);
+    } catch (error) {
+      console.error("Error debugging user:", error);
+    } finally {
+      setDebugLoading(false);
     }
-    return component;
   };
+
+  const oauthDebugContent = (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>OAuth Configuration Debug</CardTitle>
+          <CardDescription>
+            Debug OAuth configuration and troubleshoot authentication issues
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button onClick={fetchOAuthDebug} disabled={debugLoading}>
+            {debugLoading ? "Loading..." : "Check OAuth Configuration"}
+          </Button>
+
+          {oauthDebugData && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">
+                  Environment Configuration
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label>NODE_ENV</Label>
+                    <Badge variant="outline">
+                      {oauthDebugData.oauthConfig.environment.NODE_ENV}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>VERCEL_ENV</Label>
+                    <Badge variant="outline">
+                      {oauthDebugData.oauthConfig.environment.VERCEL_ENV ||
+                        "Not set"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>Base URL</Label>
+                    <code className="text-xs bg-gray-100 p-1 rounded">
+                      {oauthDebugData.oauthConfig.environment.baseUrl}
+                    </code>
+                  </div>
+                  <div>
+                    <Label>OAuth Callback URL</Label>
+                    <code className="text-xs bg-gray-100 p-1 rounded">
+                      {oauthDebugData.oauthConfig.environment.oauthCallbackUrl}
+                    </code>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">
+                  Google OAuth Status
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label>Client ID Set</Label>
+                    <Badge
+                      variant={
+                        oauthDebugData.oauthConfig.google.clientIdSet
+                          ? "default"
+                          : "destructive"
+                      }
+                    >
+                      {oauthDebugData.oauthConfig.google.clientIdSet
+                        ? "✓ Yes"
+                        : "✗ No"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>Client Secret Set</Label>
+                    <Badge
+                      variant={
+                        oauthDebugData.oauthConfig.google.clientSecretSet
+                          ? "default"
+                          : "destructive"
+                      }
+                    >
+                      {oauthDebugData.oauthConfig.google.clientSecretSet
+                        ? "✓ Yes"
+                        : "✗ No"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Troubleshooting</h3>
+                <Alert>
+                  <AlertDescription>
+                    <strong>Redirect URI Issue:</strong>{" "}
+                    {
+                      oauthDebugData.troubleshooting.redirectUriIssue
+                        .description
+                    }
+                    <br />
+                    <strong>Expected Callback URL:</strong>{" "}
+                    <code>
+                      {oauthDebugData.oauthConfig.google.expectedCallbackUrl}
+                    </code>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>User Debug</CardTitle>
+          <CardDescription>
+            Debug specific user authentication and data
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter user email or UID"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+            />
+            <Button onClick={debugUser} disabled={debugLoading || !userEmail}>
+              Debug User
+            </Button>
+          </div>
+
+          {userDebugData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Firebase Auth</Label>
+                  <Badge
+                    variant={
+                      userDebugData.authUserExists ? "default" : "destructive"
+                    }
+                  >
+                    {userDebugData.authUserExists ? "✓ Exists" : "✗ Not Found"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label>Firestore</Label>
+                  <Badge
+                    variant={
+                      userDebugData.firestoreUserExists
+                        ? "default"
+                        : "destructive"
+                    }
+                  >
+                    {userDebugData.firestoreUserExists
+                      ? "✓ Exists"
+                      : "✗ Not Found"}
+                  </Badge>
+                </div>
+              </div>
+
+              {userDebugData.authUser && (
+                <div>
+                  <h4 className="font-semibold">Firebase Auth Data</h4>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">
+                    {JSON.stringify(userDebugData.authUser, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {userDebugData.firestoreUser && (
+                <div>
+                  <h4 className="font-semibold">Firestore Data</h4>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">
+                    {JSON.stringify(userDebugData.firestoreUser, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const tabItems: TabItem[] = [
+    {
+      value: "oauth-debug",
+      label: "OAuth Debug",
+      content: oauthDebugContent,
+    },
+    {
+      value: "users",
+      label: "Users",
+      content: <UserManagement />,
+    },
+    {
+      value: "roles",
+      label: "Creative Roles",
+      content: <CreativeRolesManagement />,
+    },
+    {
+      value: "clients",
+      label: "Clients",
+      content: <ClientsContent />,
+    },
+    {
+      value: "locations",
+      label: "Locations",
+      content: <LocationsClient />,
+    },
+    {
+      value: "makes",
+      label: "Makes",
+      content: <MakesContent />,
+    },
+    {
+      value: "caption-prompts",
+      label: "Caption Prompts",
+      content: <CaptionPromptsContent />,
+    },
+  ];
 
   return (
-    <div>
-      <CustomTabs
-        items={[
-          {
-            value: "users",
-            label: "Users",
-            content: renderTabContent("users", <UserManagement />),
-          },
-          {
-            value: "roles",
-            label: "Creative Roles",
-            content: renderTabContent("roles", <CreativeRolesManagement />),
-          },
-          {
-            value: "clients",
-            label: "Clients",
-            content: renderTabContent("clients", <ClientsContent />),
-          },
-          {
-            value: "locations",
-            label: "Locations",
-            content: renderTabContent("locations", <LocationsClient />),
-          },
-          {
-            value: "makes",
-            label: "Makes",
-            content: renderTabContent("makes", <MakesContent />),
-          },
-        ]}
-        defaultValue={activeTab}
-        basePath="/admin"
-        className="w-full"
-      />
-    </div>
+    <CustomTabs
+      items={tabItems}
+      defaultValue="oauth-debug"
+      basePath="/admin"
+      className="w-full"
+    />
   );
 }

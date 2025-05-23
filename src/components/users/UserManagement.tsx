@@ -14,8 +14,9 @@ import { toast } from "@/components/ui/use-toast";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterContainer } from "@/components/ui/FilterContainer";
 import { ListContainer } from "@/components/ui/ListContainer";
-import { UserPlus } from "lucide-react";
+import { UserPlus, RefreshCw, Users } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import UserDetailModal from "./UserDetailModal";
 
 // Shared User interface to be consistent across components
@@ -43,6 +44,8 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [hasMore, setHasMore] = useState(false);
   const [lastId, setLastId] = useState<string | undefined>(undefined);
+  const [isSyncingUser, setIsSyncingUser] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   useEffect(() => {
     // Check session and sync claims when component mounts
@@ -99,6 +102,11 @@ export default function UserManagement() {
       // Try with a simplified approach in case of failures
       let url = new URL("/api/users/index", window.location.origin);
 
+      // Add pagination parameters if provided
+      if (startAfter) {
+        url.searchParams.set("startAfter", startAfter);
+      }
+
       console.log("Fetching users from:", url.toString());
 
       // Make the request directly - authentication will be handled by Next.js session
@@ -149,44 +157,33 @@ export default function UserManagement() {
           });
 
           return;
-        } else {
-          // If we're loading more data and it fails, show an error
-          toast({
-            title: "Error",
-            description: "Failed to load more users. Try refreshing the page.",
-            variant: "destructive",
-          });
-          return;
         }
+
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Process the response
       const data = await response.json();
-      console.log("Received data:", {
-        userCount: Array.isArray(data) ? data.length : "N/A",
-      });
+      console.log("Fetched users data:", data);
 
-      // Process the response (might be different format for the non-paginated endpoint)
-      const users = (Array.isArray(data) ? data : data.users || []).map(
-        (user: any) => ({
-          ...user,
-          uid: user.uid || user.id, // Handle both uid and id fields
-        })
-      );
-      const hasMoreData = data.pagination?.hasMore || false;
-      const lastUserId = data.pagination?.lastId || undefined;
+      if (data.users && Array.isArray(data.users)) {
+        if (startAfter) {
+          // Append to existing users for pagination
+          setUsers((prev) => [...prev, ...data.users]);
+          setFilteredUsers((prev) => [...prev, ...data.users]);
+        } else {
+          // Replace users for initial load
+          setUsers(data.users);
+          setFilteredUsers(data.users);
+        }
 
-      // Update pagination state
-      setHasMore(hasMoreData);
-      setLastId(lastUserId);
+        // Handle pagination
+        setHasMore(data.hasMore || false);
+        setLastId(data.lastId);
 
-      // Update users state based on whether we're loading more or starting fresh
-      if (startAfter) {
-        setUsers((prev) => [...prev, ...users]);
-        setFilteredUsers((prev) => [...prev, ...users]);
+        console.log(`Loaded ${data.users.length} users`);
       } else {
-        setUsers(users);
-        setFilteredUsers(users);
+        console.error("Invalid response format:", data);
+        throw new Error("Invalid response format");
       }
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -233,7 +230,7 @@ export default function UserManagement() {
     }
   };
 
-  const handleCreateUser = () => {
+  const handleInviteUser = () => {
     setSelectedUser(null);
     setIsUserModalOpen(true);
   };
@@ -291,6 +288,83 @@ export default function UserManagement() {
     );
   };
 
+  const syncUserAvatar = async (userId: string) => {
+    setIsSyncingUser(userId);
+    try {
+      const response = await fetch("/api/users/sync-avatar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync avatar");
+      }
+
+      const result = await response.json();
+
+      // Update the user in our local state
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.uid === userId
+            ? { ...user, photoURL: result.photoURL, image: result.photoURL }
+            : user
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Avatar synced successfully",
+      });
+    } catch (error) {
+      console.error("Error syncing avatar:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sync avatar",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncingUser(null);
+    }
+  };
+
+  const syncAllAvatars = async () => {
+    setIsSyncingAll(true);
+    try {
+      const response = await fetch("/api/users/sync-all-avatars", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync all avatars");
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "Success",
+        description: `Successfully synced ${result.updated} user avatars`,
+      });
+
+      // Refresh the user list to show updated avatars
+      fetchUsers();
+    } catch (error) {
+      console.error("Error syncing all avatars:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sync all avatars",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
   const formatDate = (dateValue: any): string => {
     if (!dateValue) return "N/A";
     try {
@@ -318,27 +392,15 @@ export default function UserManagement() {
     }
   };
 
-  const syncUserProfile = async (userId: string) => {
-    try {
-      const response = await fetch("/api/users/sync-profile", {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to sync user profile");
-      }
-
-      // Refresh user list after sync
-      fetchUsers();
-    } catch (error) {
-      console.error("Error syncing user profile:", error);
-      // Handle error appropriately
-    }
-  };
-
-  const getDisplayImage = (user: User) => {
-    // Use photoURL from Google Auth if available, fallback to image field
-    return user.photoURL || user.image || "/default-avatar.png";
+  // Get user initials for avatar fallback
+  const getInitials = (name: string) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   return (
@@ -354,12 +416,25 @@ export default function UserManagement() {
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={handleCreateUser}
+            onClick={syncAllAvatars}
+            variant="outline"
+            disabled={isSyncingAll}
+            className="border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]"
+          >
+            {isSyncingAll ? (
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Users className="w-4 h-4 mr-2" />
+            )}
+            {isSyncingAll ? "Syncing..." : "Sync All Avatars"}
+          </Button>
+          <Button
+            onClick={handleInviteUser}
             variant="outline"
             className="border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))]"
           >
             <UserPlus className="w-4 h-4 mr-2" />
-            Add User
+            Invite User
           </Button>
         </div>
       </FilterContainer>
@@ -368,6 +443,7 @@ export default function UserManagement() {
         <Table>
           <TableHeader>
             <TableRow className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-transparent">
+              <TableHead className="w-[60px]">Photo</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Roles</TableHead>
@@ -380,13 +456,13 @@ export default function UserManagement() {
           <TableBody>
             {isLoading && users.length === 0 ? (
               <TableRow key="loading">
-                <TableCell colSpan={7} className="text-center py-4">
+                <TableCell colSpan={8} className="text-center py-4">
                   <LoadingSpinner size="sm" />
                 </TableCell>
               </TableRow>
             ) : filteredUsers.length === 0 ? (
               <TableRow key="no-users">
-                <TableCell colSpan={7} className="text-center py-4">
+                <TableCell colSpan={8} className="text-center py-4">
                   <span className="text-muted-foreground">No users found</span>
                 </TableCell>
               </TableRow>
@@ -399,6 +475,17 @@ export default function UserManagement() {
                     key={rowKey}
                     className="border-b border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] bg-opacity-50"
                   >
+                    <TableCell>
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage
+                          src={user.photoURL || user.image || ""}
+                          alt={user.name}
+                        />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TableCell>
                     <TableCell className="font-medium">
                       {user.uid ? (
                         <a
@@ -470,6 +557,19 @@ export default function UserManagement() {
                         {user.uid && (
                           <>
                             <Button
+                              onClick={() => syncUserAvatar(user.uid)}
+                              variant="ghost"
+                              size="sm"
+                              disabled={isSyncingUser === user.uid}
+                              title="Sync Google Avatar"
+                            >
+                              {isSyncingUser === user.uid ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <Button
                               onClick={() => handleEditUser(user)}
                               variant="ghost"
                               size="sm"
@@ -516,59 +616,6 @@ export default function UserManagement() {
         user={selectedUser}
         onUserUpdated={handleUserUpdated}
       />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {users.map((user) => {
-          const rowKey = user.uid || `temp-${user.email}`;
-          return (
-            <div
-              key={rowKey}
-              className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
-            >
-              <div className="flex-shrink-0">
-                <img
-                  className="h-10 w-10 rounded-full"
-                  src={getDisplayImage(user)}
-                  alt={user.name}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {user.roles.map((role) => (
-                    <span
-                      key={role}
-                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
-                    >
-                      {role}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="flex-shrink-0">
-                <button
-                  onClick={() => syncUserProfile(user.uid)}
-                  className="inline-flex items-center p-1 border border-transparent rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

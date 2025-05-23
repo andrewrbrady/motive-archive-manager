@@ -14,7 +14,7 @@ interface UserRolesProps {
   initialRoles: string[];
   initialCreativeRoles: string[];
   initialStatus: string;
-  onUpdate?: () => void;
+  onUpdate?: (updatedUser?: any) => void;
 }
 
 // Define available roles and creative roles
@@ -130,6 +130,10 @@ export default function UserRolesManagement({
         );
       }
 
+      // Get the response data with updated user information
+      const responseData = await response.json();
+      const updatedUser = responseData.user;
+
       // Attempt to refresh the session to sync the role changes
       try {
         await fetch("/api/auth/refresh-session");
@@ -143,9 +147,9 @@ export default function UserRolesManagement({
 
       toast.success("User roles updated successfully");
 
-      // Call the onUpdate callback if provided
+      // Call the onUpdate callback with the updated user data
       if (onUpdate) {
-        onUpdate();
+        onUpdate(updatedUser);
       }
     } catch (error) {
       console.error("Error updating user roles:", error);

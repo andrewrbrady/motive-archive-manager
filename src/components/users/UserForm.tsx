@@ -76,7 +76,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
       const userId = user?.uid;
       const url = userId
         ? `/api/users/${userId}` // Use UID for existing user
-        : `/api/users`; // POST to base endpoint for new user
+        : `/api/users/index`; // POST to index endpoint for new user invitation
 
       const response = await fetch(url, {
         method: userId ? "PUT" : "POST",
@@ -193,87 +193,82 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
     }));
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <label
-          htmlFor="name"
-          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
-        >
-          Name
-        </label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-          placeholder="Name"
-          className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mb-1"
+          >
+            Name *
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            className="w-full px-3 py-2 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] focus:ring-2 focus:ring-[hsl(var(--background))] dark:focus:ring-[hsl(var(--background))] focus:border-transparent"
+            placeholder="Full Name"
+            required
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mb-1"
+          >
+            Email *
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            className="w-full px-3 py-2 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] focus:ring-2 focus:ring-[hsl(var(--background))] dark:focus:ring-[hsl(var(--background))] focus:border-transparent"
+            placeholder="user@company.com"
+            required
+          />
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <label
-          htmlFor="email"
-          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
-        >
-          Email
-        </label>
-        <Input
-          id="email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          required
-          placeholder="Email"
-          className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
-        />
-      </div>
-
-      <div className="space-y-2">
+      <div>
         <label
           htmlFor="roles"
-          className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]"
+          className="block text-sm font-medium text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mb-1"
         >
-          Roles
+          Access Level *
         </label>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {formData.roles?.map((role) => (
-            <div
-              key={role}
-              className="flex items-center gap-1 px-3 py-1 rounded-md bg-[hsl(var(--background))] text-sm"
-            >
-              <span>{role.charAt(0).toUpperCase() + role.slice(1)}</span>
-              {role !== "user" && (
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange(role)}
-                  className="text-[hsl(var(--foreground))] hover:text-[hsl(var(--destructive))] transition-colors"
-                >
-                  &times;
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-        <Select onValueChange={handleRoleChange}>
-          <SelectTrigger className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-            <SelectValue placeholder="Add role" />
-          </SelectTrigger>
-          <SelectContent className="bg-[var(--background-primary)] dark:bg-[hsl(var(--background))] border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]">
-            {ROLES.filter(
-              (role) => !formData.roles?.includes(role) || role === "user"
-            ).map((role) => (
-              <SelectItem
-                key={role}
-                value={role}
-                className="!bg-[var(--background-primary)] dark:!bg-[var(--background-secondary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] hover:!bg-[hsl(var(--background))] dark:hover:!bg-[hsl(var(--background))]"
-              >
-                {role.charAt(0).toUpperCase() + role.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <select
+          id="roles"
+          name="roles"
+          value={formData.roles?.includes("admin") ? "admin" : "user"}
+          onChange={(e) => {
+            const selectedRole = e.target.value;
+            setFormData({
+              ...formData,
+              roles: selectedRole === "admin" ? ["admin", "user"] : ["user"],
+            });
+          }}
+          className="w-full px-3 py-2 border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-md bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] focus:ring-2 focus:ring-[hsl(var(--background))] dark:focus:ring-[hsl(var(--background))] focus:border-transparent"
+          required
+        >
+          <option value="user">User - Standard Access</option>
+          <option value="admin">Admin - Full Access</option>
+        </select>
+        <p className="text-xs text-[hsl(var(--foreground-muted))] mt-1">
+          {formData.roles?.includes("admin")
+            ? "Admin users can manage the system and other users"
+            : "Standard users can view and manage content"}
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -372,11 +367,27 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         </Button>
         <Button
           type="submit"
+          disabled={isSubmitting}
           className="bg-[hsl(var(--background))] hover:bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] text-white dark:text-[hsl(var(--foreground))]"
         >
-          {user ? "Update User" : "Create User"}
+          {isSubmitting
+            ? "Processing..."
+            : user
+              ? "Update User"
+              : "Send Invitation"}
         </Button>
       </div>
+
+      {!user && (
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            <strong>Note:</strong> This will create an invitation for the user.
+            They will need to sign in with their Google account to access the
+            system. If they don't have access yet, they'll be automatically
+            added when they first sign in with Google.
+          </p>
+        </div>
+      )}
     </form>
   );
 }

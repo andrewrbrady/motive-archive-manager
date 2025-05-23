@@ -12,6 +12,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "validate:oauth": "tsx scripts/validate-oauth-config.ts",
+    "fix:admin-claims": "tsx scripts/fix-admin-claims.ts",
     "migrate:metadata": "tsx scripts/migrate-image-metadata.ts",
     "test:mongodb": "tsx scripts/test-mongodb.ts",
     "migrate:cars": "tsx scripts/migrate-to-atlas.ts",
