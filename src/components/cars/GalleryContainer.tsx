@@ -1,7 +1,7 @@
 import React from "react";
 import { useGalleryState } from "@/hooks/useGalleryState";
 import { CarImageGalleryV2 } from "./CarImageGalleryV2";
-import { Check, Pencil, Upload, X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ImageData } from "@/lib/imageLoader";
@@ -196,30 +196,9 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              actions.handleModeTransition(
-                state.mode === "editing" ? "viewing" : "editing"
-              )
-            }
-          >
-            {state.mode === "editing" ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Done Editing
-              </>
-            ) : (
-              <>
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit Gallery
-              </>
-            )}
-          </Button>
-          {state.mode === "editing" && (
+      {state.mode === "editing" && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -228,11 +207,11 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
               <Upload className="h-4 w-4 mr-2" />
               Upload Images
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="image-gallery-wrapper mt-4 relative">
+      <div className="image-gallery-wrapper relative">
         <div
           className={`transition-opacity duration-300 ${
             state.isSyncing ? "opacity-60" : "opacity-100"
@@ -255,6 +234,11 @@ export const GalleryContainer: React.FC<GalleryContainerProps> = ({
             onOpenUploadModal={() => setUploadModalOpen(true)}
             onSetPrimary={(image) => handlePrimaryImageChange(image._id)}
             onUpload={async () => {}}
+            onEditToggle={() =>
+              actions.handleModeTransition(
+                state.mode === "editing" ? "viewing" : "editing"
+              )
+            }
           />
         </div>
       </div>

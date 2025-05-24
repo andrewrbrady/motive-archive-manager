@@ -35,6 +35,8 @@ import {
   Copy,
   Check,
   Pin,
+  Edit,
+  Pencil,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -93,9 +95,59 @@ interface CarImageGalleryV2Props {
   onDelete?: (image: ImageData) => Promise<void>;
   onSetPrimary?: (image: ImageData) => void;
   onOpenUploadModal?: () => void;
+  onEditToggle?: () => void;
 }
 
-const THUMBNAILS_PER_PAGE = 12;
+// Hook to detect mobile screen size
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
+
+  return isMobile;
+};
+
+// Hook for swipe gestures
+const useSwipeGesture = (onSwipeLeft: () => void, onSwipeRight: () => void) => {
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      onSwipeLeft();
+    } else if (isRightSwipe) {
+      onSwipeRight();
+    }
+  };
+
+  return { onTouchStart, onTouchMove, onTouchEnd };
+};
 
 export function CarImageGalleryV2({
   images = [],
@@ -110,13 +162,19 @@ export function CarImageGalleryV2({
   onDelete,
   onSetPrimary,
   onOpenUploadModal,
+  onEditToggle,
 }: CarImageGalleryV2Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
+
+  // Responsive thumbnails per page
+  const THUMBNAILS_PER_PAGE = isMobile ? 6 : 12;
 
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [showImageDialog, setShowImageDialog] = useState(false);
-  const [showMetadata, setShowMetadata] = useState(true);
+  // Set showMetadata to false on mobile by default, true on desktop
+  const [showMetadata, setShowMetadata] = useState(!isMobile);
   const [currentTab, setCurrentTab] = useState("all");
   const [selectedAngle, setSelectedAngle] = useState<string>("all");
   const [filteredImages, setFilteredImages] = useState<ImageData[]>(images);
@@ -129,6 +187,11 @@ export function CarImageGalleryV2({
   const [selectedTod, setSelectedTod] = useState<string>("all");
   const [selectedSide, setSelectedSide] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  // Update showMetadata when screen size changes
+  useEffect(() => {
+    setShowMetadata(!isMobile);
+  }, [isMobile]);
 
   // Get current page and image from URL or default values
   const currentPage = Number(searchParams.get("page")) || 1;
@@ -357,7 +420,7 @@ export function CarImageGalleryV2({
           break;
         case "f":
         case "F":
-          if (selectedImage) {
+          if (selectedImage && !isMobile) {
             e.preventDefault();
             setShowImageDialog(true);
           }
@@ -369,7 +432,7 @@ export function CarImageGalleryV2({
           break;
       }
     },
-    [selectedImage, showImageDialog, navigateImages]
+    [selectedImage, showImageDialog, navigateImages, isMobile]
   );
 
   useEffect(() => {
@@ -487,6 +550,12 @@ export function CarImageGalleryV2({
     []
   );
 
+  // Add swipe gesture support
+  const swipeHandlers = useSwipeGesture(
+    () => navigateImages("next"), // swipe left = next
+    () => navigateImages("prev") // swipe right = prev
+  );
+
   if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -538,7 +607,7 @@ export function CarImageGalleryV2({
       tabIndex={0}
     >
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4">
           {showCategoryTabs && categories.length > 1 && (
             <Tabs
               defaultValue="all"
@@ -559,7 +628,7 @@ export function CarImageGalleryV2({
             </Tabs>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="icon"
@@ -568,19 +637,133 @@ export function CarImageGalleryV2({
             >
               <Filter className="h-4 w-4" />
             </Button>
+
+            {/* Desktop filters - animate in between filter button and search */}
+            {showFilters && (
+              <div className="hidden lg:flex items-center gap-2 animate-in slide-in-from-left-5 duration-200">
+                <Select value={selectedAngle} onValueChange={setSelectedAngle}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Angle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All angles</SelectItem>
+                    {allowedValues.angle.map((angle) => (
+                      <SelectItem key={angle} value={angle}>
+                        {angle}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedView} onValueChange={setSelectedView}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="View" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All views</SelectItem>
+                    {allowedValues.view.map((view) => (
+                      <SelectItem key={view} value={view}>
+                        {view}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedMovement}
+                  onValueChange={setSelectedMovement}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Movement" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All movement</SelectItem>
+                    {allowedValues.movement.map((movement) => (
+                      <SelectItem key={movement} value={movement}>
+                        {movement}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedTod} onValueChange={setSelectedTod}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All times</SelectItem>
+                    {allowedValues.tod.map((tod) => (
+                      <SelectItem key={tod} value={tod}>
+                        {tod}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedSide} onValueChange={setSelectedSide}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Side" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All sides</SelectItem>
+                    {allowedValues.side.map((side) => (
+                      <SelectItem key={side} value={side}>
+                        {side}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Input
               placeholder="Search images..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-[200px]"
+              className="flex-1 min-w-0 sm:w-[200px] sm:flex-none"
             />
+            {/* Mobile info button */}
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn(
+                "sm:hidden",
+                showMetadata ? "bg-accent text-accent-foreground" : ""
+              )}
+              onClick={() => setShowMetadata(!showMetadata)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+            {onEditToggle && (
+              <Button
+                variant="outline"
+                onClick={onEditToggle}
+                className={cn(
+                  "shrink-0",
+                  isEditing && "bg-accent text-accent-foreground"
+                )}
+              >
+                {isEditing ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span className="hidden sm:inline ml-2">Done Editing</span>
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-4 w-4" />
+                    <span className="hidden sm:inline ml-2">Edit Gallery</span>
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
+        {/* Mobile filters - below search bar */}
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-2 p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2 p-4 border border-border rounded-lg bg-transparent">
             <Select value={selectedAngle} onValueChange={setSelectedAngle}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Angle" />
               </SelectTrigger>
               <SelectContent>
@@ -594,7 +777,7 @@ export function CarImageGalleryV2({
             </Select>
 
             <Select value={selectedView} onValueChange={setSelectedView}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger>
                 <SelectValue placeholder="View" />
               </SelectTrigger>
               <SelectContent>
@@ -611,7 +794,7 @@ export function CarImageGalleryV2({
               value={selectedMovement}
               onValueChange={setSelectedMovement}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Movement" />
               </SelectTrigger>
               <SelectContent>
@@ -625,7 +808,7 @@ export function CarImageGalleryV2({
             </Select>
 
             <Select value={selectedTod} onValueChange={setSelectedTod}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Time of Day" />
               </SelectTrigger>
               <SelectContent>
@@ -639,7 +822,7 @@ export function CarImageGalleryV2({
             </Select>
 
             <Select value={selectedSide} onValueChange={setSelectedSide}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger>
                 <SelectValue placeholder="Side" />
               </SelectTrigger>
               <SelectContent>
@@ -676,7 +859,12 @@ export function CarImageGalleryV2({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
+      <div
+        className={cn(
+          "grid gap-4",
+          isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[2fr_1fr]"
+        )}
+      >
         {/* Main Image */}
         <div
           className={cn(
@@ -690,20 +878,23 @@ export function CarImageGalleryV2({
           onClick={(e) => {
             if (isEditing && !selectedImage) {
               document.getElementById("file-upload")?.click();
-            } else {
+            } else if (!isMobile) {
+              // Only open modal on desktop
               handleZoomClick(e);
             }
+            // Do nothing on mobile tap
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               if (isEditing && !selectedImage) {
                 document.getElementById("file-upload")?.click();
-              } else {
+              } else if (!isMobile) {
                 handleZoomClick(e as any);
               }
             }
           }}
+          {...swipeHandlers}
           aria-label={
             selectedImage
               ? `Current image: ${
@@ -741,7 +932,7 @@ export function CarImageGalleryV2({
                   variant="outline"
                   size="icon"
                   className={cn(
-                    "border border-white transition-colors",
+                    "border border-white transition-colors hidden sm:flex",
                     showMetadata
                       ? "bg-white/20 hover:bg-white/30"
                       : "bg-transparent hover:bg-black/20"
@@ -756,7 +947,7 @@ export function CarImageGalleryV2({
                 <Button
                   variant="outline"
                   size="icon"
-                  className="border border-white bg-transparent hover:bg-black/20 transition-colors"
+                  className="border border-white bg-transparent hover:bg-black/20 transition-colors hidden sm:flex"
                   onClick={handleZoomClick}
                 >
                   <ZoomIn className="h-4 w-4 text-white" />
@@ -770,39 +961,28 @@ export function CarImageGalleryV2({
                         {selectedImage.metadata.description}
                       </p>
                     )}
-                    <div className="text-xs space-x-2">
-                      {selectedImage.metadata?.angle && (
-                        <span>{selectedImage.metadata.angle}</span>
-                      )}
-                      {selectedImage.metadata?.view && (
-                        <span>{selectedImage.metadata.view}</span>
-                      )}
-                      {selectedImage.metadata?.movement && (
-                        <span>{selectedImage.metadata.movement}</span>
-                      )}
-                      {selectedImage.metadata?.tod && (
-                        <span>{selectedImage.metadata.tod}</span>
-                      )}
-                      {selectedImage.metadata?.side && (
-                        <span>{selectedImage.metadata.side}</span>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute left-2 top-1/2 -translate-y-1/2 border border-white bg-transparent hover:bg-black/20 transition-colors"
-                onClick={() => navigateImages("prev")}
+                className="absolute left-2 top-1/2 -translate-y-1/2 border border-white bg-transparent hover:bg-black/20 transition-colors hidden sm:flex"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImages("prev");
+                }}
               >
                 <ChevronLeft className="h-4 w-4 text-white" />
               </Button>
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 border border-white bg-transparent hover:bg-black/20 transition-colors"
-                onClick={() => navigateImages("next")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 border border-white bg-transparent hover:bg-black/20 transition-colors hidden sm:flex"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImages("next");
+                }}
               >
                 <ChevronRight className="h-4 w-4 text-white" />
               </Button>
@@ -819,127 +999,137 @@ export function CarImageGalleryV2({
         </div>
 
         {/* Thumbnails Grid with Pagination */}
-        <div className="flex flex-col h-full">
-          <div
-            className="grid grid-cols-3 gap-2 overflow-y-auto bg-muted/50 rounded-lg p-3"
-            style={{ maxHeight: "800px" }}
-            role="listbox"
-            aria-label="Image thumbnails"
-          >
-            {currentThumbnails.map((image) => (
-              <div
-                key={image._id}
-                className={cn(
-                  "relative w-full pb-[75%] rounded-md overflow-hidden cursor-pointer group transition-all duration-200",
-                  selectedImage?._id === image._id
-                    ? "ring-2 ring-primary"
-                    : "opacity-80 hover:opacity-100"
-                )}
-                onClick={() => handleThumbnailClick(image)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleThumbnailClick(image);
-                  }
-                }}
-                role="option"
-                aria-selected={selectedImage?._id === image._id}
-                tabIndex={0}
-                aria-label={
-                  image.metadata?.description || image.filename || "Car image"
-                }
-              >
+        {filteredImages.length > 0 && (
+          <div className={cn(isMobile ? "space-y-4" : "flex flex-col h-full")}>
+            <div
+              className={cn(
+                "gap-2",
+                isMobile
+                  ? "grid grid-cols-3"
+                  : "grid grid-cols-2 xl:grid-cols-3 overflow-y-auto bg-muted/50 rounded-lg p-3"
+              )}
+              style={!isMobile ? { maxHeight: "800px" } : {}}
+              role="listbox"
+              aria-label="Image thumbnails"
+            >
+              {currentThumbnails.map((image) => (
                 <div
+                  key={image._id}
                   className={cn(
-                    "absolute inset-0 transition-all duration-200",
+                    "relative w-full pb-[75%] rounded-md overflow-hidden cursor-pointer group transition-all duration-200",
                     selectedImage?._id === image._id
-                      ? "opacity-100"
-                      : "group-hover:opacity-100"
+                      ? "ring-2 ring-primary"
+                      : "opacity-80 hover:opacity-100"
                   )}
-                >
-                  <Image
-                    src={image.url}
-                    alt={
-                      image.metadata?.description ||
-                      image.filename ||
-                      "Car image"
+                  onClick={() => handleThumbnailClick(image)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleThumbnailClick(image);
                     }
-                    fill
-                    className="object-cover bg-background"
-                    sizes="(max-width: 768px) 33vw, 200px"
-                  />
-                  <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-30 transition-opacity" />
-                  {image.metadata?.isPrimary && (
-                    <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-[10px] px-1 py-0.5 rounded-full">
-                      Primary
-                    </div>
-                  )}
-                  {isEditing && (
-                    <>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(image);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      {/* Set as Primary button, only if not already primary */}
-                      {!image.metadata?.isPrimary && onSetPrimary && (
+                  }}
+                  role="option"
+                  aria-selected={selectedImage?._id === image._id}
+                  tabIndex={0}
+                  aria-label={
+                    image.metadata?.description || image.filename || "Car image"
+                  }
+                >
+                  <div
+                    className={cn(
+                      "absolute inset-0 transition-all duration-200",
+                      selectedImage?._id === image._id
+                        ? "opacity-100"
+                        : "group-hover:opacity-100"
+                    )}
+                  >
+                    <Image
+                      src={image.url}
+                      alt={
+                        image.metadata?.description ||
+                        image.filename ||
+                        "Car image"
+                      }
+                      fill
+                      className="object-cover bg-background"
+                      sizes="(max-width: 768px) 33vw, 200px"
+                    />
+                    <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-30 transition-opacity" />
+                    {image.metadata?.isPrimary && (
+                      <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-[10px] px-1 py-0.5 rounded-full">
+                        Primary
+                      </div>
+                    )}
+                    {isEditing && (
+                      <>
                         <Button
-                          variant="outline"
-                          size="sm"
-                          className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-primary text-primary hover:text-primary-foreground border border-primary h-7 w-7 p-0"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onSetPrimary(image);
+                            handleDelete(image);
                           }}
-                          title="Set as primary image"
                         >
-                          <Pin className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                    </>
-                  )}
+                        {/* Set as Primary button, only if not already primary */}
+                        {!image.metadata?.isPrimary && onSetPrimary && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-primary text-primary hover:text-primary-foreground border border-primary h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSetPrimary(image);
+                            }}
+                            title="Set as primary image"
+                          >
+                            <Pin className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div
-              className="flex justify-center items-center gap-2 mt-2 p-2"
-              role="navigation"
-              aria-label="Gallery pagination"
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm">
-                {currentPage} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  handlePageChange(Math.min(totalPages, currentPage + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              ))}
             </div>
-          )}
-        </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div
+                className={cn(
+                  "flex justify-center items-center gap-2",
+                  !isMobile && "mt-2 p-2"
+                )}
+                role="navigation"
+                aria-label="Gallery pagination"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handlePageChange(Math.min(totalPages, currentPage + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* File Information Display */}
@@ -952,123 +1142,136 @@ export function CarImageGalleryV2({
 
       {/* Lightbox Dialog */}
       <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
-        <DialogContent className="max-w-7xl w-full p-0">
-          <DialogTitle className="flex justify-between items-center p-4">
-            <span className="text-lg font-semibold">
+        <DialogContent className="max-w-7xl w-full p-0 max-h-[90vh] overflow-hidden">
+          <DialogTitle className="flex justify-between items-center p-4 border-b">
+            <span className="text-lg font-semibold truncate pr-4">
               {selectedImage?.metadata?.description ||
                 selectedImage?.filename ||
                 "Image"}
             </span>
             <DialogClose asChild>
-              <Button variant="ghost" size="icon" onClick={handleCloseDialog}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCloseDialog}
+                className="shrink-0"
+              >
                 <X className="h-5 w-5" />
               </Button>
             </DialogClose>
           </DialogTitle>
 
-          <div className="relative aspect-[16/9] bg-black">
-            {selectedImage && (
-              <Image
-                src={selectedImage.url}
-                alt={
-                  selectedImage.metadata?.description ||
-                  selectedImage.filename ||
-                  "Car image"
-                }
-                fill
-                className="object-cover"
-                priority
-              />
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white"
-              onClick={() => navigateImages("prev")}
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white"
-              onClick={() => navigateImages("next")}
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
-          </div>
-
-          {selectedImage?.metadata && (
-            <div className="p-4 space-y-4">
-              {/* Image Details */}
-              <div className="space-y-2">
-                <h3 className="font-semibold">Image Details</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {Object.entries(selectedImage.metadata)
-                    .filter(([key]) => key !== "isPrimary")
-                    .map(([key, value]) => (
-                      <div key={key} className="flex">
-                        <span className="font-medium capitalize mr-2">
-                          {key}:
-                        </span>
-                        <span>{String(value)}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {/* File Information */}
-              <div className="space-y-2">
-                <h3 className="font-semibold">File Information</h3>
-                <div className="space-y-2">
-                  {/* Filename */}
-                  <div className="flex items-center justify-between bg-muted p-2 rounded-md">
-                    <div className="flex-1 mr-2">
-                      <div className="text-sm font-medium mb-1">Filename</div>
-                      <div className="text-sm text-muted-foreground truncate">
-                        {selectedImage.filename || "Untitled"}
-                      </div>
-                    </div>
-                    <Button
-                      id="copy-filename-btn"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        copyToClipboard(
-                          selectedImage.filename || "",
-                          "copy-filename-btn"
-                        )
-                      }
-                    >
-                      <Copy className="h-4 w-4" />
-                      <Check className="h-4 w-4 check-icon hidden" />
-                    </Button>
-                  </div>
-
-                  {/* URL */}
-                  <div className="flex items-center justify-between bg-muted p-2 rounded-md">
-                    <div className="flex-1 mr-2">
-                      <div className="text-sm font-medium mb-1">Public URL</div>
-                      <div className="text-sm text-muted-foreground truncate">
-                        {selectedImage.url}
-                      </div>
-                    </div>
-                    <Button
-                      id="copy-url-btn"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        copyToClipboard(selectedImage.url, "copy-url-btn")
-                      }
-                    >
-                      <Copy className="h-4 w-4" />
-                      <Check className="h-4 w-4 check-icon hidden" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+          <div className="flex flex-col max-h-[calc(90vh-4rem)] overflow-hidden">
+            <div className="relative aspect-[16/9] bg-black shrink-0">
+              {selectedImage && (
+                <Image
+                  src={selectedImage.url}
+                  alt={
+                    selectedImage.metadata?.description ||
+                    selectedImage.filename ||
+                    "Car image"
+                  }
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImages("prev");
+                }}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateImages("next");
+                }}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
             </div>
-          )}
+
+            {selectedImage?.metadata && selectedImage.metadata.description && (
+              <div className="p-4 space-y-4 overflow-y-auto">
+                {/* Image Details */}
+                <div className="space-y-2">
+                  <h3 className="font-semibold">Image Details</h3>
+                  <div className="text-sm">
+                    <div className="flex flex-col">
+                      <span className="font-medium mb-1">Description:</span>
+                      <span className="break-words">
+                        {selectedImage.metadata.description}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* File Information */}
+                <div className="space-y-2">
+                  <h3 className="font-semibold">File Information</h3>
+                  <div className="space-y-2">
+                    {/* Filename */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-muted p-2 rounded-md gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium mb-1">Filename</div>
+                        <div className="text-sm text-muted-foreground break-all sm:truncate">
+                          {selectedImage.filename || "Untitled"}
+                        </div>
+                      </div>
+                      <Button
+                        id="copy-filename-btn"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 w-full sm:w-auto"
+                        onClick={() =>
+                          copyToClipboard(
+                            selectedImage.filename || "",
+                            "copy-filename-btn"
+                          )
+                        }
+                      >
+                        <Copy className="h-4 w-4" />
+                        <Check className="h-4 w-4 check-icon hidden" />
+                      </Button>
+                    </div>
+
+                    {/* URL */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-muted p-2 rounded-md gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium mb-1">
+                          Public URL
+                        </div>
+                        <div className="text-sm text-muted-foreground break-all sm:truncate">
+                          {selectedImage.url}
+                        </div>
+                      </div>
+                      <Button
+                        id="copy-url-btn"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 w-full sm:w-auto"
+                        onClick={() =>
+                          copyToClipboard(selectedImage.url, "copy-url-btn")
+                        }
+                      >
+                        <Copy className="h-4 w-4" />
+                        <Check className="h-4 w-4 check-icon hidden" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

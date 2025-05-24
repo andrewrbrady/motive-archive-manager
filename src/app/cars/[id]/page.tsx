@@ -47,7 +47,6 @@ export default function CarPage() {
     car: null as ExtendedCar | null,
     isLoading: true,
     error: null as string | null,
-    hasScrolled: false,
   });
 
   // Use React 19 transition for better performance
@@ -192,33 +191,12 @@ export default function CarPage() {
     };
   }, [id, router, fetchCarData, startTransition]);
 
-  // Scroll handler with throttling
-  useEffect(() => {
-    let ticking = false;
-
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          setState((prev) => ({
-            ...prev,
-            hasScrolled: window.scrollY > 0,
-          }));
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
   // Return early if no ID
   if (!id) {
     return null;
   }
 
-  const { car, isLoading, error, hasScrolled } = state;
+  const { car, isLoading, error } = state;
 
   return (
     <AuthGuard>
@@ -249,29 +227,6 @@ export default function CarPage() {
             </>
           )}
         </div>
-        {/* Sticky header for primary image and car title when scrolling */}
-        {car && !isLoading && (
-          <div
-            className={`fixed top-16 left-0 right-0 z-10 bg-background border-b border-border-primary shadow-sm py-2 transform transition-all duration-300 ${
-              hasScrolled
-                ? "translate-y-0 opacity-100"
-                : "-translate-y-full opacity-0"
-            }`}
-          >
-            <div className="container mx-auto px-4">
-              <div className="flex items-center gap-3">
-                <CarAvatar
-                  primaryImageId={car?.primaryImageId}
-                  entityName={generateCarTitle(car)}
-                  size="sm"
-                />
-                <h1 className="text-base font-semibold text-text-primary truncate">
-                  {generateCarTitle(car)}
-                </h1>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </AuthGuard>
   );
