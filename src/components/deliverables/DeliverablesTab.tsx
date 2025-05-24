@@ -31,7 +31,15 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Trash2, Check, X, CheckSquare, Square } from "lucide-react";
+import {
+  Trash2,
+  Check,
+  X,
+  CheckSquare,
+  Square,
+  Calendar,
+  Clock,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
@@ -1005,63 +1013,96 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       {/* Mobile View - Cards */}
       <div className="block md:hidden space-y-3">
         {isLoading ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Loading deliverables...</p>
+          <div className="flex justify-center py-8">
+            <div className="text-center">
+              <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-xs text-muted-foreground">
+                Loading deliverables...
+              </p>
+            </div>
           </div>
         ) : deliverables.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               No deliverables found. Create your first one!
             </p>
           </div>
         ) : (
-          deliverables.map((deliverable) => (
-            <div
-              key={deliverable._id?.toString()}
-              onClick={() => handleOpenModal(deliverable)}
-              className="border border-border rounded-lg px-3 py-2 bg-card cursor-pointer hover:bg-accent/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                {/* Title - takes up remaining space */}
-                <h3 className="font-medium text-foreground line-clamp-1 flex-1 min-w-0">
-                  {deliverable.title}
-                </h3>
-
-                {/* Platform Dropdown */}
-                <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                  {renderPillCell(deliverable, "platform")}
-                </div>
-
-                {/* Status Dropdown */}
-                <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                  {renderPillCell(deliverable, "status")}
-                </div>
-
-                {/* Batch Mode Checkbox */}
-                {isBatchMode && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleDeliverableSelection(
-                        deliverable._id?.toString() || ""
-                      );
-                    }}
-                    className="p-1 shrink-0"
-                  >
-                    {selectedDeliverables.includes(
-                      deliverable._id?.toString() || ""
-                    ) ? (
-                      <CheckSquare className="h-4 w-4" />
-                    ) : (
-                      <Square className="h-4 w-4" />
+          <div className="space-y-2">
+            {deliverables.map((deliverable) => (
+              <div
+                key={deliverable._id?.toString()}
+                className="bg-muted/20 rounded-lg p-3 space-y-2"
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">
+                      {deliverable.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {deliverable.platform} • {deliverable.type}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      {renderPillCell(deliverable, "status")}
+                    </div>
+                    {isBatchMode && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleDeliverableSelection(
+                            deliverable._id?.toString() || ""
+                          );
+                        }}
+                        className="p-1"
+                      >
+                        {selectedDeliverables.includes(
+                          deliverable._id?.toString() || ""
+                        ) ? (
+                          <CheckSquare className="h-3 w-3" />
+                        ) : (
+                          <Square className="h-3 w-3" />
+                        )}
+                      </Button>
                     )}
-                  </Button>
-                )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {deliverable.edit_deadline
+                      ? safeFormat(deliverable.edit_deadline, "M/d/yy")
+                      : "No deadline"}
+                  </div>
+                  {deliverable.duration > 0 &&
+                    deliverable.type !== "Photo Gallery" && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDuration(deliverable.duration)}
+                      </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleOpenModal(deliverable)}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    View Details
+                  </button>
+                  {deliverable.editor && (
+                    <span className="text-xs text-muted-foreground">
+                      • Editor: {deliverable.editor}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
@@ -1071,7 +1112,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           <TableHeader>
             <TableRow>
               {isBatchMode && (
-                <TableHead className="w-12 whitespace-nowrap px-2 py-2">
+                <TableHead className="w-12 whitespace-nowrap px-2 py-1.5 text-xs font-medium">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1086,15 +1127,31 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                   </Button>
                 </TableHead>
               )}
-              <TableHead className="w-[20%] px-2 py-2">Title</TableHead>
-              <TableHead className="w-[15%] px-2 py-2">Platform</TableHead>
-              <TableHead className="w-[10%] px-2 py-2">Type</TableHead>
-              <TableHead className="w-[8%] px-2 py-2">Status</TableHead>
-              <TableHead className="w-[6%] px-2 py-2">Duration</TableHead>
-              <TableHead className="w-[15%] px-2 py-2">Editor</TableHead>
-              <TableHead className="w-[10%] px-2 py-2">Deadline</TableHead>
-              <TableHead className="w-[10%] px-2 py-2">Release Date</TableHead>
-              <TableHead className="w-[6%] text-right px-2 py-2">
+              <TableHead className="w-[20%] px-2 py-1.5 text-xs font-medium">
+                Title
+              </TableHead>
+              <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
+                Platform
+              </TableHead>
+              <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
+                Type
+              </TableHead>
+              <TableHead className="w-[8%] px-2 py-1.5 text-xs font-medium">
+                Status
+              </TableHead>
+              <TableHead className="w-[6%] px-2 py-1.5 text-xs font-medium">
+                Duration
+              </TableHead>
+              <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
+                Editor
+              </TableHead>
+              <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
+                Deadline
+              </TableHead>
+              <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
+                Release Date
+              </TableHead>
+              <TableHead className="w-[6%] text-right px-2 py-1.5 text-xs font-medium">
                 Actions
               </TableHead>
             </TableRow>
@@ -1104,7 +1161,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               <TableRow>
                 <TableCell
                   colSpan={isBatchMode ? 10 : 9}
-                  className="text-center py-8"
+                  className="text-center py-8 text-xs"
                 >
                   Loading deliverables...
                 </TableCell>
@@ -1113,7 +1170,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               <TableRow>
                 <TableCell
                   colSpan={isBatchMode ? 10 : 9}
-                  className="text-center py-8"
+                  className="text-center py-8 text-xs"
                 >
                   No deliverables found. Create your first one!
                 </TableCell>
@@ -1122,7 +1179,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               deliverables.map((deliverable) => (
                 <TableRow key={deliverable._id?.toString()}>
                   {isBatchMode && (
-                    <TableCell className="px-2 py-1">
+                    <TableCell className="px-2 py-1.5">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1143,31 +1200,31 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                       </Button>
                     </TableCell>
                   )}
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs font-medium">
                     {renderCell(deliverable, "title")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "platform")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "type")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "status")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "duration")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "editor")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "edit_deadline")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "release_date")}
                   </TableCell>
-                  <TableCell className="px-2 py-1">
+                  <TableCell className="px-2 py-1.5">
                     <div className="flex justify-end items-center gap-1">
                       {!isBatchMode && (
                         <>
