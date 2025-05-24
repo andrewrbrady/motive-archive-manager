@@ -51,6 +51,7 @@ import EditDeliverableForm from "./EditDeliverableForm";
 import BatchDeliverableForm from "./BatchDeliverableForm";
 import { StatusSelector } from "./StatusSelector";
 import { DatePicker } from "@/components/ui/date-picker";
+import YouTubeUploadHelper from "./YouTubeUploadHelper";
 
 interface DeliverablesTabProps {
   carId: string | string[];
@@ -1149,6 +1150,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
+                    {/* YouTube Upload Button */}
+                    <YouTubeUploadHelper deliverable={deliverable} />
                     <StatusSelector
                       deliverableId={deliverable._id?.toString() || ""}
                       initialStatus={deliverable.status}
@@ -1359,6 +1362,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                               <Share2 className="h-4 w-4" />
                             </div>
                           )}
+
+                          {/* YouTube Upload Button */}
+                          <YouTubeUploadHelper deliverable={deliverable} />
 
                           <EditDeliverableForm
                             deliverable={deliverable}
