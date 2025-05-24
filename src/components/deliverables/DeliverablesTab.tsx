@@ -39,11 +39,17 @@ import {
   Square,
   Calendar,
   Clock,
+  MoreHorizontal,
+  ExternalLink,
+  Cloud,
+  Share2,
+  Copy,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import NewDeliverableForm from "./NewDeliverableForm";
 import EditDeliverableForm from "./EditDeliverableForm";
 import BatchDeliverableForm from "./BatchDeliverableForm";
+import { StatusSelector } from "./StatusSelector";
 import { DatePicker } from "@/components/ui/date-picker";
 
 interface DeliverablesTabProps {
@@ -713,6 +719,78 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     setIsModalOpen(false);
   };
 
+  const handleStatusChange = (
+    deliverableId: string,
+    newStatus: DeliverableStatus
+  ) => {
+    // Update the local state optimistically
+    setDeliverables((prevDeliverables) =>
+      prevDeliverables.map((deliverable) =>
+        deliverable._id?.toString() === deliverableId
+          ? { ...deliverable, status: newStatus }
+          : deliverable
+      )
+    );
+  };
+
+  const handleDuplicate = async (deliverable: Deliverable) => {
+    try {
+      const id = Array.isArray(carId) ? carId[0] : carId;
+
+      // Validate carId
+      if (!id || typeof id !== "string" || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error("Invalid carId format:", id);
+        toast.error("Cannot duplicate: Invalid car ID");
+        return;
+      }
+
+      // Create a copy of the deliverable with modified fields
+      const duplicatedDeliverable = {
+        title: `${deliverable.title} (Copy)`,
+        description: deliverable.description,
+        platform: deliverable.platform,
+        type: deliverable.type,
+        duration: deliverable.duration,
+        aspect_ratio: deliverable.aspect_ratio,
+        editor: deliverable.editor,
+        firebase_uid: deliverable.firebase_uid,
+        status: "not_started" as DeliverableStatus,
+        // Set new dates - deadline in 7 days, release in 10 days
+        edit_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        release_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+        target_audience: deliverable.target_audience,
+        music_track: deliverable.music_track,
+        tags: deliverable.tags,
+        assets_location: deliverable.assets_location,
+        priority_level: deliverable.priority_level,
+        // Don't copy links - these should be unique to each deliverable
+        dropbox_link: undefined,
+        social_media_link: undefined,
+        publishing_url: undefined,
+        thumbnail_url: undefined,
+        car_id: id,
+      };
+
+      const response = await fetch(`/api/cars/${id}/deliverables`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(duplicatedDeliverable),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to duplicate deliverable");
+      }
+
+      toast.success("Deliverable duplicated successfully");
+      fetchDeliverables();
+    } catch (error) {
+      console.error("Error duplicating deliverable:", error);
+      toast.error("Failed to duplicate deliverable");
+    }
+  };
+
   const getStatusColor = (status: DeliverableStatus) => {
     switch (status) {
       case "not_started":
@@ -1036,38 +1114,52 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               >
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">
-                      {deliverable.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {deliverable.platform} • {deliverable.type}
-                    </p>
+                    <button
+                      onClick={() => setSelectedDeliverable(deliverable)}
+                      className="text-left"
+                    >
+                      <p className="text-xs font-medium truncate">
+                        {deliverable.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {deliverable.platform} • {deliverable.type}
+                      </p>
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      {renderPillCell(deliverable, "status")}
-                    </div>
-                    {isBatchMode && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleDeliverableSelection(
-                            deliverable._id?.toString() || ""
-                          );
-                        }}
-                        className="p-1"
+                  <div className="flex items-center gap-1">
+                    {deliverable.dropbox_link && (
+                      <a
+                        href={deliverable.dropbox_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 text-muted-foreground hover:text-foreground"
+                        title="Dropbox"
                       >
-                        {selectedDeliverables.includes(
-                          deliverable._id?.toString() || ""
-                        ) ? (
-                          <CheckSquare className="h-3 w-3" />
-                        ) : (
-                          <Square className="h-3 w-3" />
-                        )}
-                      </Button>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     )}
+                    {deliverable.social_media_link && (
+                      <a
+                        href={deliverable.social_media_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 text-muted-foreground hover:text-foreground"
+                        title="Social Media"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    <StatusSelector
+                      deliverableId={deliverable._id?.toString() || ""}
+                      initialStatus={deliverable.status}
+                      size="sm"
+                      onStatusChange={(newStatus) =>
+                        handleStatusChange(
+                          deliverable._id?.toString() || "",
+                          newStatus
+                        )
+                      }
+                    />
                   </div>
                 </div>
 
@@ -1127,7 +1219,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                   </Button>
                 </TableHead>
               )}
-              <TableHead className="w-[20%] px-2 py-1.5 text-xs font-medium">
+              <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
                 Title
               </TableHead>
               <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
@@ -1142,16 +1234,16 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               <TableHead className="w-[6%] px-2 py-1.5 text-xs font-medium">
                 Duration
               </TableHead>
-              <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
+              <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
                 Editor
               </TableHead>
-              <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
+              <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
                 Deadline
               </TableHead>
-              <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
+              <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
                 Release Date
               </TableHead>
-              <TableHead className="w-[6%] text-right px-2 py-1.5 text-xs font-medium">
+              <TableHead className="w-[16%] text-right px-2 py-1.5 text-xs font-medium">
                 Actions
               </TableHead>
             </TableRow>
@@ -1228,10 +1320,59 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                     <div className="flex justify-end items-center gap-1">
                       {!isBatchMode && (
                         <>
+                          {/* Dropbox Link Icon */}
+                          {deliverable.dropbox_link ? (
+                            <a
+                              href={deliverable.dropbox_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 text-blue-600 hover:text-blue-800"
+                              title="Open Dropbox"
+                            >
+                              <Cloud className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <div
+                              className="p-1 text-gray-400"
+                              title="No Dropbox link"
+                            >
+                              <Cloud className="h-4 w-4" />
+                            </div>
+                          )}
+
+                          {/* Social Media Link Icon */}
+                          {deliverable.social_media_link ? (
+                            <a
+                              href={deliverable.social_media_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 text-blue-600 hover:text-blue-800"
+                              title="Open Social Media"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <div
+                              className="p-1 text-gray-400"
+                              title="No social media link"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </div>
+                          )}
+
                           <EditDeliverableForm
                             deliverable={deliverable}
                             onDeliverableUpdated={fetchDeliverables}
                           />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDuplicate(deliverable)}
+                            className="text-muted-foreground hover:text-foreground"
+                            title="Duplicate deliverable"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1388,7 +1529,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 selectedDeliverable.music_track ||
                 selectedDeliverable.tags?.length > 0 ||
                 selectedDeliverable.publishing_url ||
-                selectedDeliverable.assets_location) && (
+                selectedDeliverable.assets_location ||
+                selectedDeliverable.dropbox_link ||
+                selectedDeliverable.social_media_link) && (
                 <div className="space-y-4">
                   <h3 className="font-medium text-lg">
                     Additional Information
@@ -1462,6 +1605,38 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                         </p>
                       </div>
                     )}
+
+                    {selectedDeliverable.dropbox_link && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Dropbox Link
+                        </label>
+                        <a
+                          href={selectedDeliverable.dropbox_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 break-all"
+                        >
+                          {selectedDeliverable.dropbox_link}
+                        </a>
+                      </div>
+                    )}
+
+                    {selectedDeliverable.social_media_link && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Social Media Link
+                        </label>
+                        <a
+                          href={selectedDeliverable.social_media_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 break-all"
+                        >
+                          {selectedDeliverable.social_media_link}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1475,6 +1650,16 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                     handleCloseModal();
                   }}
                 />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleDuplicate(selectedDeliverable);
+                    handleCloseModal();
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Duplicate
+                </Button>
                 <Button
                   variant="destructive"
                   onClick={() => {

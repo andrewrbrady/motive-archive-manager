@@ -81,6 +81,12 @@ export default function EditDeliverableForm({
   const [releaseDate, setReleaseDate] = useState(
     safeFormatDate(deliverable.release_date)
   );
+  const [dropboxLink, setDropboxLink] = useState(
+    deliverable.dropbox_link || ""
+  );
+  const [socialMediaLink, setSocialMediaLink] = useState(
+    deliverable.social_media_link || ""
+  );
 
   // Reset form data when deliverable changes
   useEffect(() => {
@@ -94,6 +100,8 @@ export default function EditDeliverableForm({
       setEditorName(deliverable.editor || "");
       setEditDeadline(safeFormatDate(deliverable.edit_deadline));
       setReleaseDate(safeFormatDate(deliverable.release_date));
+      setDropboxLink(deliverable.dropbox_link || "");
+      setSocialMediaLink(deliverable.social_media_link || "");
     }
   }, [deliverable, users]);
 
@@ -123,6 +131,8 @@ export default function EditDeliverableForm({
             firebase_uid: editorId,
             edit_deadline: new Date(editDeadline).toISOString(),
             release_date: new Date(releaseDate).toISOString(),
+            dropbox_link: dropboxLink,
+            social_media_link: socialMediaLink,
           }),
         }
       );
@@ -302,6 +312,30 @@ export default function EditDeliverableForm({
               value={releaseDate}
               onChange={(e) => setReleaseDate(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="dropboxLink" className="text-sm font-medium">
+              Dropbox Link
+            </label>
+            <Input
+              id="dropboxLink"
+              value={dropboxLink}
+              onChange={(e) => setDropboxLink(e.target.value)}
+              placeholder="Enter Dropbox link"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="socialMediaLink" className="text-sm font-medium">
+              Social Media Link
+            </label>
+            <Input
+              id="socialMediaLink"
+              value={socialMediaLink}
+              onChange={(e) => setSocialMediaLink(e.target.value)}
+              placeholder="Enter Social Media link"
             />
           </div>
 

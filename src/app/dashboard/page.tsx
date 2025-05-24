@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { Calendar, Clock } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 interface DeliverableResponse {
   deliverables: (Deliverable & { car?: Car })[];
@@ -309,7 +310,7 @@ function DashboardInner() {
                           <Table>
                             <TableHeader>
                               <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                <TableHead className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                   Title
                                 </TableHead>
                                 <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium">
@@ -321,7 +322,7 @@ function DashboardInner() {
                                 <TableHead className="w-[15%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
                                   Deadline
                                 </TableHead>
-                                <TableHead className="w-[15%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
+                                <TableHead className="w-[20%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
                                   Status
                                 </TableHead>
                               </TableRow>
@@ -332,7 +333,7 @@ function DashboardInner() {
                                   key={deliverable._id?.toString()}
                                   className="hover:bg-muted/50"
                                 >
-                                  <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                  <TableCell className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                     {deliverable.title}
                                   </TableCell>
                                   <TableCell className="w-[20%] py-1.5 px-2 text-xs">
@@ -350,7 +351,7 @@ function DashboardInner() {
                                       deliverable.edit_deadline
                                     ).toLocaleDateString()}
                                   </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 pl-2 pr-3 text-right">
+                                  <TableCell className="w-[20%] py-1.5 pl-2 pr-3 text-right">
                                     <StatusSelector
                                       deliverableId={
                                         deliverable._id?.toString() || ""
@@ -387,19 +388,43 @@ function DashboardInner() {
                                     {deliverable.platform} • {deliverable.type}
                                   </p>
                                 </div>
-                                <StatusSelector
-                                  deliverableId={
-                                    deliverable._id?.toString() || ""
-                                  }
-                                  initialStatus={deliverable.status}
-                                  size="sm"
-                                  onStatusChange={(newStatus) =>
-                                    handleStatusChange(
-                                      deliverable._id?.toString() || "",
-                                      newStatus
-                                    )
-                                  }
-                                />
+                                <div className="flex items-center gap-1">
+                                  {deliverable.dropbox_link && (
+                                    <a
+                                      href={deliverable.dropbox_link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 text-muted-foreground hover:text-foreground"
+                                      title="Dropbox"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                  {deliverable.social_media_link && (
+                                    <a
+                                      href={deliverable.social_media_link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 text-muted-foreground hover:text-foreground"
+                                      title="Social Media"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                  <StatusSelector
+                                    deliverableId={
+                                      deliverable._id?.toString() || ""
+                                    }
+                                    initialStatus={deliverable.status}
+                                    size="sm"
+                                    onStatusChange={(newStatus) =>
+                                      handleStatusChange(
+                                        deliverable._id?.toString() || "",
+                                        newStatus
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Calendar className="h-3 w-3" />
@@ -471,7 +496,7 @@ function DashboardInner() {
                           <Table>
                             <TableHeader>
                               <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                <TableHead className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                   Title
                                 </TableHead>
                                 <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium">
@@ -483,7 +508,7 @@ function DashboardInner() {
                                 <TableHead className="w-[15%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
                                   Deadline
                                 </TableHead>
-                                <TableHead className="w-[15%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
+                                <TableHead className="w-[20%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
                                   Status
                                 </TableHead>
                               </TableRow>
@@ -494,7 +519,7 @@ function DashboardInner() {
                                   key={deliverable._id?.toString()}
                                   className="hover:bg-muted/50"
                                 >
-                                  <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                  <TableCell className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                     {deliverable.title}
                                   </TableCell>
                                   <TableCell className="w-[20%] py-1.5 px-2 text-xs">
@@ -512,7 +537,7 @@ function DashboardInner() {
                                       deliverable.edit_deadline
                                     ).toLocaleDateString()}
                                   </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 pl-2 pr-3 text-right">
+                                  <TableCell className="w-[20%] py-1.5 pl-2 pr-3 text-right">
                                     <StatusSelector
                                       deliverableId={
                                         deliverable._id?.toString() || ""
@@ -549,19 +574,43 @@ function DashboardInner() {
                                     {deliverable.platform} • {deliverable.type}
                                   </p>
                                 </div>
-                                <StatusSelector
-                                  deliverableId={
-                                    deliverable._id?.toString() || ""
-                                  }
-                                  initialStatus={deliverable.status}
-                                  size="sm"
-                                  onStatusChange={(newStatus) =>
-                                    handleStatusChange(
-                                      deliverable._id?.toString() || "",
-                                      newStatus
-                                    )
-                                  }
-                                />
+                                <div className="flex items-center gap-1">
+                                  {deliverable.dropbox_link && (
+                                    <a
+                                      href={deliverable.dropbox_link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 text-muted-foreground hover:text-foreground"
+                                      title="Dropbox"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                  {deliverable.social_media_link && (
+                                    <a
+                                      href={deliverable.social_media_link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 text-muted-foreground hover:text-foreground"
+                                      title="Social Media"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  )}
+                                  <StatusSelector
+                                    deliverableId={
+                                      deliverable._id?.toString() || ""
+                                    }
+                                    initialStatus={deliverable.status}
+                                    size="sm"
+                                    onStatusChange={(newStatus) =>
+                                      handleStatusChange(
+                                        deliverable._id?.toString() || "",
+                                        newStatus
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Calendar className="h-3 w-3" />

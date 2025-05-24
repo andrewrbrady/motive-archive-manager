@@ -34,6 +34,8 @@ export interface IDeliverable extends Document {
   thumbnail_url?: string;
   tags: string[];
   publishing_url?: string;
+  dropbox_link?: string; // Link to Dropbox files/folder
+  social_media_link?: string; // Link to published social media post
   metrics?: {
     views?: number;
     likes?: number;
@@ -136,6 +138,8 @@ const deliverableSchema = new mongoose.Schema(
     thumbnail_url: String,
     tags: [String],
     publishing_url: String,
+    dropbox_link: String,
+    social_media_link: String,
     metrics: {
       views: Number,
       likes: Number,

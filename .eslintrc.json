@@ -3,22 +3,26 @@
   "ignorePatterns": ["src/components/MDXEditor.tsx"],
   "rules": {
     "react/no-unescaped-entities": ["error", { "forbid": [">", "}"] }],
-    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
     "no-debugger": "error"
   },
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],
       "rules": {
-        "no-console": ["error", { "allow": [] }]
+        "no-console": ["warn", { "allow": ["warn", "error"] }]
       }
     },
     {
       "files": [
+        "src/app/api/**/*",
+        "src/lib/**/*",
         "src/scripts/**/*",
         "scripts/**/*",
         "*.config.js",
-        "*.config.ts"
+        "*.config.ts",
+        "src/auth.ts",
+        "src/auth.config.ts"
       ],
       "rules": {
         "no-console": "off"

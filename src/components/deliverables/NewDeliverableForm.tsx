@@ -48,6 +48,8 @@ export default function NewDeliverableForm({
   const [editor, setEditor] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
+  const [dropboxLink, setDropboxLink] = useState("");
+  const [socialMediaLink, setSocialMediaLink] = useState("");
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCarId, setSelectedCarId] = useState(carId || "");
@@ -118,6 +120,8 @@ export default function NewDeliverableForm({
     setEditor("");
     setEditDeadline("");
     setReleaseDate("");
+    setDropboxLink("");
+    setSocialMediaLink("");
     if (!carId) {
       setSelectedCarId("");
     }
@@ -172,6 +176,8 @@ export default function NewDeliverableForm({
             status: "not_started", // Default status
             edit_deadline: new Date(editDeadline),
             release_date: new Date(releaseDate),
+            dropbox_link: dropboxLink || undefined,
+            social_media_link: socialMediaLink || undefined,
             car_id: deliverableCarId,
           }),
         }
@@ -402,6 +408,30 @@ export default function NewDeliverableForm({
               value={releaseDate}
               onChange={(e) => setReleaseDate(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="dropboxLink" className="text-sm font-medium">
+              Dropbox Link
+            </label>
+            <Input
+              id="dropboxLink"
+              value={dropboxLink}
+              onChange={(e) => setDropboxLink(e.target.value)}
+              placeholder="Enter Dropbox link"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="socialMediaLink" className="text-sm font-medium">
+              Social Media Link
+            </label>
+            <Input
+              id="socialMediaLink"
+              value={socialMediaLink}
+              onChange={(e) => setSocialMediaLink(e.target.value)}
+              placeholder="Enter Social Media link"
             />
           </div>
 

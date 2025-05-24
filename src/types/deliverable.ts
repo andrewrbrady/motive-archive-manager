@@ -74,6 +74,8 @@ export interface Deliverable {
   thumbnail_url?: string;
   tags: string[];
   publishing_url?: string;
+  dropbox_link?: string; // Link to Dropbox files/folder
+  social_media_link?: string; // Link to published social media post
   metrics?: Metrics;
   assets_location?: string;
   priority_level?: number;
