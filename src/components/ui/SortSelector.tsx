@@ -25,18 +25,6 @@ const sortOptions: SortOption[] = [
     direction: "desc",
   },
   {
-    label: "Price: High to Low",
-    value: "price_desc",
-    field: "price",
-    direction: "desc",
-  },
-  {
-    label: "Price: Low to High",
-    value: "price_asc",
-    field: "price",
-    direction: "asc",
-  },
-  {
     label: "Year: Newest First",
     value: "year_desc",
     field: "year",
@@ -81,7 +69,7 @@ export default function SortSelector({
 
   return (
     <Select value={currentSort} onValueChange={handleSortChange}>
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className="w-full text-sm">
         <SelectValue placeholder="Sort by..." />
       </SelectTrigger>
       <SelectContent>

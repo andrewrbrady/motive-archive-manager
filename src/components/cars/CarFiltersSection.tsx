@@ -107,8 +107,8 @@ export default function CarFiltersSection({
       hasActiveFilters={hasActiveFilters}
       onClearFilters={clearFilters}
     >
-      <div className="flex flex-row gap-6 items-end w-full">
-        <FilterItem className="w-full max-w-xs">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+        <FilterItem className="lg:col-span-1">
           <FilterLabel>
             <Search className="h-4 w-4 inline mr-1" />
             Search
@@ -122,7 +122,7 @@ export default function CarFiltersSection({
           />
         </FilterItem>
 
-        <FilterItem className="w-72">
+        <FilterItem className="lg:col-span-1">
           <FilterLabel>Client</FilterLabel>
           <FilterSelect
             name="clientId"
@@ -138,7 +138,7 @@ export default function CarFiltersSection({
           </FilterSelect>
         </FilterItem>
 
-        <FilterItem className="w-56">
+        <FilterItem className="lg:col-span-1">
           <FilterLabel>Make</FilterLabel>
           <FilterSelect
             name="make"
@@ -154,9 +154,9 @@ export default function CarFiltersSection({
           </FilterSelect>
         </FilterItem>
 
-        <FilterItem className="w-80">
+        <FilterItem className="lg:col-span-1">
           <FilterLabel>Year Range</FilterLabel>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             <FilterInput
               type="number"
               name="minYear"

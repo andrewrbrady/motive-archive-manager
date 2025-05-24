@@ -5,7 +5,6 @@ import Pagination from "@/components/Pagination";
 import CarFiltersSection from "@/components/cars/CarFiltersSection";
 import CarsViewWrapper from "@/components/cars/CarsViewWrapper";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
-import EditModeToggle from "@/components/cars/EditModeToggle";
 import PageSizeSelector from "@/components/PageSizeSelector";
 import SortSelector from "@/components/ui/SortSelector";
 import { Car } from "@/types/car";
@@ -99,31 +98,43 @@ export default function CarsPageClient({
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6 sm:space-y-8">
           <PageTitle title="Cars Collection" count={totalCount}>
-            <div className="flex items-center gap-4 ml-auto">
-              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
-              <PageSizeSelector
-                currentPageSize={pageSize}
-                options={[12, 24, 48, 96]}
-              />
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
+            <div className="flex items-center gap-3 w-full">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex-1 min-w-0">
+                  <SortSelector
+                    currentSort={filters.sort || "createdAt_desc"}
+                  />
+                </div>
+                <PageSizeSelector
+                  currentPageSize={pageSize}
+                  options={[12, 24, 48, 96]}
                 />
-              )}
-              <ViewModeSelector currentView={view} />
-              <EditModeToggle isEditMode={isEditMode} />
-              <Link
-                href="/cars/new"
-                className="p-2 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))] transition-colors rounded-full hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))]"
-                title="Add New Car"
-              >
-                <Plus className="h-4 w-4" />
-              </Link>
+              </div>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {totalPages > 1 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    pageSize={pageSize}
+                  />
+                )}
+
+                <div className="hidden sm:flex">
+                  <ViewModeSelector currentView={view} />
+                </div>
+
+                <Link
+                  href="/cars/new"
+                  className="inline-flex items-center justify-center w-8 h-8 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))] transition-colors rounded-full hover:bg-[hsl(var(--background-secondary))] dark:hover:bg-[hsl(var(--background-secondary))] border border-[hsl(var(--border))] dark:border-[hsl(var(--border))] flex-shrink-0"
+                  title="Add New Car"
+                >
+                  <Plus className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
           </PageTitle>
 
@@ -141,9 +152,22 @@ export default function CarsPageClient({
 
           <CarsViewWrapper
             cars={cars}
-            viewMode={view}
+            viewMode="grid" // Force grid view on mobile, original view on desktop
             currentSearchParams={currentSearchParams}
+            forceGridOnMobile={true}
+            actualViewMode={view}
           />
+
+          {/* Bottom Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+              />
+            </div>
+          )}
         </div>
       </main>
     </div>

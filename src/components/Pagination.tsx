@@ -63,38 +63,37 @@ const Pagination = ({
   };
 
   return (
-    <div className="flex items-center justify-center gap-4">
+    <div className="flex items-center gap-0.5">
       <button
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="p-2 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-full hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
+        className="p-1 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded hover:bg-[hsl(var(--background-secondary))]"
         aria-label="Previous page"
       >
-        <ChevronLeft className="w-5 h-5" />
+        <ChevronLeft className="w-3.5 h-3.5" />
       </button>
-      <form
-        onSubmit={handlePageInputSubmit}
-        className="flex items-center gap-2"
-      >
+
+      <form onSubmit={handlePageInputSubmit} className="flex items-center mx-1">
         <input
           type="number"
           min="1"
           max={totalPages}
           value={pageInput}
           onChange={handlePageInputChange}
-          className="w-12 py-1.5 text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-transparent text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] text-center focus:outline-none focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-6 h-6 text-xs text-center bg-transparent text-[hsl(var(--foreground))] focus:outline-none border border-transparent focus:border-[hsl(var(--border))] rounded transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-          / {totalPages}
+        <span className="text-xs text-[hsl(var(--foreground-muted))]">
+          /{totalPages}
         </span>
       </form>
+
       <button
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="p-2 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-full hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
+        className="p-1 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded hover:bg-[hsl(var(--background-secondary))]"
         aria-label="Next page"
       >
-        <ChevronRight className="w-5 h-5" />
+        <ChevronRight className="w-3.5 h-3.5" />
       </button>
     </div>
   );
