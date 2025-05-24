@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Do not run development server commands like "npm run dev" or "npm run build" or "vercel build" unless explicitly given permission.

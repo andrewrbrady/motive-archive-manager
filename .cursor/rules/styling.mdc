@@ -1,6 +1,6 @@
 ---
-description: Stylig guidelines for the project
-globs: **/*.tsx, **/*.css, tailwind.config.ts
+description: 
+globs: 
 alwaysApply: false
 ---
 references: ["@file:docs/STYLING.md"]
