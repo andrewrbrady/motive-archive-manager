@@ -13,10 +13,10 @@ interface Caption {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const carId = params.id;
+    const { id: carId } = await params;
 
     if (!carId) {
       return NextResponse.json(
