@@ -19,11 +19,6 @@ export async function GET(req: NextRequest) {
       scope: [
         "https://www.googleapis.com/auth/youtube.upload",
         "https://www.googleapis.com/auth/youtube.readonly",
-        "https://www.googleapis.com/auth/youtube", // Full YouTube access
-        "https://www.googleapis.com/auth/youtube.force-ssl", // Secure access
-        "https://www.googleapis.com/auth/youtubepartner", // Partner access (sometimes needed for brand accounts)
-        "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/userinfo.profile",
       ],
       prompt: "select_account consent", // Force account selection and consent screen
       include_granted_scopes: true,
