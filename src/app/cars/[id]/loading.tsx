@@ -10,7 +10,7 @@ export default function CarDetailLoading() {
   return (
     <div className="min-h-screen bg-background">
       {/* <Navbar /> */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container-wide px-6 py-8">
         <div className="flex items-center gap-2 mb-6">
           <div className="w-12 h-12 rounded-full bg-background-secondary animate-pulse" />
           <div className="h-8 w-64 bg-background-secondary animate-pulse rounded" />

@@ -23,6 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Trash2, Check, X, CheckSquare, Square } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -66,6 +73,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     []
   );
   const [isBatchMode, setIsBatchMode] = useState(false);
+  const [selectedDeliverable, setSelectedDeliverable] =
+    useState<Deliverable | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -645,7 +655,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           handleFieldChange(deliverable, field, newValue);
         }}
       >
-        <SelectTrigger className="w-[180px] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-transparent hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] transition-colors">
+        <SelectTrigger className="w-full border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-transparent hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] transition-colors text-xs md:text-sm">
           <SelectValue>{currentLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -675,14 +685,49 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
   };
 
-  // Helper to safely handle date conversions
   const safeDateValue = (dateString: string): Date | undefined => {
     try {
+      if (!dateString) return undefined;
       const date = new Date(dateString);
-      return isNaN(date.getTime()) ? undefined : date;
+      return isValidDate(date) ? date : undefined;
     } catch (error) {
-      console.error("Error parsing date:", error);
       return undefined;
+    }
+  };
+
+  const handleOpenModal = (deliverable: Deliverable) => {
+    setSelectedDeliverable(deliverable);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedDeliverable(null);
+    setIsModalOpen(false);
+  };
+
+  const getStatusColor = (status: DeliverableStatus) => {
+    switch (status) {
+      case "not_started":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
+      case "in_progress":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      case "done":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
+    }
+  };
+
+  const getStatusText = (status: DeliverableStatus) => {
+    switch (status) {
+      case "not_started":
+        return "Not Started";
+      case "in_progress":
+        return "In Progress";
+      case "done":
+        return "Done";
+      default:
+        return status;
     }
   };
 
@@ -699,7 +744,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               value={editValue}
               onValueChange={(value) => setEditValue(value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -729,7 +774,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               value={editValue}
               onValueChange={(value) => setEditValue(value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -765,7 +810,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               value={editValue}
               onValueChange={(value) => setEditValue(value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -820,7 +865,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           <Input
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="w-[180px]"
+            className="w-full"
           />
           <Button size="sm" variant="ghost" onClick={handleSaveEdit}>
             <Check className="h-4 w-4 text-success-500" />
@@ -852,7 +897,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               void handleFieldChange(deliverable, field, date.toISOString());
             }
           }}
-          className="w-[180px]"
+          className="w-full"
         />
       );
     }
@@ -886,7 +931,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
   return (
     <div className="space-y-4 w-full">
-      <div className="flex justify-between items-center">
+      {/* Desktop Header - Title and buttons side by side */}
+      <div className="hidden md:flex justify-between items-center">
         <h2 className="text-2xl font-bold">Deliverables</h2>
         <div className="flex gap-2">
           {isBatchMode ? (
@@ -920,12 +966,112 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         </div>
       </div>
 
-      <div className="rounded-md border w-full overflow-x-auto">
-        <Table className="min-w-full">
+      {/* Mobile Header - Title on top, buttons below */}
+      <div className="block md:hidden space-y-3">
+        <h2 className="text-2xl font-bold">Deliverables</h2>
+        <div className="flex gap-2 flex-wrap">
+          {isBatchMode ? (
+            <>
+              <Button
+                variant="destructive"
+                onClick={handleBatchDelete}
+                disabled={selectedDeliverables.length === 0}
+                size="sm"
+              >
+                Delete Selected ({selectedDeliverables.length})
+              </Button>
+              <Button variant="outline" onClick={toggleBatchMode} size="sm">
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={toggleBatchMode} size="sm">
+                Batch Delete
+              </Button>
+              <BatchDeliverableForm
+                carId={Array.isArray(carId) ? carId[0] : carId}
+                onDeliverableCreated={fetchDeliverables}
+              />
+              <NewDeliverableForm
+                carId={Array.isArray(carId) ? carId[0] : carId}
+                onDeliverableCreated={fetchDeliverables}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile View - Cards */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Loading deliverables...</p>
+          </div>
+        ) : deliverables.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">
+              No deliverables found. Create your first one!
+            </p>
+          </div>
+        ) : (
+          deliverables.map((deliverable) => (
+            <div
+              key={deliverable._id?.toString()}
+              onClick={() => handleOpenModal(deliverable)}
+              className="border border-border rounded-lg px-3 py-2 bg-card cursor-pointer hover:bg-accent/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                {/* Title - takes up remaining space */}
+                <h3 className="font-medium text-foreground line-clamp-1 flex-1 min-w-0">
+                  {deliverable.title}
+                </h3>
+
+                {/* Platform Dropdown */}
+                <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                  {renderPillCell(deliverable, "platform")}
+                </div>
+
+                {/* Status Dropdown */}
+                <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                  {renderPillCell(deliverable, "status")}
+                </div>
+
+                {/* Batch Mode Checkbox */}
+                {isBatchMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDeliverableSelection(
+                        deliverable._id?.toString() || ""
+                      );
+                    }}
+                    className="p-1 shrink-0"
+                  >
+                    {selectedDeliverables.includes(
+                      deliverable._id?.toString() || ""
+                    ) ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop View - Table */}
+      <div className="hidden md:block rounded-md border w-full overflow-x-auto">
+        <Table className="w-full table-fixed">
           <TableHeader>
             <TableRow>
               {isBatchMode && (
-                <TableHead className="w-[50px] whitespace-nowrap">
+                <TableHead className="w-12 whitespace-nowrap px-2 py-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -940,31 +1086,15 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                   </Button>
                 </TableHead>
               )}
-              <TableHead className="whitespace-nowrap w-[250px]">
-                Title
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[180px]">
-                Platform
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[160px]">
-                Type
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[140px]">
-                Status
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[100px]">
-                Duration
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[180px]">
-                Editor
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[130px]">
-                Deadline
-              </TableHead>
-              <TableHead className="whitespace-nowrap w-[130px]">
-                Release Date
-              </TableHead>
-              <TableHead className="text-right whitespace-nowrap w-[100px]">
+              <TableHead className="w-[20%] px-2 py-2">Title</TableHead>
+              <TableHead className="w-[15%] px-2 py-2">Platform</TableHead>
+              <TableHead className="w-[10%] px-2 py-2">Type</TableHead>
+              <TableHead className="w-[8%] px-2 py-2">Status</TableHead>
+              <TableHead className="w-[6%] px-2 py-2">Duration</TableHead>
+              <TableHead className="w-[15%] px-2 py-2">Editor</TableHead>
+              <TableHead className="w-[10%] px-2 py-2">Deadline</TableHead>
+              <TableHead className="w-[10%] px-2 py-2">Release Date</TableHead>
+              <TableHead className="w-[6%] text-right px-2 py-2">
                 Actions
               </TableHead>
             </TableRow>
@@ -992,7 +1122,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
               deliverables.map((deliverable) => (
                 <TableRow key={deliverable._id?.toString()}>
                   {isBatchMode && (
-                    <TableCell>
+                    <TableCell className="px-2 py-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1013,20 +1143,32 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                       </Button>
                     </TableCell>
                   )}
-                  <TableCell>{renderCell(deliverable, "title")}</TableCell>
-                  <TableCell>{renderCell(deliverable, "platform")}</TableCell>
-                  <TableCell>{renderCell(deliverable, "type")}</TableCell>
-                  <TableCell>{renderCell(deliverable, "status")}</TableCell>
-                  <TableCell>{renderCell(deliverable, "duration")}</TableCell>
-                  <TableCell>{renderCell(deliverable, "editor")}</TableCell>
-                  <TableCell>
+                  <TableCell className="px-2 py-1">
+                    {renderCell(deliverable, "title")}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    {renderCell(deliverable, "platform")}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    {renderCell(deliverable, "type")}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    {renderCell(deliverable, "status")}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    {renderCell(deliverable, "duration")}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    {renderCell(deliverable, "editor")}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
                     {renderCell(deliverable, "edit_deadline")}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-2 py-1">
                     {renderCell(deliverable, "release_date")}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end items-center gap-2">
+                  <TableCell className="px-2 py-1">
+                    <div className="flex justify-end items-center gap-1">
                       {!isBatchMode && (
                         <>
                           <EditDeliverableForm
@@ -1053,6 +1195,244 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Deliverable Detail Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">
+              {selectedDeliverable?.title}
+            </DialogTitle>
+            <DialogClose />
+          </DialogHeader>
+
+          {selectedDeliverable && (
+            <div className="space-y-6 pt-4">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Basic Information</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Title
+                    </label>
+                    <p className="text-foreground">
+                      {selectedDeliverable.title}
+                    </p>
+                  </div>
+
+                  {selectedDeliverable.description && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Description
+                      </label>
+                      <p className="text-foreground">
+                        {selectedDeliverable.description}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Platform
+                    </label>
+                    <Badge variant="outline" className="mt-1">
+                      {selectedDeliverable.platform}
+                    </Badge>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Type
+                    </label>
+                    <Badge variant="outline" className="mt-1">
+                      {selectedDeliverable.type}
+                    </Badge>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Status
+                    </label>
+                    <Badge
+                      className={`mt-1 ${getStatusColor(selectedDeliverable.status)}`}
+                    >
+                      {getStatusText(selectedDeliverable.status)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Details */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Technical Details</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Duration
+                    </label>
+                    <p className="text-foreground">
+                      {selectedDeliverable.type === "Photo Gallery"
+                        ? "N/A"
+                        : formatDuration(selectedDeliverable.duration)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Aspect Ratio
+                    </label>
+                    <p className="text-foreground">
+                      {selectedDeliverable.aspect_ratio}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Editor
+                    </label>
+                    <p className="text-foreground">
+                      {selectedDeliverable.editor}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Important Dates</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Edit Deadline
+                    </label>
+                    <p className="text-foreground">
+                      {selectedDeliverable.edit_deadline
+                        ? safeFormat(selectedDeliverable.edit_deadline, "PPP")
+                        : "Not set"}
+                    </p>
+                  </div>
+
+                  {selectedDeliverable.release_date && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Release Date
+                      </label>
+                      <p className="text-foreground">
+                        {safeFormat(selectedDeliverable.release_date, "PPP")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              {(selectedDeliverable.target_audience ||
+                selectedDeliverable.music_track ||
+                selectedDeliverable.tags?.length > 0 ||
+                selectedDeliverable.publishing_url ||
+                selectedDeliverable.assets_location) && (
+                <div className="space-y-4">
+                  <h3 className="font-medium text-lg">
+                    Additional Information
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {selectedDeliverable.target_audience && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Target Audience
+                        </label>
+                        <p className="text-foreground">
+                          {selectedDeliverable.target_audience}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedDeliverable.music_track && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Music Track
+                        </label>
+                        <p className="text-foreground">
+                          {selectedDeliverable.music_track}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedDeliverable.tags &&
+                      selectedDeliverable.tags.length > 0 && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">
+                            Tags
+                          </label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedDeliverable.tags.map((tag, index) => (
+                              <Badge
+                                key={index}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {selectedDeliverable.publishing_url && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Publishing URL
+                        </label>
+                        <a
+                          href={selectedDeliverable.publishing_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 break-all"
+                        >
+                          {selectedDeliverable.publishing_url}
+                        </a>
+                      </div>
+                    )}
+
+                    {selectedDeliverable.assets_location && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Assets Location
+                        </label>
+                        <p className="text-foreground">
+                          {selectedDeliverable.assets_location}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <EditDeliverableForm
+                  deliverable={selectedDeliverable}
+                  onDeliverableUpdated={() => {
+                    fetchDeliverables();
+                    handleCloseModal();
+                  }}
+                />
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    handleDelete(selectedDeliverable._id?.toString() || "");
+                    handleCloseModal();
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

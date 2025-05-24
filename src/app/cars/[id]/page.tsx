@@ -202,7 +202,7 @@ export default function CarPage() {
     <AuthGuard>
       <div className="flex flex-col min-h-screen bg-background">
         {/* <Navbar /> */} {/* Removed Navbar component */}
-        <div className="flex-grow container mx-auto px-4 py-8">
+        <div className="container-wide px-6 py-8">
           {error ? (
             <div className="max-w-2xl mx-auto bg-destructive-50 dark:bg-destructive-900 border border-destructive-200 dark:border-destructive-800 text-destructive-700 dark:text-destructive-200 px-4 py-3 rounded">
               {error}

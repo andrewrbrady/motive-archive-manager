@@ -10,7 +10,7 @@ export default function Loading() {
   return (
     <div className="min-h-screen bg-background">
       {/* <Navbar /> */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="container-wide px-6 py-8">
         <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
           <div className="flex flex-row items-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />

@@ -198,7 +198,7 @@ export default function NewDeliverableForm({
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          New Deliverable
+          New
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">

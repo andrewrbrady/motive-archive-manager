@@ -120,20 +120,38 @@ const useIsMobile = () => {
 const useSwipeGesture = (onSwipeLeft: () => void, onSwipeRight: () => void) => {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [currentSwipeOffset, setCurrentSwipeOffset] = useState(0);
+  const [isSwipingActive, setIsSwipingActive] = useState(false);
 
   const minSwipeDistance = 50;
 
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
+    setIsSwipingActive(true);
+    setCurrentSwipeOffset(0);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (!touchStart) return;
+
+    const currentTouch = e.targetTouches[0].clientX;
+    const swipeDistance = currentTouch - touchStart;
+
+    // Limit the swipe distance to prevent over-swiping
+    const maxSwipe = 100;
+    const limitedSwipe = Math.max(-maxSwipe, Math.min(maxSwipe, swipeDistance));
+
+    setCurrentSwipeOffset(limitedSwipe);
+    setTouchEnd(currentTouch);
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (!touchStart || !touchEnd) {
+      setIsSwipingActive(false);
+      setCurrentSwipeOffset(0);
+      return;
+    }
 
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
@@ -144,9 +162,43 @@ const useSwipeGesture = (onSwipeLeft: () => void, onSwipeRight: () => void) => {
     } else if (isRightSwipe) {
       onSwipeRight();
     }
+
+    // Reset swipe state
+    setIsSwipingActive(false);
+    setCurrentSwipeOffset(0);
   };
 
-  return { onTouchStart, onTouchMove, onTouchEnd };
+  return {
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
+    swipeOffset: currentSwipeOffset,
+    isSwipingActive,
+  };
+};
+
+// Helper function to get optimized image URL for Cloudflare Images
+const getOptimizedImageUrl = (
+  url: string,
+  isMobile: boolean,
+  isLightbox: boolean = false
+) => {
+  // Check if the URL is from Cloudflare Images (contains imagedelivery.net)
+  if (!url.includes("imagedelivery.net")) {
+    return url;
+  }
+
+  // Different optimization parameters based on context
+  if (isLightbox) {
+    // High quality for lightbox
+    return `${url}w=2000,q=85`;
+  } else if (isMobile) {
+    // Optimized for mobile
+    return `${url}w=800,q=75`;
+  } else {
+    // High quality for desktop main view
+    return `${url}w=1200,q=75`;
+  }
 };
 
 export function CarImageGalleryV2({
@@ -868,7 +920,7 @@ export function CarImageGalleryV2({
         {/* Main Image */}
         <div
           className={cn(
-            "relative aspect-[3/2] bg-muted rounded-lg overflow-hidden",
+            "relative bg-muted rounded-lg overflow-hidden aspect-[3/2]",
             isEditing &&
               !selectedImage &&
               "border-2 border-dashed border-border hover:border-primary cursor-pointer"
@@ -909,18 +961,110 @@ export function CarImageGalleryV2({
         >
           {selectedImage ? (
             <>
-              <Image
-                src={selectedImage.url}
-                alt={
-                  selectedImage.metadata?.description ||
-                  selectedImage.filename ||
-                  "Car image"
-                }
-                fill
-                className="object-cover"
-                priority
-                onLoad={() => setMainImageLoaded(true)}
-              />
+              <div className="relative w-full h-full">
+                {/* Current Image */}
+                <div
+                  className="absolute inset-0 transition-transform duration-200 ease-out"
+                  style={{
+                    transform:
+                      isMobile && swipeHandlers.isSwipingActive
+                        ? `translateX(${swipeHandlers.swipeOffset}px)`
+                        : "translateX(0px)",
+                  }}
+                >
+                  <Image
+                    src={getOptimizedImageUrl(
+                      selectedImage.url,
+                      isMobile,
+                      false
+                    )}
+                    alt={
+                      selectedImage.metadata?.description ||
+                      selectedImage.filename ||
+                      "Car image"
+                    }
+                    fill
+                    className="object-cover"
+                    priority
+                    onLoad={() => setMainImageLoaded(true)}
+                  />
+                </div>
+
+                {/* Next Image (slides in from right when swiping left) */}
+                {isMobile &&
+                  swipeHandlers.isSwipingActive &&
+                  swipeHandlers.swipeOffset < 0 &&
+                  (() => {
+                    const currentIndex = filteredImages.findIndex(
+                      (img) => img._id === selectedImage._id
+                    );
+                    const nextImage =
+                      filteredImages[
+                        (currentIndex + 1) % filteredImages.length
+                      ];
+                    return nextImage ? (
+                      <div
+                        className="absolute inset-0 transition-transform duration-200 ease-out"
+                        style={{
+                          transform: `translateX(calc(100% + ${swipeHandlers.swipeOffset}px))`,
+                        }}
+                      >
+                        <Image
+                          src={getOptimizedImageUrl(
+                            nextImage.url,
+                            isMobile,
+                            false
+                          )}
+                          alt={
+                            nextImage.metadata?.description ||
+                            nextImage.filename ||
+                            "Next car image"
+                          }
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : null;
+                  })()}
+
+                {/* Previous Image (slides in from left when swiping right) */}
+                {isMobile &&
+                  swipeHandlers.isSwipingActive &&
+                  swipeHandlers.swipeOffset > 0 &&
+                  (() => {
+                    const currentIndex = filteredImages.findIndex(
+                      (img) => img._id === selectedImage._id
+                    );
+                    const prevImage =
+                      filteredImages[
+                        (currentIndex - 1 + filteredImages.length) %
+                          filteredImages.length
+                      ];
+                    return prevImage ? (
+                      <div
+                        className="absolute inset-0 transition-transform duration-200 ease-out"
+                        style={{
+                          transform: `translateX(calc(-100% + ${swipeHandlers.swipeOffset}px))`,
+                        }}
+                      >
+                        <Image
+                          src={getOptimizedImageUrl(
+                            prevImage.url,
+                            isMobile,
+                            false
+                          )}
+                          alt={
+                            prevImage.metadata?.description ||
+                            prevImage.filename ||
+                            "Previous car image"
+                          }
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : null;
+                  })()}
+              </div>
               {!mainImageLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1044,7 +1188,7 @@ export function CarImageGalleryV2({
                     )}
                   >
                     <Image
-                      src={image.url}
+                      src={getOptimizedImageUrl(image.url, isMobile, false)}
                       alt={
                         image.metadata?.description ||
                         image.filename ||
@@ -1165,7 +1309,7 @@ export function CarImageGalleryV2({
             <div className="relative aspect-[16/9] bg-black shrink-0">
               {selectedImage && (
                 <Image
-                  src={selectedImage.url}
+                  src={getOptimizedImageUrl(selectedImage.url, isMobile, true)}
                   alt={
                     selectedImage.metadata?.description ||
                     selectedImage.filename ||

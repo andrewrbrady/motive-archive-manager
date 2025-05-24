@@ -51,7 +51,7 @@ export function DatePicker({ date, setDate, className }: DatePickerProps) {
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-4 w-4 text-foreground" />
           {selectedDate ? (
             format(selectedDate, "MM/dd/yyyy")
           ) : (
