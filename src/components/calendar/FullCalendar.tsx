@@ -469,227 +469,383 @@ export function FullCalendarComponent({
     }
   };
 
-  return (
-    <div className={cn("motive-calendar", className)} style={style}>
-      {showFilterControls && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {showVisibilityControls && (
-            <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1 text-xs"
+  // Create filter controls as a separate component
+  const filterControls =
+    showFilterControls || showVisibilityControls ? (
+      <>
+        {showVisibilityControls && (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1 text-xs"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Visibility
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuLabel>Show/Hide</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuCheckboxItem
+                    checked={showEvents}
+                    onCheckedChange={setShowEvents}
                   >
-                    <Eye className="h-3.5 w-3.5" />
-                    Visibility
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuLabel>Show/Hide</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
+                    {showEvents ? (
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Square className="mr-2 h-4 w-4" />
+                    )}
+                    <span>Events</span>
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={showDeliverables}
+                    onCheckedChange={setShowDeliverables}
+                  >
+                    {showDeliverables ? (
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Square className="mr-2 h-4 w-4" />
+                    )}
+                    <span>Deliverables</span>
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Separator orientation="vertical" className="h-8" />
+          </>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 gap-1 text-xs">
+              <Filter className="h-3.5 w-3.5" />
+              Filters
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {uniqueEventTypes.length > 0 && (
+              <>
+                <DropdownMenuLabel>Event Types</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {uniqueEventTypes.map((type) => (
                     <DropdownMenuCheckboxItem
-                      checked={showEvents}
-                      onCheckedChange={setShowEvents}
+                      key={type}
+                      checked={eventTypeFilters.includes(type)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setEventTypeFilters([...eventTypeFilters, type]);
+                        } else {
+                          setEventTypeFilters(
+                            eventTypeFilters.filter((t) => t !== type)
+                          );
+                        }
+                      }}
                     >
-                      {showEvents ? (
+                      {eventTypeFilters.includes(type) ? (
                         <CheckSquare className="mr-2 h-4 w-4" />
                       ) : (
                         <Square className="mr-2 h-4 w-4" />
                       )}
-                      <span>Events</span>
+                      <span>
+                        {type
+                          .replace(/_/g, " ")
+                          .toLowerCase()
+                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
                     </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuGroup>
+              </>
+            )}
+
+            {uniqueDeliverableTypes.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Deliverable Types</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {uniqueDeliverableTypes.map((type) => (
                     <DropdownMenuCheckboxItem
-                      checked={showDeliverables}
-                      onCheckedChange={setShowDeliverables}
+                      key={type}
+                      checked={deliverableTypeFilters.includes(type)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setDeliverableTypeFilters([
+                            ...deliverableTypeFilters,
+                            type,
+                          ]);
+                        } else {
+                          setDeliverableTypeFilters(
+                            deliverableTypeFilters.filter((t) => t !== type)
+                          );
+                        }
+                      }}
                     >
-                      {showDeliverables ? (
+                      {deliverableTypeFilters.includes(type) ? (
                         <CheckSquare className="mr-2 h-4 w-4" />
                       ) : (
                         <Square className="mr-2 h-4 w-4" />
                       )}
-                      <span>Deliverables</span>
+                      <span>
+                        {type
+                          .replace(/_/g, " ")
+                          .toLowerCase()
+                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
                     </DropdownMenuCheckboxItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  ))}
+                </DropdownMenuGroup>
+              </>
+            )}
 
-              <Separator orientation="vertical" className="h-8" />
-            </>
-          )}
+            {deliverableEventCategories.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Deliverable Events</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {deliverableEventCategories.map((type) => (
+                    <DropdownMenuCheckboxItem
+                      key={type}
+                      checked={deliverableEventFilters.includes(type)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setDeliverableEventFilters([
+                            ...deliverableEventFilters,
+                            type,
+                          ]);
+                        } else {
+                          setDeliverableEventFilters(
+                            deliverableEventFilters.filter((t) => t !== type)
+                          );
+                        }
+                      }}
+                    >
+                      {deliverableEventFilters.includes(type) ? (
+                        <CheckSquare className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Square className="mr-2 h-4 w-4" />
+                      )}
+                      <span>
+                        {type
+                          .replace(/_/g, " ")
+                          .toLowerCase()
+                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuGroup>
+              </>
+            )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1 text-xs">
-                <Filter className="h-3.5 w-3.5" />
-                Filters
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              {uniqueEventTypes.length > 0 && (
-                <>
-                  <DropdownMenuLabel>Event Types</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    {uniqueEventTypes.map((type) => (
-                      <DropdownMenuCheckboxItem
-                        key={type}
-                        checked={eventTypeFilters.includes(type)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setEventTypeFilters([...eventTypeFilters, type]);
-                          } else {
-                            setEventTypeFilters(
-                              eventTypeFilters.filter((t) => t !== type)
-                            );
-                          }
-                        }}
-                      >
-                        {eventTypeFilters.includes(type) ? (
-                          <CheckSquare className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Square className="mr-2 h-4 w-4" />
-                        )}
-                        <span>
-                          {type
-                            .replace(/_/g, " ")
-                            .toLowerCase()
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </span>
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuGroup>
-                </>
-              )}
+            {uniqueDeliverablePlatforms.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Deliverable Platforms</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  {uniqueDeliverablePlatforms.map((platform) => (
+                    <DropdownMenuCheckboxItem
+                      key={platform}
+                      checked={deliverablePlatformFilters.includes(platform)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setDeliverablePlatformFilters([
+                            ...deliverablePlatformFilters,
+                            platform,
+                          ]);
+                        } else {
+                          setDeliverablePlatformFilters(
+                            deliverablePlatformFilters.filter(
+                              (p) => p !== platform
+                            )
+                          );
+                        }
+                      }}
+                    >
+                      {deliverablePlatformFilters.includes(platform) ? (
+                        <CheckSquare className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Square className="mr-2 h-4 w-4" />
+                      )}
+                      <span>
+                        {platform
+                          .replace(/_/g, " ")
+                          .toLowerCase()
+                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuGroup>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </>
+    ) : null;
 
-              {uniqueDeliverableTypes.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Deliverable Types</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    {uniqueDeliverableTypes.map((type) => (
-                      <DropdownMenuCheckboxItem
-                        key={type}
-                        checked={deliverableTypeFilters.includes(type)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setDeliverableTypeFilters([
-                              ...deliverableTypeFilters,
-                              type,
-                            ]);
-                          } else {
-                            setDeliverableTypeFilters(
-                              deliverableTypeFilters.filter((t) => t !== type)
-                            );
-                          }
-                        }}
-                      >
-                        {deliverableTypeFilters.includes(type) ? (
-                          <CheckSquare className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Square className="mr-2 h-4 w-4" />
-                        )}
-                        <span>
-                          {type
-                            .replace(/_/g, " ")
-                            .toLowerCase()
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </span>
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuGroup>
-                </>
-              )}
-
-              {deliverableEventCategories.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Deliverable Events</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    {deliverableEventCategories.map((type) => (
-                      <DropdownMenuCheckboxItem
-                        key={type}
-                        checked={deliverableEventFilters.includes(type)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setDeliverableEventFilters([
-                              ...deliverableEventFilters,
-                              type,
-                            ]);
-                          } else {
-                            setDeliverableEventFilters(
-                              deliverableEventFilters.filter((t) => t !== type)
-                            );
-                          }
-                        }}
-                      >
-                        {deliverableEventFilters.includes(type) ? (
-                          <CheckSquare className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Square className="mr-2 h-4 w-4" />
-                        )}
-                        <span>
-                          {type
-                            .replace(/_/g, " ")
-                            .toLowerCase()
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </span>
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuGroup>
-                </>
-              )}
-
-              {uniqueDeliverablePlatforms.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Deliverable Platforms</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    {uniqueDeliverablePlatforms.map((platform) => (
-                      <DropdownMenuCheckboxItem
-                        key={platform}
-                        checked={deliverablePlatformFilters.includes(platform)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setDeliverablePlatformFilters([
-                              ...deliverablePlatformFilters,
-                              platform,
-                            ]);
-                          } else {
-                            setDeliverablePlatformFilters(
-                              deliverablePlatformFilters.filter(
-                                (p) => p !== platform
-                              )
-                            );
-                          }
-                        }}
-                      >
-                        {deliverablePlatformFilters.includes(platform) ? (
-                          <CheckSquare className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Square className="mr-2 h-4 w-4" />
-                        )}
-                        <span>
-                          {platform
-                            .replace(/_/g, " ")
-                            .toLowerCase()
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </span>
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuGroup>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+  // Create filter options for the custom dropdowns
+  const filterOptions = (
+    <div className="space-y-4">
+      {uniqueEventTypes.length > 0 && (
+        <div>
+          <div className="font-medium mb-2">Event Types</div>
+          <div className="space-y-1">
+            {uniqueEventTypes.map((type) => (
+              <label
+                key={type}
+                className="flex items-center space-x-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={eventTypeFilters.includes(type)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setEventTypeFilters([...eventTypeFilters, type]);
+                    } else {
+                      setEventTypeFilters(
+                        eventTypeFilters.filter((t) => t !== type)
+                      );
+                    }
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">
+                  {type
+                    .replace(/_/g, " ")
+                    .toLowerCase()
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
 
+      {uniqueDeliverableTypes.length > 0 && (
+        <div>
+          <div className="font-medium mb-2">Deliverable Types</div>
+          <div className="space-y-1">
+            {uniqueDeliverableTypes.map((type) => (
+              <label
+                key={type}
+                className="flex items-center space-x-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={deliverableTypeFilters.includes(type)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setDeliverableTypeFilters([
+                        ...deliverableTypeFilters,
+                        type,
+                      ]);
+                    } else {
+                      setDeliverableTypeFilters(
+                        deliverableTypeFilters.filter((t) => t !== type)
+                      );
+                    }
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">
+                  {type
+                    .replace(/_/g, " ")
+                    .toLowerCase()
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {deliverableEventCategories.length > 0 && (
+        <div>
+          <div className="font-medium mb-2">Deliverable Events</div>
+          <div className="space-y-1">
+            {deliverableEventCategories.map((type) => (
+              <label
+                key={type}
+                className="flex items-center space-x-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={deliverableEventFilters.includes(type)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setDeliverableEventFilters([
+                        ...deliverableEventFilters,
+                        type,
+                      ]);
+                    } else {
+                      setDeliverableEventFilters(
+                        deliverableEventFilters.filter((t) => t !== type)
+                      );
+                    }
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">
+                  {type
+                    .replace(/_/g, " ")
+                    .toLowerCase()
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {uniqueDeliverablePlatforms.length > 0 && (
+        <div>
+          <div className="font-medium mb-2">Deliverable Platforms</div>
+          <div className="space-y-1">
+            {uniqueDeliverablePlatforms.map((platform) => (
+              <label
+                key={platform}
+                className="flex items-center space-x-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={deliverablePlatformFilters.includes(platform)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setDeliverablePlatformFilters([
+                        ...deliverablePlatformFilters,
+                        platform,
+                      ]);
+                    } else {
+                      setDeliverablePlatformFilters(
+                        deliverablePlatformFilters.filter((p) => p !== platform)
+                      );
+                    }
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">
+                  {platform
+                    .replace(/_/g, " ")
+                    .toLowerCase()
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={cn("motive-calendar", className)} style={style}>
       <div
         className="calendar-container"
         style={{ height: "calc(100vh - 220px)" }}
@@ -699,6 +855,16 @@ export function FullCalendarComponent({
           onEventDrop={handleEventDrop}
           onEventResize={handleEventResize}
           onEventClick={handleEventClick}
+          filterControls={filterControls}
+          onFiltersClick={() => {
+            // Handle filters button click
+            console.log("Filters button clicked");
+          }}
+          showEvents={showEvents}
+          showDeliverables={showDeliverables}
+          onToggleEvents={setShowEvents}
+          onToggleDeliverables={setShowDeliverables}
+          filterOptions={filterOptions}
         />
       </div>
     </div>

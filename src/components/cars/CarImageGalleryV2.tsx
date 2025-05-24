@@ -608,6 +608,15 @@ export function CarImageGalleryV2({
     () => navigateImages("prev") // swipe right = prev
   );
 
+  // Destructure swipe handlers to separate DOM events from state
+  const {
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
+    swipeOffset,
+    isSwipingActive,
+  } = swipeHandlers;
+
   if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -946,7 +955,9 @@ export function CarImageGalleryV2({
               }
             }
           }}
-          {...swipeHandlers}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
           aria-label={
             selectedImage
               ? `Current image: ${
@@ -967,8 +978,8 @@ export function CarImageGalleryV2({
                   className="absolute inset-0 transition-transform duration-200 ease-out"
                   style={{
                     transform:
-                      isMobile && swipeHandlers.isSwipingActive
-                        ? `translateX(${swipeHandlers.swipeOffset}px)`
+                      isMobile && isSwipingActive
+                        ? `translateX(${swipeOffset}px)`
                         : "translateX(0px)",
                   }}
                 >
@@ -992,8 +1003,8 @@ export function CarImageGalleryV2({
 
                 {/* Next Image (slides in from right when swiping left) */}
                 {isMobile &&
-                  swipeHandlers.isSwipingActive &&
-                  swipeHandlers.swipeOffset < 0 &&
+                  isSwipingActive &&
+                  swipeOffset < 0 &&
                   (() => {
                     const currentIndex = filteredImages.findIndex(
                       (img) => img._id === selectedImage._id
@@ -1006,7 +1017,7 @@ export function CarImageGalleryV2({
                       <div
                         className="absolute inset-0 transition-transform duration-200 ease-out"
                         style={{
-                          transform: `translateX(calc(100% + ${swipeHandlers.swipeOffset}px))`,
+                          transform: `translateX(calc(100% + ${swipeOffset}px))`,
                         }}
                       >
                         <Image
@@ -1029,8 +1040,8 @@ export function CarImageGalleryV2({
 
                 {/* Previous Image (slides in from left when swiping right) */}
                 {isMobile &&
-                  swipeHandlers.isSwipingActive &&
-                  swipeHandlers.swipeOffset > 0 &&
+                  isSwipingActive &&
+                  swipeOffset > 0 &&
                   (() => {
                     const currentIndex = filteredImages.findIndex(
                       (img) => img._id === selectedImage._id
@@ -1044,7 +1055,7 @@ export function CarImageGalleryV2({
                       <div
                         className="absolute inset-0 transition-transform duration-200 ease-out"
                         style={{
-                          transform: `translateX(calc(-100% + ${swipeHandlers.swipeOffset}px))`,
+                          transform: `translateX(calc(-100% + ${swipeOffset}px))`,
                         }}
                       >
                         <Image

@@ -25,7 +25,6 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 import { generateCarTitle } from "@/utils/car-helpers";
 import CaptionGenerator from "@/components/CaptionGenerator";
 import BaTListingGenerator from "@/components/BaTListingGenerator";
-import ResearchFiles from "@/components/ResearchFiles";
 import DocumentationFiles from "@/components/DocumentationFiles";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
 import ServiceHistoryTab from "@/components/cars/ServiceHistoryTab";
@@ -101,11 +100,6 @@ export default function CarPage() {
         value: "service",
         label: "Service History",
         content: <ServiceHistoryTab carId={id} />,
-      },
-      {
-        value: "research",
-        label: "Research",
-        content: <ResearchFiles carId={id} />,
       },
       {
         value: "documentation",

@@ -21,23 +21,120 @@
   @apply text-xl font-bold text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
 }
 
+/* Toolbar layout improvements */
+.fc .fc-toolbar {
+  @apply gap-2 py-4;
+}
+
+.fc .fc-toolbar-chunk {
+  @apply flex items-center gap-1;
+}
+
+/* Button group styling for view switcher */
+.fc .fc-button-group {
+  @apply flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden;
+}
+
+.fc .fc-button-group .fc-button {
+  @apply border-none rounded-none border-r border-gray-300 dark:border-gray-600 last:border-r-0;
+}
+
+.fc .fc-button-group .fc-button:first-child {
+  @apply rounded-l-md;
+}
+
+.fc .fc-button-group .fc-button:last-child {
+  @apply rounded-r-md;
+}
+
 /* Button styling */
 .fc .fc-button-primary {
-  @apply bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary-hover))] text-[hsl(var(--primary-foreground))] border-[hsl(var(--primary))] shadow-sm;
+  @apply bg-transparent hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] border border-gray-300 dark:border-gray-600 shadow-none rounded-md px-3 py-1.5 text-sm font-medium transition-colors;
 }
 
 .fc .fc-button-primary:disabled {
-  @apply bg-[hsl(var(--primary))] opacity-50;
+  @apply bg-transparent opacity-50 cursor-not-allowed;
 }
 
 .fc .fc-button-primary:not(:disabled):active,
 .fc .fc-button-primary:not(:disabled).fc-button-active {
-  @apply bg-[hsl(var(--primary-hover))] text-[hsl(var(--primary-foreground))] shadow-none;
+  @apply bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] border-gray-400 dark:border-gray-500 shadow-none;
 }
+
+.fc .fc-button-primary:hover:not(:disabled) {
+  @apply bg-[hsl(var(--muted)/0.8)] border-gray-400 dark:border-gray-500;
+}
+
+/* Remove default button focus outline and add subtle focus ring */
+.fc .fc-button-primary:focus {
+  @apply outline-none ring-2 ring-[hsl(var(--ring))] ring-offset-2 ring-offset-[hsl(var(--background))];
+}
+
+/* Specific styling for navigation buttons (prev/next) */
+.fc .fc-prev-button,
+.fc .fc-next-button {
+  @apply bg-transparent hover:bg-[hsl(var(--muted)/0.5)] border-none shadow-none rounded-full w-8 h-8 flex items-center justify-center;
+}
+
+/* Today button styling */
+.fc .fc-today-button {
+  @apply bg-transparent hover:bg-[hsl(var(--muted)/0.8)] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm font-medium;
+}
+
+/* Navigation button icons */
+.fc .fc-icon {
+  @apply text-[hsl(var(--muted-foreground))] transition-colors;
+}
+
+.fc .fc-button:hover .fc-icon {
+  @apply text-[hsl(var(--foreground))];
+}
+
+/* Button text styling */
+.fc .fc-button .fc-button-content {
+  @apply flex items-center justify-center;
+}
+
+/* Remove button margins for better control */
+.fc .fc-button {
+  @apply m-0;
+}
+
+/* Ensure proper spacing between toolbar elements */
+.fc .fc-toolbar > * {
+  @apply m-0;
+}
+
+/* Style filter control buttons to match calendar navigation */
 
 /* Day header styling */
 .fc .fc-col-header-cell {
   @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
+  border-color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+/* Override default FullCalendar table borders */
+.fc-theme-standard .fc-scrollgrid {
+  border-color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+/* Dark mode overrides for table borders */
+.dark .fc .fc-col-header-cell {
+  border-color: rgb(75 85 99) !important; /* gray-600 */
+}
+
+.dark .fc-theme-standard .fc-scrollgrid {
+  border-color: rgb(75 85 99) !important; /* gray-600 */
+}
+
+.dark .fc-theme-standard td,
+.dark .fc-theme-standard th {
+  border-color: rgb(75 85 99) !important; /* gray-600 */
 }
 
 /* Day grid styling */
@@ -62,7 +159,10 @@
   font-size: 0.8125rem;
   line-height: 1.2;
   font-weight: 500;
-  transition: box-shadow 0.2s, opacity 0.2s, transform 0.1s !important;
+  transition:
+    box-shadow 0.2s,
+    opacity 0.2s,
+    transform 0.1s !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
   border-width: 1px !important;
   margin: 1px 0 !important;
@@ -86,7 +186,7 @@
 }
 
 .fc .fc-timegrid-axis {
-  @apply border-r border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  @apply border-r border-gray-300 dark:border-gray-600;
 }
 
 .fc .fc-timegrid-now-indicator-line {
@@ -99,7 +199,7 @@
 
 /* List view styling */
 .fc .fc-list {
-  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 rounded-md;
+  @apply border border-gray-300 dark:border-gray-600 rounded-md;
 }
 
 .fc .fc-list-day-cushion {
@@ -117,12 +217,12 @@
 
 /* Popover styling for "more" events */
 .fc .fc-popover {
-  @apply border border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] shadow-lg;
+  @apply border border-gray-300 dark:border-gray-600 bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] shadow-lg;
   z-index: 1000 !important;
 }
 
 .fc .fc-popover-header {
-  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] border-b border-gray-300 dark:border-gray-600;
 }
 
 /* Fix week view heights */
@@ -329,4 +429,22 @@
 /* Make all-day events in week view more visible */
 .fc-timegrid-event {
   min-height: 24px;
+}
+
+/* Custom buttons styling */
+.fc .fc-separator-button {
+  @apply bg-transparent text-[hsl(var(--muted-foreground))] border-none shadow-none px-2 py-1.5 text-sm font-medium cursor-default;
+  pointer-events: none;
+}
+
+.fc .fc-filtersButton-button {
+  @apply bg-transparent hover:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] border border-gray-300 dark:border-gray-600 shadow-none rounded-md px-3 py-1.5 text-sm font-medium transition-colors;
+}
+
+.fc .fc-filtersButton-button:hover {
+  @apply bg-[hsl(var(--muted)/0.8)] border-gray-400 dark:border-gray-500;
+}
+
+.fc .fc-filtersButton-button:focus {
+  @apply outline-none ring-2 ring-[hsl(var(--ring))] ring-offset-2 ring-offset-[hsl(var(--background))];
 }
