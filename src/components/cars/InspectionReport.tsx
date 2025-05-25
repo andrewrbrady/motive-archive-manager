@@ -188,33 +188,45 @@ export default function InspectionReport({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="sm" onClick={onBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
               Inspection Report
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               View inspection details and findings
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowEmailModal(true)}>
-            <Mail className="h-4 w-4 mr-2" />
-            Send Report
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowEmailModal(true)}
+            className="flex-1 sm:flex-none"
+          >
+            <Mail className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Send Report</span>
           </Button>
-          <Button variant="outline" onClick={onEdit}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEdit}
+            className="flex-1 sm:flex-none"
+          >
+            <Edit className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Edit</span>
           </Button>
           <Button
             variant="destructive"
+            size="sm"
             onClick={handleDeleteClick}
             disabled={isDeleting}
+            className="flex-1 sm:flex-none"
           >
             {isDeleting ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -226,12 +238,14 @@ export default function InspectionReport({
       </div>
 
       {/* Main Content */}
-      <Card>
+      <Card className="border-0">
         <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="text-xl">{inspection.title}</CardTitle>
-              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex-1">
+              <CardTitle className="text-lg sm:text-xl">
+                {inspection.title}
+              </CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
                   {formatDate(inspection.inspectedAt)}
@@ -244,10 +258,12 @@ export default function InspectionReport({
                 )}
               </div>
             </div>
-            {getStatusBadge(inspection.status)}
+            <div className="flex-shrink-0">
+              {getStatusBadge(inspection.status)}
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 mt-4">
           {/* Description */}
           {inspection.description && (
             <div>
@@ -270,7 +286,7 @@ export default function InspectionReport({
                       className="flex items-start gap-3 p-3 border rounded-lg"
                     >
                       <div
-                        className={`mt-0.5 ${item.completed ? "text-green-600" : "text-red-600"}`}
+                        className={`mt-0.5 flex-shrink-0 ${item.completed ? "text-green-600" : "text-red-600"}`}
                       >
                         {item.completed ? (
                           <CheckCircle className="h-4 w-4" />
@@ -278,7 +294,7 @@ export default function InspectionReport({
                           <AlertCircle className="h-4 w-4" />
                         )}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p
                           className={
                             item.completed
@@ -305,11 +321,11 @@ export default function InspectionReport({
             inspection.inspectionImageIds.length > 0 && (
               <div>
                 <h3 className="font-semibold mb-4">Inspection Images</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {inspection.inspectionImageIds.map((imageId) => (
                     <div
                       key={imageId}
-                      className="relative rounded-lg overflow-hidden border"
+                      className="relative rounded-lg overflow-hidden"
                     >
                       <img
                         src={`https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/public`}
@@ -329,26 +345,26 @@ export default function InspectionReport({
               <h3 className="font-semibold mb-4">External Media</h3>
               <div className="space-y-2">
                 {inspection.dropboxVideoFolderUrl && (
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 break-all">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <a
                       href={inspection.dropboxVideoFolderUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline text-sm"
                     >
                       Video Folder (Dropbox)
                     </a>
                   </div>
                 )}
                 {inspection.dropboxImageFolderUrl && (
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 break-all">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <a
                       href={inspection.dropboxImageFolderUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline text-sm"
                     >
                       Image Folder (Dropbox)
                     </a>
@@ -362,7 +378,7 @@ export default function InspectionReport({
 
       {/* Email Modal */}
       <Dialog open={showEmailModal} onOpenChange={setShowEmailModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Send Inspection Report</DialogTitle>
             <DialogDescription>
@@ -395,7 +411,7 @@ export default function InspectionReport({
               />
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-start space-x-2">
               <Checkbox
                 id="include-images"
                 checked={emailForm.includeImages}
@@ -403,8 +419,12 @@ export default function InspectionReport({
                   handleEmailFormChange("includeImages", checked)
                 }
                 disabled={isSendingEmail}
+                className="mt-0.5"
               />
-              <Label htmlFor="include-images" className="text-sm font-normal">
+              <Label
+                htmlFor="include-images"
+                className="text-sm font-normal leading-relaxed"
+              >
                 Include inspection images in email
                 {inspection.inspectionImageIds?.length > 0 && (
                   <span className="text-muted-foreground ml-1">
@@ -430,17 +450,19 @@ export default function InspectionReport({
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setShowEmailModal(false)}
               disabled={isSendingEmail}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSendEmail}
               disabled={isSendingEmail || !emailForm.to.trim()}
+              className="w-full sm:w-auto"
             >
               {isSendingEmail ? (
                 <>
@@ -460,7 +482,7 @@ export default function InspectionReport({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Inspection</DialogTitle>
             <DialogDescription>
@@ -469,17 +491,18 @@ export default function InspectionReport({
               {inspection.inspectionImageIds &&
                 inspection.inspectionImageIds.length > 0 && (
                   <div className="mt-3">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-start space-x-2">
                       <Checkbox
                         id="delete-images"
                         checked={deleteImages}
                         onCheckedChange={(checked) =>
                           setDeleteImages(checked as boolean)
                         }
+                        className="mt-0.5"
                       />
                       <label
                         htmlFor="delete-images"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        className="text-sm font-medium leading-relaxed peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                       >
                         Also delete {inspection.inspectionImageIds.length}{" "}
                         associated image(s) from Cloudflare storage
@@ -493,14 +516,19 @@ export default function InspectionReport({
                 )}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleDeleteCancel}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDeleteCancel}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
+              className="w-full sm:w-auto"
             >
               {isDeleting ? (
                 <div className="flex items-center gap-2">

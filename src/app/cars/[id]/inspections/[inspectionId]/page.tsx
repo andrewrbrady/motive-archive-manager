@@ -58,7 +58,7 @@ export default function ViewInspectionPage() {
     return (
       <AuthGuard>
         <div className="flex flex-col min-h-screen bg-background">
-          <div className="container-wide px-6 py-8">
+          <div className="px-4 sm:px-6 py-4 sm:py-8">
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
@@ -72,7 +72,7 @@ export default function ViewInspectionPage() {
     return (
       <AuthGuard>
         <div className="flex flex-col min-h-screen bg-background">
-          <div className="container-wide px-6 py-8">
+          <div className="px-4 sm:px-6 py-4 sm:py-8">
             <div className="text-center py-12">
               <p className="text-muted-foreground">Inspection not found</p>
             </div>
@@ -85,7 +85,7 @@ export default function ViewInspectionPage() {
   return (
     <AuthGuard>
       <div className="flex flex-col min-h-screen bg-background">
-        <div className="container-wide px-6 py-8">
+        <div className="px-4 sm:px-6 py-4 sm:py-8">
           <InspectionReport
             inspection={inspection}
             onEdit={handleEdit}
