@@ -71,12 +71,14 @@ export async function GET(request: NextRequest) {
       .toArray();
 
     // Process images
-    const processedImages = images.map((img) => ({
-      ...img,
-      _id: img._id.toString(),
-      carId: img.carId ? img.carId.toString() : "",
-      url: getFormattedImageUrl(img.url),
-    }));
+    const processedImages = images.map((img) => {
+      return {
+        ...img,
+        _id: img._id.toString(),
+        carId: img.carId ? img.carId.toString() : "",
+        url: getFormattedImageUrl(img.url),
+      };
+    });
 
     const response = {
       images: processedImages,

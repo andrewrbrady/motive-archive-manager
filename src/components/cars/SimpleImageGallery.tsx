@@ -16,7 +16,7 @@ import { Loader2, ImageOff, AlertCircle } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { ImageLightbox } from "./ImageLightbox";
-import { ImageData } from "@/lib/imageLoader";
+import { ImageData } from "@/app/images/columns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ImageCard } from "./ImageCard";
 import { toast } from "@/components/ui/use-toast";
@@ -64,6 +64,8 @@ interface SimpleImageGalleryProps {
   selectedImageId?: string;
   filters?: Record<string, string | boolean>;
   setFilter?: (key: string, value: string | boolean) => void;
+  onCanvasExtension?: (image: ImageData) => void;
+  onImageView?: (image: ImageData) => void;
 }
 
 const categories = ["Exterior", "Interior", "Detail", "Action", "Studio"];
@@ -81,6 +83,8 @@ export function SimpleImageGallery({
   isFetchingNextPage,
   onImageSelect,
   selectedImageId,
+  onCanvasExtension,
+  onImageView,
 }: SimpleImageGalleryProps) {
   if (isLoading) {
     return (
@@ -160,6 +164,8 @@ export function SimpleImageGallery({
           onSelect={onImageSelect}
           isSelected={image._id === selectedImageId}
           onDelete={handleDelete}
+          onCanvasExtension={onCanvasExtension}
+          onImageView={onImageView}
         />
       ))}
       {isFetchingNextPage && (

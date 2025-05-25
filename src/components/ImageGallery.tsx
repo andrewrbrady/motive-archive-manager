@@ -277,6 +277,18 @@ export function ImageGallery({
   const displayFilteredImages = galleryImages.filter((image) => {
     return Object.entries(filters).every(([key, value]) => {
       if (!value) return true;
+
+      // Only check for string values on the specific filter fields we care about
+      const filterableFields = [
+        "angle",
+        "movement",
+        "tod",
+        "view",
+        "side",
+        "description",
+      ];
+      if (!filterableFields.includes(key)) return true;
+
       const imageValue = image.metadata[key as keyof typeof image.metadata];
       if (typeof imageValue !== "string") return false;
       if (typeof value !== "string") return false;

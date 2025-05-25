@@ -400,7 +400,14 @@ export function ImageGalleryWithQuery({
       // Filter by metadata filters
       const matchesFilters = Object.entries(filters).every(([key, value]) => {
         if (!value) return true;
-        return image.metadata?.[key as keyof typeof image.metadata] === value;
+
+        // Only apply filtering to the expected filterable fields
+        const filterableFields = ["angle", "view", "movement", "tod"];
+        if (!filterableFields.includes(key)) return true;
+
+        const metadataValue =
+          image.metadata?.[key as keyof typeof image.metadata];
+        return metadataValue === value;
       });
 
       // Filter by search query
@@ -1637,32 +1644,6 @@ export const ImageFilterButton = React.memo(function ImageFilterButton({
                     }`}
                   >
                     {tod}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {filterOptions.sides && filterOptions.sides.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
-                Side
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {filterOptions.sides.map((side: string) => (
-                  <button
-                    key={side}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleFilterChange("side", side);
-                    }}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out ${
-                      activeFilters.side === side
-                        ? "bg-[hsl(var(--background-primary))] text-[hsl(var(--foreground))]"
-                        : "bg-[hsl(var(--background-muted))] text-[hsl(var(--foreground-muted))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
-                    }`}
-                  >
-                    {side}
                   </button>
                 ))}
               </div>

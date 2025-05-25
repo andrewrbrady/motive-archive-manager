@@ -50,3 +50,7 @@ cookies.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# canvas extension
+extend_canvas
+/temp/

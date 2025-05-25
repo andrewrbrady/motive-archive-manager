@@ -1,8 +1,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { ImageData } from "@/lib/imageLoader";
-import { Copy, Check, Trash2, Loader2 } from "lucide-react";
+import { ImageData } from "@/app/images/columns";
+import { Copy, Check, Trash2, Loader2, Expand } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface ImageCardProps {
@@ -10,6 +10,8 @@ interface ImageCardProps {
   onSelect?: (image: ImageData) => void;
   isSelected?: boolean;
   onDelete?: (image: ImageData) => Promise<void>;
+  onCanvasExtension?: (image: ImageData) => void;
+  onImageView?: (image: ImageData) => void;
 }
 
 export function ImageCard({
@@ -17,6 +19,8 @@ export function ImageCard({
   onSelect,
   isSelected,
   onDelete,
+  onCanvasExtension,
+  onImageView,
 }: ImageCardProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedFilename, setCopiedFilename] = useState(false);
@@ -82,6 +86,11 @@ export function ImageCard({
     }
   };
 
+  const handleCanvasExtension = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCanvasExtension?.(image);
+  };
+
   if (onDelete) {
     // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
   }
@@ -90,32 +99,51 @@ export function ImageCard({
     <div
       className={cn(
         "relative overflow-hidden rounded-lg cursor-pointer group",
-        "aspect-[4/3] border border-border hover:shadow-md transition-all duration-200",
+        "border border-border hover:shadow-md transition-all duration-200",
+        "min-h-[200px] max-h-[400px]",
         isSelected && "ring-2 ring-primary"
       )}
-      onClick={() => onSelect?.(image)}
+      onClick={() => onImageView?.(image)}
     >
-      {/* Delete button (top right, visible on hover) */}
-      {onDelete && (
-        <button
-          onClick={handleDelete}
-          className="absolute top-2 right-2 z-20 p-1 bg-background/80 rounded-full hover:bg-destructive/80 hover:text-white transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none"
-          aria-label="Delete image"
-          disabled={isDeleting}
-        >
-          {isDeleting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 className="h-4 w-4" />
-          )}
-        </button>
-      )}
+      {/* Action buttons (top right, visible on hover) */}
+      <div className="absolute top-2 right-2 z-20 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        {/* Canvas Extension button */}
+        {onCanvasExtension && (
+          <button
+            onClick={handleCanvasExtension}
+            className="p-1 bg-background/80 rounded-full hover:bg-primary/80 hover:text-white transition-colors focus:outline-none"
+            aria-label="Extend canvas"
+            title="Extend canvas"
+          >
+            <Expand className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Delete button */}
+        {onDelete && (
+          <button
+            onClick={handleDelete}
+            className="p-1 bg-background/80 rounded-full hover:bg-destructive/80 hover:text-white transition-colors focus:outline-none"
+            aria-label="Delete image"
+            title="Delete image"
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </div>
       <Image
         src={image.url}
         alt={image.filename || "Car image"}
-        fill
-        className="object-cover"
+        width={0}
+        height={0}
+        className="w-full h-auto object-contain min-h-[200px] max-h-[400px]"
         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        style={{ width: "100%", height: "auto" }}
       />
 
       {/* Gradient overlay on hover */}
