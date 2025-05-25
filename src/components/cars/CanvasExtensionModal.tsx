@@ -73,6 +73,10 @@ export function CanvasExtensionModal({
     useState<ImageDimensions | null>(null);
   const [cloudflareResult, setCloudflareResult] =
     useState<CloudflareUploadResult | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const [fallbackUsed, setFallbackUsed] = useState<boolean>(false);
+  const [fallbackReason, setFallbackReason] = useState<string>("");
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -194,12 +198,30 @@ export function CanvasExtensionModal({
       }
 
       const result = await response.json();
-      setProcessedImageUrl(result.processedImageUrl);
 
-      toast({
-        title: "Success",
-        description: "Image processed successfully",
-      });
+      if (result.success) {
+        setProcessedImageUrl(result.processedImageUrl);
+        setProcessingStatus("completed");
+
+        // Show fallback information if used
+        if (result.fallbackUsed) {
+          console.log(
+            `Canvas extension used fallback: ${result.fallbackReason}`
+          );
+          setFallbackUsed(true);
+          setFallbackReason(result.fallbackReason);
+        }
+
+        toast({
+          title: "Success",
+          description: result.fallbackUsed
+            ? "Image processed successfully (using JavaScript fallback due to C++ binary issues)"
+            : "Image processed successfully",
+        });
+      } else {
+        setProcessingStatus("error");
+        setError(result.error || "Processing failed");
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -443,6 +465,8 @@ export function CanvasExtensionModal({
     setWhiteThresh("90");
     setCloudflareWidth("2000");
     setCloudflareQuality("100");
+    setFallbackUsed(false);
+    setFallbackReason("");
   };
 
   const handleClose = () => {

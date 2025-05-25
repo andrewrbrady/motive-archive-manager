@@ -28,6 +28,10 @@
     "app/api/images/extend-canvas/route.ts": {
       "maxDuration": 60,
       "memory": 1536
+    },
+    "app/api/images/extend-canvas-js/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
     }
   }
 }

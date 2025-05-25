@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
-import fs from "fs/promises";
-import path from "path";
+import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-
-const execAsync = promisify(exec);
 
 interface ExtendCanvasRequest {
   imageUrl: string;
@@ -61,14 +56,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create temporary directory for processing
-    const tempDir = path.join("/tmp", "canvas-extension");
-    await fs.mkdir(tempDir, { recursive: true });
-
-    const sessionId = uuidv4();
-    const inputPath = path.join(tempDir, `input_${sessionId}.jpg`);
-    const outputPath = path.join(tempDir, `output_${sessionId}.jpg`);
-
     try {
       // Download the image
       const imageResponse = await fetch(imageUrl);
@@ -76,134 +63,71 @@ export async function POST(request: NextRequest) {
         throw new Error("Failed to download image");
       }
 
-      const imageBuffer = await imageResponse.arrayBuffer();
-      await fs.writeFile(inputPath, Buffer.from(imageBuffer));
+      const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
-      // Check if extend_canvas executable exists
-      const executablePath = path.join(process.cwd(), "extend_canvas");
-      try {
-        await fs.access(executablePath);
-      } catch {
-        // Check if we're in a production environment
-        const isProduction = process.env.NODE_ENV === "production";
-        const errorMessage = isProduction
-          ? "Canvas extension feature is currently unavailable in production. The C++ processing program could not be compiled during deployment."
-          : "Canvas extension program not found. Please ensure extend_canvas is compiled and available in the project root.";
+      // Get image metadata
+      const image = sharp(imageBuffer);
+      const metadata = await image.metadata();
 
-        return NextResponse.json(
-          {
-            error: errorMessage,
-            details: isProduction
-              ? "This feature requires OpenCV to be installed during the build process. Please check the deployment logs for compilation errors."
-              : "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp `pkg-config --cflags --libs opencv4`",
-          },
-          { status: 503 } // Service Unavailable
-        );
+      if (!metadata.width || !metadata.height) {
+        throw new Error("Could not determine image dimensions");
       }
 
-      // Build command arguments
-      const args = [
-        inputPath,
-        outputPath,
-        desiredHeight.toString(),
-        paddingPct.toString(),
-        whiteThresh.toString(),
-      ];
+      const originalWidth = metadata.width;
+      const originalHeight = metadata.height;
 
-      // Execute the C++ program
-      const command = `${executablePath} ${args.join(" ")}`;
-      console.log("Executing command:", command);
+      console.log(
+        `Processing image: ${originalWidth}x${originalHeight} -> ${originalWidth}x${desiredHeight}`
+      );
 
-      try {
-        const { stdout, stderr } = await execAsync(command, {
-          timeout: 30000, // 30 second timeout
+      // Simple canvas extension using Sharp
+      // This is a simplified version that extends the canvas by adding white space
+      let processedImageBuffer: Buffer;
+
+      if (desiredHeight <= originalHeight) {
+        // If desired height is smaller, crop from center
+        const cropTop = Math.floor((originalHeight - desiredHeight) / 2);
+        processedImageBuffer = await image
+          .extract({
+            left: 0,
+            top: cropTop,
+            width: originalWidth,
+            height: desiredHeight,
+          })
+          .jpeg({ quality: 95 })
+          .toBuffer();
+      } else {
+        // If desired height is larger, extend the canvas
+        const extraHeight = desiredHeight - originalHeight;
+        const topPadding = Math.floor(extraHeight / 2);
+        const bottomPadding = extraHeight - topPadding;
+
+        // Create a white background
+        const background = sharp({
+          create: {
+            width: originalWidth,
+            height: desiredHeight,
+            channels: 3,
+            background: { r: 255, g: 255, b: 255 },
+          },
         });
 
-        if (stderr) {
-          console.warn("Canvas extension stderr:", stderr);
-        }
-
-        console.log("Canvas extension stdout:", stdout);
-      } catch (execError: any) {
-        console.error("Canvas extension execution error:", execError);
-
-        // Check if this is an OpenCV library dependency error
-        if (
-          execError &&
-          (execError.stderr?.includes("error while loading shared libraries") ||
-            execError.message?.includes(
-              "error while loading shared libraries"
-            )) &&
-          (execError.stderr?.includes("libopencv") ||
-            execError.message?.includes("libopencv"))
-        ) {
-          console.log(
-            "🔄 OpenCV dependency error detected, falling back to JavaScript version..."
-          );
-
-          try {
-            // Fall back to JavaScript implementation
-            const fallbackResponse = await fetch(
-              `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/images/extend-canvas-js`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  imageUrl,
-                  desiredHeight,
-                  paddingPct,
-                  whiteThresh,
-                  uploadToCloudflare,
-                  originalFilename,
-                  originalCarId,
-                }),
-              }
-            );
-
-            if (fallbackResponse.ok) {
-              const fallbackResult = await fallbackResponse.json();
-              console.log("✅ Successfully processed with JavaScript fallback");
-              return NextResponse.json({
-                ...fallbackResult,
-                fallbackUsed: true,
-                fallbackReason: "OpenCV dependency issue with C++ binary",
-              });
-            } else {
-              throw new Error(
-                `Fallback API failed: ${fallbackResponse.statusText}`
-              );
-            }
-          } catch (fallbackError) {
-            console.error(
-              "Fallback to JavaScript version also failed:",
-              fallbackError
-            );
-            throw new Error(
-              `Both C++ binary and JavaScript fallback failed. C++ error: ${execError.message || execError}. Fallback error: ${fallbackError instanceof Error ? fallbackError.message : "Unknown error"}`
-            );
-          }
-        }
-
-        throw new Error(
-          "Canvas extension binary is missing required OpenCV libraries. The binary needs to be recompiled with static linking for the Vercel environment. Please check the deployment documentation for instructions on creating a compatible binary."
-        );
+        // Composite the original image onto the white background
+        processedImageBuffer = await background
+          .composite([
+            {
+              input: imageBuffer,
+              top: topPadding,
+              left: 0,
+            },
+          ])
+          .jpeg({ quality: 95 })
+          .toBuffer();
       }
-
-      // Check if output file was created
-      try {
-        await fs.access(outputPath);
-      } catch {
-        throw new Error("Output image was not generated");
-      }
-
-      // Read the processed image
-      const processedImageBuffer = await fs.readFile(outputPath);
 
       let result: any = {
         success: true,
-        message: "Image processed successfully",
+        message: "Image processed successfully (JavaScript version)",
       };
 
       if (uploadToCloudflare) {
@@ -219,7 +143,7 @@ export async function POST(request: NextRequest) {
           // Create filename for the processed image
           const baseFilename = originalFilename || "image";
           const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
-          const processedFilename = `${nameWithoutExt}_extended_${desiredHeight}px.jpg`;
+          const processedFilename = `${nameWithoutExt}_extended_${desiredHeight}px_js.jpg`;
 
           // Create a File object from the buffer
           const processedFile = new File(
@@ -273,7 +197,7 @@ export async function POST(request: NextRequest) {
             filename: processedFilename,
             metadata: {
               category: "processed",
-              processing: "canvas_extension",
+              processing: "canvas_extension_js",
               originalImage: imageUrl,
               parameters: {
                 desiredHeight,
@@ -340,24 +264,12 @@ export async function POST(request: NextRequest) {
       const dataUrl = `data:image/jpeg;base64,${base64Image}`;
       result.processedImageUrl = dataUrl;
 
-      // Clean up temporary files
-      await Promise.all([
-        fs.unlink(inputPath).catch(() => {}),
-        fs.unlink(outputPath).catch(() => {}),
-      ]);
-
       return NextResponse.json(result);
     } catch (error) {
-      // Clean up temporary files on error
-      await Promise.all([
-        fs.unlink(inputPath).catch(() => {}),
-        fs.unlink(outputPath).catch(() => {}),
-      ]);
-
       throw error;
     }
   } catch (error) {
-    console.error("Canvas extension error:", error);
+    console.error("Canvas extension (JS) error:", error);
 
     if (error instanceof Error) {
       if (error.message.includes("timeout")) {
