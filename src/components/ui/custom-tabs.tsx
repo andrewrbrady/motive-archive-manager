@@ -3,6 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cleanupUrlParameters } from "@/utils/urlCleanup";
 
 export interface TabItem {
@@ -19,6 +26,24 @@ interface CustomTabsProps {
   className?: string;
 }
 
+// Hook to detect mobile screen size
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
+
+  return isMobile;
+};
+
 export function CustomTabs({
   items,
   defaultValue,
@@ -29,6 +54,7 @@ export function CustomTabs({
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams?.get(paramName);
+  const isMobile = useIsMobile();
 
   // Simplified refs - only track URL updates to prevent loops
   const urlUpdateTimeoutRef = useRef<NodeJS.Timeout>();
@@ -117,6 +143,10 @@ export function CustomTabs({
     };
   }, []);
 
+  // Get the current tab label for the dropdown
+  const currentTabLabel =
+    items.find((item) => item.value === activeTab)?.label || items[0]?.label;
+
   return (
     <Tabs
       defaultValue={initialTab}
@@ -124,17 +154,38 @@ export function CustomTabs({
       onValueChange={handleTabChange}
       className={`w-full ${className}`}
     >
-      <TabsList className="mb-8 h-auto min-h-[2.5rem] items-center justify-start p-1 text-[hsl(var(--muted-foreground))] w-full gap-2 overflow-visible bg-transparent flex flex-wrap">
-        {items.map((item) => (
-          <TabsTrigger
-            key={item.value}
-            value={item.value}
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium relative transition-all duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-transparent data-[state=active]:bg-transparent data-[state=active]:text-[hsl(var(--foreground))] data-[state=active]:border-[hsl(var(--border))] data-[state=active]:shadow-sm data-[state=inactive]:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))] hover:border-[hsl(var(--border))]/50 hover:-translate-y-0.5 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[hsl(var(--primary))] after:scale-x-0 after:origin-center after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=active]:after:scale-x-100 mb-1"
-          >
-            {item.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      {/* Mobile Dropdown */}
+      {isMobile ? (
+        <div className="mb-8">
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a tab">
+                {currentTabLabel}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        /* Desktop Tab List */
+        <TabsList className="mb-8 h-auto min-h-[2.5rem] items-center justify-start p-1 text-[hsl(var(--muted-foreground))] w-full gap-2 overflow-visible bg-transparent flex flex-wrap">
+          {items.map((item) => (
+            <TabsTrigger
+              key={item.value}
+              value={item.value}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium relative transition-all duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-transparent data-[state=active]:bg-transparent data-[state=active]:text-[hsl(var(--foreground))] data-[state=active]:border-[hsl(var(--border))] data-[state=active]:shadow-sm data-[state=inactive]:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))] hover:border-[hsl(var(--border))]/50 hover:-translate-y-0.5 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[hsl(var(--primary))] after:scale-x-0 after:origin-center after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=active]:after:scale-x-100 mb-1"
+            >
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      )}
 
       {items.map((item) => (
         <TabsContent key={item.value} value={item.value}>
