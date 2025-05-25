@@ -7,8 +7,13 @@
     "node": "^18.17.0 || ^20.0.0"
   },
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
-    "build": "next build",
+    "dev": "next dev",
+    "prebuild": "npm run install:opencv",
+    "build": "npm run build:cpp && next build",
+    "build:cpp": "./build-cpp.sh",
+    "install:opencv": "npm run check:opencv || npm run install:opencv:vercel",
+    "check:opencv": "command -v pkg-config >/dev/null 2>&1 && pkg-config --exists opencv4",
+    "install:opencv:vercel": "apt-get update && apt-get install -y libopencv-dev pkg-config || echo 'OpenCV installation failed - canvas extension will be disabled'",
     "build:safe": "npm run check:console-logs && next build",
     "build:production": "npm run fix:console-logs && next build",
     "start": "next start",

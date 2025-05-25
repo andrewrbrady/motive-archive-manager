@@ -84,12 +84,20 @@ export async function POST(request: NextRequest) {
       try {
         await fs.access(executablePath);
       } catch {
+        // Check if we're in a production environment
+        const isProduction = process.env.NODE_ENV === "production";
+        const errorMessage = isProduction
+          ? "Canvas extension feature is currently unavailable in production. The C++ processing program could not be compiled during deployment."
+          : "Canvas extension program not found. Please ensure extend_canvas is compiled and available in the project root.";
+
         return NextResponse.json(
           {
-            error:
-              "Canvas extension program not found. Please ensure extend_canvas is compiled and available in the project root.",
+            error: errorMessage,
+            details: isProduction
+              ? "This feature requires OpenCV to be installed during the build process. Please check the deployment logs for compilation errors."
+              : "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp `pkg-config --cflags --libs opencv4`",
           },
-          { status: 500 }
+          { status: 503 } // Service Unavailable
         );
       }
 
