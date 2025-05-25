@@ -142,3 +142,4 @@ int main(int argc, char *argv[])
     return 0;
 }// Updated for better static linking
 // Trigger full static linking attempt
+// Trigger minimal OpenCV build
