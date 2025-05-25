@@ -125,6 +125,7 @@
     "fuse.js": "^7.0.0",
     "googleapis": "^149.0.0",
     "gray-matter": "^4.0.3",
+    "heic-to": "^1.1.13",
     "jszip": "3.10.1",
     "katex": "^0.16.21",
     "langchain": "^0.3.15",
