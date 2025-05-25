@@ -373,317 +373,338 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Upload to YouTube</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-base sm:text-lg">
+              Upload to YouTube
+            </DialogTitle>
           </DialogHeader>
 
-          {!authStatus.isAuthenticated ? (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2 text-amber-600">
-                <AlertCircle className="h-5 w-5" />
-                <span className="text-sm">YouTube authentication required</span>
-              </div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            {!authStatus.isAuthenticated ? (
+              <div className="space-y-4 p-1">
+                <div className="flex items-center space-x-2 text-amber-600">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                  <span className="text-sm">
+                    YouTube authentication required
+                  </span>
+                </div>
 
-              <p className="text-sm text-muted-foreground">
-                You need to authenticate with your YouTube account to upload
-                videos. This will allow you to upload to your own YouTube
-                channel.
-              </p>
+                <p className="text-sm text-muted-foreground">
+                  You need to authenticate with your YouTube account to upload
+                  videos. This will allow you to upload to your own YouTube
+                  channel.
+                </p>
 
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAuthenticate}>
-                  Authenticate with YouTube
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Collapsible upload destination info */}
-              <div className="border border-gray-200 dark:border-gray-700 rounded-lg">
-                <button
-                  onClick={() => setShowUploadInfo(!showUploadInfo)}
-                  className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Info className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Upload Destination Info
-                    </span>
-                  </div>
-                  {showUploadInfo ? (
-                    <ChevronUp className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-gray-500" />
-                  )}
-                </button>
-                {showUploadInfo && (
-                  <div className="px-3 pb-3 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
-                    <div className="space-y-2">
-                      <div>
-                        Videos will be uploaded to the{" "}
-                        <strong>first channel</strong> associated with your
-                        authenticated Google account. If you're authenticated
-                        with your personal account, uploads will go to your
-                        personal channel even if you have access to brand
-                        accounts.
-                      </div>
-                      <div className="text-xs bg-blue-50 dark:bg-blue-950 p-2 rounded border-l-2 border-blue-400">
-                        <strong>To upload to MotiveArchiveMedia:</strong> Clear
-                        your authentication below and re-authenticate directly
-                        with the MotiveArchiveMedia Google account.
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Check if we have the personal channel in the list - this indicates potential upload issues */}
-              {authStatus.channels.length > 0 &&
-                authStatus.channels.some(
-                  (c) => c.id === "UCAy_HWd9o_G3PT_CBL0tV-Q"
-                ) && (
-                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                    <AlertDescription className="text-amber-800 dark:text-amber-200">
-                      <div className="space-y-2">
-                        <div className="font-medium">
-                          ⚠️ Authentication Issue Detected
-                        </div>
-                        <div>
-                          You're authenticated with your personal Google account
-                          which includes access to your personal Andrew Brady
-                          channel. While the system can detect the
-                          MotiveArchiveMedia brand account, uploads may still go
-                          to your personal channel due to YouTube's default
-                          behavior. For best results, re-authenticate and
-                          explicitly select only the MotiveArchiveMedia account
-                          during sign-in.
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleAuthenticate}
-                          className="mt-2"
-                        >
-                          Re-authenticate with Brand Account Only
-                        </Button>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-              {/* Always show logout option when authenticated */}
-              {authStatus.isAuthenticated && (
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border">
-                  <div className="text-sm">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
-                      Current Authentication Status
-                    </div>
-                    <div className="text-gray-500 dark:text-gray-400">
-                      {authStatus.channels.length} channel(s) accessible
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950"
-                  >
-                    Clear & Re-authenticate
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAuthenticate}>
+                    Authenticate with YouTube
                   </Button>
                 </div>
-              )}
-
-              <div className="space-y-4">
-                <Label className="text-base font-medium">Title</Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter video title"
-                  className="text-base"
-                />
               </div>
-
-              <div className="space-y-4">
-                <Label className="text-base font-medium">Description</Label>
-
-                {/* Description mode selection */}
-                <RadioGroup
-                  value={useCustomDescription ? "custom" : "caption"}
-                  onValueChange={(value) => {
-                    const useCustom = value === "custom";
-                    setUseCustomDescription(useCustom);
-                    if (useCustom) {
-                      setSelectedCaptionId("");
-                      setEditableCaption("");
-                    }
-                  }}
-                  className="flex gap-6"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="custom" id="custom" />
-                    <Label htmlFor="custom" className="cursor-pointer">
-                      Custom Description
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="caption" id="caption" />
-                    <Label htmlFor="caption" className="cursor-pointer">
-                      Use Saved Caption
-                    </Label>
-                  </div>
-                </RadioGroup>
-
-                {/* Content based on selection */}
-                {useCustomDescription ? (
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="description"
-                      className="text-sm text-muted-foreground"
-                    >
-                      Enter your custom video description
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Video description"
-                      rows={4}
-                      className="resize-none"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">
-                        Select from existing captions for this car
-                      </Label>
-                      <Select
-                        value={selectedCaptionId}
-                        onValueChange={(value) => {
-                          setSelectedCaptionId(value);
-                          const selectedCaption = captions.find(
-                            (c) => c._id === value
-                          );
-                          if (selectedCaption) {
-                            setEditableCaption(selectedCaption.caption);
-                          }
-                        }}
-                        disabled={loadingCaptions}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              loadingCaptions
-                                ? "Loading captions..."
-                                : captions.length === 0
-                                  ? "No captions available for this car"
-                                  : "Select a caption to use as description"
-                            }
-                          >
-                            {selectedCaptionId && (
-                              <span className="truncate">
-                                {(() => {
-                                  const selectedCaption = captions.find(
-                                    (c) => c._id === selectedCaptionId
-                                  );
-                                  if (selectedCaption) {
-                                    return selectedCaption.caption.length > 60
-                                      ? selectedCaption.caption.substring(
-                                          0,
-                                          60
-                                        ) + "..."
-                                      : selectedCaption.caption;
-                                  }
-                                  return "";
-                                })()}
-                              </span>
-                            )}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          {captions.map((caption) => (
-                            <SelectItem
-                              key={caption._id}
-                              value={caption._id}
-                              className="py-3"
-                            >
-                              <div className="text-sm leading-relaxed break-words max-w-full">
-                                {caption.caption.length > 120
-                                  ? caption.caption.substring(0, 120) + "..."
-                                  : caption.caption}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+            ) : (
+              <div className="space-y-6 p-1">
+                {/* Collapsible upload destination info */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <button
+                    onClick={() => setShowUploadInfo(!showUploadInfo)}
+                    className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                        Upload Destination Info
+                      </span>
                     </div>
-
-                    {/* Selected caption editor */}
-                    {selectedCaptionId && (
+                    {showUploadInfo ? (
+                      <ChevronUp className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    )}
+                  </button>
+                  {showUploadInfo && (
+                    <div className="px-3 pb-3 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
                       <div className="space-y-2">
-                        <Label
-                          htmlFor="editableCaption"
-                          className="text-sm text-muted-foreground"
-                        >
-                          Edit selected caption (you can modify text, copy
-                          title, etc.)
-                        </Label>
-                        <Textarea
-                          id="editableCaption"
-                          value={editableCaption}
-                          onChange={(e) => setEditableCaption(e.target.value)}
-                          rows={6}
-                          className="resize-none bg-muted/50 border-muted"
-                          placeholder="Caption content will appear here..."
-                        />
+                        <div className="break-words">
+                          Videos will be uploaded to the{" "}
+                          <strong>first channel</strong> associated with your
+                          authenticated Google account. If you're authenticated
+                          with your personal account, uploads will go to your
+                          personal channel even if you have access to brand
+                          accounts.
+                        </div>
+                        <div className="text-xs bg-blue-50 dark:bg-blue-950 p-2 rounded border-l-2 border-blue-400 break-words">
+                          <strong>To upload to MotiveArchiveMedia:</strong>{" "}
+                          Clear your authentication below and re-authenticate
+                          directly with the MotiveArchiveMedia Google account.
+                        </div>
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
 
-                    {captions.length === 0 && !loadingCaptions && (
-                      <div className="p-4 text-center border-2 border-dashed border-muted rounded-lg">
-                        <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground mb-1">
-                          No captions available
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Create captions for this car to use them as video
-                          descriptions
-                        </p>
+                {/* Check if we have the personal channel in the list - this indicates potential upload issues */}
+                {authStatus.channels.length > 0 &&
+                  authStatus.channels.some(
+                    (c) => c.id === "UCAy_HWd9o_G3PT_CBL0tV-Q"
+                  ) && (
+                    <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                      <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                      <AlertDescription className="text-amber-800 dark:text-amber-200">
+                        <div className="space-y-2">
+                          <div className="font-medium">
+                            ⚠️ Authentication Issue Detected
+                          </div>
+                          <div className="break-words">
+                            You're authenticated with your personal Google
+                            account which includes access to your personal
+                            Andrew Brady channel. While the system can detect
+                            the MotiveArchiveMedia brand account, uploads may
+                            still go to your personal channel due to YouTube's
+                            default behavior. For best results, re-authenticate
+                            and explicitly select only the MotiveArchiveMedia
+                            account during sign-in.
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAuthenticate}
+                            className="mt-2"
+                          >
+                            Re-authenticate with Brand Account Only
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                {/* Always show logout option when authenticated */}
+                {authStatus.isAuthenticated && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border">
+                    <div className="text-sm min-w-0 flex-1 mr-3">
+                      <div className="font-medium text-gray-900 dark:text-gray-100">
+                        Current Authentication Status
                       </div>
-                    )}
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {authStatus.channels.length} channel(s) accessible
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleLogout}
+                      className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950 flex-shrink-0"
+                    >
+                      <span className="hidden sm:inline">
+                        Clear & Re-authenticate
+                      </span>
+                      <span className="sm:hidden">Clear Auth</span>
+                    </Button>
                   </div>
                 )}
-              </div>
 
-              <div className="space-y-4">
-                <Label className="text-base font-medium">Tags</Label>
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="tags"
-                    className="text-sm text-muted-foreground"
-                  >
-                    Enter comma-separated tags for better video discoverability
-                  </Label>
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">Title</Label>
                   <Input
-                    id="tags"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    placeholder="automotive, car, review, luxury"
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter video title"
                     className="text-base"
                   />
                 </div>
-              </div>
 
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancel
-                </Button>
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">Description</Label>
+
+                  {/* Description mode selection */}
+                  <RadioGroup
+                    value={useCustomDescription ? "custom" : "caption"}
+                    onValueChange={(value) => {
+                      const useCustom = value === "custom";
+                      setUseCustomDescription(useCustom);
+                      if (useCustom) {
+                        setSelectedCaptionId("");
+                        setEditableCaption("");
+                      }
+                    }}
+                    className="flex flex-col sm:flex-row gap-4 sm:gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="custom" id="custom" />
+                      <Label htmlFor="custom" className="cursor-pointer">
+                        Custom Description
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="caption" id="caption" />
+                      <Label htmlFor="caption" className="cursor-pointer">
+                        Use Saved Caption
+                      </Label>
+                    </div>
+                  </RadioGroup>
+
+                  {/* Content based on selection */}
+                  {useCustomDescription ? (
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="description"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Enter your custom video description
+                      </Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Video description"
+                        rows={4}
+                        className="resize-none"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">
+                          Select from existing captions for this car
+                        </Label>
+                        <Select
+                          value={selectedCaptionId}
+                          onValueChange={(value) => {
+                            setSelectedCaptionId(value);
+                            const selectedCaption = captions.find(
+                              (c) => c._id === value
+                            );
+                            if (selectedCaption) {
+                              setEditableCaption(selectedCaption.caption);
+                            }
+                          }}
+                          disabled={loadingCaptions}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue
+                              placeholder={
+                                loadingCaptions
+                                  ? "Loading captions..."
+                                  : captions.length === 0
+                                    ? "No captions available for this car"
+                                    : "Select a caption to use as description"
+                              }
+                            >
+                              {selectedCaptionId && (
+                                <span className="truncate block max-w-full">
+                                  {(() => {
+                                    const selectedCaption = captions.find(
+                                      (c) => c._id === selectedCaptionId
+                                    );
+                                    if (selectedCaption) {
+                                      return selectedCaption.caption.length > 50
+                                        ? selectedCaption.caption.substring(
+                                            0,
+                                            50
+                                          ) + "..."
+                                        : selectedCaption.caption;
+                                    }
+                                    return "";
+                                  })()}
+                                </span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60 w-full">
+                            {captions.map((caption) => (
+                              <SelectItem
+                                key={caption._id}
+                                value={caption._id}
+                                className="py-3 max-w-full"
+                              >
+                                <div className="text-sm leading-relaxed break-words w-full max-w-full overflow-hidden">
+                                  <div className="font-medium text-xs text-muted-foreground mb-1 truncate">
+                                    {caption.platform} • {caption.context}
+                                  </div>
+                                  <div className="line-clamp-3">
+                                    {caption.caption.length > 100
+                                      ? caption.caption.substring(0, 100) +
+                                        "..."
+                                      : caption.caption}
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Selected caption editor */}
+                      {selectedCaptionId && (
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="editableCaption"
+                            className="text-sm text-muted-foreground"
+                          >
+                            Edit selected caption (you can modify text, copy
+                            title, etc.)
+                          </Label>
+                          <Textarea
+                            id="editableCaption"
+                            value={editableCaption}
+                            onChange={(e) => setEditableCaption(e.target.value)}
+                            rows={6}
+                            className="resize-none bg-muted/50 border-muted"
+                            placeholder="Caption content will appear here..."
+                          />
+                        </div>
+                      )}
+
+                      {captions.length === 0 && !loadingCaptions && (
+                        <div className="p-4 text-center border-2 border-dashed border-muted rounded-lg">
+                          <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground mb-1">
+                            No captions available
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Create captions for this car to use them as video
+                            descriptions
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">Tags</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="tags"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Enter comma-separated tags for better video
+                      discoverability
+                    </Label>
+                    <Input
+                      id="tags"
+                      value={tags}
+                      onChange={(e) => setTags(e.target.value)}
+                      placeholder="automotive, car, review, luxury"
+                      className="text-base"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Fixed footer with action buttons */}
+          <div className="flex-shrink-0 border-t pt-4">
+            <div className="flex justify-end space-x-3">
+              <Button variant="outline" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              {authStatus.isAuthenticated && (
                 <Button
                   onClick={handleUpload}
                   disabled={
@@ -696,18 +717,22 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
                   {isUploading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Uploading...
+                      <span className="hidden sm:inline">Uploading...</span>
+                      <span className="sm:hidden">Upload...</span>
                     </>
                   ) : (
                     <>
                       <Upload className="mr-2 h-4 w-4" />
-                      Upload to YouTube
+                      <span className="hidden sm:inline">
+                        Upload to YouTube
+                      </span>
+                      <span className="sm:hidden">Upload</span>
                     </>
                   )}
                 </Button>
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </DialogContent>
       </Dialog>
     </>

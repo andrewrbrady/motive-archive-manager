@@ -159,200 +159,309 @@ export default function EditDeliverableForm({
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit Deliverable</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+        <DialogHeader className="flex-shrink-0 pb-4 border-b border-[hsl(var(--border-subtle))]">
+          <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
+            Edit Deliverable
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="title" className="text-sm font-medium">
-              Title
-            </label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter title"
-              required
-            />
-          </div>
 
-          <div className="space-y-2">
-            <label htmlFor="platform" className="text-sm font-medium">
-              Platform
-            </label>
-            <Select
-              value={platform}
-              onValueChange={(value: Platform) => setPlatform(value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Instagram Reels">Instagram Reels</SelectItem>
-                <SelectItem value="Instagram Post">Instagram Post</SelectItem>
-                <SelectItem value="Instagram Story">Instagram Story</SelectItem>
-                <SelectItem value="YouTube">YouTube</SelectItem>
-                <SelectItem value="YouTube Shorts">YouTube Shorts</SelectItem>
-                <SelectItem value="TikTok">TikTok</SelectItem>
-                <SelectItem value="Facebook">Facebook</SelectItem>
-                <SelectItem value="Bring a Trailer">Bring a Trailer</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Basic Information Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Basic Information
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
 
-          <div className="space-y-2">
-            <label htmlFor="type" className="text-sm font-medium">
-              Type
-            </label>
-            <Select
-              value={type}
-              onValueChange={(value: DeliverableType) => {
-                setType(value);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Photo Gallery">Photo Gallery</SelectItem>
-                <SelectItem value="Video">Video</SelectItem>
-                <SelectItem value="Mixed Gallery">Mixed Gallery</SelectItem>
-                <SelectItem value="Video Gallery">Video Gallery</SelectItem>
-                <SelectItem value="Still">Still</SelectItem>
-                <SelectItem value="Graphic">Graphic</SelectItem>
-                <SelectItem value="feature">Feature</SelectItem>
-                <SelectItem value="promo">Promo</SelectItem>
-                <SelectItem value="review">Review</SelectItem>
-                <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                <SelectItem value="highlights">Highlights</SelectItem>
-                <SelectItem value="Marketing Email">Marketing Email</SelectItem>
-                <SelectItem value="Blog">Blog</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="title"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Title
+                  </label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter title"
+                    required
+                    className="text-sm"
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <label htmlFor="duration" className="text-sm font-medium">
-              Duration (seconds)
-            </label>
-            <Input
-              id="duration"
-              type="number"
-              value={type === "Photo Gallery" ? "N/A" : duration}
-              onChange={(e) => setDuration(parseInt(e.target.value))}
-              min={0}
-              required={type !== "Photo Gallery"}
-              disabled={type === "Photo Gallery"}
-              placeholder={type === "Photo Gallery" ? "N/A" : undefined}
-            />
-          </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="platform"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Platform
+                    </label>
+                    <Select
+                      value={platform}
+                      onValueChange={(value: Platform) => setPlatform(value)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Instagram Reels">
+                          Instagram Reels
+                        </SelectItem>
+                        <SelectItem value="Instagram Post">
+                          Instagram Post
+                        </SelectItem>
+                        <SelectItem value="Instagram Story">
+                          Instagram Story
+                        </SelectItem>
+                        <SelectItem value="YouTube">YouTube</SelectItem>
+                        <SelectItem value="YouTube Shorts">
+                          YouTube Shorts
+                        </SelectItem>
+                        <SelectItem value="TikTok">TikTok</SelectItem>
+                        <SelectItem value="Facebook">Facebook</SelectItem>
+                        <SelectItem value="Bring a Trailer">
+                          Bring a Trailer
+                        </SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-          <div className="space-y-2">
-            <label htmlFor="aspectRatio" className="text-sm font-medium">
-              Aspect Ratio
-            </label>
-            <Select value={aspectRatio} onValueChange={setAspectRatio}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="16:9">16:9</SelectItem>
-                <SelectItem value="9:16">9:16</SelectItem>
-                <SelectItem value="1:1">1:1</SelectItem>
-                <SelectItem value="4:3">4:3</SelectItem>
-                <SelectItem value="4:5">4:5</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="type"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Type
+                    </label>
+                    <Select
+                      value={type}
+                      onValueChange={(value: DeliverableType) => setType(value)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Photo Gallery">
+                          Photo Gallery
+                        </SelectItem>
+                        <SelectItem value="Video">Video</SelectItem>
+                        <SelectItem value="Mixed Gallery">
+                          Mixed Gallery
+                        </SelectItem>
+                        <SelectItem value="Video Gallery">
+                          Video Gallery
+                        </SelectItem>
+                        <SelectItem value="Still">Still</SelectItem>
+                        <SelectItem value="Graphic">Graphic</SelectItem>
+                        <SelectItem value="feature">Feature</SelectItem>
+                        <SelectItem value="promo">Promo</SelectItem>
+                        <SelectItem value="review">Review</SelectItem>
+                        <SelectItem value="walkthrough">Walkthrough</SelectItem>
+                        <SelectItem value="highlights">Highlights</SelectItem>
+                        <SelectItem value="Marketing Email">
+                          Marketing Email
+                        </SelectItem>
+                        <SelectItem value="Blog">Blog</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-          <div className="space-y-2">
-            <label htmlFor="editor" className="text-sm font-medium">
-              Creative
-            </label>
-            <UserSelector
-              value={editorId}
-              onChange={setEditorId}
-              onUserInfoRetrieved={(username) => {
-                if (username !== null) {
-                  setEditorName(username);
-                } else {
-                  setEditorName("");
-                }
-              }}
-              label={undefined} // Already have a label above
-              placeholder="Select creative"
-              disabled={isLoading}
-              editorName={editorName}
-            />
-          </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="duration"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Duration (seconds)
+                    </label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      value={type === "Photo Gallery" ? "N/A" : duration}
+                      onChange={(e) => setDuration(parseInt(e.target.value))}
+                      min={0}
+                      required={type !== "Photo Gallery"}
+                      disabled={type === "Photo Gallery"}
+                      placeholder={type === "Photo Gallery" ? "N/A" : undefined}
+                      className="text-sm"
+                    />
+                  </div>
 
-          <div className="space-y-2">
-            <label htmlFor="editDeadline" className="text-sm font-medium">
-              Edit Deadline
-            </label>
-            <Input
-              id="editDeadline"
-              type="date"
-              value={editDeadline}
-              onChange={(e) => setEditDeadline(e.target.value)}
-              required
-            />
-          </div>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="aspectRatio"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Aspect Ratio
+                    </label>
+                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="16:9">16:9</SelectItem>
+                        <SelectItem value="9:16">9:16</SelectItem>
+                        <SelectItem value="1:1">1:1</SelectItem>
+                        <SelectItem value="4:3">4:3</SelectItem>
+                        <SelectItem value="4:5">4:5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <div className="space-y-2">
-            <label htmlFor="releaseDate" className="text-sm font-medium">
-              Release Date
-            </label>
-            <Input
-              id="releaseDate"
-              type="date"
-              value={releaseDate}
-              onChange={(e) => setReleaseDate(e.target.value)}
-              required
-            />
-          </div>
+            {/* Assignment & Dates Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Assignment & Dates
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
 
-          <div className="space-y-2">
-            <label htmlFor="dropboxLink" className="text-sm font-medium">
-              Dropbox Link
-            </label>
-            <Input
-              id="dropboxLink"
-              value={dropboxLink}
-              onChange={(e) => setDropboxLink(e.target.value)}
-              placeholder="Enter Dropbox link"
-            />
-          </div>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="editor"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Creative
+                  </label>
+                  <UserSelector
+                    value={editorId}
+                    onChange={setEditorId}
+                    onUserInfoRetrieved={(username) => {
+                      if (username !== null) {
+                        setEditorName(username);
+                      } else {
+                        setEditorName("");
+                      }
+                    }}
+                    label={undefined}
+                    placeholder="Select creative"
+                    disabled={isLoading}
+                    editorName={editorName}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <label htmlFor="socialMediaLink" className="text-sm font-medium">
-              Social Media Link
-            </label>
-            <Input
-              id="socialMediaLink"
-              value={socialMediaLink}
-              onChange={(e) => setSocialMediaLink(e.target.value)}
-              placeholder="Enter Social Media link"
-            />
-          </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="editDeadline"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Edit Deadline
+                    </label>
+                    <Input
+                      id="editDeadline"
+                      type="date"
+                      value={editDeadline}
+                      onChange={(e) => setEditDeadline(e.target.value)}
+                      required
+                      className="text-sm"
+                    />
+                  </div>
 
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsOpen(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Updating..." : "Update"}
-            </Button>
-          </div>
-        </form>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="releaseDate"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Release Date
+                    </label>
+                    <Input
+                      id="releaseDate"
+                      type="date"
+                      value={releaseDate}
+                      onChange={(e) => setReleaseDate(e.target.value)}
+                      required
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Links Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Links
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="dropboxLink"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Dropbox Link
+                  </label>
+                  <Input
+                    id="dropboxLink"
+                    value={dropboxLink}
+                    onChange={(e) => setDropboxLink(e.target.value)}
+                    placeholder="Enter Dropbox link"
+                    className="text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="socialMediaLink"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Social Media Link
+                  </label>
+                  <Input
+                    id="socialMediaLink"
+                    value={socialMediaLink}
+                    onChange={(e) => setSocialMediaLink(e.target.value)}
+                    placeholder="Enter Social Media link"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Actions Footer */}
+        <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsOpen(false)}
+            disabled={isLoading}
+            size="sm"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            size="sm"
+            onClick={handleSubmit}
+          >
+            {isLoading ? "Updating..." : "Update"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

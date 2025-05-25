@@ -406,14 +406,14 @@ export default function InspectionForm({
                   Upload Images
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
+              <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+                <DialogHeader className="flex-shrink-0">
                   <DialogTitle>Upload Inspection Images</DialogTitle>
                   <DialogDescription>
                     Select images to upload for this inspection
                   </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
+                <div className="flex-1 overflow-y-auto py-4">
                   <InspectionImageUpload
                     onImagesUploaded={handleImageUploadSuccess}
                     onError={handleUploadError}
@@ -436,15 +436,15 @@ export default function InspectionForm({
                   Import from Dropbox
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+                <DialogHeader className="flex-shrink-0">
                   <DialogTitle>Import Images from Dropbox</DialogTitle>
                   <DialogDescription>
                     Browse a Dropbox folder and import images for this
                     inspection
                   </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
+                <div className="flex-1 overflow-y-auto py-4">
                   <DropboxImageBrowser
                     onImagesImported={handleDropboxImagesImported}
                     onError={(error) => toast.error(error)}

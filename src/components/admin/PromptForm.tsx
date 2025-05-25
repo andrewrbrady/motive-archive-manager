@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { forwardRef, useImperativeHandle } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,6 +32,10 @@ const promptFormSchema = z.object({
 
 export type PromptFormData = z.infer<typeof promptFormSchema>;
 
+export interface PromptFormRef {
+  submit: () => void;
+}
+
 interface PromptFormProps {
   prompt?: ICaptionPrompt; // For editing existing prompt
   onSubmit: (data: PromptFormData) => Promise<void>;
@@ -40,224 +44,325 @@ interface PromptFormProps {
   renderModelSelector?: () => React.ReactNode; // Custom model selector function
 }
 
-const PromptForm: React.FC<PromptFormProps> = ({
-  prompt,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-  renderModelSelector,
-}) => {
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-  } = useForm<PromptFormData>({
-    resolver: zodResolver(promptFormSchema),
-    defaultValues: {
-      name: prompt?.name || "",
-      aiModel: prompt?.aiModel || "claude-3-5-sonnet-20241022", // Default model
-      platform: prompt?.platform || "instagram",
-      tone: prompt?.tone || "professional",
-      style: prompt?.style || "descriptive",
-      length: prompt?.length || "standard",
-      prompt: prompt?.prompt || "",
-      isDefault: prompt?.isDefault || false,
-    },
-  });
+const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
+  ({ prompt, onSubmit, onCancel, isSubmitting, renderModelSelector }, ref) => {
+    const {
+      register,
+      handleSubmit,
+      control,
+      formState: { errors },
+    } = useForm<PromptFormData>({
+      resolver: zodResolver(promptFormSchema),
+      defaultValues: {
+        name: prompt?.name || "",
+        aiModel: prompt?.aiModel || "claude-3-5-sonnet-20241022", // Default model
+        platform: prompt?.platform || "instagram",
+        tone: prompt?.tone || "professional",
+        style: prompt?.style || "descriptive",
+        length: prompt?.length || "standard",
+        prompt: prompt?.prompt || "",
+        isDefault: prompt?.isDefault ?? false,
+      },
+    });
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="name">Prompt Name</Label>
-          <Input id="name" {...register("name")} />
-          {errors.name && (
-            <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
-          )}
-        </div>
+    useImperativeHandle(ref, () => ({
+      submit: () => {
+        handleSubmit(onSubmit)();
+      },
+    }));
 
-        {/* Only show the aiModel input field if no custom selector is provided */}
-        {!renderModelSelector && (
-          <div>
-            <Label htmlFor="aiModel">AI Model</Label>
-            <Input
-              id="aiModel"
-              {...register("aiModel")}
-              placeholder="e.g., claude-3-5-sonnet-20241022"
-            />
-            {errors.aiModel && (
-              <p className="text-sm text-red-500 mt-1">
-                {errors.aiModel.message}
-              </p>
-            )}
+    return (
+      <div className="w-full max-w-full overflow-hidden">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          {/* Basic Information Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1">
+              <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                Basic Information
+              </span>
+              <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2.5 w-full">
+                <div className="space-y-1.5 min-w-0">
+                  <Label
+                    htmlFor="name"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Prompt Name
+                  </Label>
+                  <Input
+                    id="name"
+                    {...register("name")}
+                    className="text-sm w-full"
+                  />
+                  {errors.name && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.name.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Only show the aiModel input field if no custom selector is provided */}
+                {!renderModelSelector && (
+                  <div className="space-y-1.5 min-w-0">
+                    <Label
+                      htmlFor="aiModel"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      AI Model
+                    </Label>
+                    <Input
+                      id="aiModel"
+                      {...register("aiModel")}
+                      placeholder="e.g., claude-3-5-sonnet-20241022"
+                      className="text-sm w-full"
+                    />
+                    {errors.aiModel && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {errors.aiModel.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Render custom model selector if provided */}
-      {renderModelSelector && (
-        <div className="hidden">
-          {/* Hidden input to satisfy form validation */}
-          <input type="hidden" {...register("aiModel")} />
-        </div>
-      )}
-
-      {/* Custom model selector will be rendered here */}
-      {renderModelSelector && renderModelSelector()}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-          <Label htmlFor="platform">Platform</Label>
-          <Controller
-            name="platform"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select platform" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="youtube">YouTube</SelectItem>
-                  <SelectItem value="twitter">Twitter/X</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="threads">Threads</SelectItem>
-                  {/* Add other platforms as needed */}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {errors.platform && (
-            <p className="text-sm text-red-500 mt-1">
-              {errors.platform.message}
-            </p>
+          {/* Render custom model selector if provided */}
+          {renderModelSelector && (
+            <div className="hidden">
+              {/* Hidden input to satisfy form validation */}
+              <input type="hidden" {...register("aiModel")} />
+            </div>
           )}
-        </div>
 
-        <div>
-          <Label htmlFor="tone">Tone</Label>
-          <Controller
-            name="tone"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select tone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="casual">Casual</SelectItem>
-                  <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {errors.tone && (
-            <p className="text-sm text-red-500 mt-1">{errors.tone.message}</p>
-          )}
-        </div>
+          {/* Custom model selector will be rendered here */}
+          {renderModelSelector && renderModelSelector()}
 
-        <div>
-          <Label htmlFor="style">Style</Label>
-          <Controller
-            name="style"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select style" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="descriptive">Descriptive</SelectItem>
-                  <SelectItem value="minimal">Minimal</SelectItem>
-                  <SelectItem value="storytelling">Storytelling</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {errors.style && (
-            <p className="text-sm text-red-500 mt-1">{errors.style.message}</p>
-          )}
-        </div>
+          {/* Platform & Settings Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1">
+              <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                Platform & Settings
+              </span>
+              <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+            </div>
 
-        <div>
-          <Label htmlFor="length">Length</Label>
-          <Controller
-            name="length"
-            control={control}
-            render={({ field }) => (
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select length" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="concise">Concise (1-2 lines)</SelectItem>
-                  <SelectItem value="standard">Standard (2-3 lines)</SelectItem>
-                  <SelectItem value="detailed">Detailed (3-4 lines)</SelectItem>
-                  <SelectItem value="comprehensive">
-                    Comprehensive (4+ lines)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {errors.length && (
-            <p className="text-sm text-red-500 mt-1">{errors.length.message}</p>
-          )}
-        </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="platform"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Platform
+                </Label>
+                <Controller
+                  name="platform"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select platform" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="instagram">Instagram</SelectItem>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="twitter">Twitter/X</SelectItem>
+                        <SelectItem value="facebook">Facebook</SelectItem>
+                        <SelectItem value="threads">Threads</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.platform && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.platform.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="tone"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Tone
+                </Label>
+                <Controller
+                  name="tone"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select tone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="professional">
+                          Professional
+                        </SelectItem>
+                        <SelectItem value="casual">Casual</SelectItem>
+                        <SelectItem value="enthusiastic">
+                          Enthusiastic
+                        </SelectItem>
+                        <SelectItem value="technical">Technical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.tone && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.tone.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="style"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Style
+                </Label>
+                <Controller
+                  name="style"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="descriptive">Descriptive</SelectItem>
+                        <SelectItem value="minimal">Minimal</SelectItem>
+                        <SelectItem value="storytelling">
+                          Storytelling
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.style && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.style.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="length"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Length
+                </Label>
+                <Controller
+                  name="length"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select length" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="concise">
+                          Concise (1-2 lines)
+                        </SelectItem>
+                        <SelectItem value="standard">
+                          Standard (2-3 lines)
+                        </SelectItem>
+                        <SelectItem value="detailed">
+                          Detailed (3-4 lines)
+                        </SelectItem>
+                        <SelectItem value="comprehensive">
+                          Comprehensive (4+ lines)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.length && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.length.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Prompt Content Section */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1">
+              <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                Prompt Content
+              </span>
+              <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="prompt"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Prompt Text
+                </Label>
+                <Textarea
+                  id="prompt"
+                  {...register("prompt")}
+                  rows={10}
+                  placeholder="Enter the full prompt text here..."
+                  className="text-sm resize-none"
+                />
+                {errors.prompt && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {errors.prompt.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Controller
+                  name="isDefault"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="isDefault"
+                      checked={Boolean(field.value)}
+                      onCheckedChange={(value) =>
+                        field.onChange(Boolean(value))
+                      }
+                    />
+                  )}
+                />
+                <Label htmlFor="isDefault" className="text-sm font-normal">
+                  Set as default prompt for its platform
+                </Label>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
+    );
+  }
+);
 
-      <div>
-        <Label htmlFor="prompt">Prompt Text</Label>
-        <Textarea
-          id="prompt"
-          {...register("prompt")}
-          rows={8}
-          placeholder="Enter the full prompt text here..."
-        />
-        {errors.prompt && (
-          <p className="text-sm text-red-500 mt-1">{errors.prompt.message}</p>
-        )}
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Controller
-          name="isDefault"
-          control={control}
-          render={({ field }) => (
-            <Checkbox
-              id="isDefault"
-              checked={Boolean(field.value)}
-              onCheckedChange={(value) => field.onChange(Boolean(value))}
-            />
-          )}
-        />
-        <Label htmlFor="isDefault" className="font-normal">
-          Set as default prompt for its platform
-        </Label>
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? "Submitting..."
-            : prompt
-              ? "Save Changes"
-              : "Create Prompt"}
-        </Button>
-      </div>
-    </form>
-  );
-};
+PromptForm.displayName = "PromptForm";
 
 export default PromptForm;

@@ -622,7 +622,7 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
   };
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       {/* File select/drop UI, only if not uploading and no progress yet */}
       {progress.length === 0 && !isUploading && (
         <div
@@ -722,43 +722,47 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
 
       {/* Pending files list and confirm button */}
       {pendingFiles.length > 0 && progress.length === 0 && !isUploading && (
-        <div className="mt-4 w-full">
+        <div className="mt-4 w-full flex flex-col h-full">
           <div className="mb-2 font-medium">Files to upload:</div>
-          <ul className="w-full max-w-[450px] overflow-hidden mb-4 divide-y divide-border rounded border border-border bg-background">
-            {pendingFiles.map((file, i) => (
-              <li
-                key={i}
-                className="flex items-center w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden"
-              >
-                <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
-                  {file.name}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="ml-2 flex-shrink-0"
-                  onClick={() => removePendingFile(i)}
-                  aria-label={`Remove ${file.name}`}
-                  disabled={isUploading}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <ul className="w-full max-w-[450px] overflow-hidden mb-4 divide-y divide-border rounded border border-border bg-background">
+              {pendingFiles.map((file, i) => (
+                <li
+                  key={i}
+                  className="flex items-center w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden"
                 >
-                  <XIcon className="w-4 h-4" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <Button
-            className="w-full"
-            onClick={startUpload}
-            disabled={isUploading || pendingFiles.length === 0}
-          >
-            Start Upload
-          </Button>
+                  <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
+                    {file.name}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-2 flex-shrink-0"
+                    onClick={() => removePendingFile(i)}
+                    aria-label={`Remove ${file.name}`}
+                    disabled={isUploading}
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex-shrink-0 pt-2 border-t">
+            <Button
+              className="w-full"
+              onClick={startUpload}
+              disabled={isUploading || pendingFiles.length === 0}
+            >
+              Start Upload
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Progress UI */}
       {progress.length > 0 && (
-        <div className="mt-4 w-full">
+        <div className="mt-4 w-full flex flex-col h-full">
           <div
             className="relative w-full max-w-[450px] h-3 bg-secondary rounded-full overflow-hidden border border-border"
             role="progressbar"
@@ -793,46 +797,48 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
           <div className="text-xs text-muted-foreground mt-1 text-center select-none">
             {overallPercent}% overall
           </div>
-          <ul className="w-full max-w-[450px] overflow-hidden mt-2 space-y-2">
-            {progress.map((p, i) => (
-              <li
-                key={i}
-                className="flex flex-col w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden bg-background rounded border"
-              >
-                <div className="flex items-center w-full max-w-full min-w-0">
-                  <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
-                    {p.file.name}
-                  </span>
-                  <span className="ml-2 flex-shrink-0">
-                    {p.status === "complete" && (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <Check className="w-4 h-4" /> Done
-                      </span>
-                    )}
-                    {p.status === "error" && (
-                      <span className="flex items-center gap-1 text-destructive">
-                        <XIcon className="w-4 h-4" /> Error
-                      </span>
-                    )}
-                    {p.status === "uploading" && (
-                      <span className="flex items-center gap-1 text-primary">
-                        <Loader2 className="w-4 h-4 animate-spin" /> {p.percent}
-                        %
-                      </span>
-                    )}
-                    {p.status === "idle" && <span>Waiting</span>}
-                  </span>
-                </div>
-                {p.status === "error" && p.error && (
-                  <div className="mt-2 text-xs text-destructive break-words">
-                    <strong>Error:</strong> {p.error}
+          <div className="flex-1 overflow-y-auto min-h-0 mt-2">
+            <ul className="w-full max-w-[450px] overflow-hidden space-y-2">
+              {progress.map((p, i) => (
+                <li
+                  key={i}
+                  className="flex flex-col w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden bg-background rounded border"
+                >
+                  <div className="flex items-center w-full max-w-full min-w-0">
+                    <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
+                      {p.file.name}
+                    </span>
+                    <span className="ml-2 flex-shrink-0">
+                      {p.status === "complete" && (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <Check className="w-4 h-4" /> Done
+                        </span>
+                      )}
+                      {p.status === "error" && (
+                        <span className="flex items-center gap-1 text-destructive">
+                          <XIcon className="w-4 h-4" /> Error
+                        </span>
+                      )}
+                      {p.status === "uploading" && (
+                        <span className="flex items-center gap-1 text-primary">
+                          <Loader2 className="w-4 h-4 animate-spin" />{" "}
+                          {p.percent}%
+                        </span>
+                      )}
+                      {p.status === "idle" && <span>Waiting</span>}
+                    </span>
                   </div>
-                )}
-              </li>
-            ))}
-          </ul>
+                  {p.status === "error" && p.error && (
+                    <div className="mt-2 text-xs text-destructive break-words">
+                      <strong>Error:</strong> {p.error}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
           {overallError && (
-            <div className="text-xs text-destructive mt-2 text-center">
+            <div className="text-xs text-destructive mt-2 text-center flex-shrink-0">
               {overallError}
             </div>
           )}

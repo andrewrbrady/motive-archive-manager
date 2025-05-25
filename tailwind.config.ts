@@ -135,7 +135,45 @@ const config = {
       },
     },
   },
-  plugins: [tailwindAnimate, tailwindTypography],
+  plugins: [
+    tailwindAnimate,
+    tailwindTypography,
+    function ({ addUtilities }: { addUtilities: any }) {
+      const newUtilities = {
+        ".line-clamp-1": {
+          overflow: "hidden",
+          display: "-webkit-box",
+          "-webkit-box-orient": "vertical",
+          "-webkit-line-clamp": "1",
+        },
+        ".line-clamp-2": {
+          overflow: "hidden",
+          display: "-webkit-box",
+          "-webkit-box-orient": "vertical",
+          "-webkit-line-clamp": "2",
+        },
+        ".line-clamp-3": {
+          overflow: "hidden",
+          display: "-webkit-box",
+          "-webkit-box-orient": "vertical",
+          "-webkit-line-clamp": "3",
+        },
+        ".line-clamp-4": {
+          overflow: "hidden",
+          display: "-webkit-box",
+          "-webkit-box-orient": "vertical",
+          "-webkit-line-clamp": "4",
+        },
+        ".line-clamp-none": {
+          overflow: "visible",
+          display: "block",
+          "-webkit-box-orient": "horizontal",
+          "-webkit-line-clamp": "none",
+        },
+      };
+      addUtilities(newUtilities);
+    },
+  ],
 } satisfies Config;
 
 export default config;

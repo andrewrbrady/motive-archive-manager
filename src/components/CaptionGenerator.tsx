@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -35,7 +35,10 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import PromptForm, { PromptFormData } from "@/components/admin/PromptForm";
+import PromptForm, {
+  PromptFormData,
+  PromptFormRef,
+} from "@/components/admin/PromptForm";
 import { Switch } from "@/components/ui/switch";
 import {
   getAllModels,
@@ -132,6 +135,8 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   const [provider, setProvider] = useState<ProviderId>("anthropic");
   // Get all available models
   const allModels = getAllModels();
+  // Add ref for PromptForm
+  const promptFormRef = useRef<PromptFormRef>(null);
 
   // Group models by provider for UI display
   const modelsByProvider = Object.values(llmProviders).map((provider) => ({
@@ -574,7 +579,19 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                       ? "Error loading"
                       : "Select a prompt..."
                 }
-              />
+              >
+                {selectedPrompt && (
+                  <div className="flex items-center gap-2 truncate">
+                    {selectedPrompt.platform === "instagram" && (
+                      <Instagram className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    {selectedPrompt.platform === "youtube" && (
+                      <Youtube className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    <span className="truncate">{selectedPrompt.name}</span>
+                  </div>
+                )}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {promptError && (
@@ -594,13 +611,15 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
               <SelectItem value="__PROMPT_NONE__">-- None --</SelectItem>
               {promptList.map((prompt) => (
                 <SelectItem key={prompt._id} value={prompt._id}>
-                  {prompt.name}{" "}
-                  <span className="text-xs text-[hsl(var(--foreground-muted))] ml-2">
-                    ({prompt.platform},{" "}
-                    {findModelById(prompt.aiModel)?.model.name ||
-                      prompt.aiModel}
-                    )
-                  </span>
+                  <div className="flex items-center gap-2 w-full">
+                    {prompt.platform === "instagram" && (
+                      <Instagram className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    {prompt.platform === "youtube" && (
+                      <Youtube className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    <span className="truncate">{prompt.name}</span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -653,269 +672,323 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
-          {" "}
-          {/* Increased width for better form layout */}
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+          <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+            <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
               {isCreatingPrompt
                 ? "Create New Prompt Template"
                 : `Edit Prompt: ${selectedPrompt?.name || "Selected Prompt"}`}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm text-[hsl(var(--foreground-muted))]">
               {isCreatingPrompt
                 ? "Define a new reusable prompt template for caption generation."
                 : "Modify the existing prompt template, including its content, parameters, and AI model."}
             </DialogDescription>
           </DialogHeader>
-          {/* Client handle switch - remains the same */}
-          {clientHandle && (
-            <div className="flex items-center gap-2 my-4">
-              <Switch
-                id="include-client-handle"
-                checked={includeClientHandle}
-                onCheckedChange={setIncludeClientHandle}
-              />
-              <label htmlFor="include-client-handle" className="text-sm">
-                Make client handle ({clientHandle}) available to prompt
-              </label>
-            </div>
-          )}
-          {/* Render PromptForm only when modal is open to ensure it can pick up selectedPrompt or undefined correctly */}
-          {isPromptModalOpen && (
-            <PromptForm
-              key={
-                isCreatingPrompt
-                  ? "new-prompt-form"
-                  : selectedPrompt?._id || "edit-prompt-form"
-              }
-              prompt={
-                isCreatingPrompt ? undefined : selectedPrompt || undefined
-              }
-              isSubmitting={isPromptSubmitting}
-              onCancel={() => {
-                setIsPromptModalOpen(false);
-                // setIsCreatingPrompt(false); // Optionally reset, but opening "New" again will set it true
-              }}
-              onSubmit={async (formData) => {
-                setIsPromptSubmitting(true);
-                setPromptError(null); // Clear previous errors
-                try {
-                  const method = isCreatingPrompt ? "POST" : "PATCH";
-                  const url = "/api/caption-prompts";
 
-                  const payload: Record<string, any> = {
-                    ...formData, // This should include name, prompt, tone, style, length, platform, etc. from PromptForm
-                    aiModel: model, // Model from CaptionGenerator's state
-                    llmProvider: provider, // Provider from CaptionGenerator's state
-                    modelParams: {
-                      // Params from CaptionGenerator's state
-                      temperature: temperature || undefined,
-                      // maxTokens: 1000, // This should ideally be part of PromptForm or a shared config
-                    },
-                  };
+          <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+            {/* Client handle switch - remains the same */}
+            {clientHandle && (
+              <div className="flex items-center gap-2 mb-3">
+                <Switch
+                  id="include-client-handle"
+                  checked={includeClientHandle}
+                  onCheckedChange={setIncludeClientHandle}
+                />
+                <label htmlFor="include-client-handle" className="text-sm">
+                  Make client handle ({clientHandle}) available to prompt
+                </label>
+              </div>
+            )}
 
-                  if (!isCreatingPrompt && selectedPrompt) {
-                    payload.id = selectedPrompt._id;
-                  }
-
-                  console.log(
-                    `Saving prompt (${method}) with payload:`,
-                    JSON.stringify(payload, null, 2)
-                  );
-
-                  const res = await fetch(url, {
-                    method,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                  });
-
-                  if (!res.ok) {
-                    const errorData = await res
-                      .json()
-                      .catch(() => ({ message: "Failed to save prompt" }));
-                    console.error(
-                      "Failed to save prompt:",
-                      res.status,
-                      errorData
-                    );
-                    throw new Error(
-                      errorData.message ||
-                        `Failed to save prompt: ${res.status}`
-                    );
-                  }
-
-                  const updatedOrCreatedPrompt = await res.json();
-
-                  // Refresh prompt list
-                  const refreshedList = await fetch(
-                    "/api/caption-prompts"
-                  ).then((r) => r.json());
-                  setPromptList(
-                    Array.isArray(refreshedList) ? refreshedList : []
-                  );
-
-                  // Update selected prompt with the newly created or edited one
-                  setSelectedPrompt(updatedOrCreatedPrompt);
-                  setIsCreatingPrompt(false); // Exit creation mode
-
-                  // Update local states from the newly selected/updated prompt
-                  setContext(updatedOrCreatedPrompt.prompt);
-                  setTone(updatedOrCreatedPrompt.tone);
-                  setStyle(updatedOrCreatedPrompt.style);
-                  setLength(updatedOrCreatedPrompt.length);
-                  setPlatform(updatedOrCreatedPrompt.platform);
-                  setModel(updatedOrCreatedPrompt.aiModel);
-
-                  const modelDetailsOnSave = findModelById(
-                    updatedOrCreatedPrompt.aiModel
-                  );
-                  if (modelDetailsOnSave) {
-                    setProvider(modelDetailsOnSave.provider.id as ProviderId);
-                  } else if (updatedOrCreatedPrompt.llmProvider) {
-                    setProvider(
-                      updatedOrCreatedPrompt.llmProvider as ProviderId
-                    );
-                  }
-                  // Temperature is already part of CaptionGenerator's state,
-                  // if PromptForm can change it, that change needs to reflect back or be included in formData.
-                  // For now, assuming temperature is managed in CaptionGenerator and passed to modelParams.
-
-                  setIsPromptModalOpen(false); // Close the modal upon successful save
-                } catch (err) {
-                  console.error("Error saving prompt:", err);
-                  setPromptError(
-                    err instanceof Error
-                      ? err.message
-                      : "An unexpected error occurred while saving the prompt."
-                  );
-                  // Keep modal open to show error
-                } finally {
-                  setIsPromptSubmitting(false);
+            {/* Render PromptForm only when modal is open to ensure it can pick up selectedPrompt or undefined correctly */}
+            {isPromptModalOpen && (
+              <PromptForm
+                ref={promptFormRef}
+                key={
+                  isCreatingPrompt
+                    ? "new-prompt-form"
+                    : selectedPrompt?._id || "edit-prompt-form"
                 }
-              }}
-              renderModelSelector={() => (
-                <div className="space-y-4 mt-4 p-4 border border-[hsl(var(--border))] rounded-md">
-                  <h3 className="text-sm font-medium text-[hsl(var(--foreground-muted))]">
-                    AI Model Configuration
-                  </h3>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      AI Provider
-                    </label>
-                    <select
-                      className="w-full border rounded p-2 bg-transparent text-[hsl(var(--foreground))] border-[hsl(var(--border))]"
-                      value={provider}
-                      onChange={(e) => {
-                        const newProvider = e.target.value as ProviderId;
-                        setProvider(newProvider);
-                        const providerModels =
-                          llmProviders[newProvider]?.models || [];
-                        if (!providerModels.some((m) => m.id === model)) {
-                          setModel(providerModels[0]?.id || "");
-                        }
-                      }}
-                    >
-                      {Object.values(llmProviders)
-                        .filter((p) => p.models.length > 0)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                prompt={
+                  isCreatingPrompt ? undefined : selectedPrompt || undefined
+                }
+                isSubmitting={isPromptSubmitting}
+                onCancel={() => {
+                  setIsPromptModalOpen(false);
+                  // setIsCreatingPrompt(false); // Optionally reset, but opening "New" again will set it true
+                }}
+                onSubmit={async (formData) => {
+                  setIsPromptSubmitting(true);
+                  setPromptError(null); // Clear previous errors
+                  try {
+                    const method = isCreatingPrompt ? "POST" : "PATCH";
+                    const url = "/api/caption-prompts";
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">
-                      AI Model
-                    </label>
-                    <select
-                      className="w-full border rounded p-2 bg-transparent text-[hsl(var(--foreground))] border-[hsl(var(--border))]"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      disabled={
-                        !provider ||
-                        !llmProviders[provider] ||
-                        llmProviders[provider].models.length === 0
-                      }
-                    >
-                      {(llmProviders[provider]?.models || []).map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                      {(!provider ||
-                        !llmProviders[provider] ||
-                        llmProviders[provider].models.length === 0) && (
-                        <option value="" disabled>
-                          Select a provider with models
-                        </option>
-                      )}
-                    </select>
+                    const payload: Record<string, any> = {
+                      ...formData, // This should include name, prompt, tone, style, length, platform, etc. from PromptForm
+                      aiModel: model, // Model from CaptionGenerator's state
+                      llmProvider: provider, // Provider from CaptionGenerator's state
+                      modelParams: {
+                        // Params from CaptionGenerator's state
+                        temperature: temperature || undefined,
+                        // maxTokens: 1000, // This should ideally be part of PromptForm or a shared config
+                      },
+                    };
 
-                    {model && llmProviders[provider] && (
-                      <div className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                        {llmProviders[provider].models.find(
-                          (m) => m.id === model
-                        )?.contextWindow
-                          ? `Context: ${(llmProviders[provider].models.find((m) => m.id === model)?.contextWindow || 0).toLocaleString()} tokens`
-                          : ""}
-                        {llmProviders[provider].models.find(
-                          (m) => m.id === model
-                        )?.costPer1KTokens
-                          ? ` • Cost: $${(llmProviders[provider].models.find((m) => m.id === model)?.costPer1KTokens || 0).toFixed(5)}/1K tokens`
-                          : ""}
-                      </div>
-                    )}
-                  </div>
+                    if (!isCreatingPrompt && selectedPrompt) {
+                      payload.id = selectedPrompt._id;
+                    }
 
-                  <div>
-                    <div className="flex justify-between">
-                      <label className="text-sm font-medium mb-1">
-                        Temperature
-                      </label>
-                      <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                        {temperature.toFixed(1)}
+                    console.log(
+                      `Saving prompt (${method}) with payload:`,
+                      JSON.stringify(payload, null, 2)
+                    );
+
+                    const res = await fetch(url, {
+                      method,
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    });
+
+                    if (!res.ok) {
+                      const errorData = await res
+                        .json()
+                        .catch(() => ({ message: "Failed to save prompt" }));
+                      console.error(
+                        "Failed to save prompt:",
+                        res.status,
+                        errorData
+                      );
+                      throw new Error(
+                        errorData.message ||
+                          `Failed to save prompt: ${res.status}`
+                      );
+                    }
+
+                    const updatedOrCreatedPrompt = await res.json();
+
+                    // Refresh prompt list
+                    const refreshedList = await fetch(
+                      "/api/caption-prompts"
+                    ).then((r) => r.json());
+                    setPromptList(
+                      Array.isArray(refreshedList) ? refreshedList : []
+                    );
+
+                    // Update selected prompt with the newly created or edited one
+                    setSelectedPrompt(updatedOrCreatedPrompt);
+                    setIsCreatingPrompt(false); // Exit creation mode
+
+                    // Update local states from the newly selected/updated prompt
+                    setContext(updatedOrCreatedPrompt.prompt);
+                    setTone(updatedOrCreatedPrompt.tone);
+                    setStyle(updatedOrCreatedPrompt.style);
+                    setLength(updatedOrCreatedPrompt.length);
+                    setPlatform(updatedOrCreatedPrompt.platform);
+                    setModel(updatedOrCreatedPrompt.aiModel);
+
+                    const modelDetailsOnSave = findModelById(
+                      updatedOrCreatedPrompt.aiModel
+                    );
+                    if (modelDetailsOnSave) {
+                      setProvider(modelDetailsOnSave.provider.id as ProviderId);
+                    } else if (updatedOrCreatedPrompt.llmProvider) {
+                      setProvider(
+                        updatedOrCreatedPrompt.llmProvider as ProviderId
+                      );
+                    }
+                    // Temperature is already part of CaptionGenerator's state,
+                    // if PromptForm can change it, that change needs to reflect back or be included in formData.
+                    // For now, assuming temperature is managed in CaptionGenerator and passed to modelParams.
+
+                    setIsPromptModalOpen(false); // Close the modal upon successful save
+                  } catch (err) {
+                    console.error("Error saving prompt:", err);
+                    setPromptError(
+                      err instanceof Error
+                        ? err.message
+                        : "An unexpected error occurred while saving the prompt."
+                    );
+                    // Keep modal open to show error
+                  } finally {
+                    setIsPromptSubmitting(false);
+                  }
+                }}
+                renderModelSelector={() => (
+                  <div className="space-y-3 p-3 border border-[hsl(var(--border-subtle))] rounded-lg bg-[var(--background-secondary)]">
+                    <div className="flex items-center gap-1">
+                      <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                        AI Model Configuration
                       </span>
+                      <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
                     </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="2.0"
-                      step="0.1"
-                      value={temperature}
-                      onChange={(e) =>
-                        setTemperature(parseFloat(e.target.value))
-                      }
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-[hsl(var(--muted-foreground))]">
-                      <span>Precise</span>
-                      <span>Creative</span>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          AI Provider
+                        </label>
+                        <select
+                          className="w-full border rounded p-2 bg-transparent text-[hsl(var(--foreground))] border-[hsl(var(--border-subtle))] text-sm"
+                          value={provider}
+                          onChange={(e) => {
+                            const newProvider = e.target.value as ProviderId;
+                            setProvider(newProvider);
+                            const providerModels =
+                              llmProviders[newProvider]?.models || [];
+                            if (!providerModels.some((m) => m.id === model)) {
+                              setModel(providerModels[0]?.id || "");
+                            }
+                          }}
+                        >
+                          {Object.values(llmProviders)
+                            .filter((p) => p.models.length > 0)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          AI Model
+                        </label>
+                        <select
+                          className="w-full border rounded p-2 bg-transparent text-[hsl(var(--foreground))] border-[hsl(var(--border-subtle))] text-sm"
+                          value={model}
+                          onChange={(e) => setModel(e.target.value)}
+                        >
+                          {(llmProviders[provider]?.models || []).map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                        Temperature: {temperature}
+                      </label>
+                      <div className="relative">
+                        <div className="relative w-full h-2 rounded-lg border border-[hsl(var(--border-subtle))] bg-transparent overflow-hidden">
+                          <div
+                            className="h-full rounded-lg transition-all duration-200"
+                            style={{
+                              width: `${(temperature / 2) * 100}%`,
+                              background: `linear-gradient(to right, 
+                                #3b82f6 0%, 
+                                #06b6d4 25%, 
+                                #10b981 41.7%, 
+                                #f59e0b 75%, 
+                                #ef4444 100%)`,
+                            }}
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="0.1"
+                          value={temperature}
+                          onChange={(e) =>
+                            setTemperature(parseFloat(e.target.value))
+                          }
+                          className="absolute top-0 w-full h-2 rounded-lg appearance-none cursor-pointer slider-thumb bg-transparent"
+                        />
+                        <style jsx>{`
+                          .slider-thumb::-webkit-slider-thumb {
+                            appearance: none;
+                            height: 16px;
+                            width: 16px;
+                            border-radius: 50%;
+                            background: ${temperature <= 0.5
+                              ? "#3b82f6"
+                              : temperature <= 1.0
+                                ? "#f59e0b"
+                                : "#ef4444"};
+                            border: 2px solid white;
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                            cursor: pointer;
+                          }
+
+                          .slider-thumb::-moz-range-thumb {
+                            height: 16px;
+                            width: 16px;
+                            border-radius: 50%;
+                            background: ${temperature <= 0.5
+                              ? "#3b82f6"
+                              : temperature <= 1.0
+                                ? "#f59e0b"
+                                : "#ef4444"};
+                            border: 2px solid white;
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                            cursor: pointer;
+                            border: none;
+                          }
+
+                          .slider-thumb::-webkit-slider-track {
+                            height: 8px;
+                            border-radius: 4px;
+                            background: transparent;
+                          }
+
+                          .slider-thumb::-moz-range-track {
+                            height: 8px;
+                            border-radius: 4px;
+                            border: none;
+                            background: transparent;
+                          }
+                        `}</style>
+                        <div className="flex justify-between text-xs text-[hsl(var(--foreground-muted))] mt-1">
+                          <span className="text-blue-500">Precise</span>
+                          <span className="text-red-500">Creative</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            />
-          )}
-          {promptError && ( // Display prompt saving error inside the modal
-            <p className="mt-4 text-sm text-destructive-500 dark:text-destructive-400 text-center">
-              {promptError}
-            </p>
-          )}
-          <DialogFooter className="mt-6">
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            {/* The submit button is now part of PromptForm */}
-          </DialogFooter>
+                )}
+              />
+            )}
+
+            {promptError && (
+              <p className="mt-3 text-sm text-destructive-500 dark:text-destructive-400 text-center">
+                {promptError}
+              </p>
+            )}
+          </div>
+
+          <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
+            <Button
+              variant="outline"
+              onClick={() => setIsPromptModalOpen(false)}
+              size="sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => promptFormRef.current?.submit()}
+              disabled={isPromptSubmitting}
+              size="sm"
+            >
+              {isPromptSubmitting
+                ? "Submitting..."
+                : isCreatingPrompt
+                  ? "Create Prompt"
+                  : "Save Changes"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Show summary of selected prompt/model */}
       <div className="mb-4 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <div className="flex flex-col gap-3">
           <div>
             <div className="text-xs text-[hsl(var(--foreground-muted))] mb-1">
               Prompt
@@ -924,27 +997,15 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
               {context}
             </div>
           </div>
-          <div className="flex flex-col md:items-end gap-1 min-w-[180px]">
-            <div className="text-xs text-[hsl(var(--foreground-muted))]">
-              Model
-            </div>
-            <div className="font-mono text-sm text-[hsl(var(--foreground))] dark:text-white">
-              {(model && findModelById(model)?.model?.name) || model}
-            </div>
-            <div className="text-xs text-[hsl(var(--foreground-muted))]">
-              {provider && llmProviders[provider as ProviderId]
-                ? llmProviders[provider as ProviderId].name
-                : ""}
-            </div>
-          </div>
         </div>
-        <div className="flex flex-wrap gap-2 mt-2 text-xs text-[hsl(var(--foreground-muted))]">
-          <span>
-            Platform:{" "}
+        <div className="flex flex-wrap gap-3 mt-3 text-xs text-[hsl(var(--foreground-muted))]">
+          <div className="flex items-center gap-1">
+            {platform === "instagram" && <Instagram className="w-3 h-3" />}
+            {platform === "youtube" && <Youtube className="w-3 h-3" />}
             <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">
               {platform}
             </span>
-          </span>
+          </div>
           <span>
             Tone:{" "}
             <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">

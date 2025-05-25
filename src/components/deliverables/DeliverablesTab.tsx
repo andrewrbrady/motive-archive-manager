@@ -44,6 +44,10 @@ import {
   Cloud,
   Share2,
   Copy,
+  Instagram,
+  Youtube,
+  Video,
+  Facebook,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import NewDeliverableForm from "./NewDeliverableForm";
@@ -1020,7 +1024,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     <div className="space-y-4 w-full">
       {/* Desktop Header - Title and buttons side by side */}
       <div className="hidden md:flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Deliverables</h2>
+        <h2 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
+          Deliverables
+        </h2>
         <div className="flex gap-2">
           {isBatchMode ? (
             <>
@@ -1055,7 +1061,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
       {/* Mobile Header - Title on top, buttons below */}
       <div className="block md:hidden space-y-3">
-        <h2 className="text-2xl font-bold">Deliverables</h2>
+        <h2 className="text-lg font-semibold text-[hsl(var(--foreground))] dark:text-white uppercase">
+          Deliverables
+        </h2>
         <div className="flex gap-2 flex-wrap">
           {isBatchMode ? (
             <>
@@ -1095,45 +1103,44 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
           <div className="flex justify-center py-8">
             <div className="text-center">
               <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Loading deliverables...
               </p>
             </div>
           </div>
         ) : deliverables.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               No deliverables found. Create your first one!
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {deliverables.map((deliverable) => (
               <div
                 key={deliverable._id?.toString()}
-                className="bg-muted/20 rounded-lg p-3 space-y-2"
+                className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors cursor-pointer"
+                onClick={() => handleOpenModal(deliverable)}
               >
-                <div className="flex justify-between items-start gap-2">
+                <div className="flex justify-between items-start gap-3 mb-3">
                   <div className="flex-1 min-w-0">
-                    <button
-                      onClick={() => setSelectedDeliverable(deliverable)}
-                      className="text-left"
-                    >
-                      <p className="text-xs font-medium truncate">
-                        {deliverable.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {deliverable.platform} • {deliverable.type}
-                      </p>
-                    </button>
+                    <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] truncate mb-1">
+                      {deliverable.title}
+                    </p>
+                    <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+                      {deliverable.platform} • {deliverable.type}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div
+                    className="flex items-center gap-1 flex-shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {deliverable.dropbox_link && (
                       <a
                         href={deliverable.dropbox_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1 text-muted-foreground hover:text-foreground"
+                        className="p-1 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground))]"
                         title="Dropbox"
                       >
                         <ExternalLink className="h-3 w-3" />
@@ -1144,8 +1151,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                         href={deliverable.social_media_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1 text-muted-foreground hover:text-foreground"
-                        title="Social Media"
+                        className="p-1 text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-muted))] dark:hover:text-[hsl(var(--foreground))]"
+                        title="Open Social Media"
                       >
                         <ExternalLink className="h-3 w-3" />
                       </a>
@@ -1166,35 +1173,29 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-3 text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mb-2">
                   <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {deliverable.edit_deadline
-                      ? safeFormat(deliverable.edit_deadline, "M/d/yy")
-                      : "No deadline"}
+                    <Calendar className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">
+                      {deliverable.edit_deadline
+                        ? safeFormat(deliverable.edit_deadline, "M/d/yy")
+                        : "No deadline"}
+                    </span>
                   </div>
                   {deliverable.duration > 0 &&
                     deliverable.type !== "Photo Gallery" && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <Clock className="h-3 w-3" />
-                        {formatDuration(deliverable.duration)}
+                        <span>{formatDuration(deliverable.duration)}</span>
                       </div>
                     )}
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleOpenModal(deliverable)}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    View Details
-                  </button>
-                  {deliverable.editor && (
-                    <span className="text-xs text-muted-foreground">
-                      • Editor: {deliverable.editor}
-                    </span>
-                  )}
-                </div>
+                {deliverable.editor && (
+                  <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] truncate">
+                    Editor: {deliverable.editor}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1344,7 +1345,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                           )}
 
                           {/* Social Media Link Icon */}
-                          {deliverable.social_media_link ? (
+                          {deliverable.social_media_link && (
                             <a
                               href={deliverable.social_media_link}
                               target="_blank"
@@ -1354,13 +1355,6 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                             >
                               <Share2 className="h-4 w-4" />
                             </a>
-                          ) : (
-                            <div
-                              className="p-1 text-gray-400"
-                              title="No social media link"
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </div>
                           )}
 
                           {/* YouTube Upload Button */}
@@ -1402,253 +1396,292 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
       {/* Deliverable Detail Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+          <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+            <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white tracking-tight">
               {selectedDeliverable?.title}
             </DialogTitle>
             <DialogClose />
           </DialogHeader>
 
-          {selectedDeliverable && (
-            <div className="space-y-6 pt-4">
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg">Basic Information</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Title
-                    </label>
-                    <p className="text-foreground">
-                      {selectedDeliverable.title}
-                    </p>
-                  </div>
-
-                  {selectedDeliverable.description && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Description
-                      </label>
-                      <p className="text-foreground">
-                        {selectedDeliverable.description}
-                      </p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Platform
-                    </label>
-                    <Badge variant="outline" className="mt-1">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+            {selectedDeliverable && (
+              <div className="space-y-3">
+                {/* Status Badges - With Icons and Colors */}
+                <div className="flex gap-2 flex-wrap">
+                  <div className="px-2.5 py-1 bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))] rounded-full flex items-center gap-1.5">
+                    {selectedDeliverable.platform.includes("Instagram") && (
+                      <Instagram className="h-3 w-3" />
+                    )}
+                    {selectedDeliverable.platform.includes("YouTube") && (
+                      <Youtube className="h-3 w-3" />
+                    )}
+                    {selectedDeliverable.platform.includes("TikTok") && (
+                      <Video className="h-3 w-3" />
+                    )}
+                    {selectedDeliverable.platform.includes("Facebook") && (
+                      <Facebook className="h-3 w-3" />
+                    )}
+                    {!selectedDeliverable.platform.includes("Instagram") &&
+                      !selectedDeliverable.platform.includes("YouTube") &&
+                      !selectedDeliverable.platform.includes("TikTok") &&
+                      !selectedDeliverable.platform.includes("Facebook") && (
+                        <Share2 className="h-3 w-3" />
+                      )}
+                    <span className="text-xs font-medium text-[hsl(var(--foreground))] dark:text-white">
                       {selectedDeliverable.platform}
-                    </Badge>
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Type
-                    </label>
-                    <Badge variant="outline" className="mt-1">
+                  <div className="px-2.5 py-1 bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))] rounded-full">
+                    <span className="text-xs font-medium text-[hsl(var(--foreground))] dark:text-white">
                       {selectedDeliverable.type}
-                    </Badge>
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Status
-                    </label>
-                    <Badge
-                      className={`mt-1 ${getStatusColor(selectedDeliverable.status)}`}
+                  <div
+                    className={`px-2.5 py-1 rounded-full border ${
+                      selectedDeliverable.status === "done"
+                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700"
+                        : selectedDeliverable.status === "in_progress"
+                          ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700"
+                          : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`text-xs font-medium ${
+                        selectedDeliverable.status === "done"
+                          ? "text-green-700 dark:text-green-300"
+                          : selectedDeliverable.status === "in_progress"
+                            ? "text-yellow-700 dark:text-yellow-300"
+                            : "text-gray-600 dark:text-gray-400"
+                      }`}
                     >
                       {getStatusText(selectedDeliverable.status)}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Technical Details */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg">Technical Details</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
+                {/* Description - Styled Card */}
+                {selectedDeliverable.description && (
+                  <div className="p-2.5 bg-[var(--background-secondary)] rounded-lg border border-[hsl(var(--border-subtle))]">
+                    <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                      Description
+                    </div>
+                    <p className="text-sm text-[hsl(var(--foreground))] dark:text-white leading-relaxed">
+                      {selectedDeliverable.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Main Details - Tighter Grid */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-2.5 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))] hover:border-[hsl(var(--border-primary))] transition-colors">
+                    <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                      Editor
+                    </div>
+                    <div className="text-base font-semibold text-[hsl(var(--foreground))] dark:text-white">
+                      {selectedDeliverable.editor}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))] hover:border-[hsl(var(--border-primary))] transition-colors">
+                    <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
                       Duration
-                    </label>
-                    <p className="text-foreground">
+                    </div>
+                    <div className="text-base font-semibold text-[hsl(var(--foreground))] dark:text-white">
                       {selectedDeliverable.type === "Photo Gallery"
                         ? "N/A"
                         : formatDuration(selectedDeliverable.duration)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Aspect Ratio
-                    </label>
-                    <p className="text-foreground">
-                      {selectedDeliverable.aspect_ratio}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Editor
-                    </label>
-                    <p className="text-foreground">
-                      {selectedDeliverable.editor}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dates */}
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg">Important Dates</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Edit Deadline
-                    </label>
-                    <p className="text-foreground">
-                      {selectedDeliverable.edit_deadline
-                        ? safeFormat(selectedDeliverable.edit_deadline, "PPP")
-                        : "Not set"}
-                    </p>
-                  </div>
-
-                  {selectedDeliverable.release_date && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Release Date
-                      </label>
-                      <p className="text-foreground">
-                        {safeFormat(selectedDeliverable.release_date, "PPP")}
-                      </p>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="p-2.5 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))] hover:border-[hsl(var(--border-primary))] transition-colors">
+                    <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                      Deadline
+                    </div>
+                    <div className="text-base font-semibold text-[hsl(var(--foreground))] dark:text-white">
+                      {selectedDeliverable.edit_deadline
+                        ? safeFormat(
+                            selectedDeliverable.edit_deadline,
+                            "MMM d, yyyy"
+                          )
+                        : "Not set"}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))] hover:border-[hsl(var(--border-primary))] transition-colors">
+                    <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                      Aspect Ratio
+                    </div>
+                    <div className="text-base font-semibold text-[hsl(var(--foreground))] dark:text-white">
+                      {selectedDeliverable.aspect_ratio}
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Additional Information */}
-              {(selectedDeliverable.target_audience ||
-                selectedDeliverable.music_track ||
-                selectedDeliverable.tags?.length > 0 ||
-                selectedDeliverable.publishing_url ||
-                selectedDeliverable.assets_location ||
-                selectedDeliverable.dropbox_link ||
-                selectedDeliverable.social_media_link) && (
-                <div className="space-y-4">
-                  <h3 className="font-medium text-lg">
-                    Additional Information
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {selectedDeliverable.target_audience && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Target Audience
-                        </label>
-                        <p className="text-foreground">
-                          {selectedDeliverable.target_audience}
-                        </p>
-                      </div>
-                    )}
+                {/* Release Date - Compact Card if exists */}
+                {selectedDeliverable.release_date && (
+                  <div className="p-2.5 bg-[var(--background-secondary)] rounded-lg border border-[hsl(var(--border-primary))]">
+                    <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                      Release Date
+                    </div>
+                    <div className="text-base font-semibold text-[hsl(var(--foreground))] dark:text-white">
+                      {safeFormat(
+                        selectedDeliverable.release_date,
+                        "MMM d, yyyy"
+                      )}
+                    </div>
+                  </div>
+                )}
 
-                    {selectedDeliverable.music_track && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Music Track
-                        </label>
-                        <p className="text-foreground">
-                          {selectedDeliverable.music_track}
-                        </p>
-                      </div>
-                    )}
+                {/* Additional Details - Compact Section */}
+                {(selectedDeliverable.target_audience ||
+                  selectedDeliverable.music_track ||
+                  selectedDeliverable.assets_location ||
+                  (selectedDeliverable.tags &&
+                    selectedDeliverable.tags.length > 0)) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                        Additional Details
+                      </span>
+                      <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                    </div>
 
-                    {selectedDeliverable.tags &&
-                      selectedDeliverable.tags.length > 0 && (
-                        <div>
-                          <label className="text-sm font-medium text-muted-foreground">
-                            Tags
-                          </label>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {selectedDeliverable.tags.map((tag, index) => (
-                              <Badge
-                                key={index}
-                                variant="secondary"
-                                className="text-xs"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {selectedDeliverable.target_audience && (
+                        <div className="p-2 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))]">
+                          <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                            Target Audience
+                          </div>
+                          <div className="text-sm text-[hsl(var(--foreground))] dark:text-white">
+                            {selectedDeliverable.target_audience}
                           </div>
                         </div>
                       )}
 
-                    {selectedDeliverable.publishing_url && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Publishing URL
-                        </label>
-                        <a
-                          href={selectedDeliverable.publishing_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 break-all"
-                        >
-                          {selectedDeliverable.publishing_url}
-                        </a>
-                      </div>
-                    )}
+                      {selectedDeliverable.music_track && (
+                        <div className="p-2 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))]">
+                          <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                            Music Track
+                          </div>
+                          <div className="text-sm text-[hsl(var(--foreground))] dark:text-white">
+                            {selectedDeliverable.music_track}
+                          </div>
+                        </div>
+                      )}
 
-                    {selectedDeliverable.assets_location && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Assets Location
-                        </label>
-                        <p className="text-foreground">
-                          {selectedDeliverable.assets_location}
-                        </p>
-                      </div>
-                    )}
+                      {selectedDeliverable.assets_location && (
+                        <div className="p-2 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))]">
+                          <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                            Assets Location
+                          </div>
+                          <div className="text-sm text-[hsl(var(--foreground))] dark:text-white">
+                            {selectedDeliverable.assets_location}
+                          </div>
+                        </div>
+                      )}
 
-                    {selectedDeliverable.dropbox_link && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Dropbox Link
-                        </label>
-                        <a
-                          href={selectedDeliverable.dropbox_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 break-all"
-                        >
-                          {selectedDeliverable.dropbox_link}
-                        </a>
-                      </div>
-                    )}
-
-                    {selectedDeliverable.social_media_link && (
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Social Media Link
-                        </label>
-                        <a
-                          href={selectedDeliverable.social_media_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 break-all"
-                        >
-                          {selectedDeliverable.social_media_link}
-                        </a>
-                      </div>
-                    )}
+                      {selectedDeliverable.tags &&
+                        selectedDeliverable.tags.length > 0 && (
+                          <div className="p-2 bg-[var(--background-primary)] rounded-lg border border-[hsl(var(--border-subtle))]">
+                            <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                              Tags
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {selectedDeliverable.tags.map((tag, index) => (
+                                <span
+                                  key={index}
+                                  className="px-2 py-0.5 bg-[var(--background-secondary)] text-[hsl(var(--foreground))] dark:text-white border border-[hsl(var(--border-subtle))] rounded text-xs font-medium"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Actions */}
-              <div className="flex justify-end gap-2 pt-4 border-t">
+                {/* Links - Show Actual URLs */}
+                {(selectedDeliverable.publishing_url ||
+                  selectedDeliverable.dropbox_link ||
+                  selectedDeliverable.social_media_link) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                        Links
+                      </span>
+                      <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {selectedDeliverable.publishing_url && (
+                        <div className="p-2 bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] rounded-lg">
+                          <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                            Publishing URL
+                          </div>
+                          <a
+                            href={selectedDeliverable.publishing_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                          >
+                            {selectedDeliverable.publishing_url.length > 60
+                              ? `${selectedDeliverable.publishing_url.substring(0, 60)}...`
+                              : selectedDeliverable.publishing_url}
+                          </a>
+                        </div>
+                      )}
+
+                      {selectedDeliverable.dropbox_link && (
+                        <div className="p-2 bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] rounded-lg">
+                          <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                            Dropbox
+                          </div>
+                          <a
+                            href={selectedDeliverable.dropbox_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                          >
+                            {selectedDeliverable.dropbox_link.length > 60
+                              ? `${selectedDeliverable.dropbox_link.substring(0, 60)}...`
+                              : selectedDeliverable.dropbox_link}
+                          </a>
+                        </div>
+                      )}
+
+                      {selectedDeliverable.social_media_link && (
+                        <div className="p-2 bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] rounded-lg">
+                          <div className="text-xs font-medium text-[hsl(var(--foreground-muted))] mb-1 uppercase tracking-wide">
+                            Social Media
+                          </div>
+                          <a
+                            href={selectedDeliverable.social_media_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                          >
+                            {selectedDeliverable.social_media_link.length > 60
+                              ? `${selectedDeliverable.social_media_link.substring(0, 60)}...`
+                              : selectedDeliverable.social_media_link}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Actions Footer - Consistent Design */}
+          <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
+            {selectedDeliverable && (
+              <>
                 <EditDeliverableForm
                   deliverable={selectedDeliverable}
                   onDeliverableUpdated={() => {
@@ -1658,9 +1691,12 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 />
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => {
-                    handleDuplicate(selectedDeliverable);
-                    handleCloseModal();
+                    if (selectedDeliverable) {
+                      handleDuplicate(selectedDeliverable);
+                      handleCloseModal();
+                    }
                   }}
                 >
                   <Copy className="h-4 w-4 mr-2" />
@@ -1668,17 +1704,20 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                 </Button>
                 <Button
                   variant="destructive"
+                  size="sm"
                   onClick={() => {
-                    handleDelete(selectedDeliverable._id?.toString() || "");
-                    handleCloseModal();
+                    if (selectedDeliverable) {
+                      handleDelete(selectedDeliverable._id?.toString() || "");
+                      handleCloseModal();
+                    }
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </Button>
-              </div>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

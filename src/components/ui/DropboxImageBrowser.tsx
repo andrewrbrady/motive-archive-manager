@@ -189,9 +189,9 @@ export default function DropboxImageBrowser({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full space-y-6">
       {/* Folder URL Input */}
-      <div className="space-y-2">
+      <div className="space-y-2 flex-shrink-0">
         <Label htmlFor="dropboxUrl">Dropbox Folder URL</Label>
         <div className="flex gap-2">
           <Input
@@ -218,7 +218,7 @@ export default function DropboxImageBrowser({
 
       {/* Loading State */}
       {isLoading && (
-        <div className="flex items-center justify-center py-8">
+        <div className="flex items-center justify-center py-8 flex-shrink-0">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span>Loading folder contents...</span>
@@ -228,7 +228,7 @@ export default function DropboxImageBrowser({
 
       {/* Import Progress */}
       {importProgress && (
-        <div className="border rounded-lg p-4 bg-muted/50">
+        <div className="border rounded-lg p-4 bg-muted/50 flex-shrink-0">
           <div className="flex items-center gap-2 mb-2">
             {isImporting ? (
               <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
@@ -254,9 +254,9 @@ export default function DropboxImageBrowser({
 
       {/* Images List */}
       {images.length > 0 && (
-        <div className="space-y-4">
+        <div className="flex flex-col flex-1 min-h-0 space-y-4">
           {/* Selection Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -275,23 +275,10 @@ export default function DropboxImageBrowser({
                 </span>
               )}
             </div>
-
-            <Button
-              onClick={handleImportSelected}
-              disabled={selectedImages.size === 0 || isImporting}
-              className="flex items-center gap-2"
-            >
-              {isImporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              Import Selected
-            </Button>
           </div>
 
-          {/* Images Grid */}
-          <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
+          {/* Images Grid - Scrollable */}
+          <div className="border rounded-lg divide-y flex-1 overflow-y-auto min-h-0">
             {images.map((image) => (
               <div
                 key={image.path_display}
@@ -317,12 +304,28 @@ export default function DropboxImageBrowser({
               </div>
             ))}
           </div>
+
+          {/* Import Button - Fixed at bottom */}
+          <div className="flex-shrink-0 pt-2 border-t">
+            <Button
+              onClick={handleImportSelected}
+              disabled={selectedImages.size === 0 || isImporting}
+              className="w-full flex items-center gap-2"
+            >
+              {isImporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Import Selected
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Empty State */}
       {!isLoading && images.length === 0 && folderUrl && (
-        <div className="text-center py-8">
+        <div className="text-center py-8 flex-shrink-0">
           <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">
             No images found in this folder

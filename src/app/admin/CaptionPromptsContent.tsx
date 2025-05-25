@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -30,7 +30,10 @@ import {
   Loader2,
 } from "lucide-react";
 import { ICaptionPrompt as ICaptionPromptFromModel } from "@/models/CaptionPrompt";
-import PromptForm, { PromptFormData } from "@/components/admin/PromptForm"; // Assuming PromptForm is in this path
+import PromptForm, {
+  PromptFormData,
+  PromptFormRef,
+} from "@/components/admin/PromptForm"; // Assuming PromptForm is in this path
 import { Document } from "mongoose"; // Import Document for Omit
 
 // Client-side interface, ensuring _id is string and no Mongoose Document methods
@@ -110,6 +113,8 @@ const CaptionPromptsContent: React.FC = () => {
   const [promptToDelete, setPromptToDelete] = useState<ICaptionPrompt | null>(
     null
   );
+  // Add ref for PromptForm
+  const promptFormRef = useRef<PromptFormRef>(null);
 
   const fetchPrompts = useCallback(async () => {
     setIsLoading(true);
@@ -408,24 +413,50 @@ const CaptionPromptsContent: React.FC = () => {
         open={isModalOpen}
         onOpenChange={(isOpen) => !isOpen && handleCloseModal()}
       >
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+          <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+            <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
               {editingPrompt ? "Edit Prompt" : "Add New Prompt"}
             </DialogTitle>
             {editingPrompt && (
-              <DialogDescription>
+              <DialogDescription className="text-sm text-[hsl(var(--foreground-muted))]">
                 Editing prompt: {editingPrompt.name}
               </DialogDescription>
             )}
           </DialogHeader>
-          <PromptForm
-            key={(editingPrompt?._id as string) || "new"} // Ensures form resets when editingPrompt changes
-            prompt={editingPrompt || undefined}
-            onSubmit={handleSubmitPrompt}
-            onCancel={handleCloseModal}
-            isSubmitting={isSubmitting}
-          />
+
+          <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+            <PromptForm
+              ref={promptFormRef}
+              key={(editingPrompt?._id as string) || "new"} // Ensures form resets when editingPrompt changes
+              prompt={editingPrompt || undefined}
+              onSubmit={handleSubmitPrompt}
+              onCancel={handleCloseModal}
+              isSubmitting={isSubmitting}
+            />
+          </div>
+
+          <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
+            <Button
+              variant="outline"
+              onClick={handleCloseModal}
+              disabled={isSubmitting}
+              size="sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => promptFormRef.current?.submit()}
+              disabled={isSubmitting}
+              size="sm"
+            >
+              {isSubmitting
+                ? "Submitting..."
+                : editingPrompt
+                  ? "Save Changes"
+                  : "Create Prompt"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

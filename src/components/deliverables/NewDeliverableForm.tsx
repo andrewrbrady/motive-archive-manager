@@ -207,247 +207,357 @@ export default function NewDeliverableForm({
           New
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create New Deliverable</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+        <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+          <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
+            Create New Deliverable
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="title" className="text-sm font-medium">
-              Title
-            </label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter title"
-              required
-            />
-          </div>
 
-          {!carId && (
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Basic Information Section */}
             <div className="space-y-2">
-              <label htmlFor="car" className="text-sm font-medium">
-                Car
-              </label>
-              <Select
-                value={selectedCarId}
-                onValueChange={(value) => setSelectedCarId(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select car" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cars.map((car) => (
-                    <SelectItem key={car._id} value={car._id.toString()}>
-                      {car.year} {car.make} {car.model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-1">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Basic Information
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="title"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Title
+                  </label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter title"
+                    required
+                    className="text-sm"
+                  />
+                </div>
+
+                {!carId && (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="car"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Car
+                    </label>
+                    <Select
+                      value={selectedCarId}
+                      onValueChange={(value) => setSelectedCarId(value)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select car" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cars.map((car) => (
+                          <SelectItem key={car._id} value={car._id.toString()}>
+                            {car.year} {car.make} {car.model}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="platform"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Platform
+                    </label>
+                    <Select
+                      value={platform || ""}
+                      onValueChange={(value) => setPlatform(value as Platform)}
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select platform" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          key="instagram-reels"
+                          value="Instagram Reels"
+                        >
+                          Instagram Reels
+                        </SelectItem>
+                        <SelectItem key="youtube" value="YouTube">
+                          YouTube
+                        </SelectItem>
+                        <SelectItem key="youtube-shorts" value="YouTube Shorts">
+                          YouTube Shorts
+                        </SelectItem>
+                        <SelectItem key="tiktok" value="TikTok">
+                          TikTok
+                        </SelectItem>
+                        <SelectItem key="facebook" value="Facebook">
+                          Facebook
+                        </SelectItem>
+                        <SelectItem
+                          key="bring-a-trailer"
+                          value="Bring a Trailer"
+                        >
+                          Bring a Trailer
+                        </SelectItem>
+                        <SelectItem key="other" value="Other">
+                          Other
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="type"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Type
+                    </label>
+                    <Select
+                      value={type || ""}
+                      onValueChange={(value) =>
+                        setType(value as DeliverableType)
+                      }
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem key="feature" value="feature">
+                          Feature
+                        </SelectItem>
+                        <SelectItem key="promo" value="promo">
+                          Promo
+                        </SelectItem>
+                        <SelectItem key="review" value="review">
+                          Review
+                        </SelectItem>
+                        <SelectItem key="walkthrough" value="walkthrough">
+                          Walkthrough
+                        </SelectItem>
+                        <SelectItem key="highlights" value="highlights">
+                          Highlights
+                        </SelectItem>
+                        <SelectItem key="photo_gallery" value="photo_gallery">
+                          Photo Gallery
+                        </SelectItem>
+                        <SelectItem
+                          key="marketing-email"
+                          value="Marketing Email"
+                        >
+                          Marketing Email
+                        </SelectItem>
+                        <SelectItem key="blog" value="Blog">
+                          Blog
+                        </SelectItem>
+                        <SelectItem key="other-type" value="other">
+                          Other
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="duration"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Duration (seconds)
+                    </label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      value={duration}
+                      onChange={(e) => setDuration(parseInt(e.target.value))}
+                      min={0}
+                      required
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="aspectRatio"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Aspect Ratio
+                    </label>
+                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select aspect ratio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem key="16:9" value="16:9">
+                          16:9
+                        </SelectItem>
+                        <SelectItem key="9:16" value="9:16">
+                          9:16
+                        </SelectItem>
+                        <SelectItem key="1:1" value="1:1">
+                          1:1
+                        </SelectItem>
+                        <SelectItem key="4:3" value="4:3">
+                          4:3
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
 
-          <div className="space-y-2">
-            <label htmlFor="platform" className="text-sm font-medium">
-              Platform
-            </label>
-            <Select
-              value={platform || ""}
-              onValueChange={(value) => setPlatform(value as Platform)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select platform" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem key="instagram-reels" value="Instagram Reels">
-                  Instagram Reels
-                </SelectItem>
-                <SelectItem key="youtube" value="YouTube">
-                  YouTube
-                </SelectItem>
-                <SelectItem key="youtube-shorts" value="YouTube Shorts">
-                  YouTube Shorts
-                </SelectItem>
-                <SelectItem key="tiktok" value="TikTok">
-                  TikTok
-                </SelectItem>
-                <SelectItem key="facebook" value="Facebook">
-                  Facebook
-                </SelectItem>
-                <SelectItem key="bring-a-trailer" value="Bring a Trailer">
-                  Bring a Trailer
-                </SelectItem>
-                <SelectItem key="other" value="Other">
-                  Other
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Assignment & Dates Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Assignment & Dates
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
 
-          <div className="space-y-2">
-            <label htmlFor="type" className="text-sm font-medium">
-              Type
-            </label>
-            <Select
-              value={type || ""}
-              onValueChange={(value) => setType(value as DeliverableType)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem key="feature" value="feature">
-                  Feature
-                </SelectItem>
-                <SelectItem key="promo" value="promo">
-                  Promo
-                </SelectItem>
-                <SelectItem key="review" value="review">
-                  Review
-                </SelectItem>
-                <SelectItem key="walkthrough" value="walkthrough">
-                  Walkthrough
-                </SelectItem>
-                <SelectItem key="highlights" value="highlights">
-                  Highlights
-                </SelectItem>
-                <SelectItem key="photo_gallery" value="photo_gallery">
-                  Photo Gallery
-                </SelectItem>
-                <SelectItem key="marketing-email" value="Marketing Email">
-                  Marketing Email
-                </SelectItem>
-                <SelectItem key="blog" value="Blog">
-                  Blog
-                </SelectItem>
-                <SelectItem key="other-type" value="other">
-                  Other
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="editor"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Editor
+                  </label>
+                  <Select
+                    value={editor}
+                    onValueChange={(value) => setEditor(value)}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Select editor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.uid} value={user.uid}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div className="space-y-2">
-            <label htmlFor="duration" className="text-sm font-medium">
-              Duration (seconds)
-            </label>
-            <Input
-              id="duration"
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(parseInt(e.target.value))}
-              min={0}
-              required
-            />
-          </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="editDeadline"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Edit Deadline
+                    </label>
+                    <Input
+                      id="editDeadline"
+                      type="date"
+                      value={editDeadline}
+                      onChange={(e) => setEditDeadline(e.target.value)}
+                      required
+                      className="text-sm"
+                    />
+                  </div>
 
-          <div className="space-y-2">
-            <label htmlFor="aspectRatio" className="text-sm font-medium">
-              Aspect Ratio
-            </label>
-            <Select value={aspectRatio} onValueChange={setAspectRatio}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select aspect ratio" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem key="16:9" value="16:9">
-                  16:9
-                </SelectItem>
-                <SelectItem key="9:16" value="9:16">
-                  9:16
-                </SelectItem>
-                <SelectItem key="1:1" value="1:1">
-                  1:1
-                </SelectItem>
-                <SelectItem key="4:3" value="4:3">
-                  4:3
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="releaseDate"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Release Date
+                    </label>
+                    <Input
+                      id="releaseDate"
+                      type="date"
+                      value={releaseDate}
+                      onChange={(e) => setReleaseDate(e.target.value)}
+                      required
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <div className="space-y-2">
-            <label htmlFor="editor" className="text-sm font-medium">
-              Editor
-            </label>
-            <Select value={editor} onValueChange={(value) => setEditor(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select editor" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.uid} value={user.uid}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Links Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Links
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
 
-          <div className="space-y-2">
-            <label htmlFor="editDeadline" className="text-sm font-medium">
-              Edit Deadline
-            </label>
-            <Input
-              id="editDeadline"
-              type="date"
-              value={editDeadline}
-              onChange={(e) => setEditDeadline(e.target.value)}
-              required
-            />
-          </div>
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="dropboxLink"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Dropbox Link
+                  </label>
+                  <Input
+                    id="dropboxLink"
+                    value={dropboxLink}
+                    onChange={(e) => setDropboxLink(e.target.value)}
+                    placeholder="Enter Dropbox link"
+                    className="text-sm"
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <label htmlFor="releaseDate" className="text-sm font-medium">
-              Release Date
-            </label>
-            <Input
-              id="releaseDate"
-              type="date"
-              value={releaseDate}
-              onChange={(e) => setReleaseDate(e.target.value)}
-              required
-            />
-          </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="socialMediaLink"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Social Media Link
+                  </label>
+                  <Input
+                    id="socialMediaLink"
+                    value={socialMediaLink}
+                    onChange={(e) => setSocialMediaLink(e.target.value)}
+                    placeholder="Enter Social Media link"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
 
-          <div className="space-y-2">
-            <label htmlFor="dropboxLink" className="text-sm font-medium">
-              Dropbox Link
-            </label>
-            <Input
-              id="dropboxLink"
-              value={dropboxLink}
-              onChange={(e) => setDropboxLink(e.target.value)}
-              placeholder="Enter Dropbox link"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="socialMediaLink" className="text-sm font-medium">
-              Social Media Link
-            </label>
-            <Input
-              id="socialMediaLink"
-              value={socialMediaLink}
-              onChange={(e) => setSocialMediaLink(e.target.value)}
-              placeholder="Enter Social Media link"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Creating..." : "Create"}
-            </Button>
-          </div>
-        </form>
+        {/* Actions Footer */}
+        <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsOpen(false)}
+            size="sm"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            size="sm"
+            onClick={handleSubmit}
+          >
+            {isLoading ? "Creating..." : "Create"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
