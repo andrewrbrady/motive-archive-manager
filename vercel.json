@@ -2,10 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "env": {
-    "NODE_ENV": "production",
-    "CANVAS_EXTENSION_SERVICE_URL": "https://canvas-service-public-s6vo3k273a-uc.a.run.app"
-  },
   "headers": [
     {
       "source": "/(.*)",

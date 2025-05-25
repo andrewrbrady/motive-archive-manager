@@ -95,24 +95,87 @@ export async function POST(request: NextRequest) {
       try {
         console.log("🔐 Attempting to get Google Cloud identity token...");
 
-        // Use the default service account in the Vercel environment
-        // This will work when deployed to Vercel with proper Google Cloud credentials
-        const auth = new GoogleAuth({
-          scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-        });
+        let idToken: string | null = null;
 
-        // Get an identity token specifically for the target audience
-        const client = await auth.getIdTokenClient(remoteServiceUrl);
-        const idToken =
-          await client.idTokenProvider.fetchIdToken(remoteServiceUrl);
-
-        if (idToken) {
-          headers["Authorization"] = `Bearer ${idToken}`;
-          console.log("✅ Successfully obtained Google Cloud identity token");
-          console.log("🔑 Token length:", idToken.length);
-          console.log("🔑 Token preview:", idToken.substring(0, 50) + "...");
+        // Skip authentication if explicitly configured (for testing)
+        if (process.env.SKIP_CLOUD_RUN_AUTH === "true") {
+          console.log("⚠️ Skipping authentication (SKIP_CLOUD_RUN_AUTH=true)");
         } else {
-          throw new Error("No identity token received");
+          // Try OIDC authentication first (for Vercel production)
+          if (process.env.NODE_ENV === "production" && process.env.VERCEL) {
+            try {
+              const { getVercelOidcToken } = await import(
+                "@vercel/functions/oidc"
+              );
+              const { ExternalAccountClient } = await import(
+                "google-auth-library"
+              );
+
+              // Check if OIDC environment variables are configured
+              if (
+                process.env.GCP_PROJECT_NUMBER &&
+                process.env.GCP_WORKLOAD_IDENTITY_POOL_ID &&
+                process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID &&
+                process.env.GCP_SERVICE_ACCOUNT_EMAIL
+              ) {
+                console.log("🔑 Using OIDC authentication for Vercel...");
+
+                const authClient = ExternalAccountClient.fromJSON({
+                  type: "external_account",
+                  audience: `//iam.googleapis.com/projects/${process.env.GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${process.env.GCP_WORKLOAD_IDENTITY_POOL_ID}/providers/${process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID}`,
+                  subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+                  token_url: "https://sts.googleapis.com/v1/token",
+                  service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${process.env.GCP_SERVICE_ACCOUNT_EMAIL}:generateAccessToken`,
+                  subject_token_supplier: {
+                    getSubjectToken: getVercelOidcToken,
+                  },
+                });
+
+                // Get an identity token for the Cloud Run service
+                if (authClient) {
+                  const accessTokenResponse = await authClient.getAccessToken();
+                  if (accessTokenResponse.token) {
+                    idToken = accessTokenResponse.token;
+                    console.log("✅ Successfully obtained OIDC identity token");
+                  }
+                }
+              } else {
+                console.log(
+                  "⚠️ OIDC environment variables not configured, falling back to GoogleAuth"
+                );
+              }
+            } catch (oidcError) {
+              console.log(
+                "⚠️ OIDC authentication failed, falling back to GoogleAuth:",
+                oidcError
+              );
+            }
+          }
+
+          // Fallback to GoogleAuth if OIDC didn't work
+          if (!idToken) {
+            console.log("🔑 Using GoogleAuth for authentication...");
+
+            // Use the default service account in the Vercel environment
+            // This will work when deployed to Vercel with proper Google Cloud credentials
+            const auth = new GoogleAuth({
+              scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+            });
+
+            // Get an identity token specifically for the target audience
+            const client = await auth.getIdTokenClient(remoteServiceUrl);
+            idToken =
+              await client.idTokenProvider.fetchIdToken(remoteServiceUrl);
+          }
+
+          if (idToken) {
+            headers["Authorization"] = `Bearer ${idToken}`;
+            console.log("✅ Successfully obtained Google Cloud identity token");
+            console.log("🔑 Token length:", idToken.length);
+            console.log("🔑 Token preview:", idToken.substring(0, 50) + "...");
+          } else {
+            throw new Error("No identity token received");
+          }
         }
       } catch (authError) {
         console.error("⚠️ Could not get identity token:", authError);
