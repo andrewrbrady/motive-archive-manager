@@ -102,15 +102,15 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      if (file.size > 10 * 1024 * 1024) {
-        // 10MB limit
+      if (file.size > 4 * 1024 * 1024) {
+        // 4MB limit (reduced for Vercel)
         const error = `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
         console.error("[API]", error);
         uploadErrors.push({
           fileName: file.name,
           fileIndex: i + 1,
           error,
-          details: "File exceeds 10MB limit",
+          details: "File exceeds 4MB limit (Vercel function payload limit)",
         });
         continue;
       }

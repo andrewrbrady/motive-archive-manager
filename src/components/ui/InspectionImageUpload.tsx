@@ -36,7 +36,8 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
   const [overallError, setOverallError] = useState<string | null>(null);
 
   // File validation constants
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+  const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB limit (reduced for Vercel)
+  const COMPRESSION_THRESHOLD = 2 * 1024 * 1024; // 2MB - compress files larger than this
   const BLOCKED_EXTENSIONS = [
     ".dng",
     ".cr2",
@@ -90,16 +91,134 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
     }
   };
 
+  // Compress image file if it's too large
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      // Only compress JPEG and PNG files
+      if (
+        !file.type.includes("jpeg") &&
+        !file.type.includes("jpg") &&
+        !file.type.includes("png")
+      ) {
+        resolve(file);
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+
+      img.onload = () => {
+        // Calculate new dimensions (max 1920px width/height)
+        const maxDimension = 1920;
+        let { width, height } = img;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          } else {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Start with high quality and reduce if needed
+        let quality = 0.8;
+        const tryCompress = () => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("Failed to compress image"));
+                return;
+              }
+
+              // If still too large and quality can be reduced, try again
+              if (blob.size > MAX_FILE_SIZE && quality > 0.3) {
+                quality -= 0.1;
+                tryCompress();
+                return;
+              }
+
+              // Create compressed file
+              const compressedFile = new File([blob], file.name, {
+                type: file.type,
+                lastModified: file.lastModified,
+              });
+
+              resolve(compressedFile);
+            },
+            file.type,
+            quality
+          );
+        };
+
+        tryCompress();
+      };
+
+      img.onerror = () => {
+        reject(new Error("Failed to load image for compression"));
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Validate individual file
   const validateFile = async (
     file: File
   ): Promise<{ isValid: boolean; error?: string; convertedFile?: File }> => {
     // Check file size first
     if (file.size > MAX_FILE_SIZE) {
-      return {
-        isValid: false,
-        error: `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`,
-      };
+      // If it's a compressible image type and over the compression threshold, try to compress
+      if (
+        (file.type.includes("jpeg") ||
+          file.type.includes("jpg") ||
+          file.type.includes("png")) &&
+        file.size > COMPRESSION_THRESHOLD
+      ) {
+        try {
+          console.log(
+            `[Validation] Attempting to compress large file "${file.name}" (${(file.size / 1024 / 1024).toFixed(1)}MB)`
+          );
+          const compressedFile = await compressImage(file);
+
+          if (compressedFile.size <= MAX_FILE_SIZE) {
+            console.log(
+              `[Validation] Successfully compressed "${file.name}" from ${(file.size / 1024 / 1024).toFixed(1)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(1)}MB`
+            );
+            return {
+              isValid: true,
+              convertedFile: compressedFile,
+            };
+          } else {
+            return {
+              isValid: false,
+              error: `File "${file.name}" is too large even after compression (${(compressedFile.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 4MB.`,
+            };
+          }
+        } catch (compressionError) {
+          console.error(
+            `[Validation] Compression failed for "${file.name}":`,
+            compressionError
+          );
+          return {
+            isValid: false,
+            error: `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) and compression failed. Maximum size is 4MB.`,
+          };
+        }
+      } else {
+        return {
+          isValid: false,
+          error: `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 4MB.`,
+        };
+      }
     }
 
     const fileName = file.name.toLowerCase();
@@ -120,12 +239,38 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
         // Convert HEIC to JPEG
         const convertedFile = await convertHeicToJpeg(file);
 
-        // Check converted file size
+        // Check converted file size and compress if needed
         if (convertedFile.size > MAX_FILE_SIZE) {
-          return {
-            isValid: false,
-            error: `File "${file.name}" is too large after conversion (${(convertedFile.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`,
-          };
+          if (convertedFile.size > COMPRESSION_THRESHOLD) {
+            try {
+              console.log(
+                `[Validation] Compressing converted HEIC file "${file.name}"`
+              );
+              const compressedFile = await compressImage(convertedFile);
+
+              if (compressedFile.size <= MAX_FILE_SIZE) {
+                return {
+                  isValid: true,
+                  convertedFile: compressedFile,
+                };
+              } else {
+                return {
+                  isValid: false,
+                  error: `File "${file.name}" is too large after conversion and compression (${(compressedFile.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 4MB.`,
+                };
+              }
+            } catch (compressionError) {
+              return {
+                isValid: false,
+                error: `File "${file.name}" is too large after conversion (${(convertedFile.size / 1024 / 1024).toFixed(1)}MB) and compression failed. Maximum size is 4MB.`,
+              };
+            }
+          } else {
+            return {
+              isValid: false,
+              error: `File "${file.name}" is too large after conversion (${(convertedFile.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 4MB.`,
+            };
+          }
         }
 
         return {
@@ -206,8 +351,17 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
       return fileName.endsWith(".heic") || fileName.endsWith(".heif");
     });
 
-    if (hasHeicFiles) {
+    // Show processing message for large files that need compression
+    const hasLargeFiles = fileArray.some(
+      (file) => file.size > COMPRESSION_THRESHOLD
+    );
+
+    if (hasHeicFiles && hasLargeFiles) {
+      setOverallError("Converting HEIC files and compressing large images...");
+    } else if (hasHeicFiles) {
       setOverallError("Converting HEIC files to JPEG...");
+    } else if (hasLargeFiles) {
+      setOverallError("Compressing large images...");
     }
 
     // Validate and convert each file
@@ -228,7 +382,7 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
     }
 
     // Clear processing message
-    if (hasHeicFiles) {
+    if (hasHeicFiles || hasLargeFiles) {
       setOverallError(null);
     }
 
@@ -508,10 +662,11 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
             Click to select or drag and drop images
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            JPEG, PNG, WebP, or HEIC images up to 10MB each
+            JPEG, PNG, WebP, or HEIC images up to 4MB each
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            HEIC files will be automatically converted to JPEG
+            Large images are automatically compressed • HEIC files converted to
+            JPEG
           </div>
         </div>
       )}
@@ -526,8 +681,8 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
             {overallError}
           </div>
           <div className="mt-3 text-xs text-muted-foreground">
-            <strong>Supported formats:</strong> JPEG, PNG, WebP, HEIC (up to
-            10MB each)
+            <strong>Supported formats:</strong> JPEG, PNG, WebP, HEIC (up to 4MB
+            each)
             <br />
             <strong>Auto-converted:</strong> HEIC and HEIF files are
             automatically converted to JPEG
