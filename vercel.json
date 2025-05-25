@@ -28,7 +28,7 @@
     "app/api/images/extend-canvas/route.ts": {
       "maxDuration": 60,
       "memory": 1536,
-      "includeFiles": ["extend_canvas_linux", "extend_canvas"]
+      "includeFiles": "extend_canvas"
     }
   }
 }
