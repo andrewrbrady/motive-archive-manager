@@ -26,8 +26,17 @@ export async function POST(request: NextRequest) {
       originalCarId,
     } = body;
 
+    console.log("🌐 Remote canvas extension service called with:", {
+      imageUrl: imageUrl.substring(0, 100) + "...",
+      desiredHeight,
+      paddingPct,
+      whiteThresh,
+      uploadToCloudflare,
+    });
+
     // Validate input parameters
     if (!imageUrl || !desiredHeight) {
+      console.error("❌ Missing required parameters");
       return NextResponse.json(
         { error: "Missing required parameters" },
         { status: 400 }
@@ -35,6 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (desiredHeight < 100 || desiredHeight > 5000) {
+      console.error("❌ Invalid desired height:", desiredHeight);
       return NextResponse.json(
         { error: "Desired height must be between 100 and 5000 pixels" },
         { status: 400 }
@@ -42,6 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (paddingPct < 0 || paddingPct > 1) {
+      console.error("❌ Invalid padding percentage:", paddingPct);
       return NextResponse.json(
         { error: "Padding percentage must be between 0 and 1" },
         { status: 400 }
@@ -49,6 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (whiteThresh !== -1 && (whiteThresh < 0 || whiteThresh > 255)) {
+      console.error("❌ Invalid white threshold:", whiteThresh);
       return NextResponse.json(
         { error: "White threshold must be -1 or between 0 and 255" },
         { status: 400 }
@@ -57,7 +69,10 @@ export async function POST(request: NextRequest) {
 
     // Get the remote service URL from environment variables
     const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
+    console.log("🔧 Remote service URL:", remoteServiceUrl);
+
     if (!remoteServiceUrl) {
+      console.error("❌ CANVAS_EXTENSION_SERVICE_URL not configured");
       return NextResponse.json(
         {
           error: "Canvas extension service not configured",
@@ -69,61 +84,101 @@ export async function POST(request: NextRequest) {
 
     try {
       // Call the remote canvas extension service with authentication
-      console.log(
-        `Calling remote canvas extension service: ${remoteServiceUrl}`
-      );
+      console.log("🚀 Calling remote canvas extension service...");
 
       // Get an identity token for the service
-      const auth = new GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-      });
-
       let headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
 
       // Try to get an identity token for authentication
       try {
+        console.log("🔐 Attempting to get Google Cloud identity token...");
+
+        // Use the default service account in the Vercel environment
+        // This will work when deployed to Vercel with proper Google Cloud credentials
+        const auth = new GoogleAuth({
+          scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+        });
+
+        // Get an identity token specifically for the target audience
         const client = await auth.getIdTokenClient(remoteServiceUrl);
         const idToken =
           await client.idTokenProvider.fetchIdToken(remoteServiceUrl);
-        headers["Authorization"] = `Bearer ${idToken}`;
-        console.log("✓ Using Google Cloud identity token for authentication");
+
+        if (idToken) {
+          headers["Authorization"] = `Bearer ${idToken}`;
+          console.log("✅ Successfully obtained Google Cloud identity token");
+          console.log("🔑 Token length:", idToken.length);
+          console.log("🔑 Token preview:", idToken.substring(0, 50) + "...");
+        } else {
+          throw new Error("No identity token received");
+        }
       } catch (authError) {
-        console.log(
-          "⚠️ Could not get identity token, trying without auth:",
-          authError
-        );
+        console.error("⚠️ Could not get identity token:", authError);
+        console.log("🔄 Proceeding without authentication...");
+
+        // For development/testing, try without auth first
+        // In production, this should fail gracefully
+        if (process.env.NODE_ENV === "production") {
+          throw new Error(
+            "Authentication required for production Cloud Run access"
+          );
+        }
       }
+
+      console.log("📡 Making request to:", `${remoteServiceUrl}/extend-canvas`);
+      console.log("📋 Request headers:", Object.keys(headers));
+
+      const requestPayload = {
+        imageUrl,
+        desiredHeight,
+        paddingPct,
+        whiteThresh,
+      };
+      console.log("📦 Request payload:", {
+        ...requestPayload,
+        imageUrl: imageUrl.substring(0, 100) + "...",
+      });
 
       const remoteResponse = await fetch(`${remoteServiceUrl}/extend-canvas`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          imageUrl,
-          desiredHeight,
-          paddingPct,
-          whiteThresh,
-        }),
+        body: JSON.stringify(requestPayload),
         // 60 second timeout for remote service
         signal: AbortSignal.timeout(60000),
       });
 
+      console.log("📨 Response status:", remoteResponse.status);
+      console.log(
+        "📨 Response headers:",
+        Object.fromEntries(remoteResponse.headers.entries())
+      );
+
       if (!remoteResponse.ok) {
         const errorText = await remoteResponse.text();
+        console.error("❌ Remote service error response:", {
+          status: remoteResponse.status,
+          statusText: remoteResponse.statusText,
+          body: errorText.substring(0, 500),
+        });
         throw new Error(
           `Remote service error: ${remoteResponse.status} ${errorText}`
         );
       }
 
+      console.log("✅ Remote service responded successfully");
       const remoteResult = await remoteResponse.json();
+      console.log("📄 Remote result keys:", Object.keys(remoteResult));
 
       if (!remoteResult.success) {
+        console.error("❌ Remote processing failed:", remoteResult.error);
         throw new Error(
           `Remote processing failed: ${remoteResult.error || "Unknown error"}`
         );
       }
 
+      console.log("🎉 Remote processing successful!");
       let result: any = {
         success: true,
         processedImageUrl: remoteResult.processedImageUrl,

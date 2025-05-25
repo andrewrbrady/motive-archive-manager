@@ -75,9 +75,10 @@ export async function POST(request: NextRequest) {
       if (remoteServiceUrl) {
         try {
           console.log("🌐 Trying remote canvas extension service...");
+          console.log("🔗 Remote service URL:", remoteServiceUrl);
 
           const remoteResponse = await fetch(
-            `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/images/extend-canvas-remote`,
+            `${remoteServiceUrl}/extend-canvas`,
             {
               method: "POST",
               headers: {
@@ -88,22 +89,34 @@ export async function POST(request: NextRequest) {
                 desiredHeight,
                 paddingPct,
                 whiteThresh,
-                uploadToCloudflare,
-                originalFilename,
-                originalCarId,
               }),
             }
           );
 
           if (remoteResponse.ok) {
             const remoteResult = await remoteResponse.json();
-            console.log("✅ Successfully processed with remote service");
+            console.log(
+              "✅ Successfully processed with remote Cloud Run service"
+            );
+
+            // Return the result with additional metadata
             return NextResponse.json({
-              ...remoteResult,
+              success: true,
+              message: "Image processed successfully with Cloud Run service",
+              processedImageUrl: remoteResult.processedImageUrl,
               remoteServiceUsed: true,
+              uploadToCloudflare,
+              originalFilename,
+              originalCarId,
             });
           } else {
-            console.log("⚠️ Remote service failed, trying local binary...");
+            const errorText = await remoteResponse.text();
+            console.log(
+              "⚠️ Remote service failed:",
+              remoteResponse.status,
+              errorText
+            );
+            console.log("⚠️ Falling back to local binary...");
           }
         } catch (remoteError) {
           console.log(
@@ -111,6 +124,10 @@ export async function POST(request: NextRequest) {
             remoteError
           );
         }
+      } else {
+        console.log(
+          "🔧 No remote service URL configured, using local binary..."
+        );
       }
 
       // Download the image
@@ -186,57 +203,13 @@ export async function POST(request: NextRequest) {
           (execError.stderr?.includes("libopencv") ||
             execError.message?.includes("libopencv"))
         ) {
-          console.log(
-            "🔄 OpenCV dependency error detected, falling back to JavaScript version..."
+          throw new Error(
+            "Canvas extension binary is missing required OpenCV libraries. Please use the Cloud Run service instead, or ensure OpenCV is properly installed for local processing."
           );
-
-          try {
-            // Fall back to JavaScript implementation
-            const fallbackResponse = await fetch(
-              `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/images/extend-canvas-js`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  imageUrl,
-                  desiredHeight,
-                  paddingPct,
-                  whiteThresh,
-                  uploadToCloudflare,
-                  originalFilename,
-                  originalCarId,
-                }),
-              }
-            );
-
-            if (fallbackResponse.ok) {
-              const fallbackResult = await fallbackResponse.json();
-              console.log("✅ Successfully processed with JavaScript fallback");
-              return NextResponse.json({
-                ...fallbackResult,
-                fallbackUsed: true,
-                fallbackReason: "OpenCV dependency issue with C++ binary",
-              });
-            } else {
-              throw new Error(
-                `Fallback API failed: ${fallbackResponse.statusText}`
-              );
-            }
-          } catch (fallbackError) {
-            console.error(
-              "Fallback to JavaScript version also failed:",
-              fallbackError
-            );
-            throw new Error(
-              `Both C++ binary and JavaScript fallback failed. C++ error: ${execError.message || execError}. Fallback error: ${fallbackError instanceof Error ? fallbackError.message : "Unknown error"}`
-            );
-          }
         }
 
         throw new Error(
-          "Canvas extension binary is missing required OpenCV libraries. The binary needs to be recompiled with static linking for the Vercel environment. Please check the deployment documentation for instructions on creating a compatible binary."
+          `Canvas extension execution failed: ${execError.message || execError}`
         );
       }
 

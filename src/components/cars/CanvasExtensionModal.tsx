@@ -13,6 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Loader2,
   Download,
   Eye,
@@ -21,6 +28,9 @@ import {
   XCircle,
   ExternalLink,
   Car,
+  Settings,
+  Cloud,
+  Monitor,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
@@ -45,6 +55,8 @@ interface CloudflareUploadResult {
   error?: string;
 }
 
+type ProcessingMethod = "cloud" | "local";
+
 export function CanvasExtensionModal({
   isOpen,
   onClose,
@@ -55,6 +67,8 @@ export function CanvasExtensionModal({
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
+  const [processingMethod, setProcessingMethod] =
+    useState<ProcessingMethod>("cloud");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
@@ -75,8 +89,23 @@ export function CanvasExtensionModal({
     useState<CloudflareUploadResult | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [fallbackUsed, setFallbackUsed] = useState<boolean>(false);
-  const [fallbackReason, setFallbackReason] = useState<string>("");
+  const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
+
+  // Load processing method preference from localStorage
+  useEffect(() => {
+    const savedMethod = localStorage.getItem(
+      "canvasExtensionMethod"
+    ) as ProcessingMethod;
+    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
+      setProcessingMethod(savedMethod);
+    }
+  }, []);
+
+  // Save processing method preference to localStorage
+  const handleProcessingMethodChange = (method: ProcessingMethod) => {
+    setProcessingMethod(method);
+    localStorage.setItem("canvasExtensionMethod", method);
+  };
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -176,9 +205,16 @@ export function CanvasExtensionModal({
 
     setIsProcessing(true);
     setCloudflareResult(null);
+    setRemoteServiceUsed(false);
 
     try {
-      const response = await fetch("/api/images/extend-canvas", {
+      // Choose the API endpoint based on the selected processing method
+      const apiEndpoint =
+        processingMethod === "cloud"
+          ? "/api/images/extend-canvas-remote"
+          : "/api/images/extend-canvas";
+
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -203,20 +239,16 @@ export function CanvasExtensionModal({
         setProcessedImageUrl(result.processedImageUrl);
         setProcessingStatus("completed");
 
-        // Show fallback information if used
-        if (result.fallbackUsed) {
-          console.log(
-            `Canvas extension used fallback: ${result.fallbackReason}`
-          );
-          setFallbackUsed(true);
-          setFallbackReason(result.fallbackReason);
+        // Track which service was used
+        if (result.remoteServiceUsed) {
+          setRemoteServiceUsed(true);
         }
 
         toast({
           title: "Success",
-          description: result.fallbackUsed
-            ? "Image processed successfully (using JavaScript fallback due to C++ binary issues)"
-            : "Image processed successfully",
+          description: `Image processed successfully using ${
+            result.remoteServiceUsed ? "Cloud Run service" : "local binary"
+          }`,
         });
       } else {
         setProcessingStatus("error");
@@ -465,8 +497,6 @@ export function CanvasExtensionModal({
     setWhiteThresh("90");
     setCloudflareWidth("2000");
     setCloudflareQuality("100");
-    setFallbackUsed(false);
-    setFallbackReason("");
   };
 
   const handleClose = () => {
@@ -557,6 +587,53 @@ export function CanvasExtensionModal({
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Higher quality = slower processing
+                </p>
+              </div>
+
+              {/* Processing Method Settings */}
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="h-4 w-4" />
+                  <Label className="text-sm font-medium">
+                    Processing Method
+                  </Label>
+                </div>
+                <Select
+                  value={processingMethod}
+                  onValueChange={handleProcessingMethodChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select processing method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cloud">
+                      <div className="flex items-center gap-2">
+                        <Cloud className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Cloud Run Service</div>
+                          <div className="text-xs text-muted-foreground">
+                            Fast, reliable, always available
+                          </div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="local">
+                      <div className="flex items-center gap-2">
+                        <Monitor className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Local Binary</div>
+                          <div className="text-xs text-muted-foreground">
+                            Uses local macOS/Linux executable
+                          </div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {processingMethod === "cloud"
+                    ? "Uses Google Cloud Run service with C++ OpenCV processing"
+                    : "Uses local extend_canvas binary (requires OpenCV)"}
                 </p>
               </div>
 
