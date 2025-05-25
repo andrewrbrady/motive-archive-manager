@@ -1,6 +1,22 @@
 "use client";
 
-import { Instagram, Mail, Moon, Sun, Menu } from "lucide-react";
+import {
+  Instagram,
+  Mail,
+  Moon,
+  Sun,
+  Menu,
+  Home,
+  Car,
+  ImageIcon,
+  FolderIcon,
+  FileText,
+  Package,
+  TrendingUp,
+  Calendar,
+  PenTool,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { logos } from "@/data/site-content";
@@ -25,7 +41,25 @@ const linkClasses =
 const iconButtonClasses =
   "text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground-subtle))] transition-colors";
 const mobileLinkClasses =
-  "text-lg uppercase tracking-wider text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-subtle))] transition-colors py-4 px-2 border-b border-[hsl(var(--border))] last:border-b-0 block hover:bg-[hsl(var(--accent))/5] rounded-md";
+  "text-sm uppercase tracking-wider text-[hsl(var(--foreground))] hover:text-[hsl(var(--foreground-subtle))] transition-colors py-3 px-3 border-b border-[hsl(var(--border))] last:border-b-0 block hover:bg-[hsl(var(--accent))/5] rounded-md flex items-center gap-3";
+
+// Function to get the appropriate icon for each navigation item
+const getNavIcon = (href: string) => {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    "/": Home,
+    "/cars": Car,
+    "/images": ImageIcon,
+    "/galleries": FolderIcon,
+    "/documents": FileText,
+    "/production": Package,
+    "/market": TrendingUp,
+    "/schedule": Calendar,
+    "/copywriting": PenTool,
+    "/admin": Settings,
+  };
+
+  return iconMap[href] || FileText;
+};
 
 interface NavbarProps {
   className?: string;
@@ -115,65 +149,84 @@ export default function Navbar({ className }: NavbarProps) {
                 <Menu className="w-6 h-6" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[350px]">
-              <SheetHeader className="text-left">
-                <SheetTitle className="text-xl font-bold tracking-wider">
-                  MOTIVE ARCHIVE
-                </SheetTitle>
+            <SheetContent
+              side="right"
+              className="w-[280px] sm:w-[320px] flex flex-col"
+            >
+              <SheetHeader className="text-left flex-shrink-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <Image
+                    src={logos.primary}
+                    alt="Motive Archive"
+                    width={32}
+                    height={32}
+                    className="w-8 h-8"
+                  />
+                  <SheetTitle className="text-lg font-bold tracking-wider">
+                    MOTIVE ARCHIVE
+                  </SheetTitle>
+                </div>
               </SheetHeader>
 
-              <div className="flex flex-col space-y-2 mt-8">
-                {navigationItems.map((item) => (
-                  <SheetClose asChild key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={mobileLinkClasses}
-                      onClick={handleLinkClick}
-                    >
-                      {item.name}
-                    </Link>
-                  </SheetClose>
-                ))}
-              </div>
-
-              {/* Mobile-only controls */}
-              <div className="flex flex-col space-y-6 mt-8 pt-8 border-t border-[hsl(var(--border))]">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-[hsl(var(--foreground-muted))] uppercase tracking-wider font-medium">
-                    Theme
-                  </span>
-                  <button
-                    onClick={toggleTheme}
-                    className={`${iconButtonClasses} p-2 rounded-md hover:bg-[hsl(var(--accent))]`}
-                    aria-label="Toggle theme"
-                  >
-                    {theme === "dark" ? (
-                      <Sun className="w-5 h-5" />
-                    ) : (
-                      <Moon className="w-5 h-5" />
-                    )}
-                  </button>
+              {/* Scrollable navigation area */}
+              <div className="flex-1 overflow-y-auto overflow-x-hidden mt-6 -mx-6 px-6">
+                <div className="flex flex-col space-y-1">
+                  {navigationItems.map((item) => {
+                    const IconComponent = getNavIcon(item.href);
+                    return (
+                      <SheetClose asChild key={item.href}>
+                        <Link
+                          href={item.href}
+                          className={mobileLinkClasses}
+                          onClick={handleLinkClick}
+                        >
+                          <IconComponent className="w-4 h-4 flex-shrink-0" />
+                          {item.name}
+                        </Link>
+                      </SheetClose>
+                    );
+                  })}
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-[hsl(var(--foreground-muted))] uppercase tracking-wider font-medium">
-                    Connect
-                  </span>
-                  <div className="flex space-x-2">
-                    <a
-                      href="#"
+                {/* Mobile-only controls */}
+                <div className="flex flex-col space-y-4 mt-6 pt-6 border-t border-[hsl(var(--border))]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[hsl(var(--foreground-muted))] uppercase tracking-wider font-medium">
+                      Theme
+                    </span>
+                    <button
+                      onClick={toggleTheme}
                       className={`${iconButtonClasses} p-2 rounded-md hover:bg-[hsl(var(--accent))]`}
-                      aria-label="Instagram"
+                      aria-label="Toggle theme"
                     >
-                      <Instagram className="w-5 h-5" />
-                    </a>
-                    <a
-                      href="#"
-                      className={`${iconButtonClasses} p-2 rounded-md hover:bg-[hsl(var(--accent))]`}
-                      aria-label="Email"
-                    >
-                      <Mail className="w-5 h-5" />
-                    </a>
+                      {theme === "dark" ? (
+                        <Sun className="w-4 h-4" />
+                      ) : (
+                        <Moon className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[hsl(var(--foreground-muted))] uppercase tracking-wider font-medium">
+                      Connect
+                    </span>
+                    <div className="flex space-x-1">
+                      <a
+                        href="#"
+                        className={`${iconButtonClasses} p-2 rounded-md hover:bg-[hsl(var(--accent))]`}
+                        aria-label="Instagram"
+                      >
+                        <Instagram className="w-4 h-4" />
+                      </a>
+                      <a
+                        href="#"
+                        className={`${iconButtonClasses} p-2 rounded-md hover:bg-[hsl(var(--accent))]`}
+                        aria-label="Email"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>

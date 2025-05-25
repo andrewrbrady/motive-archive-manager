@@ -11,6 +11,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cleanupUrlParameters } from "@/utils/urlCleanup";
+import {
+  ImageIcon,
+  FolderIcon,
+  Settings,
+  Camera,
+  FileText,
+  Edit,
+  ExternalLink,
+  Share2,
+  ClipboardCheck,
+  FileIcon,
+  Newspaper,
+  Package,
+  CalendarDays,
+  Calendar,
+} from "lucide-react";
 
 export interface TabItem {
   value: string;
@@ -25,6 +41,28 @@ interface CustomTabsProps {
   basePath: string;
   className?: string;
 }
+
+// Function to get the appropriate icon for each tab
+const getTabIcon = (tabValue: string) => {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+    gallery: ImageIcon,
+    "car-galleries": FolderIcon,
+    specs: Settings,
+    shoots: Camera,
+    "shot-lists": FileText,
+    scripts: Edit,
+    bat: ExternalLink,
+    captions: Share2,
+    inspections: ClipboardCheck,
+    documentation: FileIcon,
+    article: Newspaper,
+    deliverables: Package,
+    events: CalendarDays,
+    calendar: Calendar,
+  };
+
+  return iconMap[tabValue] || FileIcon;
+};
 
 // Hook to detect mobile screen size
 const useIsMobile = () => {
@@ -160,15 +198,27 @@ export function CustomTabs({
           <Select value={activeTab} onValueChange={handleTabChange}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a tab">
-                {currentTabLabel}
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const IconComponent = getTabIcon(activeTab);
+                    return <IconComponent className="h-4 w-4" />;
+                  })()}
+                  {currentTabLabel}
+                </div>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {items.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
+              {items.map((item) => {
+                const IconComponent = getTabIcon(item.value);
+                return (
+                  <SelectItem key={item.value} value={item.value}>
+                    <div className="flex items-center gap-2">
+                      <IconComponent className="h-4 w-4" />
+                      {item.label}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
