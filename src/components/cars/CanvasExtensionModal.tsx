@@ -240,14 +240,16 @@ export function CanvasExtensionModal({
         setProcessingStatus("completed");
 
         // Track which service was used
-        if (result.remoteServiceUsed) {
+        if (result.remoteServiceUsed || result.remoteService) {
           setRemoteServiceUsed(true);
         }
 
         toast({
           title: "Success",
           description: `Image processed successfully using ${
-            result.remoteServiceUsed ? "Cloud Run service" : "local binary"
+            result.remoteServiceUsed || result.remoteService
+              ? "Cloud Run service"
+              : "local binary"
           }`,
         });
       } else {
