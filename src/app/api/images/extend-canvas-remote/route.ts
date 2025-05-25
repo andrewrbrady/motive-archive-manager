@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { GoogleAuth } from "google-auth-library";
 
 interface ExtendCanvasRequest {
   imageUrl: string;
@@ -67,16 +68,37 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Call the remote canvas extension service
+      // Call the remote canvas extension service with authentication
       console.log(
         `Calling remote canvas extension service: ${remoteServiceUrl}`
       );
 
+      // Get an identity token for the service
+      const auth = new GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+      });
+
+      let headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      // Try to get an identity token for authentication
+      try {
+        const client = await auth.getIdTokenClient(remoteServiceUrl);
+        const idToken =
+          await client.idTokenProvider.fetchIdToken(remoteServiceUrl);
+        headers["Authorization"] = `Bearer ${idToken}`;
+        console.log("✓ Using Google Cloud identity token for authentication");
+      } catch (authError) {
+        console.log(
+          "⚠️ Could not get identity token, trying without auth:",
+          authError
+        );
+      }
+
       const remoteResponse = await fetch(`${remoteServiceUrl}/extend-canvas`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           imageUrl,
           desiredHeight,

@@ -1,0 +1,13 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-f",
+        "Dockerfile.canvas-service-simple",
+        "-t",
+        "gcr.io/motive-archive-manager-460909/canvas-service",
+        ".",
+      ]
+images:
+  - "gcr.io/motive-archive-manager-460909/canvas-service"

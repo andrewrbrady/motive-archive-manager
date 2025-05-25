@@ -1,0 +1,36 @@
+# Use official Node.js 18 image
+FROM node:18-slim
+
+# Install system dependencies and OpenCV
+RUN apt-get update && apt-get install -y \
+    g++ \
+    make \
+    pkg-config \
+    libopencv-dev \
+    libopencv-contrib-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY canvas-service/package*.json ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production
+
+# Copy debug server
+COPY debug-server.js ./server.js
+
+# Copy source files for debugging
+COPY extend_canvas.cpp ./
+
+# Compile the canvas extension binary
+RUN g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp \
+    $(pkg-config --cflags --libs opencv4) || echo "Failed to compile extend_canvas"
+
+# Make binary executable if it exists
+RUN chmod +x extend_canvas || echo "extend_canvas not found"
+
+# Start the debug server
+CMD ["node", "server.js"] 
