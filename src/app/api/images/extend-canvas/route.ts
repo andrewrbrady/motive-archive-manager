@@ -80,7 +80,11 @@ export async function POST(request: NextRequest) {
       await fs.writeFile(inputPath, Buffer.from(imageBuffer));
 
       // Check if extend_canvas executable exists
-      const executablePath = path.join(process.cwd(), "extend_canvas");
+      const platform = process.platform;
+      const executableName =
+        platform === "darwin" ? "extend_canvas_macos" : "extend_canvas";
+      const executablePath = path.join(process.cwd(), executableName);
+
       try {
         await fs.access(executablePath);
       } catch {
@@ -88,14 +92,16 @@ export async function POST(request: NextRequest) {
         const isProduction = process.env.NODE_ENV === "production";
         const errorMessage = isProduction
           ? "Canvas extension feature is currently unavailable in production. The C++ processing program could not be compiled during deployment."
-          : "Canvas extension program not found. Please ensure extend_canvas is compiled and available in the project root.";
+          : `Canvas extension program not found. Please ensure ${executableName} is compiled and available in the project root.`;
 
         return NextResponse.json(
           {
             error: errorMessage,
             details: isProduction
               ? "This feature requires OpenCV to be installed during the build process. Please check the deployment logs for compilation errors."
-              : "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp `pkg-config --cflags --libs opencv4`",
+              : platform === "darwin"
+                ? "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas_macos extend_canvas.cpp `pkg-config --cflags --libs opencv4`"
+                : "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp `pkg-config --cflags --libs opencv4`",
           },
           { status: 503 } // Service Unavailable
         );

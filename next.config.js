@@ -6,10 +6,12 @@ const nextConfig = {
     "@tanstack/react-query",
     "@tanstack/react-query-devtools",
   ],
-  experimental: {
-    outputFileTracingIncludes: {
-      "/api/images/extend-canvas": ["./extend_canvas", "./extend_canvas_linux"],
-    },
+  outputFileTracingIncludes: {
+    "/api/images/extend-canvas": [
+      "./extend_canvas",
+      "./extend_canvas_linux",
+      "./extend_canvas_macos",
+    ],
   },
   images: {
     remotePatterns: [
