@@ -520,6 +520,8 @@ function isImageFile(filename: string): boolean {
     ".bmp",
     ".webp",
     ".tiff",
+    ".heic",
+    ".heif",
   ];
   const extension = filename.toLowerCase().substring(filename.lastIndexOf("."));
   return imageExtensions.includes(extension);

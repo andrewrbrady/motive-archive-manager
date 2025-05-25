@@ -48,12 +48,20 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
   ];
   const ALLOWED_TYPES = [
     "image/jpeg",
-    "image/jpg",
     "image/png",
     "image/webp",
     "image/gif",
     "image/heic",
     "image/heif",
+  ];
+  const ALLOWED_EXTENSIONS = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".gif",
+    ".heic",
+    ".heif",
   ];
 
   // Convert HEIC file to JPEG
@@ -153,6 +161,18 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
       return {
         isValid: false,
         error: `File "${file.name}" has an unsupported format (${extension.toUpperCase()}). Please convert to JPEG, PNG, or WebP format.`,
+      };
+    }
+
+    // Check file extension
+    const hasValidExtension = ALLOWED_EXTENSIONS.some((ext) =>
+      fileName.endsWith(ext)
+    );
+
+    if (!hasValidExtension) {
+      return {
+        isValid: false,
+        error: `File "${file.name}" has an unsupported extension (${extension.toUpperCase()}). Please use JPEG, PNG, WebP, or HEIC images.`,
       };
     }
 

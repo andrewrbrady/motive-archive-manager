@@ -161,7 +161,7 @@ export const Dropzone: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
       context.addFiles(acceptedFiles);
     },
     accept: {
-      "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+      "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif"],
     },
     maxSize: 5 * 1024 * 1024, // 5MB
   });
