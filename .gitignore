@@ -52,5 +52,5 @@ cookies.txt
 next-env.d.ts
 
 # canvas extension
-extend_canvas
+# extend_canvas (commented out - needed for production deployment)
 /temp/
