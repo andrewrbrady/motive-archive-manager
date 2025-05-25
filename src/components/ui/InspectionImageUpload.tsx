@@ -289,10 +289,19 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
         completed++;
       } catch (err: any) {
         updatedProgress[i].status = "error";
-        updatedProgress[i].error = err?.message || "Upload failed";
+        const errorMessage = err?.message || "Upload failed";
+        updatedProgress[i].error = errorMessage;
         setProgress([...updatedProgress]);
-        setOverallError("One or more uploads failed.");
-        if (onError) onError(updatedProgress[i].error!);
+
+        // Set overall error with more details
+        const detailedError = `Upload failed for "${fileProgress[i].file.name}": ${errorMessage}`;
+        setOverallError(detailedError);
+
+        console.error(
+          `[Upload] Error for "${fileProgress[i].file.name}":`,
+          err
+        );
+        if (onError) onError(detailedError);
       }
     }
 
@@ -328,27 +337,104 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
       };
 
       xhr.onload = () => {
+        console.log(`[Upload] Response status for "${file.name}":`, xhr.status);
+        console.log(`[Upload] Response headers:`, xhr.getAllResponseHeaders());
+
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result = JSON.parse(xhr.responseText);
+            console.log(`[Upload] Response for "${file.name}":`, result);
+
             if (result.success && result.images && result.images.length > 0) {
               onProgress(100);
               resolve(result.images[0]); // Return the first uploaded image
+            } else if (result.errors && result.errors.length > 0) {
+              // Handle API errors with detailed information
+              const errorDetails = result.errors
+                .map((err: any) => {
+                  let details = err.error || "Unknown error";
+                  if (err.details) details += `: ${err.details}`;
+                  if (err.cloudflareStatus)
+                    details += ` (Cloudflare ${err.cloudflareStatus})`;
+                  return details;
+                })
+                .join("; ");
+
+              console.error(
+                `[Upload] API errors for "${file.name}":`,
+                result.errors
+              );
+              reject(new Error(`Upload failed: ${errorDetails}`));
             } else {
+              console.error(
+                `[Upload] No images returned for "${file.name}":`,
+                result
+              );
               reject(new Error("No images returned from upload"));
             }
-          } catch (error) {
-            reject(new Error("Failed to parse upload response"));
+          } catch (parseError) {
+            console.error(
+              `[Upload] Failed to parse response for "${file.name}":`,
+              parseError
+            );
+            console.error(`[Upload] Raw response:`, xhr.responseText);
+            reject(
+              new Error(
+                `Failed to parse upload response: ${parseError instanceof Error ? parseError.message : "Unknown parse error"}`
+              )
+            );
           }
         } else {
-          reject(new Error("Upload failed: " + xhr.statusText));
+          // Handle HTTP errors
+          console.error(`[Upload] HTTP error for "${file.name}":`, {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            response: xhr.responseText,
+          });
+
+          try {
+            const errorResult = JSON.parse(xhr.responseText);
+            let errorMessage = `Upload failed (${xhr.status})`;
+            if (errorResult.error) errorMessage += `: ${errorResult.error}`;
+            if (errorResult.details)
+              errorMessage += ` - ${errorResult.details}`;
+            if (errorResult.timestamp)
+              errorMessage += ` [${errorResult.timestamp}]`;
+            reject(new Error(errorMessage));
+          } catch {
+            reject(
+              new Error(
+                `Upload failed: ${xhr.status} ${xhr.statusText} - ${xhr.responseText}`
+              )
+            );
+          }
         }
       };
 
       xhr.onerror = () => {
-        reject(new Error("Network error during upload"));
+        console.error(`[Upload] Network error for "${file.name}"`);
+        reject(
+          new Error(
+            "Network error during upload - check your internet connection"
+          )
+        );
       };
 
+      xhr.ontimeout = () => {
+        console.error(`[Upload] Timeout error for "${file.name}"`);
+        reject(
+          new Error(
+            "Upload timed out - file may be too large or connection too slow"
+          )
+        );
+      };
+
+      // Set a timeout (30 seconds)
+      xhr.timeout = 30000;
+
+      console.log(
+        `[Upload] Starting upload for "${file.name}" (${file.size} bytes, ${file.type})`
+      );
       xhr.send(formData);
     });
   };
@@ -436,7 +522,7 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
           <div className="text-sm text-destructive font-medium mb-2">
             File Upload Issues:
           </div>
-          <div className="text-xs text-destructive whitespace-pre-line">
+          <div className="text-xs text-destructive whitespace-pre-line break-words">
             {overallError}
           </div>
           <div className="mt-3 text-xs text-muted-foreground">
@@ -451,6 +537,30 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
             <br />
             <strong>Note:</strong> HEIC conversion happens in your browser - no
             files are sent to servers during conversion
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            <strong>Debug Info:</strong> Check browser console for detailed logs
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced error display during upload */}
+      {overallError && progress.length > 0 && (
+        <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <div className="text-sm text-destructive font-medium mb-2">
+            Upload Error:
+          </div>
+          <div className="text-xs text-destructive whitespace-pre-line break-words">
+            {overallError}
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            <strong>Timestamp:</strong> {new Date().toISOString()}
+            <br />
+            <strong>Debug:</strong> Check browser console for detailed error
+            logs
+            <br />
+            <strong>Tip:</strong> Try uploading files one at a time to isolate
+            the issue
           </div>
         </div>
       )}
@@ -532,29 +642,37 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
             {progress.map((p, i) => (
               <li
                 key={i}
-                className="flex items-center w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden bg-background rounded border"
+                className="flex flex-col w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden bg-background rounded border"
               >
-                <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
-                  {p.file.name}
-                </span>
-                <span className="ml-2 flex-shrink-0">
-                  {p.status === "complete" && (
-                    <span className="flex items-center gap-1 text-green-600">
-                      <Check className="w-4 h-4" /> Done
-                    </span>
-                  )}
-                  {p.status === "error" && (
-                    <span className="flex items-center gap-1 text-destructive">
-                      <XIcon className="w-4 h-4" /> Error
-                    </span>
-                  )}
-                  {p.status === "uploading" && (
-                    <span className="flex items-center gap-1 text-primary">
-                      <Loader2 className="w-4 h-4 animate-spin" /> {p.percent}%
-                    </span>
-                  )}
-                  {p.status === "idle" && <span>Waiting</span>}
-                </span>
+                <div className="flex items-center w-full max-w-full min-w-0">
+                  <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
+                    {p.file.name}
+                  </span>
+                  <span className="ml-2 flex-shrink-0">
+                    {p.status === "complete" && (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <Check className="w-4 h-4" /> Done
+                      </span>
+                    )}
+                    {p.status === "error" && (
+                      <span className="flex items-center gap-1 text-destructive">
+                        <XIcon className="w-4 h-4" /> Error
+                      </span>
+                    )}
+                    {p.status === "uploading" && (
+                      <span className="flex items-center gap-1 text-primary">
+                        <Loader2 className="w-4 h-4 animate-spin" /> {p.percent}
+                        %
+                      </span>
+                    )}
+                    {p.status === "idle" && <span>Waiting</span>}
+                  </span>
+                </div>
+                {p.status === "error" && p.error && (
+                  <div className="mt-2 text-xs text-destructive break-words">
+                    <strong>Error:</strong> {p.error}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
