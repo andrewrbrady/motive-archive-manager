@@ -1,17 +1,9 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm install && npm run install:opencv",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "env": {
-    "NODE_ENV": "production",
-    "OPENCV_INCLUDE_PATH": "/usr/include/opencv4",
-    "OPENCV_LIB_PATH": "/usr/lib/x86_64-linux-gnu"
-  },
-  "build": {
-    "env": {
-      "DEBIAN_FRONTEND": "noninteractive"
-    }
+    "NODE_ENV": "production"
   },
   "headers": [
     {

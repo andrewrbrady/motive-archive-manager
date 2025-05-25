@@ -3,36 +3,25 @@
 # Canvas Extension C++ Build Script
 # This script compiles the extend_canvas program with OpenCV support
 
-set -e  # Exit on any error
-
 echo "🔧 Building Canvas Extension C++ Program..."
 
 # Check if we're in a CI/CD environment
 if [ "$VERCEL" = "1" ] || [ "$CI" = "true" ]; then
-    echo "📦 Detected CI/CD environment"
-    
-    # Try to install OpenCV if not available
-    if ! pkg-config --exists opencv4; then
-        echo "📥 Installing OpenCV..."
-        
-        # Update package list
-        apt-get update -qq
-        
-        # Install OpenCV and dependencies
-        apt-get install -y -qq \
-            libopencv-dev \
-            pkg-config \
-            build-essential \
-            g++ \
-            cmake
-        
-        echo "✅ OpenCV installation completed"
-    else
-        echo "✅ OpenCV already available"
-    fi
+    echo "📦 Detected CI/CD environment: Vercel"
+    echo "⚠️  Vercel's build environment doesn't support OpenCV installation"
+    echo "   Canvas extension will be disabled in production"
+    echo "   The feature will work in local development with OpenCV installed"
+    exit 0  # Don't fail the build, just skip compilation
 fi
 
-# Verify OpenCV is available
+# Verify OpenCV is available (for local development)
+if ! command -v pkg-config >/dev/null 2>&1; then
+    echo "❌ pkg-config not found. Please install pkg-config first."
+    echo "   - macOS: brew install pkg-config"
+    echo "   - Ubuntu: sudo apt install pkg-config"
+    exit 0
+fi
+
 if ! pkg-config --exists opencv4; then
     echo "❌ OpenCV 4 not found. Canvas extension will be disabled."
     echo "   To enable this feature, install OpenCV 4:"
@@ -61,7 +50,7 @@ if g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp $OPENCV_CFLAGS $O
     fi
 else
     echo "❌ Canvas extension compilation failed"
-    echo "   Canvas extension feature will be disabled in production"
+    echo "   Canvas extension feature will be disabled"
     exit 0  # Don't fail the build
 fi
 
