@@ -8,11 +8,29 @@ echo "🔧 Building Canvas Extension C++ Program..."
 # Check if we're in a CI/CD environment
 if [ "$VERCEL" = "1" ] || [ "$CI" = "true" ]; then
     echo "📦 Detected CI/CD environment: Vercel"
-    echo "⚠️  Vercel's build environment doesn't support OpenCV installation"
-    echo "   Canvas extension will be disabled in production"
-    echo "   The feature will work in local development with OpenCV installed"
-    exit 0  # Don't fail the build, just skip compilation
+    
+    # Check if pre-compiled binary exists
+    if [ -f "extend_canvas_linux" ]; then
+        echo "✅ Found pre-compiled Linux binary"
+        # Copy to the expected location for the API
+        cp extend_canvas_linux extend_canvas
+        chmod +x extend_canvas
+        echo "✅ Canvas extension ready for production"
+        echo "📏 Binary size: $(ls -lh extend_canvas | awk '{print $5}')"
+        exit 0
+    else
+        echo "❌ No pre-compiled binary found (extend_canvas_linux)"
+        echo "   To enable canvas extension in production:"
+        echo "   1. Compile on Ubuntu/Debian or use Docker:"
+        echo "      ./compile-for-vercel.sh"
+        echo "   2. Commit the extend_canvas_linux binary to the repository"
+        echo "   Canvas extension will be disabled in production"
+        exit 0
+    fi
 fi
+
+# Local development compilation
+echo "🏠 Local development environment detected"
 
 # Verify OpenCV is available (for local development)
 if ! command -v pkg-config >/dev/null 2>&1; then
