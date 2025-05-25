@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create temporary directory for processing
-    const tempDir = path.join(process.cwd(), "temp");
+    const tempDir = path.join("/tmp", "canvas-extension");
     await fs.mkdir(tempDir, { recursive: true });
 
     const sessionId = uuidv4();
