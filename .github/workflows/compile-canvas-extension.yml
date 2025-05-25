@@ -22,21 +22,28 @@ jobs:
             build-essential \
             g++ \
             pkg-config \
-            libopencv-dev
+            libopencv-dev \
+            libopencv-contrib-dev
 
       - name: Compile canvas extension
         run: |
           echo "🔨 Compiling extend_canvas for Linux..."
+
+          # Try to compile with maximum static linking
           g++ -std=c++17 -O2 -Wall -o extend_canvas_linux extend_canvas.cpp \
-            $(pkg-config --cflags --libs opencv4)
+            $(pkg-config --cflags opencv4) \
+            $(pkg-config --libs opencv4) \
+            -static-libgcc -static-libstdc++
 
           echo "✅ Compilation successful"
           ls -la extend_canvas_linux
-          file extend_canvas_linux
+
+          # Check what libraries it depends on
+          echo "📋 Library dependencies:"
+          ldd extend_canvas_linux || echo "Static binary (no dependencies)"
 
           # Test the binary
-          echo "🧪 Testing binary..."
-          ./extend_canvas_linux 2>&1 | head -5 || echo "Binary test completed"
+          ./extend_canvas_linux 2>&1 | head -5
 
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4

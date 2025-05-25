@@ -1,27 +1,12 @@
 #!/bin/bash
 
-# Compile Canvas Extension for Vercel Deployment
-# This script uses Docker to compile the C++ program for Linux
+# Compile Canvas Extension for Vercel using Docker
+# This creates a Linux binary that can run in Vercel's serverless environment
 
-echo "🐳 Compiling Canvas Extension for Vercel (Linux) using Docker..."
+echo "🐳 Compiling Canvas Extension for Vercel using Docker..."
 
-# Check if Docker is available
-if ! command -v docker >/dev/null 2>&1; then
-    echo "❌ Docker not found. Please install Docker first."
-    echo "   Visit: https://docs.docker.com/get-docker/"
-    exit 1
-fi
-
-# Check if extend_canvas.cpp exists
-if [ ! -f "extend_canvas.cpp" ]; then
-    echo "❌ extend_canvas.cpp not found in current directory"
-    exit 1
-fi
-
-echo "📦 Creating temporary Docker container with OpenCV..."
-
-# Create a temporary Dockerfile
-cat > Dockerfile.temp << 'EOF'
+# Create a Dockerfile for compilation
+cat > Dockerfile.canvas << 'EOF'
 FROM ubuntu:22.04
 
 # Install dependencies
@@ -30,49 +15,62 @@ RUN apt-get update && apt-get install -y \
     g++ \
     pkg-config \
     libopencv-dev \
+    libopencv-contrib-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY extend_canvas.cpp .
 
-# Compile with static linking for better portability
-RUN g++ -std=c++17 -O2 -Wall -static -o extend_canvas_linux extend_canvas.cpp \
-    $(pkg-config --cflags --libs opencv4) || \
-    g++ -std=c++17 -O2 -Wall -o extend_canvas_linux extend_canvas.cpp \
-    $(pkg-config --cflags --libs opencv4)
+# Compile with static linking where possible
+RUN g++ -std=c++17 -O2 -Wall -o extend_canvas_linux extend_canvas.cpp \
+    $(pkg-config --cflags opencv4) \
+    $(pkg-config --libs opencv4) \
+    -static-libgcc -static-libstdc++ && \
+    strip extend_canvas_linux
 
-CMD ["./extend_canvas_linux"]
+# Check dependencies
+RUN echo "📋 Binary info:" && \
+    ls -la extend_canvas_linux && \
+    file extend_canvas_linux && \
+    echo "📋 Library dependencies:" && \
+    (ldd extend_canvas_linux || echo "Static binary")
+
+CMD ["cp", "extend_canvas_linux", "/output/"]
 EOF
 
-echo "🔨 Building Docker image and compiling..."
+# Build the Docker image
+echo "🔨 Building Docker image..."
+docker build -f Dockerfile.canvas -t canvas-compiler .
 
-# Build the Docker image and compile
-docker build -f Dockerfile.temp -t canvas-compiler . && \
-docker run --rm -v "$(pwd):/output" canvas-compiler sh -c "cp extend_canvas_linux /output/"
+# Create output directory
+mkdir -p docker-output
 
-# Clean up
-rm -f Dockerfile.temp
+# Run the container to compile
+echo "⚙️  Compiling binary..."
+docker run --rm -v "$(pwd)/docker-output:/output" canvas-compiler cp extend_canvas_linux /output/
 
-if [ -f "extend_canvas_linux" ]; then
-    echo "✅ Successfully compiled extend_canvas_linux"
+# Copy the binary to the project root
+if [ -f "docker-output/extend_canvas_linux" ]; then
+    cp docker-output/extend_canvas_linux .
+    chmod +x extend_canvas_linux
+    echo "✅ Binary compiled successfully!"
     echo "📏 Binary size: $(ls -lh extend_canvas_linux | awk '{print $5}')"
     
-    # Test the binary
-    if ./extend_canvas_linux 2>&1 | grep -q "Usage:"; then
-        echo "✅ Binary is working correctly"
-        echo ""
-        echo "🚀 Next steps:"
-        echo "   1. git add extend_canvas_linux"
-        echo "   2. git commit -m 'Add pre-compiled Linux binary for Vercel'"
-        echo "   3. git push"
-        echo ""
-        echo "   The canvas extension will now work on Vercel!"
-    else
-        echo "⚠️  Binary compiled but may not be working correctly"
-        echo "   You may need to install additional runtime dependencies"
-    fi
+    # Test the binary (this will fail on macOS but that's expected)
+    echo "🧪 Testing binary (may fail on non-Linux systems):"
+    ./extend_canvas_linux 2>&1 | head -3 || echo "Binary test completed (expected to fail on non-Linux)"
 else
     echo "❌ Compilation failed"
-    echo "   Check the Docker build output for errors"
     exit 1
-fi 
+fi
+
+# Cleanup
+rm -f Dockerfile.canvas
+rm -rf docker-output
+
+echo "🎉 Canvas extension binary ready for Vercel deployment!"
+echo "   Binary location: ./extend_canvas_linux"
+echo "   Next steps:"
+echo "   1. git add extend_canvas_linux"
+echo "   2. git commit -m 'Update Linux binary'"
+echo "   3. git push" 

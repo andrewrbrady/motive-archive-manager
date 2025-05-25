@@ -114,15 +114,34 @@ export async function POST(request: NextRequest) {
       const command = `${executablePath} ${args.join(" ")}`;
       console.log("Executing command:", command);
 
-      const { stdout, stderr } = await execAsync(command, {
-        timeout: 30000, // 30 second timeout
-      });
+      try {
+        const { stdout, stderr } = await execAsync(command, {
+          timeout: 30000, // 30 second timeout
+        });
 
-      if (stderr) {
-        console.warn("Canvas extension stderr:", stderr);
+        if (stderr) {
+          console.warn("Canvas extension stderr:", stderr);
+        }
+
+        console.log("Canvas extension stdout:", stdout);
+      } catch (execError: any) {
+        console.error("Canvas extension execution error:", execError);
+
+        // Check if it's a library dependency issue
+        if (
+          execError.stderr &&
+          execError.stderr.includes("error while loading shared libraries")
+        ) {
+          throw new Error(
+            "Canvas extension binary is missing required OpenCV libraries. " +
+              "The binary needs to be recompiled with static linking for the Vercel environment. " +
+              "Please check the deployment documentation for instructions on creating a compatible binary."
+          );
+        }
+
+        // Re-throw the original error for other issues
+        throw execError;
       }
-
-      console.log("Canvas extension stdout:", stdout);
 
       // Check if output file was created
       try {
