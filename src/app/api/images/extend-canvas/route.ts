@@ -70,6 +70,49 @@ export async function POST(request: NextRequest) {
     const outputPath = path.join(tempDir, `output_${sessionId}.jpg`);
 
     try {
+      // First, try the remote canvas extension service if configured
+      const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
+      if (remoteServiceUrl) {
+        try {
+          console.log("🌐 Trying remote canvas extension service...");
+
+          const remoteResponse = await fetch(
+            `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/images/extend-canvas-remote`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                imageUrl,
+                desiredHeight,
+                paddingPct,
+                whiteThresh,
+                uploadToCloudflare,
+                originalFilename,
+                originalCarId,
+              }),
+            }
+          );
+
+          if (remoteResponse.ok) {
+            const remoteResult = await remoteResponse.json();
+            console.log("✅ Successfully processed with remote service");
+            return NextResponse.json({
+              ...remoteResult,
+              remoteServiceUsed: true,
+            });
+          } else {
+            console.log("⚠️ Remote service failed, trying local binary...");
+          }
+        } catch (remoteError) {
+          console.log(
+            "⚠️ Remote service error, trying local binary:",
+            remoteError
+          );
+        }
+      }
+
       // Download the image
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
