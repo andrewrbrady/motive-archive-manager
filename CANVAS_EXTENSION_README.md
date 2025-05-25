@@ -1,80 +1,81 @@
 # Canvas Extension Feature
 
-## Current Status: ✅ Ready for Testing
+## Current Status: ✅ Working with JavaScript Fallback
 
-The canvas extension feature has been updated with a new statically-linked binary that should resolve the OpenCV dependency issues in production.
+The canvas extension feature is now **fully functional** with an automatic JavaScript fallback when the C++ binary encounters OpenCV dependency issues.
+
+### How It Works
+
+1. **Primary**: Attempts to use the optimized C++ binary with OpenCV
+2. **Fallback**: Automatically switches to JavaScript implementation using Sharp library
+3. **Seamless**: Users get the same functionality regardless of which method is used
+4. **Transparent**: UI indicates when fallback is used
 
 ### Recent Updates
 
-- ✅ **New binary deployed** - Updated from 27KB to 1.7MB with static linking
-- ✅ **GitHub Action completed** - Compiled with `-static-libgcc -static-libstdc++`
-- ✅ **Production files updated** - Both `extend_canvas` and `extend_canvas_linux` deployed
-- ✅ **Local development working** - macOS binary compiled and functional
+- ✅ **JavaScript fallback implemented** - Uses Sharp library for image processing
+- ✅ **Automatic detection** - Switches to fallback when C++ binary fails
+- ✅ **Full feature parity** - Upload, download, high-res processing all work
+- ✅ **User feedback** - Toast messages indicate when fallback is used
+- 🔄 **C++ binary optimization** - Working on minimal OpenCV build to resolve dependencies
 
-### Binary Status
+### Current Behavior
 
-- `extend_canvas` (1.7MB) - Linux binary for production (statically linked)
-- `extend_canvas_linux` (1.7MB) - Source Linux binary from GitHub Action
-- Local macOS binary available for development
+When you use the canvas extension feature:
 
-### Next Steps
+1. **First attempt**: Uses C++ binary with OpenCV (faster, more sophisticated)
+2. **If C++ fails**: Automatically falls back to JavaScript version (reliable, good quality)
+3. **User notification**: Success message indicates which method was used
+4. **Same functionality**: Upload, download, and high-res processing work with both methods
 
-1. **Test in production** - Try the canvas extension feature
-2. **Monitor for errors** - Check if OpenCV dependency issues are resolved
-3. **Verify functionality** - Ensure image processing works correctly
+### JavaScript Fallback Features
 
-### Previous Issue (Resolved)
+- ✅ **Canvas extension** - Adds white space above/below image to reach target height
+- ✅ **Cloudflare upload** - Full integration with image storage
+- ✅ **MongoDB storage** - Proper metadata and car association
+- ✅ **High-resolution processing** - 2x and 4x multipliers supported
+- ✅ **Download functionality** - Both standard and high-res downloads
+- ✅ **Filename handling** - Descriptive filenames with `_js` suffix for fallback
+
+### API Endpoints
+
+- **Primary**: `/api/images/extend-canvas` - Tries C++, falls back to JavaScript
+- **Direct**: `/api/images/extend-canvas-js` - JavaScript-only implementation
+
+### C++ Binary Status
 
 ~~❌ **OpenCV shared libraries missing** in Vercel runtime environment~~
 
-```
-error while loading shared libraries: libopencv_imgcodecs.so.406: cannot open shared object file: No such file or directory
-```
+**Current Issue**: TBB (Threading Building Blocks) and OpenGL dependency conflicts during static linking
 
-**Solution Applied**: Recompiled with static linking to include OpenCV libraries in the binary.
+**Solution in Progress**: Building minimal OpenCV from source without problematic dependencies
 
-### Issue Description
+### Previous Attempts
 
-- ✅ **Binary is found and executed** in production (`/var/task/extend_canvas`)
-- ✅ **Temporary directory issue fixed** (now uses `/tmp/canvas-extension`)
-- ✅ **File inclusion configured** properly with Next.js `outputFileTracingIncludes`
-
-### Error Details
-
-```
-error while loading shared libraries: libopencv_imgcodecs.so.406: cannot open shared object file: No such file or directory
-```
-
-### Solution in Progress
-
-We're recompiling the binary with static linking to include OpenCV libraries directly in the executable:
-
-1. **Updated GitHub Action** to compile with `-static-libgcc -static-libstdc++`
-2. **Added library dependency checking** in the compilation process
-3. **Improved error handling** in the API to provide better feedback
+1. ✅ **Basic static linking** - Partial success but still had dependencies
+2. ✅ **Enhanced static linking** - Added more libraries but hit TBB/OpenGL issues
+3. 🔄 **Minimal OpenCV build** - Current approach: building OpenCV without TBB/OpenGL
 
 ### Files Involved
 
+#### Core Implementation
+
+- `src/app/api/images/extend-canvas/route.ts` - Primary API with fallback logic
+- `src/app/api/images/extend-canvas-js/route.ts` - JavaScript fallback implementation
+- `src/components/cars/CanvasExtensionModal.tsx` - UI with fallback indication
+
+#### Binary Management
+
 - `extend_canvas.cpp` - C++ source code (v5.1)
-- `extend_canvas_linux` - Linux binary (needs recompilation)
-- `extend_canvas` - Copy for API compatibility
+- `extend_canvas_linux` - Linux binary (current: 1.7MB, has dependency issues)
+- `extend_canvas` - Production binary copy
 - `.github/workflows/compile-canvas-extension.yml` - Automated compilation
-- `src/app/api/images/extend-canvas/route.ts` - API endpoint
+
+#### Configuration
+
 - `next.config.js` - File inclusion configuration
-
-### Next Steps
-
-1. Wait for GitHub Action to complete with new binary
-2. Download and commit the updated binary
-3. Test the canvas extension in production
-
-### Alternative Solutions
-
-If static linking proves difficult, we could:
-
-- Use a containerized approach with Docker
-- Implement a web-based image processing service
-- Create a simpler version without OpenCV dependencies
+- `vercel.json` - Function timeout and memory settings
+- `build-cpp.sh` - Environment-aware build script
 
 ## Technical Details
 
@@ -88,7 +89,15 @@ If static linking proves difficult, we could:
   - `padding_pct` (extra space as % of car height, default 0.05)
   - `white_thresh` (0-255 or -1 for auto-detection)
 
-### Auto-Detection Algorithm
+### JavaScript Implementation
+
+- **Library**: Sharp (Node.js image processing)
+- **Method**: Simple canvas extension with white background
+- **Quality**: 95% JPEG quality
+- **Limitations**: Less sophisticated than C++ version (no car/shadow detection)
+- **Advantages**: No external dependencies, reliable in serverless environment
+
+### Auto-Detection Algorithm (C++ Only)
 
 - Samples brightness at image's central top & bottom stripes
 - Derives threshold that adapts to soft-box lighting variations
@@ -98,12 +107,13 @@ If static linking proves difficult, we could:
 ### Processing Steps
 
 1. **Download image** to temporary directory (`/tmp/canvas-extension`)
-2. **Execute C++ program** with specified parameters
-3. **Read processed image** and convert to base64
-4. **Optionally upload** to Cloudflare with metadata
-5. **Store in MongoDB** with processing parameters
-6. **Associate with car** if `originalCarId` provided
-7. **Clean up** temporary files
+2. **Try C++ program** with specified parameters
+3. **On failure**: Automatically call JavaScript fallback API
+4. **Read processed image** and convert to base64
+5. **Optionally upload** to Cloudflare with metadata
+6. **Store in MongoDB** with processing parameters
+7. **Associate with car** if `originalCarId` provided
+8. **Clean up** temporary files
 
 ### API Configuration
 
@@ -124,6 +134,10 @@ experimental: {
   "app/api/images/extend-canvas/route.ts": {
     "maxDuration": 60,
     "memory": 1536
+  },
+  "app/api/images/extend-canvas-js/route.ts": {
+    "maxDuration": 60,
+    "memory": 1536
   }
 }
 ```
@@ -138,6 +152,7 @@ experimental: {
 - **Preset Buttons**: 9:16, 4:5, 1:1 aspect ratios
 - **Real-time Preview**: Updates with Cloudflare parameters
 - **High-res Processing**: 2x and 4x multipliers available
+- **Fallback Indication**: Toast messages show when JavaScript fallback is used
 
 ### API Endpoint
 
@@ -160,6 +175,8 @@ POST /api/images/extend-canvas
 {
   success: boolean,
   processedImageUrl: string, // base64 data URL
+  fallbackUsed?: boolean, // true if JavaScript fallback was used
+  fallbackReason?: string, // reason for fallback
   cloudflareUpload?: {
     success: boolean,
     imageUrl?: string,
@@ -168,3 +185,10 @@ POST /api/images/extend-canvas
   }
 }
 ```
+
+## Next Steps
+
+1. **Monitor fallback usage** - Track how often JavaScript fallback is used
+2. **Complete minimal OpenCV build** - Resolve C++ binary dependency issues
+3. **Performance comparison** - Compare C++ vs JavaScript processing quality
+4. **Consider hybrid approach** - Use JavaScript as primary if quality is sufficient
