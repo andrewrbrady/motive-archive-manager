@@ -572,9 +572,6 @@ export function ImageMatteModal({
                     />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Higher quality = slower processing
-                </p>
               </div>
 
               {/* Processing Method Settings */}
@@ -596,32 +593,17 @@ export function ImageMatteModal({
                     <SelectItem value="cloud">
                       <div className="flex items-center gap-2">
                         <Cloud className="h-4 w-4" />
-                        <div>
-                          <div className="font-medium">Cloud Run Service</div>
-                          <div className="text-xs text-muted-foreground">
-                            Fast, reliable, always available
-                          </div>
-                        </div>
+                        <span>Cloud Run</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="local">
                       <div className="flex items-center gap-2">
                         <Monitor className="h-4 w-4" />
-                        <div>
-                          <div className="font-medium">Local Binary</div>
-                          <div className="text-xs text-muted-foreground">
-                            Uses local macOS/Linux executable
-                          </div>
-                        </div>
+                        <span>Local Binary</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {processingMethod === "cloud"
-                    ? "Uses Google Cloud Run service with C++ OpenCV processing"
-                    : "Uses local matte_generator binary (requires OpenCV)"}
-                </p>
               </div>
 
               {/* Canvas Dimensions */}
