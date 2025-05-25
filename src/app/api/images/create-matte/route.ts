@@ -112,7 +112,157 @@ export async function POST(request: NextRequest) {
               "✅ Successfully processed with remote Cloud Run service"
             );
 
-            // Return the result with additional metadata
+            // If uploadToCloudflare is requested, upload the result
+            if (uploadToCloudflare && remoteResult.processedImageUrl) {
+              try {
+                // Convert base64 data URL to buffer
+                const base64Data = remoteResult.processedImageUrl.replace(
+                  /^data:image\/[a-z]+;base64,/,
+                  ""
+                );
+                const imageBuffer = Buffer.from(base64Data, "base64");
+
+                // Validate Cloudflare environment variables
+                if (
+                  !process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID ||
+                  !process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN
+                ) {
+                  throw new Error("Cloudflare credentials not configured");
+                }
+
+                // Create filename for the processed image
+                const baseFilename = originalFilename || "image";
+                const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
+                const processedFilename = `${nameWithoutExt}_matte_${canvasWidth}x${canvasHeight}.jpg`;
+
+                // Create a File object from the buffer
+                const processedFile = new File(
+                  [imageBuffer],
+                  processedFilename,
+                  {
+                    type: "image/jpeg",
+                  }
+                );
+
+                // Upload to Cloudflare
+                const cloudflareForm = new FormData();
+                cloudflareForm.append("file", processedFile);
+                cloudflareForm.append("requireSignedURLs", "false");
+
+                const cloudflareResponse = await fetch(
+                  `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+                  {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+                    },
+                    body: cloudflareForm,
+                  }
+                );
+
+                if (!cloudflareResponse.ok) {
+                  throw new Error(
+                    `Cloudflare upload failed: ${cloudflareResponse.statusText}`
+                  );
+                }
+
+                const cloudflareResult = await cloudflareResponse.json();
+                if (!cloudflareResult.success) {
+                  throw new Error(
+                    `Cloudflare API error: ${cloudflareResult.errors[0]?.message || "Unknown error"}`
+                  );
+                }
+
+                const cloudflareImageUrl = `${cloudflareResult.result.variants[0]}/public`;
+
+                // Store in MongoDB
+                const db = await getDatabase();
+                const now = new Date().toISOString();
+
+                const imageDoc = {
+                  _id: new ObjectId(),
+                  cloudflareId: cloudflareResult.result.id,
+                  url: cloudflareImageUrl,
+                  filename: processedFilename,
+                  metadata: {
+                    category: "processed",
+                    processing: "image_matte",
+                    originalImage: imageUrl,
+                    parameters: {
+                      canvasWidth,
+                      canvasHeight,
+                      paddingPercent,
+                      matteColor,
+                    },
+                    processedAt: now,
+                  },
+                  carId: originalCarId || "",
+                  createdAt: now,
+                  updatedAt: now,
+                };
+
+                await db.collection("images").insertOne(imageDoc);
+
+                // If this processed image is associated with a car, add it to the car's processedImageIds array
+                if (originalCarId) {
+                  try {
+                    await db.collection("cars").updateOne(
+                      { _id: new ObjectId(originalCarId) },
+                      {
+                        $addToSet: { processedImageIds: imageDoc._id },
+                        $set: { updatedAt: now },
+                      }
+                    );
+                    console.log(
+                      `Added processed image ${imageDoc._id} to car ${originalCarId}`
+                    );
+                  } catch (carUpdateError) {
+                    console.error(
+                      "Failed to update car with processed image:",
+                      carUpdateError
+                    );
+                    // Don't fail the whole operation if car update fails
+                  }
+                }
+
+                // Return the result with Cloudflare upload info
+                return NextResponse.json({
+                  success: true,
+                  message:
+                    "Image matte created successfully with Cloud Run service and uploaded to Cloudflare",
+                  processedImageUrl: remoteResult.processedImageUrl,
+                  remoteServiceUsed: true,
+                  cloudflareUpload: {
+                    success: true,
+                    imageId: cloudflareResult.result.id,
+                    imageUrl: cloudflareImageUrl,
+                    filename: processedFilename,
+                    mongoId: imageDoc._id.toString(),
+                  },
+                });
+              } catch (uploadError) {
+                console.error(
+                  "Failed to upload Cloud Run result to Cloudflare:",
+                  uploadError
+                );
+                return NextResponse.json({
+                  success: true,
+                  message:
+                    "Image matte created successfully with Cloud Run service",
+                  processedImageUrl: remoteResult.processedImageUrl,
+                  remoteServiceUsed: true,
+                  cloudflareUpload: {
+                    success: false,
+                    error:
+                      uploadError instanceof Error
+                        ? uploadError.message
+                        : "Unknown upload error",
+                  },
+                });
+              }
+            }
+
+            // Return the result with additional metadata (no Cloudflare upload)
             return NextResponse.json({
               success: true,
               message:
@@ -307,8 +457,7 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          const cloudflareImageUrl =
-            cloudflareResult.result.variants[0].replace(/\/public$/, "");
+          const cloudflareImageUrl = `${cloudflareResult.result.variants[0]}/public`;
 
           // Store in MongoDB
           const db = await getDatabase();

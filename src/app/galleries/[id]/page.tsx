@@ -302,6 +302,15 @@ export default function GalleryPage() {
     setIsDownloading(false);
   };
 
+  const handleImageProcessed = (originalImageId: string, newImageData: any) => {
+    // Refresh the gallery data to show the updated image
+    mutate();
+    toast({
+      title: "Success",
+      description: "Image processed and replaced in gallery successfully",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -806,6 +815,7 @@ ${(() => {
                 gallery={gallery}
                 onOrderChange={handleOrderChange}
                 onImageSelect={handleImageSelect}
+                onImageProcessed={handleImageProcessed}
               />
             ) : (
               <div className="text-center text-muted-foreground py-8">

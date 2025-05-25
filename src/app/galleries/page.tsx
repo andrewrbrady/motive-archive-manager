@@ -2,10 +2,14 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useGalleries, createGallery } from "@/lib/hooks/query/useGalleries";
+import {
+  useGalleries,
+  createGallery,
+  duplicateGallery,
+} from "@/lib/hooks/query/useGalleries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, ImageIcon } from "lucide-react";
+import { Loader2, Plus, ImageIcon, Copy } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +30,9 @@ export default function GalleriesPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [duplicatingGalleryId, setDuplicatingGalleryId] = useState<
+    string | null
+  >(null);
   const { data, isLoading, error, mutate } = useGalleries({
     search: searchInput,
   });
@@ -54,6 +61,32 @@ export default function GalleriesPage() {
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDuplicateGallery = async (
+    galleryId: string,
+    galleryName: string,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation(); // Prevent navigation to gallery
+
+    try {
+      setDuplicatingGalleryId(galleryId);
+      await duplicateGallery(galleryId);
+      mutate();
+      toast({
+        title: "Success",
+        description: `Gallery "${galleryName}" duplicated successfully`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to duplicate gallery",
+        variant: "destructive",
+      });
+    } finally {
+      setDuplicatingGalleryId(null);
     }
   };
 
@@ -169,11 +202,35 @@ export default function GalleriesPage() {
                   onClick={() => router.push(`/galleries/${gallery._id}`)}
                 >
                   <div className="relative aspect-[16/9] mb-4 overflow-hidden rounded-md bg-muted">
+                    {/* Image count badge */}
                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-1 rounded-md bg-background/80 backdrop-blur-sm border border-border text-foreground shadow-sm">
                       <ImageIcon className="h-3.5 w-3.5" />
                       <span className="text-xs font-medium">
                         {gallery.imageIds.length}
                       </span>
+                    </div>
+
+                    {/* Duplicate button - appears on hover */}
+                    <div className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={(e) =>
+                          handleDuplicateGallery(gallery._id, gallery.name, e)
+                        }
+                        disabled={duplicatingGalleryId === gallery._id}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-background/80 backdrop-blur-sm border border-border text-foreground shadow-sm hover:bg-background transition-colors"
+                        title="Duplicate gallery"
+                      >
+                        {duplicatingGalleryId === gallery._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        <span className="text-xs font-medium">
+                          {duplicatingGalleryId === gallery._id
+                            ? "Duplicating..."
+                            : "Duplicate"}
+                        </span>
+                      </button>
                     </div>
 
                     {gallery.thumbnailImage ? (

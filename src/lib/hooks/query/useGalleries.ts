@@ -191,3 +191,16 @@ export async function updateGalleryImageOrder(
 
   return response.json();
 }
+
+export async function duplicateGallery(id: string) {
+  const response = await fetch(`/api/galleries/${id}/duplicate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to duplicate gallery");
+  }
+
+  return response.json();
+}

@@ -208,11 +208,8 @@ export function CanvasExtensionModal({
     setRemoteServiceUsed(false);
 
     try {
-      // Choose the API endpoint based on the selected processing method
-      const apiEndpoint =
-        processingMethod === "cloud"
-          ? "/api/images/extend-canvas-remote"
-          : "/api/images/extend-canvas";
+      // Use the unified API endpoint that handles both cloud and local processing
+      const apiEndpoint = "/api/images/extend-canvas";
 
       const response = await fetch(apiEndpoint, {
         method: "POST",
@@ -224,6 +221,7 @@ export function CanvasExtensionModal({
           desiredHeight: parseInt(desiredHeight),
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+          processingMethod: processingMethod,
           uploadToCloudflare: false,
           originalFilename: image.filename,
         }),
