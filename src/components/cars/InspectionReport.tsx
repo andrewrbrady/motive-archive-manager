@@ -1,0 +1,519 @@
+"use client";
+
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ArrowLeft,
+  Edit,
+  Mail,
+  Trash2,
+  Calendar,
+  User,
+  CheckCircle,
+  AlertCircle,
+  FileText,
+  Send,
+  Loader2,
+} from "lucide-react";
+import { Inspection } from "@/types/inspection";
+import { toast } from "sonner";
+
+interface InspectionReportProps {
+  inspection: Inspection;
+  onEdit: () => void;
+  onBack: () => void;
+  onDelete: () => void;
+}
+
+export default function InspectionReport({
+  inspection,
+  onEdit,
+  onBack,
+  onDelete,
+}: InspectionReportProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteImages, setDeleteImages] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    to: "",
+    subject: `Inspection Report - ${inspection.title}`,
+    includeImages: true,
+    message: "",
+  });
+
+  const formatDate = (date: Date | string) => {
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    return status === "pass" ? (
+      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        Pass
+      </Badge>
+    ) : (
+      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+        <AlertCircle className="h-3 w-3 mr-1" />
+        Needs Attention
+      </Badge>
+    );
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/inspections/${inspection._id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deleteImages,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete inspection");
+      }
+
+      const result = await response.json();
+
+      let message = "Inspection deleted successfully";
+      if (deleteImages && result.imagesDeleted > 0) {
+        message += ` and ${result.imagesDeleted} image(s) removed from storage`;
+      }
+
+      toast.success(message);
+      onDelete();
+    } catch (error) {
+      console.error("Error deleting inspection:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete inspection"
+      );
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setDeleteImages(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
+    setDeleteImages(false);
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailForm.to.trim()) {
+      toast.error("Recipient email is required");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailForm.to)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      const response = await fetch(`/api/inspections/${inspection._id}/email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailForm),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send email");
+      }
+
+      const result = await response.json();
+      toast.success("Inspection report sent successfully!");
+      setShowEmailModal(false);
+
+      // Reset form
+      setEmailForm({
+        to: "",
+        subject: `Inspection Report - ${inspection.title}`,
+        includeImages: true,
+        message: "",
+      });
+    } catch (error) {
+      console.error("Error sending email:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send email"
+      );
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const handleEmailFormChange = (field: string, value: any) => {
+    setEmailForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Inspection Report
+            </h2>
+            <p className="text-muted-foreground">
+              View inspection details and findings
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowEmailModal(true)}>
+            <Mail className="h-4 w-4 mr-2" />
+            Send Report
+          </Button>
+          <Button variant="outline" onClick={onEdit}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDeleteClick}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-xl">{inspection.title}</CardTitle>
+              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {formatDate(inspection.inspectedAt)}
+                </div>
+                {inspection.inspectedBy && (
+                  <div className="flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    {inspection.inspectedBy}
+                  </div>
+                )}
+              </div>
+            </div>
+            {getStatusBadge(inspection.status)}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Description */}
+          {inspection.description && (
+            <div>
+              <h3 className="font-semibold mb-2">Notes</h3>
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                {inspection.description}
+              </p>
+            </div>
+          )}
+
+          {/* Checklist Items */}
+          {inspection.checklistItems &&
+            inspection.checklistItems.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-4">Inspection Checklist</h3>
+                <div className="space-y-2">
+                  {inspection.checklistItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-3 p-3 border rounded-lg"
+                    >
+                      <div
+                        className={`mt-0.5 ${item.completed ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {item.completed ? (
+                          <CheckCircle className="h-4 w-4" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p
+                          className={
+                            item.completed
+                              ? "text-muted-foreground line-through"
+                              : ""
+                          }
+                        >
+                          {item.description}
+                        </p>
+                        {item.completed && item.dateCompleted && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Completed: {formatDate(item.dateCompleted)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Images */}
+          {inspection.inspectionImageIds &&
+            inspection.inspectionImageIds.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-4">Inspection Images</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {inspection.inspectionImageIds.map((imageId) => (
+                    <div
+                      key={imageId}
+                      className="relative rounded-lg overflow-hidden border"
+                    >
+                      <img
+                        src={`https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/public`}
+                        alt="Inspection image"
+                        className="w-full h-auto object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Dropbox Links */}
+          {(inspection.dropboxVideoFolderUrl ||
+            inspection.dropboxImageFolderUrl) && (
+            <div>
+              <h3 className="font-semibold mb-4">External Media</h3>
+              <div className="space-y-2">
+                {inspection.dropboxVideoFolderUrl && (
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <a
+                      href={inspection.dropboxVideoFolderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      Video Folder (Dropbox)
+                    </a>
+                  </div>
+                )}
+                {inspection.dropboxImageFolderUrl && (
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <a
+                      href={inspection.dropboxImageFolderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      Image Folder (Dropbox)
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Email Modal */}
+      <Dialog open={showEmailModal} onOpenChange={setShowEmailModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Send Inspection Report</DialogTitle>
+            <DialogDescription>
+              Send this inspection report via email to a recipient.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipient-email">Recipient Email *</Label>
+              <Input
+                id="recipient-email"
+                type="email"
+                placeholder="recipient@example.com"
+                value={emailForm.to}
+                onChange={(e) => handleEmailFormChange("to", e.target.value)}
+                disabled={isSendingEmail}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email-subject">Subject</Label>
+              <Input
+                id="email-subject"
+                placeholder="Email subject line"
+                value={emailForm.subject}
+                onChange={(e) =>
+                  handleEmailFormChange("subject", e.target.value)
+                }
+                disabled={isSendingEmail}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="include-images"
+                checked={emailForm.includeImages}
+                onCheckedChange={(checked) =>
+                  handleEmailFormChange("includeImages", checked)
+                }
+                disabled={isSendingEmail}
+              />
+              <Label htmlFor="include-images" className="text-sm font-normal">
+                Include inspection images in email
+                {inspection.inspectionImageIds?.length > 0 && (
+                  <span className="text-muted-foreground ml-1">
+                    ({inspection.inspectionImageIds.length} images)
+                  </span>
+                )}
+              </Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="additional-message">
+                Additional Message (Optional)
+              </Label>
+              <Textarea
+                id="additional-message"
+                placeholder="Add a personal message to include with the report..."
+                value={emailForm.message}
+                onChange={(e) =>
+                  handleEmailFormChange("message", e.target.value)
+                }
+                rows={3}
+                disabled={isSendingEmail}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEmailModal(false)}
+              disabled={isSendingEmail}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              disabled={isSendingEmail || !emailForm.to.trim()}
+            >
+              {isSendingEmail ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Report
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Inspection</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this inspection? This action
+              cannot be undone.
+              {inspection.inspectionImageIds &&
+                inspection.inspectionImageIds.length > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="delete-images"
+                        checked={deleteImages}
+                        onCheckedChange={(checked) =>
+                          setDeleteImages(checked as boolean)
+                        }
+                      />
+                      <label
+                        htmlFor="delete-images"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Also delete {inspection.inspectionImageIds.length}{" "}
+                        associated image(s) from Cloudflare storage
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 ml-6">
+                      This will permanently remove the images from storage and
+                      free up space.
+                    </p>
+                  </div>
+                )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDeleteCancel}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Deleting...
+                </div>
+              ) : (
+                "Delete Inspection"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

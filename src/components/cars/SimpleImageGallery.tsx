@@ -103,10 +103,11 @@ export function SimpleImageGallery({
 
   if (!data?.length) {
     return (
-      <div className="flex h-[200px] items-center justify-center">
+      <div className="flex h-[400px] items-center justify-center">
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <ImageOff className="h-8 w-8" />
-          <p>No images found</p>
+          <ImageOff className="h-12 w-12 mb-2" />
+          <p className="text-lg font-medium">No images found</p>
+          <p className="text-sm">Try adjusting your search or filters</p>
         </div>
       </div>
     );

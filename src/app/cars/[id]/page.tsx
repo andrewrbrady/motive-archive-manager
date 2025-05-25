@@ -27,7 +27,7 @@ import CaptionGenerator from "@/components/CaptionGenerator";
 import BaTListingGenerator from "@/components/BaTListingGenerator";
 import DocumentationFiles from "@/components/DocumentationFiles";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
-import ServiceHistoryTab from "@/components/cars/ServiceHistoryTab";
+import InspectionTab from "@/components/cars/InspectionTab";
 import CarGalleries from "@/components/cars/CarGalleries";
 
 export default function CarPage() {
@@ -97,9 +97,9 @@ export default function CarPage() {
         content: <CaptionGenerator carId={id} />,
       },
       {
-        value: "service",
-        label: "Service History",
-        content: <ServiceHistoryTab carId={id} />,
+        value: "inspections",
+        label: "Inspections",
+        content: <InspectionTab carId={id} />,
       },
       {
         value: "documentation",

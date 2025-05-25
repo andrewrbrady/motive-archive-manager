@@ -19,6 +19,8 @@ import {
   ImageIcon,
   ChevronRightSquare,
   ChevronLeftSquare,
+  Pencil,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageFilterControls } from "./ImageFilterControls";
@@ -757,7 +759,43 @@ export function ImageGallery({
 
   if (images.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">No images available</div>
+      <div className="flex flex-col h-[400px] items-center justify-center gap-4">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Upload className="h-12 w-12 mb-2" />
+          <p className="text-lg font-medium">No images yet</p>
+          <p className="text-sm">Upload images to get started</p>
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                if (externalFileInputRef?.current) {
+                  externalFileInputRef.current.click();
+                } else {
+                  document.getElementById("file-upload-gallery")?.click();
+                }
+              }}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Images
+              {!externalFileInputRef && (
+                <input
+                  id="file-upload-gallery"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && onImagesChange) {
+                      onImagesChange(e.target.files);
+                    }
+                  }}
+                />
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 

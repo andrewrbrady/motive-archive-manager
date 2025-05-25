@@ -402,7 +402,9 @@ export async function GET(request: Request) {
       year:
         typeof car.year === "string"
           ? parseInt(car.year, 10)
-          : car.year || new Date().getFullYear(),
+          : car.year !== null && car.year !== undefined
+            ? car.year
+            : undefined,
       mileage: car.mileage
         ? {
             value:

@@ -132,9 +132,9 @@ export interface Car {
   _id: string;
   make: string;
   model: string;
-  year: number | null;
+  year?: number;
   price: PriceHistory;
-  mileage: {
+  mileage?: {
     value: number;
     unit: string;
   };

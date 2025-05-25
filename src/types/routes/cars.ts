@@ -186,7 +186,7 @@ export interface StandardizedCar {
   _id: string;
   make: string;
   model: string;
-  year: number;
+  year?: number;
   vin?: string;
   color?: string;
   mileage: CarMileage;
@@ -235,7 +235,7 @@ export interface StandardizedCar {
 export interface CreateCarBody {
   make: string;
   model: string;
-  year: number;
+  year?: number;
   vin?: string;
   color?: string;
   mileage: CarMileage;

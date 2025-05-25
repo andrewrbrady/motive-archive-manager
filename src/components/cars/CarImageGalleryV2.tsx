@@ -628,20 +628,25 @@ export function CarImageGalleryV2({
   if (images.length === 0) {
     return (
       <div className="flex flex-col h-[400px] items-center justify-center gap-4">
-        {isEditing ? (
-          <>
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <Upload className="h-12 w-12 mb-2" />
-              <p className="text-lg font-medium">No images yet</p>
-              <p className="text-sm">Upload images to get started</p>
-              <Button
-                variant="outline"
-                size="lg"
-                className="mt-4"
-                onClick={() => document.getElementById("file-upload")?.click()}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Images
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Upload className="h-12 w-12 mb-2" />
+          <p className="text-lg font-medium">No images yet</p>
+          <p className="text-sm">Upload images to get started</p>
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                if (onOpenUploadModal) {
+                  onOpenUploadModal();
+                } else {
+                  document.getElementById("file-upload")?.click();
+                }
+              }}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Images
+              {!onOpenUploadModal && (
                 <input
                   id="file-upload"
                   type="file"
@@ -650,12 +655,16 @@ export function CarImageGalleryV2({
                   className="hidden"
                   onChange={handleFileUpload}
                 />
+              )}
+            </Button>
+            {!isEditing && onEditToggle && (
+              <Button variant="default" size="lg" onClick={onEditToggle}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Start Editing
               </Button>
-            </div>
-          </>
-        ) : (
-          <div className="text-muted-foreground">No images available</div>
-        )}
+            )}
+          </div>
+        </div>
       </div>
     );
   }

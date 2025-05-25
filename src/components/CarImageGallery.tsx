@@ -139,7 +139,13 @@ const CarImageGallery: React.FC<CarImageGalleryProps> = ({
 
   if (images.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">No images available</div>
+      <div className="flex flex-col h-[400px] items-center justify-center gap-4">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <ZoomIn className="h-12 w-12 mb-2" />
+          <p className="text-lg font-medium">No images yet</p>
+          <p className="text-sm">Add images to see them here</p>
+        </div>
+      </div>
     );
   }
 

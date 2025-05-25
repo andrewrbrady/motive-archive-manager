@@ -81,7 +81,7 @@ interface VINResponse {
 export interface CarFormData {
   make: string;
   model: string;
-  year: number;
+  year?: number;
   price?: {
     listPrice: number | null;
     soldPrice?: number | null;
@@ -92,10 +92,9 @@ export interface CarFormData {
       notes?: string;
     }>;
   };
-  mileage: MeasurementValue;
+  mileage?: MeasurementValue;
   color: string;
   horsepower: number;
-  condition: string;
   location: string;
   description: string;
   type: string;
@@ -138,16 +137,15 @@ export default function CarEntryForm({
   const [formData, setFormData] = useState<CarFormData>({
     make: "",
     model: "",
-    year: new Date().getFullYear(),
+    year: undefined,
     price: {
       listPrice: null,
       soldPrice: null,
       priceHistory: [],
     },
-    mileage: { value: 0, unit: "mi" },
+    mileage: undefined,
     color: "",
     horsepower: 0,
-    condition: "",
     location: "",
     description: "",
     type: "",
@@ -845,18 +843,23 @@ export default function CarEntryForm({
             </div>
 
             <div>
-              <label className={labelClasses}>Year</label>
+              <label className={labelClasses}>Year (Optional)</label>
               <input
                 type="number"
-                value={formData.year}
-                onChange={(e) => handleChange("year", parseInt(e.target.value))}
+                value={formData.year || ""}
+                onChange={(e) =>
+                  handleChange(
+                    "year",
+                    e.target.value ? parseInt(e.target.value) : undefined
+                  )
+                }
                 className={inputClasses}
-                required
+                placeholder="Enter year (optional)"
               />
             </div>
 
             <div>
-              <label className={labelClasses}>Price</label>
+              <label className={labelClasses}>Price (Optional)</label>
               <input
                 type="number"
                 value={formData.price?.listPrice || ""}
@@ -867,16 +870,18 @@ export default function CarEntryForm({
                   })
                 }
                 className={inputClasses}
+                placeholder="Enter price (optional)"
               />
             </div>
 
             <div>
-              <label className={labelClasses}>Mileage</label>
+              <label className={labelClasses}>Mileage (Optional)</label>
               <MeasurementInputWithUnit
                 value={formData.mileage || { value: null, unit: "mi" }}
                 onChange={(value) => handleChange("mileage", value)}
                 availableUnits={getUnitsForType("MILEAGE")}
                 className="w-full"
+                placeholder="Enter mileage (optional)"
               />
             </div>
           </div>
@@ -997,19 +1002,13 @@ export default function CarEntryForm({
             </div>
 
             <div>
-              <label className={labelClasses}>Condition</label>
-              <select
-                value={formData.condition}
-                onChange={(e) => handleChange("condition", e.target.value)}
+              <label className={labelClasses}>Location</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => handleChange("location", e.target.value)}
                 className={inputClasses}
-              >
-                <option value="">Select condition</option>
-                <option value="New">New</option>
-                <option value="Like New">Like New</option>
-                <option value="Excellent">Excellent</option>
-                <option value="Good">Good</option>
-                <option value="Fair">Fair</option>
-              </select>
+              />
             </div>
           </div>
         </div>
