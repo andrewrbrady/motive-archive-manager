@@ -7,10 +7,25 @@ interface EmailOptions {
 }
 
 // Initialize SendGrid with API key
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const sendgridApiKey = process.env.SENDGRID_API_KEY;
+console.log("SendGrid API Key check:", {
+  exists: !!sendgridApiKey,
+  length: sendgridApiKey?.length || 0,
+  startsWithSG: sendgridApiKey?.startsWith("SG.") || false,
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL: process.env.VERCEL,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+});
+
+if (sendgridApiKey) {
+  sgMail.setApiKey(sendgridApiKey);
+  console.log("SendGrid API key initialized successfully");
 } else {
-  console.warn("SendGrid API key not found in environment variables");
+  console.error("SendGrid API key not found in environment variables");
+  console.log(
+    "Available env variables:",
+    Object.keys(process.env).filter((key) => key.includes("SENDGRID"))
+  );
 }
 
 /**
@@ -18,6 +33,12 @@ if (process.env.SENDGRID_API_KEY) {
  */
 export async function sendEmail(options: EmailOptions) {
   try {
+    // Check if SendGrid is properly initialized
+    if (!sendgridApiKey) {
+      console.error("Cannot send email: SendGrid API key not available");
+      return { success: false, error: "SendGrid not configured" };
+    }
+
     // Prepare email data
     const msg = {
       to: options.to,
@@ -26,18 +47,40 @@ export async function sendEmail(options: EmailOptions) {
       html: options.html,
     };
 
+    console.log("Attempting to send email with config:", {
+      to: msg.to,
+      from: msg.from,
+      subject: msg.subject,
+      htmlLength: msg.html.length,
+      NODE_ENV: process.env.NODE_ENV,
+      EMAIL_FROM_SET: !!process.env.EMAIL_FROM,
+    });
+
     // Send email
     const result = await sgMail.send(msg);
 
-    // [REMOVED] // [REMOVED] console.log("Email sent successfully");
+    console.log("Email sent successfully", {
+      messageId: result[0]?.headers?.["x-message-id"],
+      statusCode: result[0]?.statusCode,
+    });
 
     return {
       success: true,
       messageId: `sg_${Date.now()}`,
       response: result[0],
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to send email:", error);
+
+    // Log detailed SendGrid error information
+    if (error.response?.body) {
+      console.error("SendGrid error details:", {
+        statusCode: error.code,
+        errorBody: error.response.body,
+        headers: error.response.headers,
+      });
+    }
+
     return { success: false, error };
   }
 }

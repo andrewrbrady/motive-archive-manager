@@ -69,10 +69,10 @@ export default function InspectionList({
           key={inspection._id.toString()}
           className="hover:shadow-md transition-shadow"
         >
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {getStatusIcon(inspection.status)}
                   <h3 className="font-semibold text-lg">{inspection.title}</h3>
                   {getStatusBadge(inspection.status)}
@@ -83,7 +83,7 @@ export default function InspectionList({
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0 mb-1">
                 <Button
                   variant="outline"
                   size="sm"
@@ -105,7 +105,7 @@ export default function InspectionList({
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-4 pb-4">
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,22 +14,16 @@ import {
 } from "lucide-react";
 import { Inspection } from "@/types/inspection";
 import { toast } from "sonner";
-import InspectionForm from "./InspectionForm";
 import InspectionList from "./InspectionList";
-import InspectionReport from "./InspectionReport";
 
 interface InspectionTabProps {
   carId: string;
 }
 
-type View = "list" | "create" | "edit" | "view";
-
 export default function InspectionTab({ carId }: InspectionTabProps) {
+  const router = useRouter();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<View>("list");
-  const [selectedInspection, setSelectedInspection] =
-    useState<Inspection | null>(null);
 
   // Fetch inspections for this car
   const fetchInspections = async () => {
@@ -57,37 +52,18 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
   }, [carId]);
 
   const handleCreateInspection = () => {
-    setSelectedInspection(null);
-    setCurrentView("create");
+    // Navigate to the new inspection page
+    router.push(`/cars/${carId}/inspections/new`);
   };
 
   const handleEditInspection = (inspection: Inspection) => {
-    setSelectedInspection(inspection);
-    setCurrentView("edit");
+    // Navigate to the edit inspection page
+    router.push(`/cars/${carId}/inspections/${inspection._id}/edit`);
   };
 
   const handleViewInspection = (inspection: Inspection) => {
-    setSelectedInspection(inspection);
-    setCurrentView("view");
-  };
-
-  const handleInspectionSaved = () => {
-    fetchInspections();
-    setCurrentView("list");
-    setSelectedInspection(null);
-    toast.success("Inspection saved successfully");
-  };
-
-  const handleInspectionDeleted = () => {
-    fetchInspections();
-    setCurrentView("list");
-    setSelectedInspection(null);
-    toast.success("Inspection deleted successfully");
-  };
-
-  const handleBackToList = () => {
-    setCurrentView("list");
-    setSelectedInspection(null);
+    // Navigate to the view inspection page
+    router.push(`/cars/${carId}/inspections/${inspection._id}`);
   };
 
   // Summary stats
@@ -98,28 +74,6 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
     (i) => i.status === "needs_attention"
   ).length;
   const totalInspections = inspections.length;
-
-  if (currentView === "create" || currentView === "edit") {
-    return (
-      <InspectionForm
-        carId={carId}
-        inspection={selectedInspection}
-        onSave={handleInspectionSaved}
-        onCancel={handleBackToList}
-      />
-    );
-  }
-
-  if (currentView === "view" && selectedInspection) {
-    return (
-      <InspectionReport
-        inspection={selectedInspection}
-        onEdit={() => handleEditInspection(selectedInspection)}
-        onBack={handleBackToList}
-        onDelete={handleInspectionDeleted}
-      />
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -152,8 +106,10 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
               </CardTitle>
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalInspections}</div>
+            <CardContent className="pb-4 pt-2">
+              <div className="text-2xl font-bold flex items-center justify-start h-8">
+                {totalInspections}
+              </div>
             </CardContent>
           </Card>
 
@@ -162,8 +118,8 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
               <CardTitle className="text-sm font-medium">Passed</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+            <CardContent className="pb-4 pt-2">
+              <div className="text-2xl font-bold text-green-600 flex items-center justify-start h-8">
                 {passedInspections}
               </div>
             </CardContent>
@@ -176,8 +132,8 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
               </CardTitle>
               <AlertCircle className="h-4 w-4 text-red-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
+            <CardContent className="pb-4 pt-2">
+              <div className="text-2xl font-bold text-red-600 flex items-center justify-start h-8">
                 {failedInspections}
               </div>
             </CardContent>

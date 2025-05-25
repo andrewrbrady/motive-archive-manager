@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { Upload, Check, X as XIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { heicTo, isHeic } from "heic-to";
 
 interface UploadedImage {
   id: string;
@@ -34,12 +35,201 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [overallError, setOverallError] = useState<string | null>(null);
 
-  // Handle file selection or drop
-  const handleFiles = (files: FileList | null) => {
+  // File validation constants
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+  const BLOCKED_EXTENSIONS = [
+    ".dng",
+    ".cr2",
+    ".cr3",
+    ".nef",
+    ".arw",
+    ".orf",
+    ".rw2",
+  ];
+  const ALLOWED_TYPES = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+  ];
+
+  // Convert HEIC file to JPEG
+  const convertHeicToJpeg = async (file: File): Promise<File> => {
+    try {
+      const jpegBlob = await heicTo({
+        blob: file,
+        type: "image/jpeg",
+        quality: 0.9, // High quality conversion
+      });
+
+      // Create a new File object with the converted blob
+      const convertedFile = new File(
+        [jpegBlob],
+        file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+        {
+          type: "image/jpeg",
+          lastModified: file.lastModified,
+        }
+      );
+
+      return convertedFile;
+    } catch (error) {
+      console.error("HEIC conversion failed:", error);
+      throw new Error(`Failed to convert HEIC file "${file.name}" to JPEG`);
+    }
+  };
+
+  // Validate individual file
+  const validateFile = async (
+    file: File
+  ): Promise<{ isValid: boolean; error?: string; convertedFile?: File }> => {
+    // Check file size first
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        isValid: false,
+        error: `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`,
+      };
+    }
+
+    const fileName = file.name.toLowerCase();
+    const extension = fileName.substring(fileName.lastIndexOf("."));
+
+    // Check if it's a HEIC file that needs conversion
+    if (extension === ".heic" || extension === ".heif") {
+      try {
+        // Verify it's actually a HEIC file
+        const isActuallyHeic = await isHeic(file);
+        if (!isActuallyHeic) {
+          return {
+            isValid: false,
+            error: `File "${file.name}" appears to be corrupted or not a valid HEIC file.`,
+          };
+        }
+
+        // Convert HEIC to JPEG
+        const convertedFile = await convertHeicToJpeg(file);
+
+        // Check converted file size
+        if (convertedFile.size > MAX_FILE_SIZE) {
+          return {
+            isValid: false,
+            error: `File "${file.name}" is too large after conversion (${(convertedFile.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`,
+          };
+        }
+
+        return {
+          isValid: true,
+          convertedFile,
+        };
+      } catch (error) {
+        return {
+          isValid: false,
+          error: `Failed to convert HEIC file "${file.name}": ${error instanceof Error ? error.message : "Unknown error"}`,
+        };
+      }
+    }
+
+    // Check for other blocked extensions
+    const hasBlockedExtension = BLOCKED_EXTENSIONS.some((ext) =>
+      fileName.endsWith(ext)
+    );
+
+    if (hasBlockedExtension) {
+      // Special message for RAW files
+      if (
+        [".dng", ".cr2", ".cr3", ".nef", ".arw", ".orf", ".rw2"].includes(
+          extension
+        )
+      ) {
+        return {
+          isValid: false,
+          error: `File "${file.name}" is a RAW format (${extension.toUpperCase()}). RAW files are too large for web upload.\nPlease export as JPEG from your photo editing software.`,
+        };
+      }
+
+      return {
+        isValid: false,
+        error: `File "${file.name}" has an unsupported format (${extension.toUpperCase()}). Please convert to JPEG, PNG, or WebP format.`,
+      };
+    }
+
+    // Check MIME type (excluding HEIC since we handle it above)
+    if (
+      !ALLOWED_TYPES.includes(file.type) &&
+      !file.type.includes("heic") &&
+      !file.type.includes("heif")
+    ) {
+      return {
+        isValid: false,
+        error: `File "${file.name}" has an unsupported format. Please use JPEG, PNG, or WebP images.`,
+      };
+    }
+
+    return { isValid: true };
+  };
+
+  // Handle file selection or drop with validation and conversion
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+
     setOverallError(null);
-    setPendingFiles(Array.from(files));
-    setProgress([]); // Reset progress if new files are selected
+    const fileArray = Array.from(files);
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+
+    // Show processing message for HEIC files
+    const hasHeicFiles = fileArray.some((file) => {
+      const fileName = file.name.toLowerCase();
+      return fileName.endsWith(".heic") || fileName.endsWith(".heif");
+    });
+
+    if (hasHeicFiles) {
+      setOverallError("Converting HEIC files to JPEG...");
+    }
+
+    // Validate and convert each file
+    for (const file of fileArray) {
+      try {
+        const validation = await validateFile(file);
+        if (validation.isValid) {
+          // Use converted file if available, otherwise use original
+          validFiles.push(validation.convertedFile || file);
+        } else {
+          errors.push(validation.error!);
+        }
+      } catch (error) {
+        errors.push(
+          `Error processing "${file.name}": ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+      }
+    }
+
+    // Clear processing message
+    if (hasHeicFiles) {
+      setOverallError(null);
+    }
+
+    // Show errors if any
+    if (errors.length > 0) {
+      const errorMessage =
+        errors.length === 1
+          ? errors[0]
+          : `${errors.length} files were rejected:\n${errors.join("\n")}`;
+      setOverallError(errorMessage);
+      if (onError) onError(errorMessage);
+    }
+
+    // Set valid files for upload
+    if (validFiles.length > 0) {
+      setPendingFiles(validFiles);
+      setProgress([]); // Reset progress if new files are selected
+    } else if (errors.length > 0) {
+      // If no valid files and there were errors, clear pending files
+      setPendingFiles([]);
+    }
   };
 
   // Start upload after confirmation
@@ -143,13 +333,13 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
     });
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleFiles(e.target.files);
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    await handleFiles(e.target.files);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    handleFiles(e.dataTransfer.files);
+    await handleFiles(e.dataTransfer.files);
   };
 
   const handleClick = () => {
@@ -201,7 +391,7 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
             multiple={multiple}
             className="hidden"
             onChange={handleInputChange}
@@ -212,7 +402,35 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
             Click to select or drag and drop images
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            Images up to 5MB each
+            JPEG, PNG, WebP, or HEIC images up to 10MB each
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            HEIC files will be automatically converted to JPEG
+          </div>
+        </div>
+      )}
+
+      {/* Error display for file validation */}
+      {overallError && progress.length === 0 && (
+        <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <div className="text-sm text-destructive font-medium mb-2">
+            File Upload Issues:
+          </div>
+          <div className="text-xs text-destructive whitespace-pre-line">
+            {overallError}
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            <strong>Supported formats:</strong> JPEG, PNG, WebP, HEIC (up to
+            10MB each)
+            <br />
+            <strong>Auto-converted:</strong> HEIC and HEIF files are
+            automatically converted to JPEG
+            <br />
+            <strong>Not supported:</strong> DNG, CR2, NEF, ARW, and other RAW
+            formats
+            <br />
+            <strong>Note:</strong> HEIC conversion happens in your browser - no
+            files are sent to servers during conversion
           </div>
         </div>
       )}
