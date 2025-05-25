@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Expand,
   ExternalLink,
+  Palette,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
@@ -27,6 +28,7 @@ interface ImageViewModalProps {
   image: ImageData | null;
   images?: ImageData[];
   onCanvasExtension?: (image: ImageData) => void;
+  onImageMatte?: (image: ImageData) => void;
   onNavigate?: (image: ImageData) => void;
 }
 
@@ -41,6 +43,7 @@ export function ImageViewModal({
   image,
   images = [],
   onCanvasExtension,
+  onImageMatte,
   onNavigate,
 }: ImageViewModalProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -180,6 +183,13 @@ export function ImageViewModal({
   const handleCanvasExtension = () => {
     if (image && onCanvasExtension) {
       onCanvasExtension(image);
+      onClose();
+    }
+  };
+
+  const handleImageMatte = () => {
+    if (image && onImageMatte) {
+      onImageMatte(image);
       onClose();
     }
   };
@@ -396,6 +406,18 @@ export function ImageViewModal({
                   >
                     <Expand className="h-4 w-4 mr-2" />
                     Extend Canvas
+                  </Button>
+                )}
+
+                {onImageMatte && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleImageMatte}
+                    className="justify-start bg-purple-600 hover:bg-purple-700"
+                  >
+                    <Palette className="h-4 w-4 mr-2" />
+                    Create Matte
                   </Button>
                 )}
               </div>

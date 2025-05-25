@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
 import { CanvasExtensionModal } from "@/components/cars/CanvasExtensionModal";
+import { ImageMatteModal } from "@/components/cars/ImageMatteModal";
 import { ImageViewModal } from "@/components/cars/ImageViewModal";
 import { useImages } from "@/hooks/use-images";
 import { ImageData } from "@/app/images/columns";
@@ -101,6 +102,11 @@ export default function ImagesPage() {
   // Canvas extension modal state
   const [isCanvasModalOpen, setIsCanvasModalOpen] = useState(false);
   const [selectedImageForCanvas, setSelectedImageForCanvas] =
+    useState<ImageData | null>(null);
+
+  // Image matte modal state
+  const [isMatteModalOpen, setIsMatteModalOpen] = useState(false);
+  const [selectedImageForMatte, setSelectedImageForMatte] =
     useState<ImageData | null>(null);
 
   // Image view modal state
@@ -375,6 +381,12 @@ export default function ImagesPage() {
     setIsCanvasModalOpen(true);
   };
 
+  // Handle image matte
+  const handleImageMatte = (image: ImageData) => {
+    setSelectedImageForMatte(image);
+    setIsMatteModalOpen(true);
+  };
+
   // Handle image view
   const handleImageView = (image: ImageData) => {
     setSelectedImageForView(image);
@@ -632,6 +644,7 @@ export default function ImagesPage() {
               isLoading={isLoading}
               error={error || undefined}
               onCanvasExtension={handleCanvasExtension}
+              onImageMatte={handleImageMatte}
               onImageView={handleImageView}
             />
 
@@ -656,6 +669,16 @@ export default function ImagesPage() {
           image={selectedImageForCanvas}
         />
 
+        {/* Image Matte Modal */}
+        <ImageMatteModal
+          isOpen={isMatteModalOpen}
+          onClose={() => {
+            setIsMatteModalOpen(false);
+            setSelectedImageForMatte(null);
+          }}
+          image={selectedImageForMatte}
+        />
+
         {/* Image View Modal */}
         <ImageViewModal
           isOpen={isImageViewModalOpen}
@@ -666,6 +689,7 @@ export default function ImagesPage() {
           image={selectedImageForView}
           images={mappedImages}
           onCanvasExtension={handleCanvasExtension}
+          onImageMatte={handleImageMatte}
           onNavigate={handleImageNavigate}
         />
       </div>

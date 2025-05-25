@@ -2,7 +2,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ImageData } from "@/app/images/columns";
-import { Copy, Check, Trash2, Loader2, Expand } from "lucide-react";
+import { Copy, Check, Trash2, Loader2, Expand, Palette } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface ImageCardProps {
@@ -11,6 +11,7 @@ interface ImageCardProps {
   isSelected?: boolean;
   onDelete?: (image: ImageData) => Promise<void>;
   onCanvasExtension?: (image: ImageData) => void;
+  onImageMatte?: (image: ImageData) => void;
   onImageView?: (image: ImageData) => void;
 }
 
@@ -20,6 +21,7 @@ export function ImageCard({
   isSelected,
   onDelete,
   onCanvasExtension,
+  onImageMatte,
   onImageView,
 }: ImageCardProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -91,6 +93,11 @@ export function ImageCard({
     onCanvasExtension?.(image);
   };
 
+  const handleImageMatte = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onImageMatte?.(image);
+  };
+
   if (onDelete) {
     // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
   }
@@ -116,6 +123,18 @@ export function ImageCard({
             title="Extend canvas"
           >
             <Expand className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Image Matte button */}
+        {onImageMatte && (
+          <button
+            onClick={handleImageMatte}
+            className="p-1 bg-background/80 rounded-full hover:bg-purple-600/80 hover:text-white transition-colors focus:outline-none"
+            aria-label="Create image matte"
+            title="Create image matte"
+          >
+            <Palette className="h-4 w-4" />
           </button>
         )}
 

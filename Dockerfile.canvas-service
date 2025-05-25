@@ -1,78 +1,38 @@
 FROM ubuntu:22.04
 
+# Set environment variables to prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     g++ \
     pkg-config \
-    cmake \
-    libjpeg-dev \
-    libpng-dev \
-    libtiff-dev \
-    libwebp-dev \
-    zlib1g-dev \
+    libopencv-dev \
+    libopencv-contrib-dev \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# Build minimal OpenCV from source
-WORKDIR /opencv-build
-RUN curl -L https://github.com/opencv/opencv/archive/4.8.0.tar.gz | tar xz
-WORKDIR /opencv-build/opencv-4.8.0/build
-
-RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
-    -D CMAKE_INSTALL_PREFIX=/usr/local \
-    -D BUILD_SHARED_LIBS=OFF \
-    -D BUILD_STATIC_LIBS=ON \
-    -D WITH_TBB=OFF \
-    -D WITH_OPENGL=OFF \
-    -D WITH_OPENCL=OFF \
-    -D WITH_IPP=OFF \
-    -D WITH_ITT=OFF \
-    -D BUILD_opencv_apps=OFF \
-    -D BUILD_opencv_calib3d=OFF \
-    -D BUILD_opencv_dnn=OFF \
-    -D BUILD_opencv_features2d=OFF \
-    -D BUILD_opencv_flann=OFF \
-    -D BUILD_opencv_gapi=OFF \
-    -D BUILD_opencv_highgui=OFF \
-    -D BUILD_opencv_java_bindings_generator=OFF \
-    -D BUILD_opencv_js=OFF \
-    -D BUILD_opencv_ml=OFF \
-    -D BUILD_opencv_objdetect=OFF \
-    -D BUILD_opencv_photo=OFF \
-    -D BUILD_opencv_python_bindings_generator=OFF \
-    -D BUILD_opencv_stitching=OFF \
-    -D BUILD_opencv_ts=OFF \
-    -D BUILD_opencv_video=OFF \
-    -D BUILD_opencv_videoio=OFF \
-    -D BUILD_opencv_world=OFF \
-    -D BUILD_TESTS=OFF \
-    -D BUILD_PERF_TESTS=OFF \
-    -D BUILD_EXAMPLES=OFF \
-    -D INSTALL_PYTHON_EXAMPLES=OFF \
-    -D INSTALL_C_EXAMPLES=OFF \
-    -D OPENCV_ENABLE_NONFREE=OFF \
-    .. && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
 
 # Set up application directory
 WORKDIR /app
 
 # Copy source code
 COPY extend_canvas.cpp .
+COPY matte_generator.cpp .
 
-# Compile the canvas extension binary
-RUN g++ -std=c++17 -O2 -Wall -static -o extend_canvas extend_canvas.cpp \
-    -I/usr/local/include/opencv4 \
-    -L/usr/local/lib \
-    -lopencv_core -lopencv_imgproc -lopencv_imgcodecs \
-    -ljpeg -lpng -ltiff -lwebp -lz -lpthread -ldl
+# Compile the canvas extension binary with dynamic linking
+RUN g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp \
+    `pkg-config --cflags --libs opencv4`
 
-# Install Node.js for the API server
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
+# Compile the matte generator binary with dynamic linking
+RUN g++ -std=c++17 -O2 -Wall -o matte_generator matte_generator.cpp \
+    `pkg-config --cflags --libs opencv4`
 
 # Copy package files
 COPY canvas-service/package*.json ./
@@ -83,8 +43,8 @@ RUN npm install
 # Copy service code
 COPY canvas-service/ .
 
-# Create temp directory
-RUN mkdir -p /tmp/canvas-extension
+# Create temp directories
+RUN mkdir -p /tmp/canvas-extension /tmp/image-matte
 
 # Expose port
 EXPOSE 3000

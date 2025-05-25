@@ -65,6 +65,7 @@ interface SimpleImageGalleryProps {
   filters?: Record<string, string | boolean>;
   setFilter?: (key: string, value: string | boolean) => void;
   onCanvasExtension?: (image: ImageData) => void;
+  onImageMatte?: (image: ImageData) => void;
   onImageView?: (image: ImageData) => void;
 }
 
@@ -84,6 +85,7 @@ export function SimpleImageGallery({
   onImageSelect,
   selectedImageId,
   onCanvasExtension,
+  onImageMatte,
   onImageView,
 }: SimpleImageGalleryProps) {
   if (isLoading) {
@@ -166,6 +168,7 @@ export function SimpleImageGallery({
           onDelete={handleDelete}
           onCanvasExtension={onCanvasExtension}
           onImageView={onImageView}
+          onImageMatte={onImageMatte}
         />
       ))}
       {isFetchingNextPage && (
