@@ -1,0 +1,29 @@
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    g++ \
+    pkg-config \
+    libopencv-dev \
+    libopencv-contrib-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY extend_canvas.cpp .
+
+# Compile with static linking where possible
+RUN g++ -std=c++17 -O2 -Wall -o extend_canvas_linux extend_canvas.cpp \
+    $(pkg-config --cflags opencv4) \
+    $(pkg-config --libs opencv4) \
+    -static-libgcc -static-libstdc++ && \
+    strip extend_canvas_linux
+
+# Check dependencies
+RUN echo "📋 Binary info:" && \
+    ls -la extend_canvas_linux && \
+    file extend_canvas_linux && \
+    echo "📋 Library dependencies:" && \
+    (ldd extend_canvas_linux || echo "Static binary")
+
+CMD ["cp", "extend_canvas_linux", "/output/"]

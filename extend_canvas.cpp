@@ -141,3 +141,4 @@ int main(int argc, char *argv[])
     std::cout << "Saved (thr=" << whiteThr << ") to " << outP << std::endl;
     return 0;
 }// Updated for better static linking
+// Trigger full static linking attempt

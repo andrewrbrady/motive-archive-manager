@@ -23,24 +23,50 @@ jobs:
             g++ \
             pkg-config \
             libopencv-dev \
-            libopencv-contrib-dev
+            libopencv-contrib-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            libwebp-dev \
+            zlib1g-dev
 
       - name: Compile canvas extension
         run: |
-          echo "🔨 Compiling extend_canvas for Linux..."
+          echo "🔨 Compiling extend_canvas for Linux with full static linking..."
 
-          # Try to compile with maximum static linking
-          g++ -std=c++17 -O2 -Wall -o extend_canvas_linux extend_canvas.cpp \
-            $(pkg-config --cflags opencv4) \
-            $(pkg-config --libs opencv4) \
-            -static-libgcc -static-libstdc++
+          # Get OpenCV flags
+          OPENCV_CFLAGS=$(pkg-config --cflags opencv4)
+          OPENCV_LIBS=$(pkg-config --libs opencv4)
 
-          echo "✅ Compilation successful"
+          echo "OpenCV CFLAGS: $OPENCV_CFLAGS"
+          echo "OpenCV LIBS: $OPENCV_LIBS"
+
+          # Try multiple static linking approaches
+          echo "🔧 Attempting full static compilation..."
+
+          # Approach 1: Full static linking
+          if g++ -std=c++17 -O2 -Wall -static -o extend_canvas_linux extend_canvas.cpp \
+            $OPENCV_CFLAGS $OPENCV_LIBS -lpthread -ldl; then
+            echo "✅ Full static compilation successful"
+          else
+            echo "⚠️ Full static failed, trying partial static..."
+            # Approach 2: Partial static with specific libraries
+            g++ -std=c++17 -O2 -Wall -o extend_canvas_linux extend_canvas.cpp \
+              $OPENCV_CFLAGS \
+              -Wl,-Bstatic $OPENCV_LIBS \
+              -Wl,-Bdynamic -lpthread -ldl -lm -lc
+          fi
+
+          echo "✅ Compilation completed"
           ls -la extend_canvas_linux
 
           # Check what libraries it depends on
           echo "📋 Library dependencies:"
-          ldd extend_canvas_linux || echo "Static binary (no dependencies)"
+          ldd extend_canvas_linux || echo "Fully static binary (no dependencies)"
+
+          # Check binary info
+          echo "📋 Binary info:"
+          file extend_canvas_linux
 
           # Test the binary
           ./extend_canvas_linux 2>&1 | head -5
