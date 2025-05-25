@@ -1,4 +1,4 @@
-// extend_canvas.cpp  (v5)
+// extend_canvas.cpp  (v5.1)
 // Autodetection refined: samples brightness at the image's central top & bottom stripes
 // to derive a threshold that adapts to soft-box lighting variations.
 //
