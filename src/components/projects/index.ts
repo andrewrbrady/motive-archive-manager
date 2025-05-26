@@ -3,6 +3,8 @@ export { ProjectProgressCards } from "./ProjectProgressCards";
 export { ProjectOverviewTab } from "./ProjectOverviewTab";
 export { ProjectTimelineTab } from "./ProjectTimelineTab";
 export { ProjectTeamTab } from "./ProjectTeamTab";
+export { ProjectCarsTab } from "./ProjectCarsTab";
 export { ProjectAssetsTab } from "./ProjectAssetsTab";
 export { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
+export { ProjectCaptionGenerator } from "./ProjectCaptionGenerator";
 export { ProjectTabs } from "./ProjectTabs";

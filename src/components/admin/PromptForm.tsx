@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle } from "react";
+import React, { forwardRef, useImperativeHandle, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -42,14 +42,26 @@ interface PromptFormProps {
   onCancel: () => void;
   isSubmitting?: boolean;
   renderModelSelector?: () => React.ReactNode; // Custom model selector function
+  externalAiModel?: string; // External AI model state for syncing
 }
 
 const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
-  ({ prompt, onSubmit, onCancel, isSubmitting, renderModelSelector }, ref) => {
+  (
+    {
+      prompt,
+      onSubmit,
+      onCancel,
+      isSubmitting,
+      renderModelSelector,
+      externalAiModel,
+    },
+    ref
+  ) => {
     const {
       register,
       handleSubmit,
       control,
+      setValue,
       formState: { errors },
     } = useForm<PromptFormData>({
       resolver: zodResolver(promptFormSchema),
@@ -70,6 +82,12 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
         handleSubmit(onSubmit)();
       },
     }));
+
+    useEffect(() => {
+      if (renderModelSelector && externalAiModel) {
+        setValue("aiModel", externalAiModel);
+      }
+    }, [renderModelSelector, externalAiModel, setValue]);
 
     return (
       <div className="w-full max-w-full overflow-hidden">

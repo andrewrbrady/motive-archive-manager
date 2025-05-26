@@ -141,12 +141,6 @@ export default function NewDeliverableForm({
       return;
     }
 
-    // If no carId was provided and no car was selected, show error
-    if (!carId && !selectedCarId) {
-      toast.error("Please select a car");
-      return;
-    }
-
     const deliverableCarId = carId || selectedCarId;
 
     // Find the selected user to get both name and firebase_uid
@@ -158,30 +152,38 @@ export default function NewDeliverableForm({
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/cars/${deliverableCarId}/deliverables`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title,
-            platform,
-            type,
-            duration,
-            aspect_ratio: aspectRatio,
-            editor: selectedUser.name, // Store the name for display
-            firebase_uid: selectedUser.uid, // Store the UID for filtering
-            status: "not_started", // Default status
-            edit_deadline: new Date(editDeadline),
-            release_date: new Date(releaseDate),
-            dropbox_link: dropboxLink || undefined,
-            social_media_link: socialMediaLink || undefined,
-            car_id: deliverableCarId,
-          }),
-        }
-      );
+      // Determine which API endpoint to use based on whether we have a car
+      const apiUrl = deliverableCarId
+        ? `/api/cars/${deliverableCarId}/deliverables`
+        : `/api/deliverables`;
+
+      const requestBody: any = {
+        title,
+        platform,
+        type,
+        duration,
+        aspect_ratio: aspectRatio,
+        editor: selectedUser.name, // Store the name for display
+        firebase_uid: selectedUser.uid, // Store the UID for filtering
+        status: "not_started", // Default status
+        edit_deadline: new Date(editDeadline),
+        release_date: new Date(releaseDate),
+        dropbox_link: dropboxLink || undefined,
+        social_media_link: socialMediaLink || undefined,
+      };
+
+      // Only add car_id if we have one
+      if (deliverableCarId) {
+        requestBody.car_id = deliverableCarId;
+      }
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to create deliverable");
@@ -250,16 +252,17 @@ export default function NewDeliverableForm({
                       htmlFor="car"
                       className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
                     >
-                      Car
+                      Car (Optional)
                     </label>
                     <Select
                       value={selectedCarId}
                       onValueChange={(value) => setSelectedCarId(value)}
                     >
                       <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Select car" />
+                        <SelectValue placeholder="Select car (optional)" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="">No car selected</SelectItem>
                         {cars.map((car) => (
                           <SelectItem key={car._id} value={car._id.toString()}>
                             {car.year} {car.make} {car.model}

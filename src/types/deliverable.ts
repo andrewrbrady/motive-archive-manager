@@ -47,7 +47,7 @@ export interface Metrics {
 
 export interface Deliverable {
   _id?: ObjectId;
-  car_id: ObjectId;
+  car_id?: ObjectId;
 
   // Basic Information
   title: string;

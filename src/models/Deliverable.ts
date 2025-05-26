@@ -15,7 +15,7 @@ if (mongoose.models.Deliverable) {
 }
 
 export interface IDeliverable extends Document {
-  car_id: mongoose.Types.ObjectId;
+  car_id?: mongoose.Types.ObjectId;
   title: string;
   description?: string;
   platform: Platform;
@@ -56,7 +56,7 @@ const deliverableSchema = new mongoose.Schema(
     car_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Car",
-      required: true,
+      required: false,
       index: true,
     },
     title: {

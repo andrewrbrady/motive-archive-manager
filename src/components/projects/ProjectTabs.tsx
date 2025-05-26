@@ -6,6 +6,8 @@ import { ProjectTimelineTab } from "./ProjectTimelineTab";
 import { ProjectTeamTab } from "./ProjectTeamTab";
 import { ProjectAssetsTab } from "./ProjectAssetsTab";
 import { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
+import { ProjectCarsTab } from "./ProjectCarsTab";
+import { ProjectCaptionGenerator } from "./ProjectCaptionGenerator";
 import { Project } from "@/types/project";
 
 interface MemberDetails {
@@ -31,7 +33,7 @@ export function ProjectTabs({
 }: ProjectTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-      <TabsList className="grid w-full grid-cols-5 bg-transparent border rounded-md h-auto p-1 gap-1">
+      <TabsList className="grid w-full grid-cols-7 bg-transparent border rounded-md h-auto p-1 gap-1">
         <TabsTrigger
           value="overview"
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
@@ -51,6 +53,12 @@ export function ProjectTabs({
           Team
         </TabsTrigger>
         <TabsTrigger
+          value="cars"
+          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
+        >
+          Cars
+        </TabsTrigger>
+        <TabsTrigger
           value="assets"
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
         >
@@ -61,6 +69,12 @@ export function ProjectTabs({
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
         >
           Deliverables
+        </TabsTrigger>
+        <TabsTrigger
+          value="captions"
+          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
+        >
+          Captions
         </TabsTrigger>
       </TabsList>
 
@@ -86,6 +100,10 @@ export function ProjectTabs({
         />
       </TabsContent>
 
+      <TabsContent value="cars" className="space-y-6">
+        <ProjectCarsTab project={project} onProjectUpdate={onProjectUpdate} />
+      </TabsContent>
+
       <TabsContent value="assets" className="space-y-6">
         <ProjectAssetsTab project={project} onProjectUpdate={onProjectUpdate} />
       </TabsContent>
@@ -94,6 +112,13 @@ export function ProjectTabs({
         <ProjectDeliverablesTab
           project={project}
           memberDetails={memberDetails}
+          onProjectUpdate={onProjectUpdate}
+        />
+      </TabsContent>
+
+      <TabsContent value="captions" className="space-y-6">
+        <ProjectCaptionGenerator
+          project={project}
           onProjectUpdate={onProjectUpdate}
         />
       </TabsContent>

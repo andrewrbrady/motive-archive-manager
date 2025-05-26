@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import CaptionPromptsContent from "./CaptionPromptsContent";
+import SystemPromptsContent from "./SystemPromptsContent";
 
 export default function AdminTabs() {
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
@@ -277,6 +278,11 @@ export default function AdminTabs() {
       value: "caption-prompts",
       label: "Caption Prompts",
       content: <CaptionPromptsContent />,
+    },
+    {
+      value: "system-prompts",
+      label: "System Prompts",
+      content: <SystemPromptsContent />,
     },
   ];
 

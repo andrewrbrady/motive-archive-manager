@@ -46,9 +46,15 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     const tabFromUrl = urlParams.get("tab");
     if (
       tabFromUrl &&
-      ["overview", "timeline", "team", "assets", "deliverables"].includes(
-        tabFromUrl
-      )
+      [
+        "overview",
+        "timeline",
+        "team",
+        "cars",
+        "assets",
+        "deliverables",
+        "captions",
+      ].includes(tabFromUrl)
     ) {
       setActiveTab(tabFromUrl);
     }
@@ -61,13 +67,17 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       const tabFromUrl = urlParams.get("tab");
       if (
         tabFromUrl &&
-        ["overview", "timeline", "team", "assets", "deliverables"].includes(
-          tabFromUrl
-        )
+        [
+          "overview",
+          "timeline",
+          "team",
+          "cars",
+          "assets",
+          "deliverables",
+          "captions",
+        ].includes(tabFromUrl)
       ) {
         setActiveTab(tabFromUrl);
-      } else {
-        setActiveTab("overview");
       }
     };
 

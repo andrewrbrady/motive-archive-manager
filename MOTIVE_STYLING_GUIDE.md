@@ -919,3 +919,202 @@ const validateForm = () => {
 - **Follow consistent naming conventions** across the application
 - **Add proper validation** for required fields
 - **Include accessibility attributes** for screen readers
+
+## Selectable Card/Button Hover States
+
+### White Border Hover Pattern
+
+For selectable cards or buttons (like car selection, item selection, etc.), use a **white border on hover** instead of background color changes for better visual hierarchy and cleaner aesthetics.
+
+#### ✅ Correct Hover Implementation
+
+```tsx
+// Selectable card with white border hover
+<button
+  className={`flex items-center space-x-3 p-3 border rounded-lg transition-all text-left w-full ${
+    isSelected
+      ? "border-blue-500/50" // Selected state with subtle blue border
+      : "border-[hsl(var(--border-subtle))] hover:border-white" // White border on hover
+  }`}
+>
+  {/* Card content */}
+</button>
+
+// Alternative with more opacity control
+<button
+  className={`p-4 border rounded-lg transition-all ${
+    isSelected
+      ? "border-blue-500/60"
+      : "border-border/30 hover:border-white/80"
+  }`}
+>
+  {/* Card content */}
+</button>
+```
+
+#### ❌ Avoid Gray Background Hovers
+
+```tsx
+// Don't use gray background hovers for selectable items
+<button
+  className={`p-3 border rounded-lg ${
+    isSelected
+      ? "border-blue-500"
+      : "border-border hover:bg-accent" // ❌ Avoid this
+  }`}
+>
+```
+
+### Selection State Patterns
+
+#### Basic Selection Pattern
+
+```tsx
+const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+const handleItemSelection = (itemId: string) => {
+  setSelectedItems((prev) =>
+    prev.includes(itemId)
+      ? prev.filter((id) => id !== itemId)
+      : [...prev, itemId]
+  );
+};
+
+// In render
+{
+  items.map((item) => {
+    const isSelected = selectedItems.includes(item.id);
+
+    return (
+      <button
+        key={item.id}
+        onClick={() => handleItemSelection(item.id)}
+        className={`p-3 border rounded-lg transition-all w-full text-left ${
+          isSelected
+            ? "border-blue-500/50"
+            : "border-border/30 hover:border-white"
+        }`}
+      >
+        <div className="flex items-center gap-3">{/* Item content */}</div>
+      </button>
+    );
+  });
+}
+```
+
+#### Multi-Select with Select All
+
+```tsx
+const handleSelectAll = () => {
+  if (selectedItems.length === items.length) {
+    setSelectedItems([]);
+  } else {
+    setSelectedItems(items.map((item) => item.id));
+  }
+};
+
+// Select All button
+<Button
+  variant="outline"
+  size="sm"
+  onClick={handleSelectAll}
+  className="border-[hsl(var(--border))]"
+>
+  {selectedItems.length === items.length ? "Deselect All" : "Select All"}
+</Button>;
+```
+
+### Border Opacity Guidelines
+
+Use these opacity levels for consistent visual hierarchy:
+
+```tsx
+// Default state - very subtle
+"border-border/30";
+
+// Hover state - bright and clear
+"hover:border-white";
+
+// Selected state - colored but not overwhelming
+"border-blue-500/50";
+
+// Focus state - slightly more prominent
+"focus:border-blue-500/70";
+```
+
+### Transition Classes
+
+Always include smooth transitions for selection states:
+
+```tsx
+className = "transition-all duration-200";
+// or
+className = "transition-colors duration-150";
+```
+
+### Complete Selectable Card Example
+
+```tsx
+interface SelectableCardProps {
+  item: any;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  children: React.ReactNode;
+}
+
+function SelectableCard({
+  item,
+  isSelected,
+  onSelect,
+  children,
+}: SelectableCardProps) {
+  return (
+    <button
+      onClick={() => onSelect(item.id)}
+      className={`
+        flex items-center space-x-3 p-4 border rounded-lg 
+        transition-all duration-200 text-left w-full
+        ${
+          isSelected
+            ? "border-blue-500/50"
+            : "border-border/30 hover:border-white"
+        }
+      `}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Usage
+<SelectableCard
+  item={car}
+  isSelected={selectedCarIds.includes(car.id)}
+  onSelect={handleCarSelection}
+>
+  <div className="flex-shrink-0">
+    <Avatar src={car.image} alt={car.name} />
+  </div>
+  <div className="flex-1">
+    <h3 className="font-medium">{car.name}</h3>
+    <p className="text-sm text-muted-foreground">{car.description}</p>
+  </div>
+  <Badge variant="outline">{car.status}</Badge>
+</SelectableCard>;
+```
+
+### When to Use This Pattern
+
+- **Car/vehicle selection interfaces**
+- **File/document selection**
+- **User/team member selection**
+- **Product/item selection in lists**
+- **Multi-select interfaces**
+- **Gallery item selection**
+
+### When NOT to Use This Pattern
+
+- **Navigation buttons** (use standard button hover states)
+- **Form inputs** (use input-specific hover states)
+- **Action buttons** (use button variant hover states)
+- **Menu items** (use menu-specific hover states)

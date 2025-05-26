@@ -198,25 +198,16 @@ export async function POST(
       );
     }
 
-    // Determine car_id - use provided carId or first car from project
+    // Determine car_id - use provided carId or first car from project (optional)
     let selectedCarId = carId;
     if (!selectedCarId && project.carIds.length > 0) {
       selectedCarId = project.carIds[0];
       console.log("🚗 Using first car from project:", selectedCarId);
     }
 
-    if (!selectedCarId) {
-      console.log("❌ No car ID available for deliverable");
-      return NextResponse.json(
-        { error: "Car ID is required for deliverable" },
-        { status: 400 }
-      );
-    }
-
     // Create new deliverable in the deliverables collection
     console.log("🏗️ Creating new deliverable in deliverables collection...");
-    const deliverableData = {
-      car_id: new ObjectId(selectedCarId),
+    const deliverableData: any = {
       title: title.trim(),
       description: description?.trim() || "",
       platform: platform || "Other",
@@ -233,6 +224,16 @@ export async function POST(
       created_at: new Date(),
       updated_at: new Date(),
     };
+
+    // Only add car_id if we have a selectedCarId
+    if (selectedCarId) {
+      deliverableData.car_id = new ObjectId(selectedCarId);
+      console.log("🚗 Adding car_id to deliverable:", selectedCarId);
+    } else {
+      console.log(
+        "📝 Creating deliverable without car_id (project-only deliverable)"
+      );
+    }
 
     console.log(
       "📦 Deliverable data to create:",

@@ -315,8 +315,87 @@ ${template === "dealer" ? "- Do not include the dealer reference - it will be ad
 - Each caption needs to include the hashtags #motivearchive and #thecollectorsresrouce at the very end, without exception`;
 
     // Build system prompt that works across providers
-    const systemPrompt = `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
+    // Fetch the active system prompt from database
+    let systemPrompt = "";
+    try {
+      const systemPromptResponse = await fetch(
+        `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active?type=car_caption`
+      );
+      if (systemPromptResponse.ok) {
+        const systemPromptData = await systemPromptResponse.json();
+        systemPrompt = systemPromptData.prompt;
+      } else {
+        // Fallback to default if API fails
+        systemPrompt = `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
 
+${guidelines.map((g) => `- ${g}`).join("\n")}
+
+Length Guideline: ${
+          lengthGuidelines[length as keyof typeof lengthGuidelines] ||
+          lengthGuidelines.standard
+        }
+Tone Guideline: ${
+          toneGuidelines[tone as keyof typeof toneGuidelines] ||
+          toneGuidelines.professional
+        }
+Style Guideline: ${
+          styleGuidelines[style as keyof typeof styleGuidelines] ||
+          styleGuidelines.descriptive
+        }
+
+${context ? `USER'S SPECIFIC INSTRUCTIONS: ${context}` : ""}
+
+The first line of every caption must follow this format:
+[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
+Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
+
+${
+  clientInfo && clientInfo.includeInCaption && clientInfo.handle
+    ? `IMPORTANT: You MUST include the client/dealer handle ${clientInfo.handle} in the caption.`
+    : ""
+}
+
+Important: End the caption with relevant hashtags on a new line.`;
+      }
+    } catch (error) {
+      console.error("Error fetching system prompt:", error);
+      // Fallback to default system prompt
+      systemPrompt = `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
+
+${guidelines.map((g) => `- ${g}`).join("\n")}
+
+Length Guideline: ${
+        lengthGuidelines[length as keyof typeof lengthGuidelines] ||
+        lengthGuidelines.standard
+      }
+Tone Guideline: ${
+        toneGuidelines[tone as keyof typeof toneGuidelines] ||
+        toneGuidelines.professional
+      }
+Style Guideline: ${
+        styleGuidelines[style as keyof typeof styleGuidelines] ||
+        styleGuidelines.descriptive
+      }
+
+${context ? `USER'S SPECIFIC INSTRUCTIONS: ${context}` : ""}
+
+The first line of every caption must follow this format:
+[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
+Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
+
+${
+  clientInfo && clientInfo.includeInCaption && clientInfo.handle
+    ? `IMPORTANT: You MUST include the client/dealer handle ${clientInfo.handle} in the caption.`
+    : ""
+}
+
+Important: End the caption with relevant hashtags on a new line.`;
+    }
+
+    // Append platform-specific guidelines and formatting to the system prompt
+    systemPrompt += `
+
+Platform-specific guidelines:
 ${guidelines.map((g) => `- ${g}`).join("\n")}
 
 Length Guideline: ${
@@ -376,6 +455,15 @@ ${promptInstructions}`;
     }
 
     // Log the final prompt
+    console.log("=== CAR CAPTION GENERATION REQUEST ===");
+    console.log("System Prompt:", systemPrompt);
+    console.log("User Prompt:", userPrompt);
+    console.log("Model:", aiModel);
+    console.log("Temperature:", temperature);
+    console.log("Platform:", platform);
+    console.log("Template:", template);
+    console.log("=== END REQUEST DETAILS ===");
+
     console.log("FINAL PROMPT BEING SENT:", {
       userPrompt: userPrompt.substring(0, 300) + "...",
       systemPrompt: systemPrompt.substring(0, 300) + "...",
