@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDatabase } from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import {
   UpdateProjectRequest,
@@ -15,28 +15,42 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("🔍 GET /api/projects/[id] - Starting project fetch");
+
   try {
     const session = await auth();
+    console.log("🔐 Authentication check:", {
+      hasSession: !!session,
+      userId: session?.user?.id,
+    });
+
     if (!session?.user?.id) {
+      console.log("❌ Authentication failed");
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
 
-    const db = await getDatabase();
     const { id: projectId } = await params;
+    console.log("📋 Project ID from params:", projectId);
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
+      console.log("❌ Invalid project ID format");
       return NextResponse.json(
         { error: "Invalid project ID" },
         { status: 400 }
       );
     }
 
-    const project = await db.collection("projects").findOne({
-      _id: new ObjectId(projectId),
+    console.log("🔗 Connecting to database...");
+    await connectToDatabase();
+    console.log("✅ Database connected successfully");
+
+    console.log("🔍 Searching for project using Mongoose model...");
+    const project = await Project.findOne({
+      _id: projectId,
       $or: [
         { ownerId: session.user.id },
         { "members.userId": session.user.id },
@@ -44,19 +58,33 @@ export async function GET(
     });
 
     if (!project) {
+      console.log("❌ Project not found or access denied");
       return NextResponse.json(
         { error: "Project not found or access denied" },
         { status: 404 }
       );
     }
 
+    console.log("✅ Project found via Mongoose:", {
+      projectId: project._id,
+      projectTitle: project.title,
+      hasDeliverables: !!project.deliverables,
+      deliverablesCount: project.deliverables?.length || 0,
+      deliverables: project.deliverables || [],
+      projectKeys: Object.keys(project.toObject()),
+    });
+
     const response: ProjectResponse = {
-      project: project as unknown as IProject,
+      project: project.toObject() as unknown as IProject,
     };
 
+    console.log(
+      "📤 Sending response with deliverables count:",
+      response.project.deliverables?.length || 0
+    );
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Error fetching project:", error);
+    console.error("💥 Error fetching project:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
@@ -79,7 +107,7 @@ export async function PUT(
       );
     }
 
-    const db = await getDatabase();
+    await connectToDatabase();
     const { id: projectId } = await params;
     const data: UpdateProjectRequest = await request.json();
 
@@ -92,8 +120,8 @@ export async function PUT(
     }
 
     // Check if user has permission to update this project
-    const existingProject = await db.collection("projects").findOne({
-      _id: new ObjectId(projectId),
+    const existingProject = await Project.findOne({
+      _id: projectId,
       $or: [
         { ownerId: session.user.id },
         {
@@ -185,21 +213,18 @@ export async function PUT(
       updateData.archivedAt = new Date();
     }
 
-    const result = await db
-      .collection("projects")
-      .updateOne({ _id: new ObjectId(projectId) }, { $set: updateData });
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      { $set: updateData },
+      { new: true }
+    );
 
-    if (result.matchedCount === 0) {
+    if (!updatedProject) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Fetch updated project
-    const updatedProject = await db.collection("projects").findOne({
-      _id: new ObjectId(projectId),
-    });
-
     const response: ProjectResponse = {
-      project: updatedProject as unknown as IProject,
+      project: updatedProject.toObject() as unknown as IProject,
     };
 
     return NextResponse.json(response);
@@ -227,7 +252,7 @@ export async function DELETE(
       );
     }
 
-    const db = await getDatabase();
+    await connectToDatabase();
     const { id: projectId } = await params;
 
     // Validate ObjectId
@@ -239,8 +264,8 @@ export async function DELETE(
     }
 
     // Check if user has permission to delete this project (only owner)
-    const existingProject = await db.collection("projects").findOne({
-      _id: new ObjectId(projectId),
+    const existingProject = await Project.findOne({
+      _id: projectId,
       ownerId: session.user.id,
     });
 
@@ -251,11 +276,9 @@ export async function DELETE(
       );
     }
 
-    const result = await db
-      .collection("projects")
-      .deleteOne({ _id: new ObjectId(projectId) });
+    const result = await Project.findByIdAndDelete(projectId);
 
-    if (result.deletedCount === 0) {
+    if (!result) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 

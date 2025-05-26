@@ -3,4 +3,22 @@ description:
 globs: 
 alwaysApply: true
 ---
+# Cursor Rules
+
+## CRITICAL: NO BUILD COMMANDS
+**NEVER EVER run any build, dev, or deployment commands without explicit user permission:**
+- `npm run build`
+- `npm run dev` 
+- `npm start`
+- `yarn build`
+- `yarn dev`
+- `vercel build`
+- `vercel deploy`
+- `next build`
+- `next dev`
+- Any other build/dev/deployment commands
+
+**This is MANDATORY. Do not run these commands even to "test" or "check for errors".**
+
+## General Rules
 Do not run development server commands like "npm run dev" or "npm run build" or "vercel build" unless explicitly given permission.

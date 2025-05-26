@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listUsers } from "@/lib/firestore/users";
+import { auth } from "@/auth";
+import { connectToDatabase } from "@/lib/mongodb";
+import { User } from "@/models/User";
 import { logger } from "@/lib/logging";
 import { getUsers } from "@/lib/users/cache";
 
@@ -15,23 +17,48 @@ export async function GET(request: NextRequest) {
   const requestId = crypto.randomUUID();
 
   try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    await connectToDatabase();
+
     logger.info({
-      message: "Fetching users from cache/Firestore",
+      message: "Fetching users for team member selection",
       requestId,
       route: "api/users",
+      userId: session.user.id,
     });
 
-    // Use the caching utility to get users
-    const users = await getUsers();
+    // Fetch all users with basic information
+    const users = await User.find(
+      {},
+      {
+        _id: 1,
+        name: 1,
+        email: 1,
+        image: 1,
+        createdAt: 1,
+      }
+    ).sort({ name: 1 });
 
     logger.info({
       message: "Successfully fetched users",
       requestId,
-      count: users.length,
+      userCount: users.length,
     });
 
-    return NextResponse.json(users);
+    return NextResponse.json({
+      users,
+      total: users.length,
+    });
   } catch (error) {
+    console.error("Error fetching users:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     logger.error({
@@ -41,7 +68,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: "Failed to fetch users" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

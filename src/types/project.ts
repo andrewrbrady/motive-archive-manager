@@ -78,6 +78,19 @@ export interface ProjectAsset {
   addedBy: string;
 }
 
+export interface ProjectDeliverable {
+  id: string;
+  title: string;
+  description?: string;
+  type: "document" | "video" | "image" | "presentation" | "other";
+  status: "pending" | "in_progress" | "review" | "completed" | "rejected";
+  dueDate: Date;
+  assignedTo?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+}
+
 export interface ProjectTemplate {
   _id?: string;
   name: string;
@@ -120,6 +133,9 @@ export interface Project {
 
   // Assets and deliverables
   assets: ProjectAsset[];
+
+  // Embedded deliverables
+  deliverables: ProjectDeliverable[];
 
   // Progress tracking
   progress: {

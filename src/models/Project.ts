@@ -11,6 +11,7 @@ import {
   ProjectBudget,
   ProjectExpense,
   ProjectAsset,
+  ProjectDeliverable,
 } from "@/types/project";
 
 // Project document interface
@@ -190,6 +191,46 @@ const projectAssetSchema = new mongoose.Schema({
   },
 });
 
+// Project deliverable schema
+const projectDeliverableSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true,
+    default: () => new mongoose.Types.ObjectId().toString(),
+  },
+  title: {
+    type: String,
+    required: true,
+  },
+  description: String,
+  type: {
+    type: String,
+    required: true,
+    enum: ["document", "video", "image", "presentation", "other"],
+    default: "document",
+  },
+  status: {
+    type: String,
+    required: true,
+    enum: ["pending", "in_progress", "review", "completed", "rejected"],
+    default: "pending",
+  },
+  dueDate: {
+    type: Date,
+    required: true,
+  },
+  assignedTo: String,
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  completedAt: Date,
+});
+
 // Main project schema
 const projectSchema = new mongoose.Schema<
   IProjectDocument,
@@ -275,6 +316,9 @@ const projectSchema = new mongoose.Schema<
 
     // Assets and deliverables
     assets: [projectAssetSchema],
+
+    // Embedded deliverables
+    deliverables: [projectDeliverableSchema],
 
     // Progress tracking
     progress: {
