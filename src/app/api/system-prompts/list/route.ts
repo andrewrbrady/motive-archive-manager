@@ -27,10 +27,7 @@ export async function GET(request: NextRequest) {
     const filter: any = { type };
 
     // If length is specified, include prompts that either match the length or have no length specified (general prompts)
-    if (
-      length &&
-      ["concise", "standard", "detailed", "comprehensive"].includes(length)
-    ) {
+    if (length) {
       filter.$or = [
         { length: length },
         { length: { $exists: false } },

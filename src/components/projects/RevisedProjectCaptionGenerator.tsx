@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { CarSelection } from "./caption-generator/CarSelection";
 import { EventSelection } from "./caption-generator/EventSelection";
@@ -48,28 +48,10 @@ export function RevisedProjectCaptionGenerator({
   const { formState, handlers: formHandlers } = useFormState();
 
   // Prompt handlers with callbacks to update form state - must be called before any early returns
-  const promptHandlers = usePromptHandlers(
-    {
-      promptList: [],
-      selectedPrompt: null,
-      promptLoading: false,
-      promptError: null,
-    },
-    {
-      onFormValuesUpdate: (values: PromptFormValues) => {
-        formHandlers.updateFormValues({
-          context: values.context,
-          additionalContext: formState.additionalContext, // Keep existing
-          tone: values.tone as Tone,
-          style: values.style as Style,
-          platform: values.platform as Platform,
-          model: values.model,
-          provider: values.provider as ProviderId,
-          temperature: values.temperature,
-        });
-      },
-    }
-  );
+  const promptHandlers = usePromptHandlers({
+    formHandlers,
+    formState,
+  });
 
   // Use project data hook - must be called before any early returns
   const projectDataHook = useProjectData({ projectId: project._id || "" });
@@ -90,6 +72,31 @@ export function RevisedProjectCaptionGenerator({
 
   // Saved captions management - must be called before any early returns
   const savedCaptionsHook = useSavedCaptions();
+
+  // Helper function to update form values from prompt values
+  const updateFormFromPromptValues = useCallback(
+    (values: {
+      context: string;
+      tone: string;
+      style: string;
+      platform: string;
+      model: string;
+      provider: string;
+      temperature: number;
+    }) => {
+      formHandlers.updateFormValues({
+        context: values.context,
+        additionalContext: formState.additionalContext, // Keep existing
+        tone: values.tone as Tone,
+        style: values.style as Style,
+        platform: values.platform as Platform,
+        model: values.model,
+        provider: values.provider as ProviderId,
+        temperature: values.temperature,
+      });
+    },
+    [formHandlers, formState.additionalContext]
+  );
 
   // Fetch prompts when component mounts - must be called before any early returns
   useEffect(() => {
@@ -337,18 +344,7 @@ export function RevisedProjectCaptionGenerator({
         onModelChange={formHandlers.updateModel}
         onProviderChange={formHandlers.updateProvider}
         onTemperatureChange={formHandlers.updateTemperature}
-        onFormValuesUpdate={(values) => {
-          formHandlers.updateFormValues({
-            context: values.context,
-            additionalContext: formState.additionalContext, // Keep existing
-            tone: values.tone as Tone,
-            style: values.style as Style,
-            platform: values.platform as Platform,
-            model: values.model,
-            provider: values.provider as ProviderId,
-            temperature: values.temperature,
-          });
-        }}
+        onFormValuesUpdate={updateFormFromPromptValues}
       />
 
       {promptHandlers.promptError && (

@@ -70,35 +70,11 @@ export function PromptEditModal({
       const method = isCreating ? "POST" : "PATCH";
       const url = "/api/caption-prompts";
 
-      // Validate and normalize the length value to ensure it's in the allowed enum
-      const validLengthValues = [
-        "concise",
-        "standard",
-        "detailed",
-        "comprehensive",
-      ];
-      let normalizedLength = formData.length;
-
-      // If the length value is not in the allowed enum, map it to a valid one
-      if (!validLengthValues.includes(formData.length)) {
-        // Map common invalid values to valid ones
-        if (formData.length.includes("comprehensive")) {
-          normalizedLength = "comprehensive";
-        } else if (formData.length.includes("detailed")) {
-          normalizedLength = "detailed";
-        } else if (formData.length.includes("standard")) {
-          normalizedLength = "standard";
-        } else if (formData.length.includes("concise")) {
-          normalizedLength = "concise";
-        } else {
-          // Default fallback
-          normalizedLength = "standard";
-        }
-      }
-
+      // Use the length value as-is from the form - no validation needed
+      // since the dropdown only shows valid options from the database
       const payload: Record<string, any> = {
         ...formData,
-        length: normalizedLength, // Use the normalized length value
+        length: formData.length, // Use the actual selected length value
         aiModel: model,
         llmProvider: provider,
         modelParams: {

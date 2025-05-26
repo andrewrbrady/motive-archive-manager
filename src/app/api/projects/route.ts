@@ -291,8 +291,16 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("Projects API: GET request received");
+
     const session = await auth();
+    console.log("Projects API: Session check", {
+      hasSession: !!session,
+      userId: session?.user?.id,
+    });
+
     if (!session?.user?.id) {
+      console.log("Projects API: No authentication, returning 401");
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -300,6 +308,8 @@ export async function GET(request: NextRequest) {
     }
 
     const db = await getDatabase();
+    console.log("Projects API: Database connection established");
+
     const { searchParams } = new URL(request.url);
 
     // Parse query parameters
@@ -311,6 +321,17 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const clientId = searchParams.get("clientId");
     const ownerId = searchParams.get("ownerId");
+
+    console.log("Projects API: Query parameters", {
+      search,
+      sort,
+      page,
+      limit,
+      status,
+      type,
+      clientId,
+      ownerId,
+    });
 
     // Build query
     const query: any = {
@@ -351,6 +372,23 @@ export async function GET(request: NextRequest) {
       query.ownerId = ownerId;
     }
 
+    console.log("Projects API: Final query", JSON.stringify(query, null, 2));
+
+    // Debug: Check all projects in database vs user-accessible projects
+    const allProjects = await db.collection("projects").find({}).toArray();
+    console.log("Projects API: All projects in database:", {
+      totalProjects: allProjects.length,
+      projects: allProjects.map((p) => ({
+        id: p._id,
+        title: p.title,
+        ownerId: p.ownerId,
+        members:
+          p.members?.map((m: any) => ({ userId: m.userId, role: m.role })) ||
+          [],
+        currentUserId: session.user.id,
+      })),
+    });
+
     // Parse sort parameter
     const [sortField, sortOrder] = sort.split("_");
     const sortOptions = {
@@ -358,10 +396,13 @@ export async function GET(request: NextRequest) {
         sortOrder === "desc" ? -1 : 1,
     } as const;
 
+    console.log("Projects API: Sort options", sortOptions);
+
     // Calculate pagination
     const skip = (page - 1) * limit;
 
     // Execute query
+    console.log("Projects API: Executing database query...");
     const [projects, total] = await Promise.all([
       db
         .collection("projects")
@@ -373,6 +414,12 @@ export async function GET(request: NextRequest) {
       db.collection("projects").countDocuments(query),
     ]);
 
+    console.log("Projects API: Query results", {
+      projectsFound: projects.length,
+      totalCount: total,
+      firstProjectTitle: projects[0]?.title || "No projects",
+    });
+
     const response: ProjectListResponse = {
       projects: projects.map((project) =>
         convertProjectForFrontend(project)
@@ -382,9 +429,14 @@ export async function GET(request: NextRequest) {
       limit,
     };
 
+    console.log("Projects API: Returning response", {
+      projectsCount: response.projects.length,
+      total: response.total,
+    });
+
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Error fetching projects:", error);
+    console.error("Projects API: Error fetching projects:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(

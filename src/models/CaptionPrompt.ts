@@ -57,7 +57,7 @@ const CaptionPromptSchema = new Schema<ICaptionPrompt>(
     },
     length: {
       type: String,
-      enum: ["concise", "standard", "detailed", "comprehensive"],
+      required: true,
       default: "standard",
     },
     isDefault: { type: Boolean, default: false },

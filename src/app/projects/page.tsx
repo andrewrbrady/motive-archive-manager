@@ -58,16 +58,30 @@ export default function ProjectsPage() {
   >({});
 
   useEffect(() => {
-    if (status === "loading") return;
+    console.log("ProjectsPage: useEffect triggered", {
+      status,
+      sessionExists: !!session,
+      userId: session?.user?.id,
+    });
+
+    if (status === "loading") {
+      console.log("ProjectsPage: Session still loading...");
+      return;
+    }
+
     if (!session) {
+      console.log("ProjectsPage: No session, redirecting to signin");
       router.push("/auth/signin");
       return;
     }
+
+    console.log("ProjectsPage: Session valid, fetching projects");
     fetchProjects();
   }, [session, status, search, statusFilter, typeFilter]);
 
   const fetchProjects = async () => {
     try {
+      console.log("ProjectsPage: Starting to fetch projects...");
       setLoading(true);
       const params = new URLSearchParams();
 
@@ -75,13 +89,28 @@ export default function ProjectsPage() {
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (typeFilter !== "all") params.append("type", typeFilter);
 
-      const response = await fetch(`/api/projects?${params.toString()}`);
+      const url = `/api/projects?${params.toString()}`;
+      console.log("ProjectsPage: Fetching from URL:", url);
+
+      const response = await fetch(url);
+      console.log("ProjectsPage: Response status:", response.status);
 
       if (!response.ok) {
-        throw new Error("Failed to fetch projects");
+        const errorText = await response.text();
+        console.error("ProjectsPage: Response error:", errorText);
+        throw new Error(
+          `Failed to fetch projects: ${response.status} ${response.statusText}`
+        );
       }
 
       const data: ProjectListResponse = await response.json();
+      console.log("ProjectsPage: Received data:", {
+        projectsCount: data.projects.length,
+        total: data.total,
+        page: data.page,
+        limit: data.limit,
+      });
+
       setProjects(data.projects);
 
       // Initialize image states and fetch primary images
@@ -152,6 +181,7 @@ export default function ProjectsPage() {
         }
       });
     } catch (err) {
+      console.error("ProjectsPage: Error fetching projects:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);

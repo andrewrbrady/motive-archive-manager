@@ -30,64 +30,43 @@ export interface PromptModalState {
 
 // Callbacks interface for external state management
 export interface PromptHandlerCallbacks {
-  onPromptListUpdate?: (promptList: PromptTemplate[]) => void;
-  onSelectedPromptUpdate?: (prompt: PromptTemplate | null) => void;
   onFormValuesUpdate?: (values: PromptFormValues) => void;
-  onPromptError?: (error: string | null) => void;
-  onPromptLoading?: (loading: boolean) => void;
+  // Alternative: accept form handlers directly
+  formHandlers?: {
+    updateFormValues: (values: any) => void;
+    updateAdditionalContext?: (context: string) => void;
+  };
+  formState?: {
+    additionalContext: string;
+  };
 }
 
 // Main hook for prompt management
-export function usePromptManager(
-  initialState?: Partial<PromptState>,
-  callbacks?: PromptHandlerCallbacks
-) {
-  // Internal state
-  const [promptList, setPromptList] = useState<PromptTemplate[]>(
-    initialState?.promptList || []
-  );
+export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
+  // Internal state - initialize with sensible defaults
+  const [promptList, setPromptList] = useState<PromptTemplate[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(
-    initialState?.selectedPrompt || null
+    null
   );
-  const [promptLoading, setPromptLoading] = useState(
-    initialState?.promptLoading || false
-  );
-  const [promptError, setPromptError] = useState<string | null>(
-    initialState?.promptError || null
-  );
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
 
   // Update callbacks when state changes
-  const updatePromptList = useCallback(
-    (newList: PromptTemplate[]) => {
-      setPromptList(newList);
-      callbacks?.onPromptListUpdate?.(newList);
-    },
-    [callbacks]
-  );
+  const updatePromptList = useCallback((newList: PromptTemplate[]) => {
+    setPromptList(newList);
+  }, []);
 
-  const updateSelectedPrompt = useCallback(
-    (prompt: PromptTemplate | null) => {
-      setSelectedPrompt(prompt);
-      callbacks?.onSelectedPromptUpdate?.(prompt);
-    },
-    [callbacks]
-  );
+  const updateSelectedPrompt = useCallback((prompt: PromptTemplate | null) => {
+    setSelectedPrompt(prompt);
+  }, []);
 
-  const updatePromptError = useCallback(
-    (error: string | null) => {
-      setPromptError(error);
-      callbacks?.onPromptError?.(error);
-    },
-    [callbacks]
-  );
+  const updatePromptError = useCallback((error: string | null) => {
+    setPromptError(error);
+  }, []);
 
-  const updatePromptLoading = useCallback(
-    (loading: boolean) => {
-      setPromptLoading(loading);
-      callbacks?.onPromptLoading?.(loading);
-    },
-    [callbacks]
-  );
+  const updatePromptLoading = useCallback((loading: boolean) => {
+    setPromptLoading(loading);
+  }, []);
 
   // Fetch prompts
   const fetchPrompts = useCallback(async () => {
@@ -244,8 +223,8 @@ export function usePromptManager(
     (prompt: PromptTemplate | null) => {
       updateSelectedPrompt(prompt);
 
-      if (prompt && callbacks?.onFormValuesUpdate) {
-        callbacks.onFormValuesUpdate({
+      if (prompt) {
+        const formValues = {
           context: prompt.prompt || "",
           tone: prompt.tone as Tone,
           style: prompt.style as Style,
@@ -253,7 +232,25 @@ export function usePromptManager(
           model: prompt.aiModel || "claude-3-5-sonnet-20241022",
           provider: prompt.llmProvider || "anthropic",
           temperature: prompt.modelParams?.temperature || 1.0,
-        });
+        };
+
+        // Use the new form handlers approach if available
+        if (callbacks?.formHandlers) {
+          callbacks.formHandlers.updateFormValues({
+            context: formValues.context,
+            additionalContext: callbacks.formState?.additionalContext || "", // Keep existing
+            tone: formValues.tone,
+            style: formValues.style,
+            platform: formValues.platform,
+            model: formValues.model,
+            provider: formValues.provider,
+            temperature: formValues.temperature,
+          });
+        }
+        // Fallback to the old callback approach
+        else if (callbacks?.onFormValuesUpdate) {
+          callbacks.onFormValuesUpdate(formValues);
+        }
       }
     },
     [updateSelectedPrompt, callbacks]
@@ -315,11 +312,8 @@ export function usePromptModal() {
 }
 
 // Combined hook for full prompt functionality
-export function usePromptHandlers(
-  initialState?: Partial<PromptState>,
-  callbacks?: PromptHandlerCallbacks
-) {
-  const promptManager = usePromptManager(initialState, callbacks);
+export function usePromptHandlers(callbacks?: PromptHandlerCallbacks) {
+  const promptManager = usePromptManager(callbacks);
   const modal = usePromptModal();
 
   // Combined handlers
@@ -328,16 +322,32 @@ export function usePromptHandlers(
     modal.openForCreate();
 
     // Reset form to defaults
-    if (callbacks?.onFormValuesUpdate) {
-      callbacks.onFormValuesUpdate({
-        context: "",
-        tone: "professional",
-        style: "descriptive",
-        platform: "instagram",
-        model: "claude-3-5-sonnet-20241022",
-        provider: "anthropic",
-        temperature: 1.0,
+    const defaultValues = {
+      context: "",
+      tone: "professional" as Tone,
+      style: "descriptive" as Style,
+      platform: "instagram" as Platform,
+      model: "claude-3-5-sonnet-20241022",
+      provider: "anthropic",
+      temperature: 1.0,
+    };
+
+    // Use the new form handlers approach if available
+    if (callbacks?.formHandlers) {
+      callbacks.formHandlers.updateFormValues({
+        context: defaultValues.context,
+        additionalContext: callbacks.formState?.additionalContext || "", // Keep existing
+        tone: defaultValues.tone,
+        style: defaultValues.style,
+        platform: defaultValues.platform,
+        model: defaultValues.model,
+        provider: defaultValues.provider,
+        temperature: defaultValues.temperature,
       });
+    }
+    // Fallback to the old callback approach
+    else if (callbacks?.onFormValuesUpdate) {
+      callbacks.onFormValuesUpdate(defaultValues);
     }
   }, [promptManager, modal, callbacks]);
 

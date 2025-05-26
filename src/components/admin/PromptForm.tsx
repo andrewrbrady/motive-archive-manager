@@ -130,6 +130,12 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
           if (response.ok) {
             const settings = await response.json();
             setLengthSettings(settings);
+          } else {
+            console.error(
+              "Failed to fetch length settings:",
+              response.status,
+              response.statusText
+            );
           }
         } catch (error) {
           console.error("Error fetching length settings:", error);
@@ -355,11 +361,13 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                         <SelectValue placeholder="Select length" />
                       </SelectTrigger>
                       <SelectContent>
-                        {lengthSettings.map((setting) => (
-                          <SelectItem key={setting.key} value={setting.key}>
-                            {setting.name} ({setting.description})
-                          </SelectItem>
-                        ))}
+                        {lengthSettings.map((setting) => {
+                          return (
+                            <SelectItem key={setting.key} value={setting.key}>
+                              {setting.name} ({setting.description})
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}
