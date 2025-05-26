@@ -5,6 +5,7 @@ import { Components, EventProps } from "react-big-calendar";
 import BaseCalendar, { BaseCalendarEvent } from "./BaseCalendar";
 import { Event, EventStatus } from "@/types/event";
 import { Deliverable } from "@/types/deliverable";
+import { ProjectMilestone } from "@/types/project";
 import EventTooltip from "../events/EventTooltip";
 import DeliverableTooltip from "../deliverables/DeliverableTooltip";
 import {
@@ -47,15 +48,17 @@ type DeliverableWithEventType = Deliverable & {
 
 // Calendar event interface
 export interface MotiveCalendarEvent extends BaseCalendarEvent {
-  type: "event" | "deliverable";
-  resource: Event | DeliverableWithEventType;
+  type: "event" | "deliverable" | "milestone";
+  resource: Event | DeliverableWithEventType | ProjectMilestone;
 }
 
 // Props for the MotiveCalendar component
 export interface MotiveCalendarProps {
-  carId: string;
+  carId?: string;
+  projectId?: string;
   events: Event[];
   deliverables: Deliverable[];
+  milestones?: ProjectMilestone[];
   onEventDrop?: (args: any) => void;
   onEventResize?: (args: any) => void;
   onSelectEvent?: (event: any) => void;
@@ -69,8 +72,10 @@ export interface MotiveCalendarProps {
 
 export function MotiveCalendar({
   carId,
+  projectId,
   events,
   deliverables,
+  milestones = [],
   onEventDrop,
   onEventResize,
   onSelectEvent,
@@ -83,6 +88,7 @@ export function MotiveCalendar({
 }: MotiveCalendarProps) {
   const [showEvents, setShowEvents] = useState(true);
   const [showDeliverables, setShowDeliverables] = useState(true);
+  const [showMilestones, setShowMilestones] = useState(true);
   const [eventTypeFilters, setEventTypeFilters] = useState<string[]>([]);
   const [deliverableTypeFilters, setDeliverableTypeFilters] = useState<
     string[]
@@ -93,6 +99,9 @@ export function MotiveCalendar({
   const [deliverableEventFilters, setDeliverableEventFilters] = useState<
     string[]
   >([]);
+  const [milestoneStatusFilters, setMilestoneStatusFilters] = useState<
+    string[]
+  >([]);
 
   // Get unique event types
   const uniqueEventTypes = useMemo(() => {
@@ -101,6 +110,9 @@ export function MotiveCalendar({
 
   // Get unique deliverable event categories (deadline and release)
   const deliverableEventCategories = ["deadline", "release"];
+
+  // Get unique milestone status categories
+  const milestoneStatusCategories = ["completed", "pending"];
 
   // Get unique deliverable types
   const uniqueDeliverableTypes = useMemo(() => {
@@ -120,6 +132,7 @@ export function MotiveCalendar({
     setDeliverableTypeFilters([...uniqueDeliverableTypes]);
     setDeliverablePlatformFilters([...uniqueDeliverablePlatforms]);
     setDeliverableEventFilters([...deliverableEventCategories]);
+    setMilestoneStatusFilters([...milestoneStatusCategories]);
   }, [uniqueEventTypes, uniqueDeliverableTypes, uniqueDeliverablePlatforms]);
 
   const calendarEvents = useMemo(() => {
@@ -130,20 +143,33 @@ export function MotiveCalendar({
               eventTypeFilters.length === 0 ||
               eventTypeFilters.includes(event.type)
           )
-          .map(
-            (event): MotiveCalendarEvent => ({
+          .map((event): MotiveCalendarEvent => {
+            const formattedEventType = event.type
+              .replace(/_/g, " ")
+              .toLowerCase()
+              .replace(/\b\w/g, (l) => l.toUpperCase());
+
+            // Use title as primary, fall back to description if no title, then event type
+            let title = formattedEventType;
+            if (event.title?.trim()) {
+              title =
+                event.description?.trim() && event.description !== event.title
+                  ? `${event.title.trim()} | ${formattedEventType}`
+                  : `${event.title.trim()} | ${formattedEventType}`;
+            } else if (event.description?.trim()) {
+              title = `${event.description.trim()} | ${formattedEventType}`;
+            }
+
+            return {
               id: event.id,
-              title: event.type
-                .replace(/_/g, " ")
-                .toLowerCase()
-                .replace(/\b\w/g, (l) => l.toUpperCase()),
+              title,
               start: new Date(event.start),
               end: event.end ? new Date(event.end) : new Date(event.start),
               type: "event",
               resource: event,
               allDay: event.isAllDay || !event.end,
-            })
-          )
+            };
+          })
       : [];
 
     const deliverableItems: MotiveCalendarEvent[] = showDeliverables
@@ -202,18 +228,46 @@ export function MotiveCalendar({
           })
       : [];
 
-    return [...eventItems, ...deliverableItems].sort(
+    const milestoneItems: MotiveCalendarEvent[] = showMilestones
+      ? milestones
+          .filter((milestone) => {
+            const status = milestone.completed ? "completed" : "pending";
+            return (
+              milestoneStatusFilters.length === 0 ||
+              milestoneStatusFilters.includes(status)
+            );
+          })
+          .map((milestone): MotiveCalendarEvent => {
+            const statusText = milestone.completed ? "✓" : "○";
+            const title = `${statusText} ${milestone.title} (Milestone)`;
+
+            return {
+              id: milestone.id,
+              title,
+              start: new Date(milestone.dueDate),
+              end: new Date(milestone.dueDate),
+              type: "milestone",
+              resource: milestone,
+              allDay: true,
+            };
+          })
+      : [];
+
+    return [...eventItems, ...deliverableItems, ...milestoneItems].sort(
       (a, b) => a.start.getTime() - b.start.getTime()
     );
   }, [
     events,
     deliverables,
+    milestones,
     eventTypeFilters,
     deliverableEventFilters,
     deliverablePlatformFilters,
     deliverableTypeFilters,
+    milestoneStatusFilters,
     showEvents,
     showDeliverables,
+    showMilestones,
   ]);
 
   // Event style getter
@@ -240,7 +294,7 @@ export function MotiveCalendar({
           fontWeight: 500,
         },
       };
-    } else {
+    } else if (event.type === "deliverable") {
       // Deliverable styling
       const deliverableResource = event.resource as DeliverableWithEventType;
       let backgroundColor = `hsl(var(--deliverable-${deliverableResource.type
@@ -268,7 +322,45 @@ export function MotiveCalendar({
           fontWeight: 500,
         },
       };
+    } else if (event.type === "milestone") {
+      // Milestone styling
+      const milestoneResource = event.resource as ProjectMilestone;
+      const backgroundColor = milestoneResource.completed
+        ? "#10b981" // green-500
+        : "#f59e0b"; // amber-500
+
+      return {
+        style: {
+          backgroundColor,
+          color: "white",
+          border: "2px solid #374151", // gray-700
+          borderRadius: "6px",
+          padding: "2px 4px",
+          opacity: 0.95,
+          minHeight: "22px",
+          fontSize: "0.8125rem",
+          lineHeight: "1.2",
+          fontWeight: 600,
+          borderStyle: "dashed",
+        },
+      };
     }
+
+    // Fallback styling
+    return {
+      style: {
+        backgroundColor: "hsl(var(--muted))",
+        color: "hsl(var(--muted-foreground))",
+        border: "1px solid hsl(var(--border))",
+        borderRadius: "4px",
+        padding: "2px 4px",
+        opacity: 0.9,
+        minHeight: "22px",
+        fontSize: "0.8125rem",
+        lineHeight: "1.2",
+        fontWeight: 500,
+      },
+    };
   };
 
   // Custom components for the calendar
@@ -282,7 +374,7 @@ export function MotiveCalendar({
             </div>
           </EventTooltip>
         );
-      } else {
+      } else if (event.type === "deliverable") {
         return (
           <DeliverableTooltip deliverable={event.resource as Deliverable}>
             <div className="h-full w-full">
@@ -290,7 +382,23 @@ export function MotiveCalendar({
             </div>
           </DeliverableTooltip>
         );
+      } else if (event.type === "milestone") {
+        const milestone = event.resource as ProjectMilestone;
+        return (
+          <div
+            className="h-full w-full"
+            title={`Milestone: ${milestone.title}${milestone.description ? `\n${milestone.description}` : ""}\nDue: ${new Date(milestone.dueDate).toLocaleDateString()}\nStatus: ${milestone.completed ? "Completed" : "Pending"}`}
+          >
+            <div className="truncate text-xs leading-none">{event.title}</div>
+          </div>
+        );
       }
+
+      return (
+        <div className="h-full w-full">
+          <div className="truncate text-xs leading-none">{event.title}</div>
+        </div>
+      );
     },
   };
 
@@ -415,6 +523,25 @@ export function MotiveCalendar({
                 )}
                 Deliverables
               </Button>
+              {milestones.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMilestones(!showMilestones)}
+                  className={cn(
+                    "flex items-center gap-2",
+                    showMilestones &&
+                      "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
+                  )}
+                >
+                  {showMilestones ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  Milestones
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -531,6 +658,35 @@ export function MotiveCalendar({
                     </DropdownMenuGroup>
                   </>
                 )}
+
+                {showMilestones && milestones.length > 0 && (
+                  <>
+                    {(showEvents && uniqueEventTypes.length > 0) ||
+                    showDeliverables ? (
+                      <DropdownMenuSeparator />
+                    ) : null}
+                    <DropdownMenuLabel>Milestone Status</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      {milestoneStatusCategories.map((status) => (
+                        <DropdownMenuCheckboxItem
+                          key={status}
+                          checked={milestoneStatusFilters.includes(status)}
+                          onCheckedChange={(checked) => {
+                            setMilestoneStatusFilters(
+                              checked
+                                ? [...milestoneStatusFilters, status]
+                                : milestoneStatusFilters.filter(
+                                    (s) => s !== status
+                                  )
+                            );
+                          }}
+                        >
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </>
@@ -569,7 +725,12 @@ export function MotiveCalendar({
           adjustedEnd = new Date(start.getTime() + originalDuration);
         }
 
-        const response = await fetch(`/api/cars/${carId}/events/${event.id}`, {
+        // Determine the correct API endpoint based on context
+        const apiEndpoint = carId
+          ? `/api/cars/${carId}/events/${event.id}`
+          : `/api/projects/${projectId}/events/${event.id}`;
+
+        const response = await fetch(apiEndpoint, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -602,24 +763,26 @@ export function MotiveCalendar({
           throw new Error("Deliverable ID is missing");
         }
 
-        const response = await fetch(
-          `/api/cars/${carId}/deliverables/${deliverableId}`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(
-              isDeadline
-                ? {
-                    edit_deadline: start.toISOString(),
-                  }
-                : {
-                    release_date: start.toISOString(),
-                  }
-            ),
-          }
-        );
+        // Determine the correct API endpoint based on context
+        const apiEndpoint = carId
+          ? `/api/cars/${carId}/deliverables/${deliverableId}`
+          : `/api/projects/${projectId}/deliverables/${deliverableId}`;
+
+        const response = await fetch(apiEndpoint, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            isDeadline
+              ? {
+                  edit_deadline: start.toISOString(),
+                }
+              : {
+                  release_date: start.toISOString(),
+                }
+          ),
+        });
 
         if (!response.ok) {
           let errorMessage = "Failed to update deliverable";
@@ -638,6 +801,10 @@ export function MotiveCalendar({
             isDeadline ? "Edit deadline" : "Release date"
           } updated successfully`
         );
+      } else if (event.type === "milestone") {
+        // For now, milestones are read-only - we could add API support later
+        toast.error("Milestone dates cannot be changed from the calendar");
+        return;
       }
 
       // Call the parent handler if provided
@@ -661,7 +828,12 @@ export function MotiveCalendar({
       }
 
       if (event.type === "event") {
-        const response = await fetch(`/api/cars/${carId}/events/${event.id}`, {
+        // Determine the correct API endpoint based on context
+        const apiEndpoint = carId
+          ? `/api/cars/${carId}/events/${event.id}`
+          : `/api/projects/${projectId}/events/${event.id}`;
+
+        const response = await fetch(apiEndpoint, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -687,6 +859,9 @@ export function MotiveCalendar({
         toast.success("Event updated successfully");
       } else if (event.type === "deliverable") {
         toast.error("Deliverable dates cannot be resized");
+        return;
+      } else if (event.type === "milestone") {
+        toast.error("Milestone dates cannot be resized");
         return;
       }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { LocationResponse } from "@/models/location";
 
 interface DropdownOption {
   value: string;
@@ -18,11 +19,20 @@ interface CustomDropdownProps {
   className?: string;
 }
 
+interface LocationDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+  allowEmpty?: boolean;
+}
+
 export function CustomDropdown({
   value,
   onChange,
   options,
-  placeholder = "Select an option",
+  placeholder = "Select option",
   disabled = false,
   className = "",
 }: CustomDropdownProps) {
@@ -32,13 +42,26 @@ export function CustomDropdown({
     left: 0,
     width: 0,
   });
-  const [positionCalculated, setPositionCalculated] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
+  const selectedOption = options.find((option) => option.value === value);
+
+  // Calculate position when opening
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: triggerRect.bottom + window.scrollY,
+        left: triggerRect.left + window.scrollX,
+        width: triggerRect.width + 16, // Add extra width to prevent clipping
+      });
+    }
+  }, [isOpen]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node) &&
@@ -46,181 +69,185 @@ export function CustomDropdown({
         !triggerRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setPositionCalculated(false);
       }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    };
 
-  // Calculate dropdown position when opening
-  useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: triggerRect.bottom + window.scrollY,
-        left: triggerRect.left + window.scrollX,
-        width: triggerRect.width,
-      });
-      // Use requestAnimationFrame to ensure position is set before rendering
-      requestAnimationFrame(() => {
-        setPositionCalculated(true);
-      });
-    } else {
-      setPositionCalculated(false);
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen]);
-
-  const selectedOption = options.find((option) => option.value === value);
 
   const handleSelectOption = (optionValue: string) => {
     onChange(optionValue);
     setIsOpen(false);
-    setPositionCalculated(false);
   };
 
-  const handleToggle = () => {
-    setIsOpen(!isOpen);
-  };
-
-  // Only render dropdown content after position is calculated
-  const dropdownContent =
-    isOpen && positionCalculated ? (
+  const dropdownContent = isOpen ? (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        pointerEvents: "none",
+        zIndex: 9999,
+      }}
+      onWheel={(e) => {
+        e.stopPropagation();
+      }}
+    >
       <div
+        ref={dropdownRef}
+        className="bg-background rounded-lg border border-input shadow-xl overflow-y-auto max-h-60 animate-in slide-in-from-top-2 duration-200 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          pointerEvents: "none",
+          position: "absolute",
+          top: dropdownPosition.top,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
+          pointerEvents: "auto",
         }}
         onWheel={(e) => {
-          // CRITICAL: Allow wheel events to pass through to dropdown
+          e.stopPropagation();
+        }}
+        onScroll={(e) => {
           e.stopPropagation();
         }}
       >
-        <div
-          ref={dropdownRef}
-          style={{
-            position: "absolute",
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            width: dropdownPosition.width + 16,
-            height: "200px",
-            overflow: "hidden",
-            backgroundColor: "hsl(var(--background))",
-            border: "1px solid hsl(var(--border))",
-            borderRadius: "8px",
-            boxShadow:
-              "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
-            pointerEvents: "auto",
-          }}
-          onWheel={(e) => {
-            // CRITICAL: Ensure wheel events work on the dropdown
-            e.stopPropagation();
-          }}
-        >
-          {/* Scrollable inner container */}
-          <div
-            style={{
-              height: "100%",
-              overflowY: "scroll",
-              overflowX: "hidden",
-              padding: "8px",
-              scrollbarWidth: "thin",
-              scrollbarColor: "hsl(var(--border)) transparent",
-            }}
-            onWheel={(e) => {
-              // CRITICAL: Prevent event from bubbling up
-              e.stopPropagation();
-            }}
-            onScroll={(e) => {
-              // Explicitly handle scroll events
-              e.stopPropagation();
-            }}
-          >
-            {options.map((option, index) => (
-              <button
-                key={option.value}
-                type="button"
-                style={{
-                  display: "flex",
-                  width: "100%",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "10px 12px",
-                  fontSize: "14px",
-                  border: "1px solid transparent",
-                  borderRadius: "6px",
-                  marginBottom: index === options.length - 1 ? "0" : "4px",
-                  cursor: option.disabled ? "not-allowed" : "pointer",
-                  opacity: option.disabled ? "0.5" : "1",
-                  backgroundColor: "transparent",
-                  color: "hsl(var(--foreground))",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!option.disabled) {
-                    e.currentTarget.style.borderColor =
-                      "rgba(255, 255, 255, 0.8)";
-                    e.currentTarget.style.boxShadow =
-                      "0 1px 2px 0 rgb(0 0 0 / 0.05)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "transparent";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-                onClick={() => handleSelectOption(option.value)}
-                disabled={option.disabled}
-              >
-                {option.icon && (
-                  <span style={{ flexShrink: 0 }}>{option.icon}</span>
-                )}
-                <span style={{ flex: 1, textAlign: "left" }}>
-                  {option.label}
-                </span>
-              </button>
-            ))}
-
-            {/* Add extra content to force scrolling */}
-            <div style={{ height: "20px" }}></div>
-          </div>
+        <div className="py-3 px-2 pb-4">
+          {options.length > 6 && (
+            <div className="text-xs text-muted-foreground text-center mb-2 px-1">
+              Scroll for more options
+            </div>
+          )}
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-sm border border-transparent hover:border-white/80 rounded-md disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 ease-out hover:shadow-sm mb-1 last:mb-0"
+              onClick={() => handleSelectOption(option.value)}
+              disabled={option.disabled}
+            >
+              {option.icon && (
+                <span className="flex-shrink-0">{option.icon}</span>
+              )}
+              <span className="truncate">{option.label}</span>
+            </button>
+          ))}
         </div>
       </div>
-    ) : null;
+    </div>
+  ) : null;
 
   return (
     <div className={`relative ${className}`}>
-      {/* Trigger Button */}
       <button
         ref={triggerRef}
         type="button"
-        onClick={handleToggle}
+        onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border border-input bg-background h-10 hover:bg-accent hover:text-accent-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border border-input bg-background h-10 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <div className="flex items-center gap-2">
-          {selectedOption?.icon && (
-            <span className="flex-shrink-0">{selectedOption.icon}</span>
+        <div className="flex items-center gap-2 truncate">
+          {selectedOption ? (
+            <>
+              {selectedOption.icon && (
+                <span className="flex-shrink-0">{selectedOption.icon}</span>
+              )}
+              <span className="truncate">{selectedOption.label}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">{placeholder}</span>
           )}
-          <span className={selectedOption ? "" : "text-muted-foreground"}>
-            {selectedOption ? selectedOption.label : placeholder}
-          </span>
         </div>
         {isOpen ? (
-          <ChevronUp className="h-4 w-4" />
+          <ChevronUp className="h-4 w-4 flex-shrink-0" />
         ) : (
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 flex-shrink-0" />
         )}
       </button>
 
-      {/* Portal the dropdown content to document.body with pointer-events fix */}
       {typeof window !== "undefined" &&
         dropdownContent &&
         createPortal(dropdownContent, document.body)}
     </div>
+  );
+}
+
+export function LocationDropdown({
+  value,
+  onChange,
+  placeholder = "Select location",
+  disabled = false,
+  className = "",
+  allowEmpty = true,
+}: LocationDropdownProps) {
+  const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const fetchLocations = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/locations");
+      if (!response.ok) throw new Error("Failed to fetch locations");
+
+      const data = await response.json();
+      setLocations(data || []);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch locations when dropdown opens
+  const handleDropdownOpen = () => {
+    if (!isOpen && locations.length === 0) {
+      fetchLocations();
+    }
+    setIsOpen(true);
+  };
+
+  // Create options from locations
+  const options: DropdownOption[] = [
+    ...(allowEmpty
+      ? [
+          {
+            value: "",
+            label: "No location",
+            icon: (
+              <MapPin className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+            ),
+          },
+        ]
+      : []),
+    ...locations.map((location) => ({
+      value: location.id,
+      label: location.name,
+      icon: <MapPin className="w-4 h-4 flex-shrink-0" />,
+    })),
+  ];
+
+  if (loading) {
+    options.push({
+      value: "loading",
+      label: "Loading locations...",
+      disabled: true,
+      icon: <MapPin className="w-4 h-4 flex-shrink-0 text-muted-foreground" />,
+    });
+  }
+
+  return (
+    <CustomDropdown
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={className}
+    />
   );
 }

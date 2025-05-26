@@ -25,6 +25,11 @@ import { Plus, Car, MoreHorizontal, Search } from "lucide-react";
 import { format } from "date-fns";
 import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
+import Image from "next/image";
+import Link from "next/link";
+import { MotiveLogo } from "@/components/ui/MotiveLogo";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { getFormattedImageUrl } from "@/lib/cloudflare";
 
 interface Car {
   _id: string;
@@ -36,12 +41,214 @@ interface Car {
   status: string;
   primaryImageId?: string;
   imageIds?: string[];
+  images?: Array<{
+    _id: string;
+    url: string;
+    metadata?: {
+      isPrimary?: boolean;
+    };
+  }>;
   createdAt: string;
 }
 
 interface ProjectCarsTabProps {
   project: Project;
   onProjectUpdate: () => void;
+}
+
+// Car Card Component for Project Cars
+function ProjectCarCard({
+  car,
+  onUnlink,
+}: {
+  car: Car;
+  onUnlink: (carId: string) => void;
+}) {
+  const [primaryImage, setPrimaryImage] = useState<{
+    id?: string;
+    url: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const findPrimaryImage = () => {
+      setLoading(true);
+
+      // Case 1: We have an array of images
+      if (car.images && Array.isArray(car.images) && car.images.length > 0) {
+        // Try to find the image marked as primary first
+        const primaryImg = car.images.find(
+          (img) =>
+            img.metadata?.isPrimary ||
+            (car.primaryImageId && img._id === car.primaryImageId)
+        );
+
+        // Use primary image if found, otherwise use first image
+        const imageToUse = primaryImg || car.images[0];
+
+        setPrimaryImage({
+          id: imageToUse._id,
+          url: getFormattedImageUrl(imageToUse.url),
+        });
+
+        setLoading(false);
+        return;
+      }
+
+      // Case 2: We have image IDs but no loaded images
+      if (car.imageIds?.length && car.primaryImageId) {
+        // Fetch the primary image
+        const fetchImage = async () => {
+          try {
+            const response = await fetch(`/api/images/${car.primaryImageId}`);
+
+            if (response.ok) {
+              const imageData = await response.json();
+              setPrimaryImage({
+                id: imageData._id,
+                url: getFormattedImageUrl(imageData.url),
+              });
+            } else {
+              // If primary image fetch fails, try the first image
+              if (
+                car.imageIds &&
+                car.imageIds.length > 0 &&
+                car.imageIds[0] !== car.primaryImageId
+              ) {
+                const fallbackResponse = await fetch(
+                  `/api/images/${car.imageIds[0]}`
+                );
+                if (fallbackResponse.ok) {
+                  const fallbackImageData = await fallbackResponse.json();
+                  setPrimaryImage({
+                    id: fallbackImageData._id,
+                    url: getFormattedImageUrl(fallbackImageData.url),
+                  });
+                } else {
+                  setPrimaryImage(null);
+                }
+              } else {
+                setPrimaryImage(null);
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching image:", error);
+            setPrimaryImage(null);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        fetchImage();
+        return;
+      }
+
+      // No images available
+      setLoading(false);
+      setPrimaryImage(null);
+    };
+
+    findPrimaryImage();
+  }, [car._id, car.imageIds, car.images, car.primaryImageId]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "available":
+        return "bg-green-100 text-green-800";
+      case "sold":
+        return "bg-red-100 text-red-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const generateCarTitle = () => {
+    return [
+      car.year ? car.year : null,
+      car.make ? car.make : null,
+      car.model ? car.model : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  return (
+    <div className="bg-background rounded-lg border border-border-primary overflow-hidden hover:border-border-secondary transition-colors relative group">
+      {/* Image */}
+      <div className="relative aspect-[16/9]">
+        {loading ? (
+          <div className="w-full h-full bg-background-primary/50 flex flex-col items-center justify-center gap-4">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : primaryImage ? (
+          <Image
+            src={primaryImage.url}
+            alt={generateCarTitle()}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority
+          />
+        ) : (
+          <div className="w-full h-full bg-black/10 dark:bg-black/40 flex items-center justify-center">
+            <div className="flex items-center gap-4 px-6">
+              <MotiveLogo className="w-12 h-12 text-text-primary fill-current" />
+              <span className="text-sm font-medium text-text-secondary uppercase tracking-wider">
+                No Image
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions Menu - Absolutely positioned */}
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 bg-background/90 hover:bg-background border border-border/20 hover:border-border/30"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/cars/${car._id}`}>View Car Details</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onUnlink(car._id)}
+              className="text-red-600"
+            >
+              Unlink from Project
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Car Info */}
+      <div className="p-4">
+        <h3 className="text-lg font-semibold text-text-primary mb-2">
+          {generateCarTitle()}
+        </h3>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {car.color && (
+            <p className="text-sm text-text-secondary">
+              <span className="font-medium">Color:</span> {car.color}
+            </p>
+          )}
+          {car.vin && (
+            <p className="text-sm text-text-secondary">
+              <span className="font-medium">VIN:</span> {car.vin}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ProjectCarsTab({
@@ -187,6 +394,23 @@ export function ProjectCarsTab({
     }
   };
 
+  // Filter available cars based on search term
+  const filteredAvailableCars = availableCars.filter((car) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      car.make?.toLowerCase().includes(searchLower) ||
+      car.model?.toLowerCase().includes(searchLower) ||
+      car.year?.toString().includes(searchLower) ||
+      car.color?.toLowerCase().includes(searchLower) ||
+      car.vin?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const formatCarName = (car: Car) => {
+    const parts = [car.year, car.make, car.model].filter(Boolean);
+    return parts.join(" ");
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "available":
@@ -199,23 +423,6 @@ export function ProjectCarsTab({
         return "bg-gray-100 text-gray-800";
     }
   };
-
-  const formatCarName = (car: Car) => {
-    const parts = [car.year, car.make, car.model].filter(Boolean);
-    return parts.join(" ");
-  };
-
-  // Filter available cars based on search term
-  const filteredAvailableCars = availableCars.filter((car) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      car.make?.toLowerCase().includes(searchLower) ||
-      car.model?.toLowerCase().includes(searchLower) ||
-      car.year?.toString().includes(searchLower) ||
-      car.color?.toLowerCase().includes(searchLower) ||
-      car.vin?.toLowerCase().includes(searchLower)
-    );
-  });
 
   return (
     <Card>
@@ -298,16 +505,9 @@ export function ProjectCarsTab({
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Added{" "}
-                              {format(new Date(car.createdAt), "MMM d, yyyy")}
-                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(car.status)}>
-                            {car.status}
-                          </Badge>
                           <Button
                             size="sm"
                             onClick={() => handleLinkCar(car._id)}
@@ -352,51 +552,13 @@ export function ProjectCarsTab({
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projectCars.map((car) => (
-              <div
+              <ProjectCarCard
                 key={car._id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/20 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">🚗</div>
-                  <div className="flex-1">
-                    <div className="font-medium">{formatCarName(car)}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {car.color && <span>{car.color}</span>}
-                      {car.vin && (
-                        <span>
-                          {car.color ? " • " : ""}VIN: {car.vin}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Added {format(new Date(car.createdAt), "MMM d, yyyy")}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={getStatusColor(car.status)}>
-                    {car.status}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Car Details</DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleUnlinkCar(car._id)}
-                        className="text-red-600"
-                      >
-                        Unlink from Project
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+                car={car}
+                onUnlink={handleUnlinkCar}
+              />
             ))}
           </div>
         )}

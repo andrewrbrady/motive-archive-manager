@@ -5,11 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Project, ProjectStatus } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
-import {
-  ProjectHeader,
-  ProjectProgressCards,
-  ProjectTabs,
-} from "@/components/projects";
+import { ProjectHeader, ProjectTabs } from "@/components/projects";
 
 interface ProjectDetailPageProps {
   params: Promise<{
@@ -55,6 +51,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         "assets",
         "deliverables",
         "captions",
+        "calendar",
       ].includes(tabFromUrl)
     ) {
       setActiveTab(tabFromUrl);
@@ -77,6 +74,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           "assets",
           "deliverables",
           "captions",
+          "calendar",
         ].includes(tabFromUrl)
       ) {
         setActiveTab(tabFromUrl);
@@ -276,9 +274,6 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             onStatusChange={handleStatusChange}
             onBack={handleBack}
           />
-
-          {/* Progress Overview */}
-          <ProjectProgressCards project={project} />
 
           {/* Main Content Tabs */}
           <ProjectTabs

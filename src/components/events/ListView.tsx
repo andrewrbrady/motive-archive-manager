@@ -94,7 +94,8 @@ export default function ListView({
         return {
           ...event,
           car: existingEvent?.car,
-          assignees: event.assignees || existingEvent?.assignees || [],
+          teamMemberIds:
+            event.teamMemberIds || existingEvent?.teamMemberIds || [],
         };
       })
     );
@@ -138,7 +139,7 @@ export default function ListView({
             return {
               ...event,
               car,
-              assignees: event.assignees || [],
+              teamMemberIds: event.teamMemberIds || [],
             };
           } catch (error) {
             console.error("Error fetching car:", error);
@@ -216,7 +217,7 @@ export default function ListView({
           event.id === eventId
             ? {
                 ...event,
-                [field]: field === "assignees" ? [...value] : value,
+                [field]: field === "teamMemberIds" ? [...value] : value,
               }
             : event
         )
@@ -430,8 +431,8 @@ export default function ListView({
                     event.status === EventStatus.COMPLETED
                       ? "default"
                       : event.status === EventStatus.IN_PROGRESS
-                      ? "secondary"
-                      : "outline"
+                        ? "secondary"
+                        : "outline"
                   }
                 >
                   {event.status}
@@ -446,9 +447,9 @@ export default function ListView({
                         role="combobox"
                         className="w-full justify-between"
                       >
-                        {Array.isArray(event.assignees) &&
-                        event.assignees.length > 0
-                          ? `${event.assignees.length} selected`
+                        {Array.isArray(event.teamMemberIds) &&
+                        event.teamMemberIds.length > 0
+                          ? `${event.teamMemberIds.length} selected`
                           : "Select assignees"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -458,27 +459,28 @@ export default function ListView({
                         <div className="grid grid-cols-2 gap-1">
                           {users.map((user) => {
                             const isSelected =
-                              Array.isArray(event.assignees) &&
-                              event.assignees.includes(user.name);
+                              Array.isArray(event.teamMemberIds) &&
+                              event.teamMemberIds.includes(user.name);
                             return (
                               <button
                                 key={user._id}
                                 onClick={() => {
-                                  const currentAssignees = Array.isArray(
-                                    event.assignees
+                                  const currentTeamMemberIds = Array.isArray(
+                                    event.teamMemberIds
                                   )
-                                    ? [...event.assignees]
+                                    ? [...event.teamMemberIds]
                                     : [];
                                   if (!isSelected) {
-                                    updateEventField(event.id, "assignees", [
-                                      ...currentAssignees,
-                                      user.name,
-                                    ]);
+                                    updateEventField(
+                                      event.id,
+                                      "teamMemberIds",
+                                      [...currentTeamMemberIds, user.name]
+                                    );
                                   } else {
                                     updateEventField(
                                       event.id,
-                                      "assignees",
-                                      currentAssignees.filter(
+                                      "teamMemberIds",
+                                      currentTeamMemberIds.filter(
                                         (name) => name !== user.name
                                       )
                                     );
@@ -511,9 +513,9 @@ export default function ListView({
                   </Popover>
                 ) : (
                   <div className="flex flex-wrap gap-1">
-                    {Array.isArray(event.assignees) &&
-                    event.assignees.length > 0 ? (
-                      event.assignees.map((name) => (
+                    {Array.isArray(event.teamMemberIds) &&
+                    event.teamMemberIds.length > 0 ? (
+                      event.teamMemberIds.map((name) => (
                         <Badge
                           key={name}
                           variant="secondary"

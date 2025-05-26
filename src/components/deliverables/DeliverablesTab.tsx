@@ -1363,6 +1363,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                           <EditDeliverableForm
                             deliverable={deliverable}
                             onDeliverableUpdated={fetchDeliverables}
+                            onClose={() => {}}
                           />
                           <Button
                             variant="ghost"
@@ -1688,6 +1689,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
                     fetchDeliverables();
                     handleCloseModal();
                   }}
+                  onClose={() => {}}
                 />
                 <Button
                   variant="outline"

@@ -170,7 +170,6 @@ export async function PUT(
       updateData.description = data.description;
     if (data.type !== undefined) updateData.type = data.type;
     if (data.status !== undefined) updateData.status = data.status;
-    if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.clientId !== undefined) updateData.clientId = data.clientId;
     if (data.carIds !== undefined) updateData.carIds = data.carIds;
     if (data.tags !== undefined) updateData.tags = data.tags;

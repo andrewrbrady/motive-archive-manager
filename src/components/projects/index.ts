@@ -8,4 +8,5 @@ export { ProjectAssetsTab } from "./ProjectAssetsTab";
 export { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 export { ProjectCaptionGenerator } from "./ProjectCaptionGenerator";
 export { default as ProjectEventsTab } from "./ProjectEventsTab";
+export { ProjectCalendarTab } from "./ProjectCalendarTab";
 export { ProjectTabs } from "./ProjectTabs";

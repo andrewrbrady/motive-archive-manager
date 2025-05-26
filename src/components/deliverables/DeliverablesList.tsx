@@ -512,7 +512,7 @@ export default function DeliverablesList() {
               ) : (
                 deliverables.map((deliverable) => {
                   const id = deliverable._id?.toString() || "";
-                  const carId = deliverable.car_id.toString();
+                  const carId = deliverable.car_id?.toString() || "";
                   const editorKey = deliverable.firebase_uid || "unassigned";
 
                   return (
@@ -551,15 +551,15 @@ export default function DeliverablesList() {
                             deliverable.status === "done"
                               ? "success"
                               : deliverable.status === "in_progress"
-                              ? "secondary"
-                              : "default"
+                                ? "secondary"
+                                : "default"
                           }
                         >
                           {deliverable.status === "not_started"
                             ? "Not Started"
                             : deliverable.status === "in_progress"
-                            ? "In Progress"
-                            : "Done"}
+                              ? "In Progress"
+                              : "Done"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -594,6 +594,7 @@ export default function DeliverablesList() {
                           <EditDeliverableForm
                             deliverable={deliverable}
                             onDeliverableUpdated={fetchDeliverables}
+                            onClose={() => {}}
                           />
                           <Button
                             size="sm"

@@ -30,7 +30,6 @@ export async function POST(request: NextRequest) {
       console.log("Creating project with data:", {
         title: data.title,
         type: data.type,
-        priority: data.priority,
         hasClientId: !!data.clientId,
         carIdsCount: data.carIds?.length || 0,
         hasTemplate: !!data.templateId,
@@ -100,7 +99,6 @@ export async function POST(request: NextRequest) {
         description: data.description,
         type: data.type,
         status: "draft",
-        priority: data.priority,
         clientId: data.clientId,
         carIds: data.carIds || [],
         galleryIds: [],
@@ -198,7 +196,6 @@ export async function POST(request: NextRequest) {
       description: data.description,
       type: data.type,
       status: "draft",
-      priority: data.priority,
       clientId: data.clientId,
       carIds: data.carIds || [],
       galleryIds: [],
@@ -300,7 +297,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const status = searchParams.get("status");
     const type = searchParams.get("type");
-    const priority = searchParams.get("priority");
     const clientId = searchParams.get("clientId");
     const ownerId = searchParams.get("ownerId");
 
@@ -333,11 +329,6 @@ export async function GET(request: NextRequest) {
     if (type) {
       const typeArray = type.split(",");
       query.type = { $in: typeArray };
-    }
-
-    if (priority) {
-      const priorityArray = priority.split(",");
-      query.priority = { $in: priorityArray };
     }
 
     if (clientId) {

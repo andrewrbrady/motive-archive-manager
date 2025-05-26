@@ -119,9 +119,9 @@ export async function POST(
     const eventModel = new EventModel(db);
 
     // Validate required fields
-    if (!data.type || !data.start) {
+    if (!data.type || !data.start || !data.title) {
       return NextResponse.json(
-        { error: "Type and start date are required" },
+        { error: "Type, title, and start date are required" },
         { status: 400 }
       );
     }
@@ -131,17 +131,34 @@ export async function POST(
       (id: string) => new ObjectId(id)
     );
 
+    // Convert image IDs to ObjectIds if provided
+    const primaryImageId = data.primaryImageId
+      ? new ObjectId(data.primaryImageId)
+      : undefined;
+    const imageIds = (data.imageIds || []).map(
+      (id: string) => new ObjectId(id)
+    );
+
+    // Convert location ID to ObjectId if provided
+    const locationId = data.locationId
+      ? new ObjectId(data.locationId)
+      : undefined;
+
     // Create event object
     const eventData: Omit<DbEvent, "_id" | "created_at" | "updated_at"> = {
       project_id: projectId,
       car_id: data.car_id, // Optional - can be associated with specific car in project
       type: data.type,
+      title: data.title.trim(),
       description: data.description || "",
       status: data.status || EventStatus.NOT_STARTED,
       start: new Date(data.start),
       end: data.end ? new Date(data.end) : undefined,
       is_all_day: data.isAllDay || false,
       teamMemberIds,
+      location_id: locationId,
+      primary_image_id: primaryImageId,
+      image_ids: imageIds.length > 0 ? imageIds : undefined,
     };
 
     const newEventId = await eventModel.create(eventData);

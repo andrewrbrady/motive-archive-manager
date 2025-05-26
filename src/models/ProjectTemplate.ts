@@ -170,7 +170,6 @@ projectTemplateSchema.methods.createProject = async function (data: {
     description: data.description,
     type: this.type,
     status: "draft",
-    priority: "medium",
     ownerId: data.ownerId,
     templateId: (this._id as mongoose.Types.ObjectId).toString(),
     timeline: {

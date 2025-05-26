@@ -8,7 +8,6 @@ import {
   ProjectListResponse,
   ProjectStatus,
   ProjectType,
-  ProjectPriority,
 } from "@/types/project";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +41,6 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
   useEffect(() => {
     if (status === "loading") return;
@@ -51,7 +49,7 @@ export default function ProjectsPage() {
       return;
     }
     fetchProjects();
-  }, [session, status, search, statusFilter, typeFilter, priorityFilter]);
+  }, [session, status, search, statusFilter, typeFilter]);
 
   const fetchProjects = async () => {
     try {
@@ -61,7 +59,6 @@ export default function ProjectsPage() {
       if (search) params.append("search", search);
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (typeFilter !== "all") params.append("type", typeFilter);
-      if (priorityFilter !== "all") params.append("priority", priorityFilter);
 
       const response = await fetch(`/api/projects?${params.toString()}`);
 
@@ -80,8 +77,6 @@ export default function ProjectsPage() {
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
-      case "draft":
-        return "bg-gray-100 text-gray-800";
       case "active":
         return "bg-blue-100 text-blue-800";
       case "in_review":
@@ -90,21 +85,6 @@ export default function ProjectsPage() {
         return "bg-green-100 text-green-800";
       case "archived":
         return "bg-gray-100 text-gray-600";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPriorityColor = (priority: ProjectPriority) => {
-    switch (priority) {
-      case "low":
-        return "bg-green-100 text-green-800";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800";
-      case "high":
-        return "bg-orange-100 text-orange-800";
-      case "urgent":
-        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -174,7 +154,6 @@ export default function ProjectsPage() {
                 onChange={setStatusFilter}
                 options={[
                   { value: "all", label: "All Status" },
-                  { value: "draft", label: "Draft" },
                   { value: "active", label: "Active" },
                   { value: "in_review", label: "In Review" },
                   { value: "completed", label: "Completed" },
@@ -195,20 +174,6 @@ export default function ProjectsPage() {
                   { value: "custom", label: "Custom" },
                 ]}
                 placeholder="Type"
-                className="w-[150px]"
-              />
-
-              <CustomDropdown
-                value={priorityFilter}
-                onChange={setPriorityFilter}
-                options={[
-                  { value: "all", label: "All Priorities" },
-                  { value: "low", label: "Low" },
-                  { value: "medium", label: "Medium" },
-                  { value: "high", label: "High" },
-                  { value: "urgent", label: "Urgent" },
-                ]}
-                placeholder="Priority"
                 className="w-[150px]"
               />
             </div>
@@ -243,9 +208,6 @@ export default function ProjectsPage() {
                       <CardTitle className="text-lg line-clamp-2">
                         {project.title}
                       </CardTitle>
-                      <Badge className={getPriorityColor(project.priority)}>
-                        {project.priority}
-                      </Badge>
                     </div>
                     <div className="flex gap-2 mb-2">
                       <Badge className={getStatusColor(project.status)}>

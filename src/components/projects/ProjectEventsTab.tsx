@@ -37,13 +37,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import {
+  CustomDropdown,
+  LocationDropdown,
+} from "@/components/ui/custom-dropdown";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import EventCard from "@/components/events/EventCard";
+import EditEventDialog from "@/components/events/EditEventDialog";
 
 interface ProjectEventsTabProps {
   projectId: string;
@@ -89,6 +94,8 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [showEditEvent, setShowEditEvent] = useState(false);
 
   const fetchEvents = async () => {
     try {
@@ -189,34 +196,9 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
     }
   };
 
-  const getStatusColor = (status: EventStatus) => {
-    switch (status) {
-      case EventStatus.NOT_STARTED:
-        return "bg-gray-100 text-gray-800";
-      case EventStatus.IN_PROGRESS:
-        return "bg-blue-100 text-blue-800";
-      case EventStatus.COMPLETED:
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getTypeColor = (type: EventType) => {
-    switch (type) {
-      case EventType.PRODUCTION:
-        return "bg-purple-100 text-purple-800";
-      case EventType.POST_PRODUCTION:
-        return "bg-indigo-100 text-indigo-800";
-      case EventType.MARKETING:
-        return "bg-pink-100 text-pink-800";
-      case EventType.INSPECTION:
-        return "bg-yellow-100 text-yellow-800";
-      case EventType.DETAIL:
-        return "bg-cyan-100 text-cyan-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setShowEditEvent(true);
   };
 
   if (isLoading) {
@@ -229,85 +211,64 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Project Events</h3>
-        <Button
-          onClick={() => setShowCreateEvent(true)}
-          className="border-[hsl(var(--border))]"
-        >
-          <Plus className="h-4 w-4 mr-2" />
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Events</h2>
+          <p className="text-muted-foreground">
+            Manage project events and milestones
+          </p>
+        </div>
+        <Button onClick={() => setShowCreateEvent(true)}>
+          <Plus className="w-4 h-4 mr-2" />
           Add Event
         </Button>
       </div>
 
+      {/* Events Grid */}
       {events.length === 0 ? (
         <Card>
           <CardContent className="pt-4">
-            <div className="text-center text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No events scheduled for this project</p>
-              <Button
-                variant="outline"
-                className="mt-4 border-[hsl(var(--border))]"
-                onClick={() => setShowCreateEvent(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Event
+            <div className="text-center py-12">
+              <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No events yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Create your first event to get started
+              </p>
+              <Button onClick={() => setShowCreateEvent(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Event
               </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => (
-            <Card key={event.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
-                    {event.description || "Untitled Event"}
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getTypeColor(event.type)}>
-                      {event.type.replace(/_/g, " ")}
-                    </Badge>
-                    <Badge className={getStatusColor(event.status)}>
-                      {event.status.replace(/_/g, " ")}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {format(new Date(event.start), "MMM d, yyyy 'at' h:mm a")}
-                      {event.end &&
-                        ` - ${format(new Date(event.end), "h:mm a")}`}
-                    </span>
-                  </div>
-                  {event.teamMemberIds.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <User className="h-4 w-4" />
-                      <span>{event.teamMemberIds.length} team member(s)</span>
-                    </div>
-                  )}
-                </div>
-                {event.car_id && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    Associated with car: {event.car_id}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <div key={event.id} className="group">
+              <EventCard
+                event={event}
+                onEdit={handleEditEvent}
+                onDelete={handleDeleteEvent}
+              />
+            </div>
           ))}
         </div>
       )}
 
+      {/* Create Event Dialog */}
       <CreateEventDialog
         open={showCreateEvent}
         onOpenChange={setShowCreateEvent}
         onCreate={handleCreateEvent}
+      />
+
+      {/* Edit Event Dialog */}
+      <EditEventDialog
+        event={editingEvent}
+        open={showEditEvent}
+        onOpenChange={setShowEditEvent}
+        onUpdate={handleUpdateEvent}
       />
     </div>
   );
@@ -325,19 +286,21 @@ function CreateEventDialog({
 }) {
   const [formData, setFormData] = useState({
     type: EventType.PRODUCTION,
+    title: "",
     description: "",
     start: "",
     end: "",
     status: EventStatus.NOT_STARTED,
     isAllDay: false,
+    locationId: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate required fields
-    if (!formData.description.trim()) {
-      toast.error("Description is required");
+    if (!formData.title.trim()) {
+      toast.error("Title is required");
       return;
     }
 
@@ -349,17 +312,22 @@ function CreateEventDialog({
     try {
       await onCreate({
         ...formData,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        locationId: formData.locationId || undefined,
         teamMemberIds: [], // Start with empty team
       });
 
       // Reset form after successful creation
       setFormData({
         type: EventType.PRODUCTION,
+        title: "",
         description: "",
         start: "",
         end: "",
         status: EventStatus.NOT_STARTED,
         isAllDay: false,
+        locationId: "",
       });
     } catch (error) {
       // Error handling is done in the parent component
@@ -372,11 +340,13 @@ function CreateEventDialog({
     // Reset form when closing
     setFormData({
       type: EventType.PRODUCTION,
+      title: "",
       description: "",
       start: "",
       end: "",
       status: EventStatus.NOT_STARTED,
       isAllDay: false,
+      locationId: "",
     });
   };
 
@@ -403,20 +373,56 @@ function CreateEventDialog({
 
               <div className="space-y-2">
                 <Label
+                  htmlFor="title"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Title
+                </Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
+                  placeholder="Event title"
+                  required
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label
                   htmlFor="description"
                   className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
                 >
                   Description
                 </Label>
-                <Input
+                <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="Event description"
-                  required
                   className="text-sm"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="location"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Location
+                </Label>
+                <LocationDropdown
+                  value={formData.locationId}
+                  onChange={(value) =>
+                    setFormData({ ...formData, locationId: value })
+                  }
+                  placeholder="Select location"
+                  className="w-full"
                 />
               </div>
             </div>

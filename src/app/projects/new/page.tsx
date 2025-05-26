@@ -36,7 +36,6 @@ import { cn } from "@/lib/utils";
 import {
   ProjectTemplate,
   ProjectType,
-  ProjectPriority,
   CreateProjectRequest,
 } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
@@ -86,7 +85,6 @@ export default function NewProjectPage() {
     title: "",
     description: "",
     type: "custom" as ProjectType,
-    priority: "medium" as ProjectPriority,
     startDate: new Date(),
     estimatedDuration: 30,
     budget: {
@@ -169,7 +167,6 @@ export default function NewProjectPage() {
         title: formData.title,
         description: formData.description,
         type: formData.type,
-        priority: formData.priority,
         timeline: {
           startDate: formData.startDate,
           estimatedDuration: formData.estimatedDuration,
@@ -474,28 +471,6 @@ export default function NewProjectPage() {
                         placeholder="Select project type"
                       />
                     </div>
-
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Priority
-                      </label>
-                      <CustomDropdown
-                        value={formData.priority}
-                        onChange={(value) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            priority: value as ProjectPriority,
-                          }))
-                        }
-                        options={[
-                          { value: "low", label: "Low" },
-                          { value: "medium", label: "Medium" },
-                          { value: "high", label: "High" },
-                          { value: "urgent", label: "Urgent" },
-                        ]}
-                        placeholder="Select priority"
-                      />
-                    </div>
                   </div>
 
                   <div>
@@ -714,12 +689,6 @@ export default function NewProjectPage() {
                         <div className="text-sm font-medium">Type</div>
                         <div className="text-sm text-muted-foreground">
                           {getTypeLabel(formData.type)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">Priority</div>
-                        <div className="text-sm text-muted-foreground capitalize">
-                          {formData.priority}
                         </div>
                       </div>
                       <div>

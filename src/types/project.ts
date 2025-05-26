@@ -7,8 +7,6 @@ export type ProjectStatus =
   | "completed"
   | "archived";
 
-export type ProjectPriority = "low" | "medium" | "high" | "urgent";
-
 export type ProjectType =
   | "documentation"
   | "media_campaign"
@@ -112,7 +110,6 @@ export interface Project {
   description: string;
   type: ProjectType;
   status: ProjectStatus;
-  priority: ProjectPriority;
 
   // Relationships
   clientId?: string;
@@ -174,7 +171,6 @@ export interface CreateProjectRequest {
   title: string;
   description: string;
   type: ProjectType;
-  priority: ProjectPriority;
   clientId?: string;
   carIds?: string[];
   templateId?: string;
@@ -207,7 +203,6 @@ export interface UpdateProjectRequest extends Partial<CreateProjectRequest> {
 export interface ProjectFilters {
   status?: ProjectStatus[];
   type?: ProjectType[];
-  priority?: ProjectPriority[];
   clientId?: string;
   ownerId?: string;
   memberUserId?: string;

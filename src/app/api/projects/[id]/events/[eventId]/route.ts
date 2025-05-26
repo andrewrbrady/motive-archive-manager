@@ -62,12 +62,26 @@ export async function PUT(
       ? data.teamMemberIds.map((id: string) => new ObjectId(id))
       : [];
 
+    // Convert image IDs to ObjectIds if provided
+    const primaryImageId = data.primaryImageId
+      ? new ObjectId(data.primaryImageId)
+      : undefined;
+    const imageIds = Array.isArray(data.imageIds)
+      ? data.imageIds.map((id: string) => new ObjectId(id))
+      : [];
+
+    // Convert location ID to ObjectId if provided
+    const locationId = data.locationId
+      ? new ObjectId(data.locationId)
+      : undefined;
+
     // Map the frontend fields to database fields
     const mappedUpdates: any = {
       updated_at: new Date(),
     };
 
     if (data.type) mappedUpdates.type = data.type;
+    if (data.title !== undefined) mappedUpdates.title = data.title.trim();
     if (data.description !== undefined)
       mappedUpdates.description = data.description;
     if (data.status) mappedUpdates.status = data.status;
@@ -76,6 +90,19 @@ export async function PUT(
     if (typeof data.isAllDay === "boolean")
       mappedUpdates.is_all_day = data.isAllDay;
     if (data.car_id !== undefined) mappedUpdates.car_id = data.car_id;
+
+    // Handle location field
+    if (data.locationId !== undefined) {
+      mappedUpdates.location_id = locationId;
+    }
+
+    // Handle image fields
+    if (data.primaryImageId !== undefined) {
+      mappedUpdates.primary_image_id = primaryImageId;
+    }
+    if (data.imageIds !== undefined) {
+      mappedUpdates.image_ids = imageIds.length > 0 ? imageIds : [];
+    }
 
     // Always update teamMemberIds array
     mappedUpdates.teamMemberIds = teamMemberIds;

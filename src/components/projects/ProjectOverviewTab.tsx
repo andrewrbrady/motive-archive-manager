@@ -229,12 +229,6 @@ export function ProjectOverviewTab({
               </div>
             </div>
             <div>
-              <div className="text-sm font-medium">Priority</div>
-              <div className="text-sm text-muted-foreground capitalize">
-                {project.priority}
-              </div>
-            </div>
-            <div>
               <div className="text-sm font-medium">Created</div>
               <div className="text-sm text-muted-foreground">
                 {format(new Date(project.createdAt), "MMM d, yyyy")}

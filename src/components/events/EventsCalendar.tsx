@@ -332,9 +332,9 @@ export default function EventsCalendar({
       : undefined;
 
     // Convert string[] to SelectOption[]
-    const assignees = (event.resource.assignees || []).map((assignee) => ({
-      label: assignee,
-      value: assignee,
+    const assignees = (event.resource.teamMemberIds || []).map((memberId) => ({
+      label: memberId, // You might want to map this to actual user names
+      value: memberId,
     }));
 
     setSelectedEvent({
@@ -363,14 +363,14 @@ export default function EventsCalendar({
         updates.end = selectedEvent.tempEnd;
       }
       if (selectedEvent.tempAssignees) {
-        const newAssignees = selectedEvent.tempAssignees.map(
+        const newTeamMemberIds = selectedEvent.tempAssignees.map(
           (option) => option.value
         );
         if (
-          JSON.stringify(newAssignees) !==
-          JSON.stringify(selectedEvent.assignees)
+          JSON.stringify(newTeamMemberIds) !==
+          JSON.stringify(selectedEvent.teamMemberIds)
         ) {
-          updates.assignees = newAssignees;
+          updates.teamMemberIds = newTeamMemberIds;
         }
       }
       if (selectedEvent.tempType !== selectedEvent.type) {

@@ -55,10 +55,29 @@ export async function POST(request: Request) {
     const data = await request.json();
     const eventModel = new EventModel(db);
 
-    // [REMOVED] // [REMOVED] console.log("Creating event with data:", data); // Debug log
+    // Validate required fields
+    if (!data.type || !data.start || !data.title) {
+      return NextResponse.json(
+        { error: "Type, title, and start date are required" },
+        { status: 400 }
+      );
+    }
 
     // Convert teamMemberIds to ObjectIds
     const teamMemberIds = (data.teamMemberIds || data.assignees || []).map(
+      (id: string) => new ObjectId(id)
+    );
+
+    // Convert location ID to ObjectId if provided
+    const locationId = data.locationId
+      ? new ObjectId(data.locationId)
+      : undefined;
+
+    // Convert image IDs to ObjectIds if provided
+    const primaryImageId = data.primaryImageId
+      ? new ObjectId(data.primaryImageId)
+      : undefined;
+    const imageIds = (data.imageIds || []).map(
       (id: string) => new ObjectId(id)
     );
 
@@ -66,18 +85,19 @@ export async function POST(request: Request) {
     const eventData: Omit<DbEvent, "_id" | "created_at" | "updated_at"> = {
       car_id: carId.toString(),
       type: data.type,
+      title: data.title.trim(),
       description: data.description || "",
       status: data.status || EventStatus.NOT_STARTED,
       start: new Date(data.start),
       end: data.end ? new Date(data.end) : undefined,
       is_all_day: data.isAllDay || false,
       teamMemberIds,
+      location_id: locationId,
+      primary_image_id: primaryImageId,
+      image_ids: imageIds.length > 0 ? imageIds : undefined,
     };
 
-    // [REMOVED] // [REMOVED] console.log("Transformed event data:", eventData); // Debug log
-
     const newEventId = await eventModel.create(eventData);
-    // [REMOVED] // [REMOVED] console.log("Created event with ID:", newEventId); // Debug log
 
     // Update the car's eventIds array
     const updateFilter: UpdateFilter<Car> = {
@@ -131,12 +151,26 @@ export async function PUT(request: Request) {
         )
       : [];
 
+    // Convert location ID to ObjectId if provided
+    const locationId = data.locationId
+      ? new ObjectId(data.locationId)
+      : undefined;
+
+    // Convert image IDs to ObjectIds if provided
+    const primaryImageId = data.primaryImageId
+      ? new ObjectId(data.primaryImageId)
+      : undefined;
+    const imageIds = Array.isArray(data.imageIds)
+      ? data.imageIds.map((id: string) => new ObjectId(id))
+      : [];
+
     // Map the frontend fields to database fields
     const mappedUpdates: any = {
       updated_at: new Date(),
     };
 
     if (data.type) mappedUpdates.type = data.type;
+    if (data.title !== undefined) mappedUpdates.title = data.title.trim();
     if (data.description !== undefined)
       mappedUpdates.description = data.description;
     if (data.status) mappedUpdates.status = data.status;
@@ -144,6 +178,19 @@ export async function PUT(request: Request) {
     if (data.end) mappedUpdates.end = new Date(data.end);
     if (typeof data.isAllDay === "boolean")
       mappedUpdates.is_all_day = data.isAllDay;
+
+    // Handle location field
+    if (data.locationId !== undefined) {
+      mappedUpdates.location_id = locationId;
+    }
+
+    // Handle image fields
+    if (data.primaryImageId !== undefined) {
+      mappedUpdates.primary_image_id = primaryImageId;
+    }
+    if (data.imageIds !== undefined) {
+      mappedUpdates.image_ids = imageIds.length > 0 ? imageIds : [];
+    }
 
     // Always update teamMemberIds array
     mappedUpdates.teamMemberIds = teamMemberIds;

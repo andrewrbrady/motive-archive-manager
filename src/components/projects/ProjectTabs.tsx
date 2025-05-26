@@ -9,6 +9,7 @@ import { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 import { ProjectCarsTab } from "./ProjectCarsTab";
 import { ProjectCaptionGenerator } from "./ProjectCaptionGenerator";
 import ProjectEventsTab from "./ProjectEventsTab";
+import { ProjectCalendarTab } from "./ProjectCalendarTab";
 import { Project } from "@/types/project";
 
 interface MemberDetails {
@@ -34,7 +35,7 @@ export function ProjectTabs({
 }: ProjectTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-      <TabsList className="grid w-full grid-cols-8 bg-transparent border rounded-md h-auto p-1 gap-1">
+      <TabsList className="grid w-full grid-cols-9 bg-transparent border rounded-md h-auto p-1 gap-1">
         <TabsTrigger
           value="overview"
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
@@ -82,6 +83,12 @@ export function ProjectTabs({
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
         >
           Captions
+        </TabsTrigger>
+        <TabsTrigger
+          value="calendar"
+          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
+        >
+          Calendar
         </TabsTrigger>
       </TabsList>
 
@@ -132,6 +139,10 @@ export function ProjectTabs({
           project={project}
           onProjectUpdate={onProjectUpdate}
         />
+      </TabsContent>
+
+      <TabsContent value="calendar" className="space-y-6">
+        <ProjectCalendarTab projectId={project._id!} />
       </TabsContent>
     </Tabs>
   );

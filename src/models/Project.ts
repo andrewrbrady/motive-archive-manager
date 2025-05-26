@@ -2,7 +2,6 @@ import mongoose, { Document, Model } from "mongoose";
 import {
   Project as IProject,
   ProjectStatus,
-  ProjectPriority,
   ProjectType,
   ProjectMemberRole,
   ProjectMember,
@@ -260,12 +259,6 @@ const projectSchema = new mongoose.Schema<
       enum: ["draft", "active", "in_review", "completed", "archived"],
       default: "draft",
     },
-    priority: {
-      type: String,
-      required: true,
-      enum: ["low", "medium", "high", "urgent"],
-      default: "medium",
-    },
 
     // Relationships
     clientId: {
@@ -368,7 +361,7 @@ const projectSchema = new mongoose.Schema<
 );
 
 // Indexes for performance
-projectSchema.index({ status: 1, priority: 1 });
+projectSchema.index({ status: 1 });
 projectSchema.index({ ownerId: 1 });
 projectSchema.index({ "members.userId": 1 });
 projectSchema.index({ clientId: 1 });
