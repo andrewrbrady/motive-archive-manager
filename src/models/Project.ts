@@ -262,30 +262,30 @@ const projectSchema = new mongoose.Schema<
 
     // Relationships
     clientId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Client",
     },
     carIds: [
       {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Car",
       },
     ],
     galleryIds: [
       {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Gallery",
       },
     ],
     deliverableIds: [
       {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Deliverable",
       },
     ],
     eventIds: [
       {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Event",
       },
     ],
@@ -345,8 +345,12 @@ const projectSchema = new mongoose.Schema<
       },
     ],
     notes: String,
+    primaryImageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Image",
+    },
     templateId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "ProjectTemplate",
     },
 

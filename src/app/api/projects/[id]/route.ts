@@ -8,6 +8,7 @@ import {
 } from "@/types/project";
 import { auth } from "@/auth";
 import { ObjectId } from "mongodb";
+import { convertProjectForFrontend } from "@/utils/objectId";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,7 @@ export async function GET(
     });
 
     const response: ProjectResponse = {
-      project: project.toObject() as unknown as IProject,
+      project: convertProjectForFrontend(project.toObject()) as IProject,
     };
 
     console.log(
@@ -174,6 +175,26 @@ export async function PUT(
     if (data.carIds !== undefined) updateData.carIds = data.carIds;
     if (data.tags !== undefined) updateData.tags = data.tags;
 
+    // Handle primaryImageId - convert string to ObjectId if provided
+    if ((data as any).primaryImageId !== undefined) {
+      if ((data as any).primaryImageId) {
+        // Validate ObjectId format if provided
+        if (ObjectId.isValid((data as any).primaryImageId)) {
+          updateData.primaryImageId = new ObjectId(
+            (data as any).primaryImageId
+          );
+        } else {
+          return NextResponse.json(
+            { error: "Invalid primaryImageId format" },
+            { status: 400 }
+          );
+        }
+      } else {
+        // If empty string or null, remove the field
+        updateData.primaryImageId = null;
+      }
+    }
+
     // Update timeline if provided
     if (data.timeline) {
       const timelineUpdate: any = {};
@@ -223,7 +244,7 @@ export async function PUT(
     }
 
     const response: ProjectResponse = {
-      project: updatedProject.toObject() as unknown as IProject,
+      project: convertProjectForFrontend(updatedProject.toObject()) as IProject,
     };
 
     return NextResponse.json(response);

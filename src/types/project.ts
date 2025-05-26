@@ -104,6 +104,7 @@ export interface ProjectTemplate {
   updatedAt: Date;
 }
 
+// Frontend/API Project interface - ObjectIds are converted to strings
 export interface Project {
   _id?: string;
   title: string;
@@ -111,7 +112,7 @@ export interface Project {
   type: ProjectType;
   status: ProjectStatus;
 
-  // Relationships
+  // Relationships - stored as ObjectIds in DB, converted to strings for frontend
   clientId?: string;
   carIds: string[];
   galleryIds: string[];
@@ -120,7 +121,7 @@ export interface Project {
 
   // Team and permissions
   members: ProjectMember[];
-  ownerId: string;
+  ownerId: string; // Firebase UID, always a string
 
   // Timeline and milestones
   timeline: ProjectTimeline;
@@ -145,7 +146,8 @@ export interface Project {
   // Metadata
   tags: string[];
   notes?: string;
-  templateId?: string;
+  primaryImageId?: string; // ObjectId converted to string
+  templateId?: string; // ObjectId converted to string
 
   // Timestamps
   createdAt: Date;
@@ -192,6 +194,7 @@ export interface CreateProjectRequest {
 
 export interface UpdateProjectRequest extends Partial<CreateProjectRequest> {
   status?: ProjectStatus;
+  primaryImageId?: string;
   progress?: {
     percentage: number;
     completedTasks: number;

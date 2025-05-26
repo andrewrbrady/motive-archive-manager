@@ -48,9 +48,14 @@ export async function GET(
     // Fetch car details for linked cars
     const cars = [];
     if (project.carIds && project.carIds.length > 0) {
+      // carIds should already be ObjectIds in the database
       const carObjectIds = project.carIds
-        .filter((carId: string) => ObjectId.isValid(carId))
-        .map((carId: string) => new ObjectId(carId));
+        .filter(
+          (carId: any) => carId instanceof ObjectId || ObjectId.isValid(carId)
+        )
+        .map((carId: any) =>
+          carId instanceof ObjectId ? carId : new ObjectId(carId)
+        );
 
       if (carObjectIds.length > 0) {
         const carDocs = await db
@@ -138,18 +143,25 @@ export async function POST(
     }
 
     // Check if car is already linked
-    if (project.carIds && project.carIds.includes(carId)) {
+    const carIdExists =
+      project.carIds &&
+      project.carIds.some((id: any) => {
+        const idStr = id instanceof ObjectId ? id.toString() : id;
+        return idStr === carId;
+      });
+
+    if (carIdExists) {
       return NextResponse.json(
         { error: "Car is already linked to this project" },
         { status: 400 }
       );
     }
 
-    // Add car to project
+    // Add car to project (store as ObjectId)
     await db.collection("projects").updateOne(
       { _id: projectId },
       {
-        $addToSet: { carIds: carId },
+        $addToSet: { carIds: carObjectId },
         $set: { updatedAt: new Date() },
       }
     );
@@ -215,11 +227,15 @@ export async function DELETE(
       );
     }
 
-    // Remove car from project
+    // Remove car from project (handle both ObjectId and string formats)
     await db.collection("projects").updateOne(
       { _id: projectId },
       {
-        $pull: { carIds: carId } as any,
+        $pull: {
+          carIds: {
+            $in: [carId, new ObjectId(carId)],
+          },
+        } as any,
         $set: { updatedAt: new Date() },
       }
     );

@@ -10,6 +10,8 @@ import {
 } from "@/types/project";
 import { auth } from "@/auth";
 import { ObjectId } from "mongodb";
+import { ProjectTemplate } from "@/models/ProjectTemplate";
+import { convertProjectForFrontend } from "@/utils/objectId";
 
 export const dynamic = "force-dynamic";
 
@@ -166,7 +168,12 @@ export async function POST(request: NextRequest) {
         .collection("projects")
         .findOne({ _id: result.insertedId });
 
-      return NextResponse.json({ project }, { status: 201 });
+      return NextResponse.json(
+        {
+          project: convertProjectForFrontend(project),
+        },
+        { status: 201 }
+      );
     }
 
     // Create project without template
@@ -265,7 +272,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ project }, { status: 201 });
+    return NextResponse.json(
+      {
+        project: convertProjectForFrontend(project),
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error creating project:", error);
     const errorMessage =
@@ -362,7 +374,9 @@ export async function GET(request: NextRequest) {
     ]);
 
     const response: ProjectListResponse = {
-      projects: projects as unknown as IProject[],
+      projects: projects.map((project) =>
+        convertProjectForFrontend(project)
+      ) as IProject[],
       total,
       page,
       limit,
