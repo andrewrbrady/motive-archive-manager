@@ -2,11 +2,24 @@
 import mongoose from "mongoose";
 import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
+// Check if we're in a build environment and should skip database connections
+const isBuildTime =
+  process.env.NODE_ENV === "production" &&
+  !process.env.VERCEL &&
+  !process.env.DATABASE_URL;
+const isStaticGeneration = process.env.NEXT_PHASE === "phase-production-build";
+
 if (!process.env.MONGODB_URI) {
-  throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
+  if (isBuildTime || isStaticGeneration) {
+    console.warn(
+      "MongoDB URI not available during build time - this is expected"
+    );
+  } else {
+    throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
+  }
 }
 
-const uri = process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/fallback";
 const options: MongoClientOptions = {
   maxPoolSize: 10,
   minPoolSize: 1,
@@ -83,6 +96,9 @@ const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
 // Helper function to get database instance with consistent database name
 export async function getDatabase(): Promise<Db> {
+  if (isBuildTime || isStaticGeneration) {
+    throw new Error("Database connections are not available during build time");
+  }
   const client = await getMongoClient();
   return client.db(DB_NAME);
 }
@@ -137,6 +153,11 @@ function shouldForceNewConnection(): boolean {
 
 // For Mongoose ORM connection (used by models)
 export async function dbConnect() {
+  if (isBuildTime || isStaticGeneration) {
+    console.warn("Skipping database connection during build time");
+    return;
+  }
+
   try {
     // [REMOVED] // [REMOVED] console.log("MongoDB - Attempting connection...");
     if (mongoose.connection.readyState >= 1) {
@@ -170,6 +191,11 @@ let clientPromise: Promise<MongoClient> | null = null;
 
 // Create a cached MongoDB connection
 function initializeConnection() {
+  if (isBuildTime || isStaticGeneration) {
+    console.log("Skipping MongoDB initialization during build time");
+    return;
+  }
+
   if (!global._mongoClientPromise || shouldForceNewConnection()) {
     // [REMOVED] // [REMOVED] console.log("Initializing MongoDB connection");
     global._mongoClientPromise = createMongoClient();
@@ -182,6 +208,10 @@ initializeConnection();
 
 // Robust connection creation function with retry logic
 function createMongoClient(): Promise<MongoClient> {
+  if (isBuildTime || isStaticGeneration) {
+    throw new Error("Cannot create MongoDB client during build time");
+  }
+
   // [REMOVED] // [REMOVED] console.log("Creating new MongoDB client connection to database:", DB_NAME);
   console.log("MongoDB connection options:", {
     maxPoolSize: options.maxPoolSize,
@@ -274,6 +304,12 @@ export async function getMongoClient(
   maxRetries = 3, // Reduced from 5 for faster connection attempts
   baseDelay = 200 // Reduced from 300 for faster recovery
 ): Promise<MongoClient> {
+  if (isBuildTime || isStaticGeneration) {
+    throw new Error(
+      "MongoDB client connections are not available during build time"
+    );
+  }
+
   // Keep track of attempts across function calls
   if (!global._connectionAttempts) {
     global._connectionAttempts = 0;
@@ -418,27 +454,31 @@ export async function connectToDatabase() {
 }
 
 // Initialize Mongoose connection
-dbConnect().catch(console.error);
+if (!isBuildTime && !isStaticGeneration) {
+  dbConnect().catch(console.error);
+}
 
 // Graceful shutdown handlers
-["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
-  process.on(signal, async () => {
-    try {
-      if (cached.conn) {
-        await cached.conn.disconnect();
+if (!isBuildTime && !isStaticGeneration) {
+  ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
+    process.on(signal, async () => {
+      try {
+        if (cached.conn) {
+          await cached.conn.disconnect();
+        }
+        if (clientPromise) {
+          const client = await clientPromise;
+          await client.close();
+        }
+        // [REMOVED] // [REMOVED] console.log("MongoDB connections closed.");
+        process.exit(0);
+      } catch (err) {
+        console.error("Error closing MongoDB connections:", err);
+        process.exit(1);
       }
-      if (clientPromise) {
-        const client = await clientPromise;
-        await client.close();
-      }
-      // [REMOVED] // [REMOVED] console.log("MongoDB connections closed.");
-      process.exit(0);
-    } catch (err) {
-      console.error("Error closing MongoDB connections:", err);
-      process.exit(1);
-    }
+    });
   });
-});
+}
 
 export default clientPromise;
 

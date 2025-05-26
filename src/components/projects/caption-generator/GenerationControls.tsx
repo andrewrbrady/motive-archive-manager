@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Instagram, Youtube, Eye, EyeOff } from "lucide-react";
 import type { LengthSetting } from "./types";
+import { findModelById } from "@/lib/llmProviders";
 
 interface GenerationControlsProps {
   selectedCarIds: string[];
@@ -402,7 +403,9 @@ export function GenerationControls({
                   Settings
                 </div>
                 <div className="text-xs text-[hsl(var(--foreground))] dark:text-white">
-                  {platform} • {tone} • {style} • {model} • temp: {temperature}
+                  {platform} • {tone} • {style} •{" "}
+                  {findModelById(model)?.model.name || model} • temp:{" "}
+                  {temperature}
                 </div>
               </div>
 

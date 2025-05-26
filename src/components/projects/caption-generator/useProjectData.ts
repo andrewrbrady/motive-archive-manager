@@ -304,11 +304,6 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     }
   }, [selectedPrompt]);
 
-  // Derive length from selected prompt template
-  const derivedLength = selectedPrompt
-    ? lengthSettings.find((l) => l.key === selectedPrompt.length) || null
-    : null;
-
   const handleCarSelection = (carId: string) => {
     setSelectedCarIds((prev) => {
       if (prev.includes(carId)) {
@@ -363,7 +358,10 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     setSelectedPrompt(found || null);
   };
 
-  const buildLLMText = () => {
+  const buildLLMText = (derivedLengthParam?: any) => {
+    // Use the parameter if provided, otherwise fall back to the prop
+    const lengthToUse = derivedLengthParam;
+
     if (!selectedSystemPromptId) {
       return "Please select a system prompt to generate LLM input.";
     }
@@ -503,16 +501,16 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     llmText += `- Platform: ${platform}\n`;
     llmText += `- Tone: ${tone}\n`;
     llmText += `- Style: ${style}\n`;
-    llmText += `- Length: ${derivedLength?.key || "Will be selected during generation"}\n`;
+    llmText += `- Length: ${lengthToUse?.key || "Will be selected during generation"}\n`;
 
     if (template && template !== "none") {
       llmText += `- Template: ${template}\n`;
     }
 
     // Length instructions (if available)
-    if (derivedLength) {
+    if (lengthToUse) {
       llmText += "\nLENGTH INSTRUCTIONS:\n";
-      llmText += derivedLength.instructions + "\n";
+      llmText += lengthToUse.instructions + "\n";
     }
 
     llmText += "\nGenerate a caption that follows the requirements above.";
@@ -520,25 +518,28 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     return llmText;
   };
 
-  const handleShowPreviewToggle = () => {
+  const handleShowPreviewToggle = (derivedLength?: any) => {
     if (!showPreview) {
       // Generate the LLM text when opening preview
-      const generatedText = buildLLMText();
+      const generatedText = buildLLMText(derivedLength);
       setEditableLLMText(generatedText);
     }
     setShowPreview(!showPreview);
   };
 
-  const handleRefreshLLMText = () => {
-    const generatedText = buildLLMText();
+  const handleRefreshLLMText = (derivedLength?: any) => {
+    const generatedText = buildLLMText(derivedLength);
     setEditableLLMText(generatedText);
   };
 
-  const handleUseMinimalCarDataChange = (checked: boolean) => {
+  const handleUseMinimalCarDataChange = (
+    checked: boolean,
+    derivedLength?: any
+  ) => {
     setUseMinimalCarData(checked);
     // Regenerate LLM text if preview is open
     if (showPreview) {
-      const generatedText = buildLLMText();
+      const generatedText = buildLLMText(derivedLength);
       setEditableLLMText(generatedText);
     }
   };
@@ -569,7 +570,6 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
 
     // Length settings
     lengthSettings,
-    derivedLength,
 
     // Prompt templates
     promptList,
