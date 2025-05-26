@@ -6,13 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import {
   Card,
   CardContent,
@@ -463,50 +457,44 @@ export default function NewProjectPage() {
                       <label className="text-sm font-medium mb-2 block">
                         Project Type
                       </label>
-                      <Select
+                      <CustomDropdown
                         value={formData.type}
-                        onValueChange={(value: ProjectType) =>
-                          setFormData((prev) => ({ ...prev, type: value }))
+                        onChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            type: value as ProjectType,
+                          }))
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="documentation">
-                            Documentation
-                          </SelectItem>
-                          <SelectItem value="media_campaign">
-                            Media Campaign
-                          </SelectItem>
-                          <SelectItem value="event_coverage">
-                            Event Coverage
-                          </SelectItem>
-                          <SelectItem value="custom">Custom</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        options={[
+                          { value: "documentation", label: "Documentation" },
+                          { value: "media_campaign", label: "Media Campaign" },
+                          { value: "event_coverage", label: "Event Coverage" },
+                          { value: "custom", label: "Custom" },
+                        ]}
+                        placeholder="Select project type"
+                      />
                     </div>
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">
                         Priority
                       </label>
-                      <Select
+                      <CustomDropdown
                         value={formData.priority}
-                        onValueChange={(value: ProjectPriority) =>
-                          setFormData((prev) => ({ ...prev, priority: value }))
+                        onChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            priority: value as ProjectPriority,
+                          }))
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        options={[
+                          { value: "low", label: "Low" },
+                          { value: "medium", label: "Medium" },
+                          { value: "high", label: "High" },
+                          { value: "urgent", label: "Urgent" },
+                        ]}
+                        placeholder="Select priority"
+                      />
                     </div>
                   </div>
 
@@ -625,25 +613,22 @@ export default function NewProjectPage() {
                         Budget (optional)
                       </label>
                       <div className="flex gap-2">
-                        <Select
+                        <CustomDropdown
                           value={formData.budget.currency}
-                          onValueChange={(value) =>
+                          onChange={(value) =>
                             setFormData((prev) => ({
                               ...prev,
                               budget: { ...prev.budget, currency: value },
                             }))
                           }
-                        >
-                          <SelectTrigger className="w-24">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="USD">USD</SelectItem>
-                            <SelectItem value="EUR">EUR</SelectItem>
-                            <SelectItem value="GBP">GBP</SelectItem>
-                            <SelectItem value="CAD">CAD</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          options={[
+                            { value: "USD", label: "USD" },
+                            { value: "EUR", label: "EUR" },
+                            { value: "GBP", label: "GBP" },
+                            { value: "CAD", label: "CAD" },
+                          ]}
+                          placeholder="Select currency"
+                        />
                         <Input
                           type="number"
                           value={formData.budget.total}

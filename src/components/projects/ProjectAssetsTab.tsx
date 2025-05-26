@@ -15,13 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -201,24 +195,21 @@ export function ProjectAssetsTab({
                 </div>
                 <div className="grid gap-2">
                   <Label>Asset Type</Label>
-                  <Select
+                  <CustomDropdown
                     value={assetForm.type}
-                    onValueChange={(value) =>
+                    onChange={(value) =>
                       setAssetForm({
                         ...assetForm,
                         type: value as any,
                       })
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gallery">Gallery</SelectItem>
-                      <SelectItem value="image">Image</SelectItem>
-                      <SelectItem value="deliverable">Deliverable</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "gallery", label: "Gallery" },
+                      { value: "image", label: "Image" },
+                      { value: "deliverable", label: "Deliverable" },
+                    ]}
+                    placeholder="Select asset type"
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="referenceId">Reference ID</Label>

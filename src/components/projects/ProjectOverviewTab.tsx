@@ -16,13 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { CheckCircle, Circle, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { Project, ProjectType } from "@/types/project";
@@ -38,13 +32,13 @@ export function ProjectOverviewTab({
   onProjectUpdate,
 }: ProjectOverviewTabProps) {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     description: "",
     amount: "",
     category: "materials",
     receipt: "",
   });
-  const [isAddingExpense, setIsAddingExpense] = useState(false);
 
   const handleAddExpense = async () => {
     if (
@@ -312,27 +306,24 @@ export function ProjectOverviewTab({
                       </div>
                       <div className="grid gap-2">
                         <Label>Category</Label>
-                        <Select
+                        <CustomDropdown
                           value={expenseForm.category}
-                          onValueChange={(value) =>
+                          onChange={(value) =>
                             setExpenseForm({
                               ...expenseForm,
                               category: value,
                             })
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="materials">Materials</SelectItem>
-                            <SelectItem value="labor">Labor</SelectItem>
-                            <SelectItem value="equipment">Equipment</SelectItem>
-                            <SelectItem value="travel">Travel</SelectItem>
-                            <SelectItem value="software">Software</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          options={[
+                            { value: "materials", label: "Materials" },
+                            { value: "labor", label: "Labor" },
+                            { value: "equipment", label: "Equipment" },
+                            { value: "travel", label: "Travel" },
+                            { value: "software", label: "Software" },
+                            { value: "other", label: "Other" },
+                          ]}
+                          placeholder="Select category"
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="expenseReceipt">

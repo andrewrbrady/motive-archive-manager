@@ -53,6 +53,13 @@ export default function NewDeliverableForm({
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCarId, setSelectedCarId] = useState(carId || "");
+  const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
+
+  const handleSelectOpenChange = (selectId: string, open: boolean) => {
+    setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
+  };
+
+  const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -209,7 +216,11 @@ export default function NewDeliverableForm({
           New
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full"
+        onEscapeKeyDown={(e) => isAnySelectOpen && e.preventDefault()}
+        onPointerDownOutside={(e) => isAnySelectOpen && e.preventDefault()}
+      >
         <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
           <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
             Create New Deliverable
@@ -257,8 +268,12 @@ export default function NewDeliverableForm({
                     <Select
                       value={selectedCarId}
                       onValueChange={(value) => setSelectedCarId(value)}
+                      open={openSelects["car"]}
+                      onOpenChange={(open) =>
+                        handleSelectOpenChange("car", open)
+                      }
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select car (optional)" />
                       </SelectTrigger>
                       <SelectContent>
@@ -284,8 +299,12 @@ export default function NewDeliverableForm({
                     <Select
                       value={platform || ""}
                       onValueChange={(value) => setPlatform(value as Platform)}
+                      open={openSelects["platform"]}
+                      onOpenChange={(open) =>
+                        handleSelectOpenChange("platform", open)
+                      }
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select platform" />
                       </SelectTrigger>
                       <SelectContent>
@@ -332,8 +351,12 @@ export default function NewDeliverableForm({
                       onValueChange={(value) =>
                         setType(value as DeliverableType)
                       }
+                      open={openSelects["type"]}
+                      onOpenChange={(open) =>
+                        handleSelectOpenChange("type", open)
+                      }
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -398,8 +421,15 @@ export default function NewDeliverableForm({
                     >
                       Aspect Ratio
                     </label>
-                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                      <SelectTrigger className="text-sm">
+                    <Select
+                      value={aspectRatio}
+                      onValueChange={setAspectRatio}
+                      open={openSelects["aspectRatio"]}
+                      onOpenChange={(open) =>
+                        handleSelectOpenChange("aspectRatio", open)
+                      }
+                    >
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select aspect ratio" />
                       </SelectTrigger>
                       <SelectContent>
@@ -443,8 +473,12 @@ export default function NewDeliverableForm({
                   <Select
                     value={editor}
                     onValueChange={(value) => setEditor(value)}
+                    open={openSelects["editor"]}
+                    onOpenChange={(open) =>
+                      handleSelectOpenChange("editor", open)
+                    }
                   >
-                    <SelectTrigger className="text-sm">
+                    <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                       <SelectValue placeholder="Select editor" />
                     </SelectTrigger>
                     <SelectContent>

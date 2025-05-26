@@ -7,4 +7,5 @@ export { ProjectCarsTab } from "./ProjectCarsTab";
 export { ProjectAssetsTab } from "./ProjectAssetsTab";
 export { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 export { ProjectCaptionGenerator } from "./ProjectCaptionGenerator";
+export { default as ProjectEventsTab } from "./ProjectEventsTab";
 export { ProjectTabs } from "./ProjectTabs";

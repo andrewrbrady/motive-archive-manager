@@ -1,26 +1,17 @@
 import { Collection, Db, ObjectId, Filter } from "mongodb";
-import { Event, EventStatus, EventType } from "@/types/event";
-
-interface DbEvent extends Omit<Event, "id"> {
-  _id: ObjectId;
-  car_id: string;
-  created_at: Date;
-  updated_at: Date;
-  scheduled_date: string;
-  end_date?: string;
-  is_all_day?: boolean;
-  assignees: string[];
-}
+import { Event, EventStatus, EventType, DbEvent } from "@/types/event";
 
 type EventQuery = {
   type?: EventType;
   status?: EventStatus;
-  assignees?: string | { $in: string[] };
-  scheduled_date?:
-    | string
+  teamMemberIds?: string | { $in: string[] };
+  car_id?: string;
+  project_id?: string;
+  start?:
+    | Date
     | {
-        $gte?: string;
-        $lte?: string;
+        $gte?: Date;
+        $lte?: Date;
       };
 };
 
@@ -38,10 +29,12 @@ export class EventModel {
     // Create indexes if they don't exist
     if (collections.length <= 1) {
       await this.collection.createIndex({ car_id: 1 });
+      await this.collection.createIndex({ project_id: 1 });
       await this.collection.createIndex({ type: 1 });
-      await this.collection.createIndex({ scheduled_date: 1 });
+      await this.collection.createIndex({ start: 1 });
       await this.collection.createIndex({ status: 1 });
       await this.collection.createIndex({ created_at: -1 });
+      await this.collection.createIndex({ teamMemberIds: 1 });
     }
   }
 
@@ -51,7 +44,7 @@ export class EventModel {
       ...event,
       created_at: now,
       updated_at: now,
-      assignees: event.assignees || [],
+      teamMemberIds: event.teamMemberIds || [],
     };
 
     const result = await this.collection.insertOne(newEvent as DbEvent);
@@ -63,12 +56,18 @@ export class EventModel {
   }
 
   async findByCarId(carId: string) {
-    // [REMOVED] // [REMOVED] console.log("Finding events for car ID:", carId); // Debug log
     const events = await this.collection
       .find({ car_id: carId })
-      .sort({ scheduled_date: 1 })
+      .sort({ start: 1 })
       .toArray();
-    // [REMOVED] // [REMOVED] console.log("Found events:", events); // Debug log
+    return events;
+  }
+
+  async findByProjectId(projectId: string) {
+    const events = await this.collection
+      .find({ project_id: projectId })
+      .sort({ start: 1 })
+      .toArray();
     return events;
   }
 
@@ -85,43 +84,57 @@ export class EventModel {
       filter.status = query.status;
     }
 
-    // Add assignee filter
-    if (query.assignees) {
-      if (typeof query.assignees === "string") {
-        filter.assignees = { $in: [query.assignees] };
+    // Add car_id filter
+    if (query.car_id) {
+      filter.car_id = query.car_id;
+    }
+
+    // Add project_id filter
+    if (query.project_id) {
+      filter.project_id = query.project_id;
+    }
+
+    // Add team member filter
+    if (query.teamMemberIds) {
+      if (typeof query.teamMemberIds === "string") {
+        filter.teamMemberIds = { $in: [new ObjectId(query.teamMemberIds)] };
       } else {
-        filter.assignees = query.assignees;
+        filter.teamMemberIds = {
+          $in: query.teamMemberIds.$in.map((id) => new ObjectId(id)),
+        };
       }
     }
 
     // Add date filters
-    if (query.scheduled_date) {
-      if (typeof query.scheduled_date === "string") {
-        filter.scheduled_date = query.scheduled_date;
+    if (query.start) {
+      if (query.start instanceof Date) {
+        filter.start = query.start;
       } else {
-        filter.scheduled_date = {};
-        if (query.scheduled_date.$gte) {
-          filter.scheduled_date.$gte = query.scheduled_date.$gte;
+        filter.start = {};
+        if (query.start.$gte) {
+          filter.start.$gte = query.start.$gte;
         }
-        if (query.scheduled_date.$lte) {
-          filter.scheduled_date.$lte = query.scheduled_date.$lte;
+        if (query.start.$lte) {
+          filter.start.$lte = query.start.$lte;
         }
       }
     }
 
-    return this.collection.find(filter).sort({ scheduled_date: 1 }).toArray();
+    return this.collection.find(filter).sort({ start: 1 }).toArray();
   }
 
   async update(id: ObjectId, updates: Partial<DbEvent>): Promise<boolean> {
     try {
-      // [REMOVED] // [REMOVED] console.log("Updating event:", id, "with updates:", updates); // Debug log
-
-      // Validate assignees if present
-      if (updates.assignees !== undefined) {
-        if (!Array.isArray(updates.assignees)) {
-          console.error("Invalid assignees format:", updates.assignees);
+      // Validate teamMemberIds if present
+      if (updates.teamMemberIds !== undefined) {
+        if (!Array.isArray(updates.teamMemberIds)) {
+          console.error("Invalid teamMemberIds format:", updates.teamMemberIds);
           return false;
         }
+        // Ensure all teamMemberIds are ObjectIds
+        updates.teamMemberIds = updates.teamMemberIds.map((id) =>
+          typeof id === "string" ? new ObjectId(id) : id
+        );
       }
 
       // Ensure dates are proper Date objects
@@ -139,8 +152,6 @@ export class EventModel {
           },
         }
       );
-
-      // [REMOVED] // [REMOVED] console.log("Update result:", result); // Debug log
 
       return result.matchedCount > 0;
     } catch (error) {
@@ -166,10 +177,28 @@ export class EventModel {
     const now = new Date();
     return await this.collection
       .find({
-        scheduled_date: { $gte: now.toISOString() },
+        start: { $gte: now },
       })
-      .sort({ scheduled_date: 1 })
+      .sort({ start: 1 })
       .limit(limit)
       .toArray();
+  }
+
+  // Transform database event to API event
+  transformToApiEvent(dbEvent: DbEvent): Event {
+    return {
+      id: dbEvent._id.toString(),
+      car_id: dbEvent.car_id,
+      project_id: dbEvent.project_id,
+      type: dbEvent.type,
+      description: dbEvent.description,
+      status: dbEvent.status,
+      start: dbEvent.start.toISOString(),
+      end: dbEvent.end?.toISOString(),
+      isAllDay: dbEvent.is_all_day || false,
+      teamMemberIds: dbEvent.teamMemberIds.map((id) => id.toString()),
+      createdAt: dbEvent.created_at.toISOString(),
+      updatedAt: dbEvent.updated_at.toISOString(),
+    };
   }
 }

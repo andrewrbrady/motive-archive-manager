@@ -15,13 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -404,27 +398,24 @@ export function ProjectTeamTab({
                 </div>
                 <div className="grid gap-2">
                   <Label>Role</Label>
-                  <Select
+                  <CustomDropdown
                     value={memberForm.role}
-                    onValueChange={(value) =>
+                    onChange={(value) =>
                       setMemberForm({
                         ...memberForm,
                         role: value,
                       })
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                      <SelectItem value="writer">Writer</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="photographer">Photographer</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="owner">Owner</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "viewer", label: "Viewer" },
+                      { value: "writer", label: "Writer" },
+                      { value: "editor", label: "Editor" },
+                      { value: "photographer", label: "Photographer" },
+                      { value: "manager", label: "Manager" },
+                      { value: "owner", label: "Owner" },
+                    ]}
+                    placeholder="Select role"
+                  />
                 </div>
               </div>
               <DialogFooter>

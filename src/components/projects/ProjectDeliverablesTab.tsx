@@ -16,13 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,14 +63,13 @@ export function ProjectDeliverablesTab({
     carId: "",
   });
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
+  const [projectDeliverables, setProjectDeliverables] = useState<any[]>([]);
+  const [isLoadingDeliverables, setIsLoadingDeliverables] = useState(true);
+  const [existingDeliverables, setExistingDeliverables] = useState<any[]>([]);
   const [selectedDeliverables, setSelectedDeliverables] = useState<string[]>(
     []
   );
   const [isLinkingDeliverables, setIsLinkingDeliverables] = useState(false);
-  const [projectDeliverables, setProjectDeliverables] = useState<any[]>([]);
-  const [existingDeliverables, setExistingDeliverables] = useState<any[]>([]);
-  const [loadingExistingDeliverables, setLoadingExistingDeliverables] =
-    useState(false);
 
   // Fetch project deliverables on mount and when project changes
   useEffect(() => {
@@ -107,7 +100,7 @@ export function ProjectDeliverablesTab({
 
   const fetchExistingDeliverables = async () => {
     try {
-      setLoadingExistingDeliverables(true);
+      setIsLoadingDeliverables(true);
       console.log("📦 Fetching all existing deliverables...");
 
       const response = await fetch("/api/deliverables");
@@ -137,7 +130,7 @@ export function ProjectDeliverablesTab({
         variant: "destructive",
       });
     } finally {
-      setLoadingExistingDeliverables(false);
+      setIsLoadingDeliverables(false);
     }
   };
 
@@ -466,7 +459,7 @@ export function ProjectDeliverablesTab({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto py-4">
-                  {loadingExistingDeliverables ? (
+                  {isLoadingDeliverables ? (
                     <div className="flex items-center justify-center h-32">
                       <div className="text-sm text-muted-foreground">
                         Loading deliverables...
@@ -620,68 +613,46 @@ export function ProjectDeliverablesTab({
                   </div>
                   <div className="grid gap-2">
                     <Label>Type</Label>
-                    <Select
+                    <CustomDropdown
                       value={deliverableForm.type}
-                      onValueChange={(value) =>
+                      onChange={(value) =>
                         setDeliverableForm({
                           ...deliverableForm,
                           type: value as any,
                         })
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Video">Video</SelectItem>
-                        <SelectItem value="Photo Gallery">
-                          Photo Gallery
-                        </SelectItem>
-                        <SelectItem value="Mixed Gallery">
-                          Mixed Gallery
-                        </SelectItem>
-                        <SelectItem value="Video Gallery">
-                          Video Gallery
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "Video", label: "Video" },
+                        { value: "Photo Gallery", label: "Photo Gallery" },
+                        { value: "Mixed Gallery", label: "Mixed Gallery" },
+                        { value: "Video Gallery", label: "Video Gallery" },
+                      ]}
+                      placeholder="Select type"
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label>Platform</Label>
-                    <Select
+                    <CustomDropdown
                       value={deliverableForm.platform}
-                      onValueChange={(value) =>
+                      onChange={(value) =>
                         setDeliverableForm({
                           ...deliverableForm,
                           platform: value,
                         })
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Instagram Reels">
-                          Instagram Reels
-                        </SelectItem>
-                        <SelectItem value="Instagram Post">
-                          Instagram Post
-                        </SelectItem>
-                        <SelectItem value="Instagram Story">
-                          Instagram Story
-                        </SelectItem>
-                        <SelectItem value="YouTube">YouTube</SelectItem>
-                        <SelectItem value="YouTube Shorts">
-                          YouTube Shorts
-                        </SelectItem>
-                        <SelectItem value="TikTok">TikTok</SelectItem>
-                        <SelectItem value="Facebook">Facebook</SelectItem>
-                        <SelectItem value="Bring a Trailer">
-                          Bring a Trailer
-                        </SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "Instagram Reels", label: "Instagram Reels" },
+                        { value: "Instagram Post", label: "Instagram Post" },
+                        { value: "Instagram Story", label: "Instagram Story" },
+                        { value: "YouTube", label: "YouTube" },
+                        { value: "YouTube Shorts", label: "YouTube Shorts" },
+                        { value: "TikTok", label: "TikTok" },
+                        { value: "Facebook", label: "Facebook" },
+                        { value: "Bring a Trailer", label: "Bring a Trailer" },
+                        { value: "Other", label: "Other" },
+                      ]}
+                      placeholder="Select platform"
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="duration">Duration (seconds)</Label>
@@ -700,26 +671,23 @@ export function ProjectDeliverablesTab({
                   </div>
                   <div className="grid gap-2">
                     <Label>Aspect Ratio</Label>
-                    <Select
+                    <CustomDropdown
                       value={deliverableForm.aspectRatio}
-                      onValueChange={(value) =>
+                      onChange={(value) =>
                         setDeliverableForm({
                           ...deliverableForm,
                           aspectRatio: value,
                         })
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="16:9">16:9</SelectItem>
-                        <SelectItem value="9:16">9:16</SelectItem>
-                        <SelectItem value="1:1">1:1</SelectItem>
-                        <SelectItem value="4:3">4:3</SelectItem>
-                        <SelectItem value="3:4">3:4</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "16:9", label: "16:9" },
+                        { value: "9:16", label: "9:16" },
+                        { value: "1:1", label: "1:1" },
+                        { value: "4:3", label: "4:3" },
+                        { value: "3:4", label: "3:4" },
+                      ]}
+                      placeholder="Select aspect ratio"
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label>Due Date</Label>
@@ -736,54 +704,45 @@ export function ProjectDeliverablesTab({
                   </div>
                   <div className="grid gap-2">
                     <Label>Assigned To (Optional)</Label>
-                    <Select
+                    <CustomDropdown
                       value={deliverableForm.assignedTo}
-                      onValueChange={(value) =>
+                      onChange={(value) =>
                         setDeliverableForm({
                           ...deliverableForm,
                           assignedTo: value,
                         })
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select team member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {project?.members.map((member) => (
-                          <SelectItem key={member.userId} value={member.userId}>
-                            {memberDetails[member.userId]?.name ||
-                              `User ${member.userId}`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "unassigned", label: "Unassigned" },
+                        ...(project?.members.map((member) => ({
+                          value: member.userId,
+                          label:
+                            memberDetails[member.userId]?.name ||
+                            `User ${member.userId}`,
+                        })) || []),
+                      ]}
+                      placeholder="Select team member"
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label>Car (Optional)</Label>
-                    <Select
+                    <CustomDropdown
                       value={deliverableForm.carId}
-                      onValueChange={(value) =>
+                      onChange={(value) =>
                         setDeliverableForm({
                           ...deliverableForm,
                           carId: value,
                         })
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select car" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">
-                          Auto-select from project
-                        </SelectItem>
-                        {project?.carIds.map((carId) => (
-                          <SelectItem key={carId} value={carId}>
-                            Car {carId}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "auto", label: "Auto-select from project" },
+                        ...(project?.carIds.map((carId) => ({
+                          value: carId,
+                          label: `Car ${carId}`,
+                        })) || []),
+                      ]}
+                      placeholder="Select car"
+                    />
                   </div>
                 </div>
                 <DialogFooter>

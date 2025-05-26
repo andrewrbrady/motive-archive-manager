@@ -22,14 +22,31 @@ export enum EventStatus {
 
 export interface Event {
   id: string;
-  car_id: string;
+  car_id?: string;
+  project_id?: string;
   type: EventType;
   description: string;
   status: EventStatus;
   start: string;
   end?: string;
   isAllDay?: boolean;
-  assignees: string[];
+  teamMemberIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Database representation
+export interface DbEvent {
+  _id: ObjectId;
+  car_id?: string;
+  project_id?: string;
+  type: EventType;
+  description: string;
+  status: EventStatus;
+  start: Date;
+  end?: Date;
+  is_all_day?: boolean;
+  teamMemberIds: ObjectId[];
+  created_at: Date;
+  updated_at: Date;
 }

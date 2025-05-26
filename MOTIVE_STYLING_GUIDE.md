@@ -405,20 +405,6 @@ function CustomUserDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const selectedUser = users.find((user) => user._id === value);
 
   const handleSelectUser = (userId: string) => {
@@ -717,208 +703,134 @@ const handleUserSelect = (userId: string, event?: React.MouseEvent) => {
 </Select>
 ```
 
-### Handling Optional Values
+### Critical: SelectTrigger Hover States in Modals
 
-When you need to represent "no selection" or "unassigned" states:
+**SOLUTION: Use CustomDropdown instead of Radix Select in modal contexts**
+
+The Radix UI Select component has persistent hover state issues when used inside Dialog/Modal components. This is a known limitation that cannot be reliably fixed with CSS or configuration changes.
+
+#### ✅ Correct Implementation for Modals
+
+Use the `CustomDropdown` component for all dropdown selections inside modals:
 
 ```tsx
-// 1. Use special values in your state
-const [assignedUser, setAssignedUser] = useState("unassigned");
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
-// 2. Convert to/from API format
-const handleSubmit = () => {
-  const apiData = {
-    assignedTo: assignedUser === "unassigned" ? undefined : assignedUser,
-  };
-  // Send to API
-};
-
-// 3. Initialize from API data
-useEffect(() => {
-  if (data.assignedTo) {
-    setAssignedUser(data.assignedTo);
-  } else {
-    setAssignedUser("unassigned");
-  }
-}, [data]);
+// Inside a Dialog/Modal
+<CustomDropdown
+  value={selectedValue}
+  onChange={setSelectedValue}
+  options={[
+    { value: "option1", label: "Option 1" },
+    { value: "option2", label: "Option 2" },
+    { value: "option3", label: "Option 3" },
+  ]}
+  placeholder="Select an option"
+  disabled={false}
+  className="w-full"
+/>;
 ```
 
-### Common Select Patterns
-
-#### User Assignment Select
+#### ❌ Avoid: Radix Select in Modals
 
 ```tsx
-<Select value={assignedTo} onValueChange={setAssignedTo}>
+// DON'T DO THIS - hover states don't work properly in modals
+<Dialog>
+  <DialogContent>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger>
+        <SelectValue placeholder="Select option" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="option1">Option 1</SelectItem>
+      </SelectContent>
+    </Select>
+  </DialogContent>
+</Dialog>
+```
+
+#### CustomDropdown Features
+
+- **Proper hover states** that work inside modals
+- **Keyboard navigation** support
+- **Outside click detection** to close dropdown
+- **Consistent styling** that matches other UI components
+- **TypeScript support** with proper option types
+- **Disabled state** support
+- **Custom className** support for sizing
+
+#### When to Use Each Component
+
+**Use CustomDropdown:**
+
+- Inside Dialog/Modal components
+- In forms that are rendered in modals
+- When you need reliable hover states
+- For project management interfaces
+
+**Use Radix Select:**
+
+- In regular page content (outside modals)
+- In navigation components
+- When you need advanced Select features (groups, search, etc.)
+
+#### Migration Pattern
+
+When migrating from Select to CustomDropdown:
+
+```tsx
+// Before (Select)
+<Select value={value} onValueChange={onChange}>
   <SelectTrigger>
-    <SelectValue placeholder="Select team member" />
+    <SelectValue placeholder="Select option" />
   </SelectTrigger>
   <SelectContent>
-    <SelectItem value="unassigned">Unassigned</SelectItem>
-    {users.map((user) => (
-      <SelectItem key={user.id} value={user.id}>
-        {user.name}
-      </SelectItem>
-    ))}
+    <SelectItem value="option1">Option 1</SelectItem>
+    <SelectItem value="option2">Option 2</SelectItem>
   </SelectContent>
 </Select>
-```
 
-#### Status Filter Select
-
-```tsx
-<Select value={statusFilter} onValueChange={setStatusFilter}>
-  <SelectTrigger>
-    <SelectValue placeholder="Filter by status" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">All Statuses</SelectItem>
-    <SelectItem value="active">Active</SelectItem>
-    <SelectItem value="pending">Pending</SelectItem>
-    <SelectItem value="completed">Completed</SelectItem>
-  </SelectContent>
-</Select>
-```
-
-#### Category Select with None Option
-
-```tsx
-<Select value={category} onValueChange={setCategory}>
-  <SelectTrigger>
-    <SelectValue placeholder="Select category" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="none">No Category</SelectItem>
-    <SelectItem value="materials">Materials</SelectItem>
-    <SelectItem value="labor">Labor</SelectItem>
-    <SelectItem value="equipment">Equipment</SelectItem>
-  </SelectContent>
-</Select>
-```
-
-### Form Integration Patterns
-
-#### With React Hook Form
-
-```tsx
-<FormField
-  control={form.control}
-  name="assignedTo"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Assigned To</FormLabel>
-      <Select
-        onValueChange={field.onChange}
-        defaultValue={field.value || "unassigned"}
-      >
-        <FormControl>
-          <SelectTrigger>
-            <SelectValue placeholder="Select team member" />
-          </SelectTrigger>
-        </FormControl>
-        <SelectContent>
-          <SelectItem value="unassigned">Unassigned</SelectItem>
-          {users.map((user) => (
-            <SelectItem key={user.id} value={user.id}>
-              {user.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <FormMessage />
-    </FormItem>
-  )}
+// After (CustomDropdown)
+<CustomDropdown
+  value={value}
+  onChange={onChange}
+  options={[
+    { value: "option1", label: "Option 1" },
+    { value: "option2", label: "Option 2" },
+  ]}
+  placeholder="Select option"
 />
 ```
 
-#### With State Management
+#### Root Cause: Dialog Body Lock
 
-```tsx
-const [formData, setFormData] = useState({
-  title: "",
-  assignedTo: "unassigned",
-  category: "none",
-  status: "pending",
-});
+When a Dialog opens, it applies `pointer-events: none` to the `<body>` element to prevent background scrolling. Any dropdown content that is portaled to the body (the default behavior) inherits this rule, making the browser never consider your cursor "inside" the menu, so hover styles don't fire.
 
-const handleSelectChange = (field: string, value: string) => {
-  setFormData((prev) => ({
-    ...prev,
-    [field]: value,
-  }));
-};
+The CustomDropdown component avoids this issue by:
 
-// In JSX
-<Select
-  value={formData.assignedTo}
-  onValueChange={(value) => handleSelectChange("assignedTo", value)}
->
-  <SelectTrigger>
-    <SelectValue placeholder="Select assignee" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="unassigned">Unassigned</SelectItem>
-    {/* other options */}
-  </SelectContent>
-</Select>;
-```
+1. **Not using portals** - content stays within the modal's DOM tree
+2. **Manual event handling** - uses proper click and focus events
+3. **Custom positioning** - uses absolute positioning within the container
+4. **Proper z-index management** - ensures dropdown appears above other content
 
-### Special Value Conventions
+### Components Using CustomDropdown
 
-Use these conventional values for common "empty" states:
+The following components have been updated to use CustomDropdown:
 
-- `"unassigned"` - For user assignments
-- `"none"` - For categories, locations, containers
-- `"all"` - For filters that show all items
-- `"default"` - For default selections
-- `"other"` - For custom/other options
-
-### Validation Patterns
-
-```tsx
-// Validate that required selects aren't in "empty" state
-const validateForm = () => {
-  const errors = [];
-
-  if (formData.assignedTo === "unassigned" && isAssignmentRequired) {
-    errors.push("Assignment is required");
-  }
-
-  if (formData.category === "none" && isCategoryRequired) {
-    errors.push("Category is required");
-  }
-
-  return errors;
-};
-```
-
-### Accessibility Considerations
-
-```tsx
-<Select value={value} onValueChange={onChange}>
-  <SelectTrigger aria-label="Select team member">
-    <SelectValue placeholder="Select team member" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="unassigned">
-      <span className="flex items-center gap-2">
-        <User className="h-4 w-4" />
-        Unassigned
-      </span>
-    </SelectItem>
-    {/* other options */}
-  </SelectContent>
-</Select>
-```
+- `ProjectDeliverablesTab.tsx` - All form dropdowns in modal
+- `ProjectOverviewTab.tsx` - Expense category dropdown in modal
+- `ProjectAssetsTab.tsx` - Asset type dropdown in modal
+- `ProjectTeamTab.tsx` - Role selection dropdown in modal
+- `ProjectEventsTab.tsx` - Event type and status dropdowns in modal
+- `src/app/projects/page.tsx` - Filter dropdowns (not in modal, but for consistency)
+- `src/app/projects/new/page.tsx` - Project type and priority dropdowns
 
 ### Summary
 
-- **Never use empty string values** in SelectItem components
-- **Use descriptive special values** like "unassigned", "none", "all"
-- **Convert special values to undefined/null** when sending to APIs
-- **Initialize with special values** when loading from APIs
-- **Follow consistent naming conventions** across the application
-- **Add proper validation** for required fields
-- **Include accessibility attributes** for screen readers
+- **Never use Radix Select inside Dialog/Modal components** - hover states will not work
+- **Use CustomDropdown for all modal dropdown needs** - provides reliable interaction
+- **Keep Radix Select for regular page content** - works fine outside of modals
+- **Follow the migration pattern** when converting existing Select components
 
 ## Selectable Card/Button Hover States
 
@@ -1118,3 +1030,351 @@ function SelectableCard({
 - **Form inputs** (use input-specific hover states)
 - **Action buttons** (use button variant hover states)
 - **Menu items** (use menu-specific hover states)
+
+### Critical: Z-Index Conflicts in Modals
+
+**Dropdown components (Select, DropdownMenu, Tooltip) inside modals require higher z-index values** to appear above modal overlays. We use `z-[60]` for dropdown content to ensure it appears above modal overlays which use `z-50`.
+
+#### ✅ Fixed Z-Index Values
+
+Our UI components use these z-index values to prevent conflicts:
+
+```tsx
+// Modal overlays and content
+Dialog: z - 50;
+AlertDialog: z - 50;
+Sheet: z - 50;
+
+// Dropdown content (appears above modals)
+SelectContent: z - [60];
+DropdownMenuContent: z - [60];
+DropdownMenuSubContent: z - [60];
+TooltipContent: z - [60];
+```
+
+#### ❌ Common Z-Index Issues
+
+```tsx
+// DON'T DO THIS - SelectContent at same level as modal
+<Dialog>
+  {" "}
+  {/* z-50 */}
+  <DialogContent>
+    <Select>
+      <SelectContent className="z-50">
+        {" "}
+        {/* ❌ Same z-index as modal */}
+        <SelectItem>Option</SelectItem>
+      </SelectContent>
+    </Select>
+  </DialogContent>
+</Dialog>
+```
+
+#### ✅ Correct Z-Index Implementation
+
+```tsx
+// DO THIS - SelectContent above modal
+<Dialog>
+  {" "}
+  {/* z-50 */}
+  <DialogContent>
+    <Select>
+      <SelectContent className="z-[60]">
+        {" "}
+        {/* ✅ Above modal */}
+        <SelectItem>Option</SelectItem>
+      </SelectContent>
+    </Select>
+  </DialogContent>
+</Dialog>
+```
+
+### Z-Index Hierarchy
+
+Use this hierarchy for consistent layering:
+
+```tsx
+// Base content
+z-0 to z-10: Page content, cards, buttons
+
+// Navigation and fixed elements
+z-40: Fixed navigation, sticky headers
+
+// Modals and overlays
+z-50: Dialog, AlertDialog, Sheet overlays and content
+
+// Dropdown content (above modals)
+z-[60]: Select, DropdownMenu, Tooltip content
+
+// Critical overlays
+z-[70]: Loading overlays, critical notifications
+
+// Debug/development
+z-[9999]: Development tools, debug overlays
+```
+
+## Dropdown Hover States in Modals - CRITICAL SOLUTION
+
+### The Problem
+
+When using dropdown components inside Dialog/Modal components, hover states don't work due to CSS `pointer-events: none` inheritance from the modal's body lock mechanism. This affects:
+
+- CustomDropdown components
+- Radix UI Select components
+- Any portaled content that extends outside modal boundaries
+
+### The ONLY Working Solution: Portal with Pointer Events Fix
+
+Use this exact pattern for dropdown components that need to work inside modals:
+
+```tsx
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+
+export function CustomDropdown(
+  {
+    /* props */
+  }
+) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Calculate position when opening
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: triggerRect.bottom + window.scrollY,
+        left: triggerRect.left + window.scrollX,
+        width: triggerRect.width,
+      });
+    }
+  }, [isOpen]);
+
+  const dropdownContent = isOpen ? (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        pointerEvents: "none", // Don't block interactions elsewhere
+        zIndex: 9999, // Above everything
+      }}
+    >
+      <div
+        ref={dropdownRef}
+        className="bg-background rounded-md border border-input shadow-lg overflow-y-auto max-h-60"
+        style={{
+          position: "absolute",
+          top: dropdownPosition.top,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
+          pointerEvents: "auto", // CRITICAL: Restore pointer events
+        }}
+      >
+        <div className="py-1">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className="flex w-full items-center px-3 py-1.5 text-sm border border-transparent hover:border-white disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+              onClick={() => handleSelectOption(option.value)}
+              disabled={option.disabled}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <div className="relative">
+      <button ref={triggerRef} onClick={() => setIsOpen(!isOpen)}>
+        {/* Trigger content */}
+      </button>
+
+      {/* Portal with pointer-events fix */}
+      {typeof window !== "undefined" &&
+        dropdownContent &&
+        createPortal(dropdownContent, document.body)}
+    </div>
+  );
+}
+```
+
+### Key Technical Points
+
+1. **Portal to document.body**: Renders dropdown outside modal DOM tree
+2. **Wrapper with `pointer-events: 'none'`**: Covers viewport but doesn't block interactions
+3. **Dropdown with `pointer-events: 'auto'`**: Explicitly restores pointer events
+4. **High z-index**: `zIndex: 9999` ensures it appears above modal overlays
+5. **Absolute positioning**: Uses `getBoundingClientRect()` for exact placement
+
+### Hover State Pattern for Dropdowns
+
+Use **white border hover** with rounded corners, smooth animations, and better spacing for a friendly feel:
+
+```tsx
+// ✅ Correct dropdown item hover (smooth without scale)
+className =
+  "flex w-full items-center gap-3 px-3 py-2.5 text-sm border border-transparent hover:border-white/80 rounded-md disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 ease-out hover:shadow-sm";
+
+// ✅ Dropdown container styling (natural slide-down animation)
+className =
+  "bg-background rounded-lg border border-input shadow-xl overflow-y-auto max-h-60 animate-in slide-in-from-top-2 duration-200";
+
+// ❌ Avoid background hover in dropdowns
+className = "hover:bg-accent hover:text-accent-foreground";
+```
+
+### Icon Support in Dropdowns
+
+The CustomDropdown component supports icons for better visual hierarchy:
+
+```tsx
+// ✅ Dropdown with icons
+<CustomDropdown
+  value={selectedValue}
+  onChange={setSelectedValue}
+  options={[
+    {
+      value: "production",
+      label: "Production",
+      icon: <Camera className="w-4 h-4 flex-shrink-0" />,
+    },
+    {
+      value: "marketing",
+      label: "Marketing",
+      icon: <Sparkles className="w-4 h-4 flex-shrink-0" />,
+    },
+  ]}
+  placeholder="Select option"
+/>;
+
+// Icon interface
+interface DropdownOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  icon?: React.ReactNode; // Optional icon support
+}
+```
+
+### Dropdown Styling Improvements
+
+**Friendly Design Elements:**
+
+- `rounded-lg` for dropdown container (more rounded than default)
+- `shadow-xl` for better depth perception
+- `py-3 px-2 pb-4` container padding for breathing room and clipping prevention
+- `px-3 py-2.5` item padding for comfortable touch targets
+- `gap-3` between icons and text
+- `mb-1 last:mb-0` for item spacing without overflow
+- `transition-all duration-300 ease-out` for smooth interactions
+- `hover:border-white/80` for subtle white border hover
+- `hover:shadow-sm` for depth change on hover
+- `animate-in slide-in-from-top-2 duration-200` for natural dropdown animation
+
+**Scrolling Support:**
+
+- `overflow-y-auto max-h-60` enables vertical scrolling with max height of 240px
+- `scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent` for styled scrollbars
+- Scroll indicator appears when more than 6 options: "Scroll for more options"
+- Smooth scrolling with proper padding to prevent clipping
+- **CRITICAL**: `onWheel` event handlers required for scroll to work in portals
+
+**Critical Scroll Wheel Event Handling:**
+Portal dropdowns require explicit scroll wheel event handling to work properly:
+
+```tsx
+// Portal wrapper - allow wheel events to pass through
+<div
+  style={{ pointerEvents: "none" }}
+  onWheel={(e) => {
+    e.stopPropagation(); // CRITICAL for scrolling
+  }}
+>
+  {/* Dropdown container */}
+  <div
+    style={{ pointerEvents: "auto" }}
+    onWheel={(e) => {
+      e.stopPropagation(); // CRITICAL for scrolling
+    }}
+  >
+    {/* Scrollable content */}
+    <div
+      style={{ overflowY: "scroll" }}
+      onWheel={(e) => {
+        e.stopPropagation(); // CRITICAL for scrolling
+      }}
+      onScroll={(e) => {
+        e.stopPropagation(); // Handle scroll events
+      }}
+    >
+      {/* Content */}
+    </div>
+  </div>
+</div>
+```
+
+**Clipping Prevention:**
+
+- Container width: `dropdownPosition.width + 16` (adds extra width to prevent right-side clipping)
+- Container padding: `py-3 px-2 pb-4` (prevents bottom clipping and provides side margins)
+- Item margins: `mb-1 last:mb-0` (creates spacing between items without overflow)
+
+### When to Use This Solution
+
+**Use Portal Dropdown:**
+
+- Inside Dialog/Modal components
+- When dropdown needs to extend outside container boundaries
+- For any dropdown that experiences hover/click issues in modals
+
+**Use Regular Dropdown:**
+
+- In normal page content (outside modals)
+- When container has sufficient space for dropdown expansion
+
+### Root Cause Explanation
+
+When a Dialog opens:
+
+1. `pointer-events: none` is applied to `<body>`
+2. Any content portaled to body inherits this rule
+3. Browser never considers cursor "inside" the dropdown
+4. Hover states and clicks don't fire
+
+The wrapper div with `pointer-events: 'none'` + dropdown with `pointer-events: 'auto'` pattern is the ONLY way to override this inheritance and restore proper interaction.
+
+### Components Using This Pattern
+
+Current components using the portal solution:
+
+- `CustomDropdown` - All project modal dropdowns
+- Used in: ProjectDeliverablesTab, ProjectOverviewTab, ProjectAssetsTab, ProjectTeamTab, ProjectEventsTab
+
+### Migration Checklist
+
+When converting a dropdown for modal use:
+
+1. ✅ Add portal with createPortal
+2. ✅ Add wrapper div with `pointer-events: 'none'`
+3. ✅ Add dropdown div with `pointer-events: 'auto'`
+4. ✅ Use `getBoundingClientRect()` for positioning
+5. ✅ Set `zIndex: 9999`
+6. ✅ Use white border hover instead of background hover
+7. ✅ Test hover states work in modal
+8. ✅ Test clicks work in modal
+9. ✅ Test outside click closes dropdown

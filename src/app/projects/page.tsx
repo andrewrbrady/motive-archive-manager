@@ -12,13 +12,7 @@ import {
 } from "@/types/project";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -175,45 +169,48 @@ export default function ProjectsPage() {
                 />
               </div>
 
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="in_review">In Review</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
+              <CustomDropdown
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { value: "all", label: "All Status" },
+                  { value: "draft", label: "Draft" },
+                  { value: "active", label: "Active" },
+                  { value: "in_review", label: "In Review" },
+                  { value: "completed", label: "Completed" },
+                  { value: "archived", label: "Archived" },
+                ]}
+                placeholder="Status"
+                className="w-[150px]"
+              />
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="documentation">Documentation</SelectItem>
-                  <SelectItem value="media_campaign">Media Campaign</SelectItem>
-                  <SelectItem value="event_coverage">Event Coverage</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
+              <CustomDropdown
+                value={typeFilter}
+                onChange={setTypeFilter}
+                options={[
+                  { value: "all", label: "All Types" },
+                  { value: "documentation", label: "Documentation" },
+                  { value: "media_campaign", label: "Media Campaign" },
+                  { value: "event_coverage", label: "Event Coverage" },
+                  { value: "custom", label: "Custom" },
+                ]}
+                placeholder="Type"
+                className="w-[150px]"
+              />
 
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
+              <CustomDropdown
+                value={priorityFilter}
+                onChange={setPriorityFilter}
+                options={[
+                  { value: "all", label: "All Priorities" },
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                  { value: "urgent", label: "Urgent" },
+                ]}
+                placeholder="Priority"
+                className="w-[150px]"
+              />
             </div>
 
             {/* Right side: Add Project Button */}

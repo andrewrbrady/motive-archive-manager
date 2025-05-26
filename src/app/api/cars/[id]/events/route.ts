@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId, UpdateFilter } from "mongodb";
-import { Event, EventStatus } from "@/types/event";
+import { Event, EventStatus, DbEvent } from "@/types/event";
 import { EventModel } from "@/models/Event";
 
 interface Car {
@@ -26,17 +26,9 @@ export async function GET(request: Request) {
     // [REMOVED] // [REMOVED] console.log("Found events from database:", events); // Debug log
 
     // Transform the events to match the Event interface
-    const transformedEvents = events.map((event) => ({
-      id: event._id.toString(),
-      car_id: carId,
-      description: event.description || "",
-      type: event.type,
-      status: event.status || EventStatus.NOT_STARTED,
-      start: event.scheduled_date,
-      end: event.end_date,
-      assignees: event.assignees || [],
-      isAllDay: event.is_all_day || false,
-    }));
+    const transformedEvents = events.map((event) =>
+      eventModel.transformToApiEvent(event)
+    );
 
     // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
     return NextResponse.json(transformedEvents);
@@ -65,24 +57,26 @@ export async function POST(request: Request) {
 
     // [REMOVED] // [REMOVED] console.log("Creating event with data:", data); // Debug log
 
+    // Convert teamMemberIds to ObjectIds
+    const teamMemberIds = (data.teamMemberIds || data.assignees || []).map(
+      (id: string) => new ObjectId(id)
+    );
+
     // Create event object matching DbEvent type
-    const event = {
+    const eventData: Omit<DbEvent, "_id" | "created_at" | "updated_at"> = {
       car_id: carId.toString(),
       type: data.type,
       description: data.description || "",
       status: data.status || EventStatus.NOT_STARTED,
-      start: data.start,
-      scheduled_date: data.start,
-      end_date: data.end,
+      start: new Date(data.start),
+      end: data.end ? new Date(data.end) : undefined,
       is_all_day: data.isAllDay || false,
-      assignees: data.assignees || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      teamMemberIds,
     };
 
-    // [REMOVED] // [REMOVED] console.log("Transformed event data:", event); // Debug log
+    // [REMOVED] // [REMOVED] console.log("Transformed event data:", eventData); // Debug log
 
-    const newEventId = await eventModel.create(event);
+    const newEventId = await eventModel.create(eventData);
     // [REMOVED] // [REMOVED] console.log("Created event with ID:", newEventId); // Debug log
 
     // Update the car's eventIds array
@@ -92,18 +86,13 @@ export async function POST(request: Request) {
 
     await db.collection<Car>("cars").updateOne({ _id: carId }, updateFilter);
 
-    // Return the created event with frontend-expected field names
-    return NextResponse.json({
-      id: newEventId.toString(),
-      car_id: event.car_id,
-      type: event.type,
-      description: event.description,
-      status: event.status,
-      start: event.scheduled_date,
-      end: event.end_date,
-      isAllDay: event.is_all_day,
-      assignees: event.assignees,
-    });
+    // Fetch the created event and return it
+    const createdEvent = await eventModel.findById(newEventId);
+    if (!createdEvent) {
+      throw new Error("Failed to retrieve created event");
+    }
+
+    return NextResponse.json(eventModel.transformToApiEvent(createdEvent));
   } catch (error) {
     console.error("Error creating event:", error);
     return NextResponse.json(
@@ -135,20 +124,46 @@ export async function PUT(request: Request) {
     const data = await request.json();
     const eventModel = new EventModel(db);
 
-    // Update event with new data
-    const updates = {
-      type: data.type,
-      description: data.description,
-      status: data.status,
-      scheduled_date: data.start,
-      end_date: data.end,
-      is_all_day: data.isAllDay,
-      assignees: data.assignees,
+    // Convert teamMemberIds to ObjectIds
+    const teamMemberIds = Array.isArray(data.teamMemberIds || data.assignees)
+      ? (data.teamMemberIds || data.assignees).map(
+          (id: string) => new ObjectId(id)
+        )
+      : [];
+
+    // Map the frontend fields to database fields
+    const mappedUpdates: any = {
+      updated_at: new Date(),
     };
 
-    await eventModel.update(eventId, updates);
+    if (data.type) mappedUpdates.type = data.type;
+    if (data.description !== undefined)
+      mappedUpdates.description = data.description;
+    if (data.status) mappedUpdates.status = data.status;
+    if (data.start) mappedUpdates.start = new Date(data.start);
+    if (data.end) mappedUpdates.end = new Date(data.end);
+    if (typeof data.isAllDay === "boolean")
+      mappedUpdates.is_all_day = data.isAllDay;
 
-    return NextResponse.json({ success: true });
+    // Always update teamMemberIds array
+    mappedUpdates.teamMemberIds = teamMemberIds;
+
+    const success = await eventModel.update(eventId, mappedUpdates);
+
+    if (!success) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    // Fetch the updated event to return
+    const updatedEvent = await eventModel.findById(eventId);
+    if (!updatedEvent) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      event: eventModel.transformToApiEvent(updatedEvent),
+    });
   } catch (error) {
     console.error("Error updating event:", error);
     return NextResponse.json(

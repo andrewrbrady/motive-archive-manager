@@ -19,36 +19,35 @@ export async function GET(request: NextRequest) {
     if (searchParams.has("type")) {
       query.type = searchParams.get("type");
     }
-    if (searchParams.has("assignee")) {
-      query.assignees = searchParams.get("assignee");
+    if (searchParams.has("teamMember") || searchParams.has("assignee")) {
+      // Support both new and legacy parameter names
+      query.teamMemberIds =
+        searchParams.get("teamMember") || searchParams.get("assignee");
+    }
+    if (searchParams.has("car_id")) {
+      query.car_id = searchParams.get("car_id");
+    }
+    if (searchParams.has("project_id")) {
+      query.project_id = searchParams.get("project_id");
     }
     if (searchParams.has("from")) {
-      query.scheduled_date = {
-        ...query.scheduled_date,
+      query.start = {
+        ...query.start,
         $gte: new Date(searchParams.get("from")!),
       };
     }
     if (searchParams.has("to")) {
-      query.scheduled_date = {
-        ...query.scheduled_date,
+      query.start = {
+        ...query.start,
         $lte: new Date(searchParams.get("to")!),
       };
     }
 
     const events = await eventModel.findAll(query);
-    const transformedEvents: Event[] = events.map((event: any) => ({
-      id: event._id.toString(),
-      car_id: event.car_id,
-      description: event.description || "",
-      type: event.type,
-      status: event.status,
-      start: event.scheduled_date,
-      end: event.end_date,
-      assignees: event.assignees || [],
-      isAllDay: event.is_all_day || false,
-      createdAt: event.created_at.toISOString(),
-      updatedAt: event.updated_at.toISOString(),
-    }));
+    const transformedEvents: Event[] = events.map((event) =>
+      eventModel.transformToApiEvent(event)
+    );
+
     return NextResponse.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching all events:", error);

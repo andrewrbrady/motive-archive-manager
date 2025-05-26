@@ -47,39 +47,45 @@ export async function PUT(request: Request) {
     const eventObjectId = new ObjectId(eventId);
     const data = await request.json();
 
-    // [REMOVED] // [REMOVED] console.log("Updating event with data:", data); // Debug log
-
-    // Ensure assignees is always an array
-    const assignees = Array.isArray(data.assignees) ? data.assignees : [];
+    // Ensure teamMemberIds is always an array and convert to ObjectIds
+    const teamMemberIds = Array.isArray(data.teamMemberIds || data.assignees)
+      ? (data.teamMemberIds || data.assignees).map(
+          (id: string) => new ObjectId(id)
+        )
+      : [];
 
     // Map the frontend fields to database fields
-    const mappedUpdates = {
-      ...(data.type && { type: data.type }),
-      ...(data.description && { description: data.description }),
-      ...(data.status && { status: data.status }),
-      ...(data.start && { scheduled_date: data.start }),
-      ...(data.end && { end_date: data.end }),
-      ...(typeof data.isAllDay === "boolean" && { is_all_day: data.isAllDay }),
-      assignees, // Always update assignees array
-      updated_at: new Date(), // Ensure proper Date object
+    const mappedUpdates: any = {
+      updated_at: new Date(),
     };
 
-    // [REMOVED] // [REMOVED] console.log("Mapped updates:", mappedUpdates); // Debug log
+    if (data.type) mappedUpdates.type = data.type;
+    if (data.description !== undefined)
+      mappedUpdates.description = data.description;
+    if (data.status) mappedUpdates.status = data.status;
+    if (data.start) mappedUpdates.start = new Date(data.start);
+    if (data.end) mappedUpdates.end = new Date(data.end);
+    if (typeof data.isAllDay === "boolean")
+      mappedUpdates.is_all_day = data.isAllDay;
+
+    // Always update teamMemberIds array
+    mappedUpdates.teamMemberIds = teamMemberIds;
 
     const success = await eventModel.update(eventObjectId, mappedUpdates);
 
     if (!success) {
-      // [REMOVED] // [REMOVED] console.log("Event not found or update failed"); // Debug log
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     // Fetch the updated event to verify changes
     const updatedEvent = await eventModel.findById(eventObjectId);
-    // [REMOVED] // [REMOVED] console.log("Updated event:", updatedEvent); // Debug log
+    if (!updatedEvent) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
 
     return NextResponse.json({
       success: true,
-      event: updatedEvent,
+      event: eventModel.transformToApiEvent(updatedEvent),
     });
   } catch (error) {
     console.error("Error updating event:", error);

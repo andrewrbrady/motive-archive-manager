@@ -27,11 +27,13 @@ import { useUsers } from "@/hooks/useUsers";
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
   onDeliverableUpdated: () => void;
+  onClose: () => void;
 }
 
 export default function EditDeliverableForm({
   deliverable,
   onDeliverableUpdated,
+  onClose,
 }: EditDeliverableFormProps) {
   const { data: users = [] } = useUsers();
   const [isOpen, setIsOpen] = useState(false);
@@ -41,6 +43,30 @@ export default function EditDeliverableForm({
   const [type, setType] = useState<DeliverableType>(deliverable.type);
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
+  const [editor, setEditor] = useState(deliverable.firebase_uid || "");
+  const [editDeadline, setEditDeadline] = useState(
+    deliverable.edit_deadline
+      ? new Date(deliverable.edit_deadline).toISOString().split("T")[0]
+      : ""
+  );
+  const [releaseDate, setReleaseDate] = useState(
+    deliverable.release_date
+      ? new Date(deliverable.release_date).toISOString().split("T")[0]
+      : ""
+  );
+  const [dropboxLink, setDropboxLink] = useState(
+    deliverable.dropbox_link || ""
+  );
+  const [socialMediaLink, setSocialMediaLink] = useState(
+    deliverable.social_media_link || ""
+  );
+  const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
+
+  const handleSelectOpenChange = (selectId: string, open: boolean) => {
+    setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
+  };
+
+  const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
   // Helper function to find user UID from name (for legacy data)
   const findUserUidFromName = (editorName: string): string | null => {
@@ -74,19 +100,6 @@ export default function EditDeliverableForm({
       return "";
     }
   };
-
-  const [editDeadline, setEditDeadline] = useState(
-    safeFormatDate(deliverable.edit_deadline)
-  );
-  const [releaseDate, setReleaseDate] = useState(
-    safeFormatDate(deliverable.release_date)
-  );
-  const [dropboxLink, setDropboxLink] = useState(
-    deliverable.dropbox_link || ""
-  );
-  const [socialMediaLink, setSocialMediaLink] = useState(
-    deliverable.social_media_link || ""
-  );
 
   // Reset form data when deliverable changes
   useEffect(() => {
@@ -159,7 +172,11 @@ export default function EditDeliverableForm({
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full"
+        onEscapeKeyDown={(e) => isAnySelectOpen && e.preventDefault()}
+        onPointerDownOutside={(e) => isAnySelectOpen && e.preventDefault()}
+      >
         <DialogHeader className="flex-shrink-0 pb-4 border-b border-[hsl(var(--border-subtle))]">
           <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
             Edit Deliverable
@@ -206,10 +223,14 @@ export default function EditDeliverableForm({
                     </label>
                     <Select
                       value={platform}
-                      onValueChange={(value: Platform) => setPlatform(value)}
+                      onValueChange={(value) => setPlatform(value as Platform)}
+                      open={openSelects["platform"]}
+                      onOpenChange={(open) =>
+                        handleSelectOpenChange("platform", open)
+                      }
                     >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <SelectValue placeholder="Select platform" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Instagram Reels">
@@ -244,10 +265,16 @@ export default function EditDeliverableForm({
                     </label>
                     <Select
                       value={type}
-                      onValueChange={(value: DeliverableType) => setType(value)}
+                      onValueChange={(value) =>
+                        setType(value as DeliverableType)
+                      }
+                      open={openSelects["type"]}
+                      onOpenChange={(open) =>
+                        handleSelectOpenChange("type", open)
+                      }
                     >
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Photo Gallery">
@@ -306,8 +333,8 @@ export default function EditDeliverableForm({
                       Aspect Ratio
                     </label>
                     <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <SelectValue placeholder="Select aspect ratio" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="16:9">16:9</SelectItem>

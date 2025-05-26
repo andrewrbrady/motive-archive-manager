@@ -186,7 +186,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select platform" />
                       </SelectTrigger>
                       <SelectContent>
@@ -221,7 +221,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select tone" />
                       </SelectTrigger>
                       <SelectContent>
@@ -259,7 +259,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select style" />
                       </SelectTrigger>
                       <SelectContent>
@@ -294,7 +294,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
                         <SelectValue placeholder="Select length" />
                       </SelectTrigger>
                       <SelectContent>

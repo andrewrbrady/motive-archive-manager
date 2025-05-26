@@ -49,6 +49,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       [
         "overview",
         "timeline",
+        "events",
         "team",
         "cars",
         "assets",
@@ -70,6 +71,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         [
           "overview",
           "timeline",
+          "events",
           "team",
           "cars",
           "assets",
