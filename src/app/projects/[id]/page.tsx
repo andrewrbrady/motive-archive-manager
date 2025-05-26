@@ -267,7 +267,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   return (
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
-        <div className="space-y-6 sm:space-y-8">
+        <div>
           {/* Header */}
           <ProjectHeader
             project={project}

@@ -28,9 +28,12 @@ import {
   Calendar,
   Users,
   DollarSign,
+  ImageIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import Image from "next/image";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
@@ -41,6 +44,18 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  // State for tracking image loading for each project
+  const [imageStates, setImageStates] = useState<
+    Record<
+      string,
+      {
+        loading: boolean;
+        url: string | null;
+        error: boolean;
+      }
+    >
+  >({});
 
   useEffect(() => {
     if (status === "loading") return;
@@ -68,6 +83,74 @@ export default function ProjectsPage() {
 
       const data: ProjectListResponse = await response.json();
       setProjects(data.projects);
+
+      // Initialize image states and fetch primary images
+      const newImageStates: Record<
+        string,
+        {
+          loading: boolean;
+          url: string | null;
+          error: boolean;
+        }
+      > = {};
+
+      data.projects.forEach((project) => {
+        if (project.primaryImageId) {
+          newImageStates[project._id!] = {
+            loading: true,
+            url: null,
+            error: false,
+          };
+        } else {
+          newImageStates[project._id!] = {
+            loading: false,
+            url: null,
+            error: false,
+          };
+        }
+      });
+
+      setImageStates(newImageStates);
+
+      // Fetch primary images
+      data.projects.forEach(async (project) => {
+        if (project.primaryImageId) {
+          try {
+            const imageResponse = await fetch(
+              `/api/images/${project.primaryImageId}`
+            );
+            if (imageResponse.ok) {
+              const imageData = await imageResponse.json();
+              setImageStates((prev) => ({
+                ...prev,
+                [project._id!]: {
+                  loading: false,
+                  url: imageData.url,
+                  error: false,
+                },
+              }));
+            } else {
+              setImageStates((prev) => ({
+                ...prev,
+                [project._id!]: {
+                  loading: false,
+                  url: null,
+                  error: true,
+                },
+              }));
+            }
+          } catch (error) {
+            setImageStates((prev) => ({
+              ...prev,
+              [project._id!]: {
+                loading: false,
+                url: null,
+                error: true,
+              },
+            }));
+          }
+        }
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -197,91 +280,127 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map((project) => (
-                <Card
-                  key={project._id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => router.push(`/projects/${project._id}`)}
-                >
-                  <CardHeader>
-                    <div className="flex justify-between items-start mb-2">
-                      <CardTitle className="text-lg line-clamp-2">
-                        {project.title}
-                      </CardTitle>
-                    </div>
-                    <div className="flex gap-2 mb-2">
-                      <Badge className={getStatusColor(project.status)}>
-                        {project.status.replace("_", " ")}
-                      </Badge>
-                      <Badge variant="outline">
-                        {getTypeLabel(project.type)}
-                      </Badge>
-                    </div>
-                    <CardDescription className="line-clamp-3">
-                      {project.description}
-                    </CardDescription>
-                  </CardHeader>
+              {projects.map((project) => {
+                const imageState = imageStates[project._id!] || {
+                  loading: false,
+                  url: null,
+                  error: false,
+                };
 
-                  <CardContent>
-                    <div className="space-y-3">
-                      {/* Progress */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full transition-all"
-                            style={{ width: `${project.progress.percentage}%` }}
-                          />
+                return (
+                  <Card
+                    key={project._id}
+                    className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
+                    onClick={() => router.push(`/projects/${project._id}`)}
+                  >
+                    {/* Primary Image */}
+                    <div className="relative aspect-[16/9]">
+                      {imageState.loading ? (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <LoadingSpinner size="lg" />
                         </div>
-                        <span className="text-sm text-gray-600">
-                          {project.progress.percentage}%
-                        </span>
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {format(
-                            new Date(project.timeline.startDate),
-                            "MMM d"
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {project.members.length}
-                        </div>
-                        {project.budget && (
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            {project.budget.currency}{" "}
-                            {project.budget.total.toLocaleString()}
+                      ) : imageState.url ? (
+                        <Image
+                          src={imageState.url}
+                          alt={project.title}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <ImageIcon className="h-8 w-8" />
+                            <span className="text-sm font-medium">
+                              No Image
+                            </span>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Tags */}
-                      {project.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {project.tags.slice(0, 3).map((tag, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                          {project.tags.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{project.tags.length - 3}
-                            </Badge>
-                          )}
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <CardHeader>
+                      <div className="flex justify-between items-start mb-2">
+                        <CardTitle className="text-lg line-clamp-2">
+                          {project.title}
+                        </CardTitle>
+                      </div>
+                      <div className="flex gap-2 mb-2">
+                        <Badge className={getStatusColor(project.status)}>
+                          {project.status.replace("_", " ")}
+                        </Badge>
+                        <Badge variant="outline">
+                          {getTypeLabel(project.type)}
+                        </Badge>
+                      </div>
+                      <CardDescription className="line-clamp-3">
+                        {project.description}
+                      </CardDescription>
+                    </CardHeader>
+
+                    <CardContent>
+                      <div className="space-y-3">
+                        {/* Progress */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all"
+                              style={{
+                                width: `${project.progress.percentage}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {project.progress.percentage}%
+                          </span>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {format(
+                              new Date(project.timeline.startDate),
+                              "MMM d"
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {project.members.length}
+                          </div>
+                          {project.budget && (
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              {project.budget.currency}{" "}
+                              {project.budget.total.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tags */}
+                        {project.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {project.tags.slice(0, 3).map((tag, index) => (
+                              <Badge
+                                key={index}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                            {project.tags.length > 3 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{project.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

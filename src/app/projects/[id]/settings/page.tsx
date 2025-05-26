@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { ArrowLeft, Save, Upload } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { PrimaryImageSelector } from "@/components/projects/PrimaryImageSelector";
 
 interface ProjectSettingsPageProps {
   params: Promise<{
@@ -120,6 +121,10 @@ export default function ProjectSettingsPage({
     router.push(`/projects/${resolvedParams.id}`);
   };
 
+  const handlePrimaryImageSelect = (imageId: string | null) => {
+    setFormData({ ...formData, primaryImageId: imageId || "" });
+  };
+
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -201,23 +206,16 @@ export default function ProjectSettingsPage({
                   />
                 </div>
 
-                {/* Primary Image ID */}
+                {/* Primary Image Selector */}
                 <div className="space-y-2">
-                  <Label htmlFor="primaryImageId">Primary Image ID</Label>
-                  <Input
-                    id="primaryImageId"
-                    value={formData.primaryImageId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        primaryImageId: e.target.value,
-                      })
-                    }
-                    placeholder="Enter image ID (optional)"
+                  <Label>Primary Image</Label>
+                  <PrimaryImageSelector
+                    selectedImageId={formData.primaryImageId || undefined}
+                    onImageSelect={handlePrimaryImageSelect}
                   />
                   <p className="text-sm text-muted-foreground">
-                    The ID of the image to use as the primary image for this
-                    project
+                    Select an image to use as the primary image for this
+                    project. This will be displayed as the project thumbnail.
                   </p>
                 </div>
 

@@ -1,6 +1,11 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle, useEffect } from "react";
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+  useState,
+} from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -45,6 +50,13 @@ interface PromptFormProps {
   externalAiModel?: string; // External AI model state for syncing
 }
 
+interface LengthSetting {
+  key: string;
+  name: string;
+  description: string;
+  instructions: string;
+}
+
 const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
   (
     {
@@ -57,6 +69,33 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
     },
     ref
   ) => {
+    const [lengthSettings, setLengthSettings] = useState<LengthSetting[]>([
+      {
+        key: "concise",
+        name: "Concise",
+        description: "1-2 lines",
+        instructions: "",
+      },
+      {
+        key: "standard",
+        name: "Standard",
+        description: "2-3 lines",
+        instructions: "",
+      },
+      {
+        key: "detailed",
+        name: "Detailed",
+        description: "3-4 lines",
+        instructions: "",
+      },
+      {
+        key: "comprehensive",
+        name: "Comprehensive",
+        description: "4+ lines",
+        instructions: "",
+      },
+    ]);
+
     const {
       register,
       handleSubmit,
@@ -82,6 +121,24 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
         handleSubmit(onSubmit)();
       },
     }));
+
+    // Fetch length settings on component mount
+    useEffect(() => {
+      const fetchLengthSettings = async () => {
+        try {
+          const response = await fetch("/api/length-settings");
+          if (response.ok) {
+            const settings = await response.json();
+            setLengthSettings(settings);
+          }
+        } catch (error) {
+          console.error("Error fetching length settings:", error);
+          // Keep default settings on error
+        }
+      };
+
+      fetchLengthSettings();
+    }, []);
 
     useEffect(() => {
       if (renderModelSelector && externalAiModel) {
@@ -298,18 +355,11 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                         <SelectValue placeholder="Select length" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="concise">
-                          Concise (1-2 lines)
-                        </SelectItem>
-                        <SelectItem value="standard">
-                          Standard (2-3 lines)
-                        </SelectItem>
-                        <SelectItem value="detailed">
-                          Detailed (3-4 lines)
-                        </SelectItem>
-                        <SelectItem value="comprehensive">
-                          Comprehensive (4+ lines)
-                        </SelectItem>
+                        {lengthSettings.map((setting) => (
+                          <SelectItem key={setting.key} value={setting.key}>
+                            {setting.name} ({setting.description})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}

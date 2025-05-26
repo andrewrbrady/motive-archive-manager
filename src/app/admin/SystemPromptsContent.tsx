@@ -111,9 +111,10 @@ const SystemPromptsContent: React.FC = () => {
     try {
       const url = "/api/system-prompts";
       const method = editingPrompt ? "PUT" : "POST";
+
       const body = editingPrompt
         ? { id: editingPrompt._id, ...formData }
-        : formData;
+        : { ...formData };
 
       const response = await fetch(url, {
         method,

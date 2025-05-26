@@ -51,13 +51,44 @@ export function CustomDropdown({
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
+
+      // Check if we're inside a modal/dialog
+      const isInModal = triggerRef.current.closest('[role="dialog"]') !== null;
+
+      // Calculate position more accurately for modals
+      let top = triggerRect.bottom + window.scrollY;
+      let left = triggerRect.left + window.scrollX;
+
+      // If in modal, adjust for potential viewport constraints
+      if (isInModal) {
+        // Ensure dropdown doesn't go off-screen
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const dropdownHeight = Math.min(240, options.length * 40 + 20); // Estimate dropdown height
+
+        // If dropdown would go below viewport, position it above the trigger
+        if (top + dropdownHeight > viewportHeight) {
+          top = triggerRect.top + window.scrollY - dropdownHeight - 4;
+        }
+
+        // Ensure dropdown doesn't go off the right edge
+        if (left + triggerRect.width > viewportWidth - 20) {
+          left = viewportWidth - triggerRect.width - 20;
+        }
+
+        // Ensure dropdown doesn't go off the left edge
+        if (left < 20) {
+          left = 20;
+        }
+      }
+
       setDropdownPosition({
-        top: triggerRect.bottom + window.scrollY,
-        left: triggerRect.left + window.scrollX,
-        width: triggerRect.width + 16, // Add extra width to prevent clipping
+        top,
+        left,
+        width: Math.max(triggerRect.width, 200), // Minimum width of 200px
       });
     }
-  }, [isOpen]);
+  }, [isOpen, options.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,6 +110,20 @@ export function CustomDropdown({
     }
   }, [isOpen]);
 
+  // Close dropdown on escape key
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [isOpen]);
+
   const handleSelectOption = (optionValue: string) => {
     onChange(optionValue);
     setIsOpen(false);
@@ -93,7 +138,7 @@ export function CustomDropdown({
         right: 0,
         bottom: 0,
         pointerEvents: "none",
-        zIndex: 9999,
+        zIndex: 99999, // Higher z-index to ensure it's above modals
       }}
       onWheel={(e) => {
         e.stopPropagation();
@@ -101,13 +146,14 @@ export function CustomDropdown({
     >
       <div
         ref={dropdownRef}
-        className="bg-background rounded-lg border border-input shadow-xl overflow-y-auto max-h-60 animate-in slide-in-from-top-2 duration-200 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
+        className="bg-background rounded-lg border border-input shadow-xl overflow-y-auto max-h-60 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
         style={{
           position: "absolute",
           top: dropdownPosition.top,
           left: dropdownPosition.left,
           width: dropdownPosition.width,
           pointerEvents: "auto",
+          maxHeight: "240px", // Explicit max height
         }}
         onWheel={(e) => {
           e.stopPropagation();

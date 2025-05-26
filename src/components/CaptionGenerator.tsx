@@ -51,7 +51,13 @@ type Platform = "instagram" | "youtube";
 type Template = "none" | "bat" | "dealer" | "question";
 type Tone = "professional" | "casual" | "enthusiastic" | "technical";
 type Style = "descriptive" | "minimal" | "storytelling";
-type Length = "concise" | "standard" | "detailed" | "comprehensive";
+
+interface LengthSetting {
+  key: string;
+  name: string;
+  description: string;
+  instructions: string;
+}
 
 const TEMPLATE_CONTEXTS = {
   none: "",
@@ -105,7 +111,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   const [temperature, setTemperature] = useState(1.0);
   const [tone, setTone] = useState<Tone>("professional");
   const [style, setStyle] = useState<Style>("descriptive");
-  const [length, setLength] = useState<Length>("concise");
+  const [length, setLength] = useState<LengthSetting | null>(null);
   const [savedCaptions, setSavedCaptions] = useState<
     Array<{
       _id: string;
@@ -137,6 +143,22 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   const allModels = getAllModels();
   // Add ref for PromptForm
   const promptFormRef = useRef<PromptFormRef>(null);
+
+  // System prompt selection state
+  const [systemPrompts, setSystemPrompts] = useState<any[]>([]);
+  const [selectedSystemPromptId, setSelectedSystemPromptId] =
+    useState<string>("");
+  const [loadingSystemPrompts, setLoadingSystemPrompts] = useState(false);
+  const [systemPromptError, setSystemPromptError] = useState<string | null>(
+    null
+  );
+
+  // Length settings state
+  const [lengthSettings, setLengthSettings] = useState<LengthSetting[]>([]);
+  const [loadingLengthSettings, setLoadingLengthSettings] = useState(false);
+  const [lengthSettingsError, setLengthSettingsError] = useState<string | null>(
+    null
+  );
 
   // Group models by provider for UI display
   const modelsByProvider = Object.values(llmProviders).map((provider) => ({
@@ -216,7 +238,75 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       })
       .catch((err) => setPromptError("Failed to fetch prompts"))
       .finally(() => setPromptLoading(false));
-  }, []); // Fetch once on mount
+  }, []);
+
+  // Fetch system prompts when component mounts
+  useEffect(() => {
+    fetchSystemPrompts();
+  }, []);
+
+  // Fetch length settings when component mounts
+  useEffect(() => {
+    fetchLengthSettings();
+  }, []);
+
+  // Refetch system prompts when length changes
+  useEffect(() => {
+    fetchSystemPrompts();
+  }, [length]);
+
+  const fetchSystemPrompts = async () => {
+    try {
+      setLoadingSystemPrompts(true);
+      setSystemPromptError(null);
+
+      // Include length parameter if one is selected
+      const lengthParam = length ? `&length=${length.key}` : "";
+      const response = await fetch(
+        `/api/system-prompts/list?type=car_caption${lengthParam}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch system prompts");
+      }
+
+      const data = await response.json();
+      setSystemPrompts(Array.isArray(data) ? data : []);
+
+      // Auto-select the first active system prompt if available
+      const activePrompt = data.find((prompt: any) => prompt.isActive);
+      if (activePrompt) {
+        setSelectedSystemPromptId(activePrompt._id);
+      } else if (data.length > 0) {
+        setSelectedSystemPromptId(data[0]._id);
+      }
+    } catch (error) {
+      console.error("Error fetching system prompts:", error);
+      setSystemPromptError("Failed to load system prompts");
+    } finally {
+      setLoadingSystemPrompts(false);
+    }
+  };
+
+  const fetchLengthSettings = async () => {
+    try {
+      setLoadingLengthSettings(true);
+      setLengthSettingsError(null);
+
+      const response = await fetch("/api/length-settings");
+      if (!response.ok) {
+        throw new Error("Failed to fetch length settings");
+      }
+
+      const data = await response.json();
+      setLengthSettings(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching length settings:", error);
+      setLengthSettingsError("Failed to load length settings");
+    } finally {
+      setLoadingLengthSettings(false);
+    }
+  };
 
   // When a prompt is selected, update local state for prompt/model
   useEffect(() => {
@@ -224,7 +314,6 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       setContext(selectedPrompt.prompt);
       setTone(selectedPrompt.tone);
       setStyle(selectedPrompt.style);
-      setLength(selectedPrompt.length);
       setPlatform(selectedPrompt.platform);
       setModel(selectedPrompt.aiModel);
 
@@ -262,8 +351,11 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
           setContext(data.prompt);
           setTone(data.tone);
           setStyle(data.style);
-          setLength(data.length);
-          // setPlatform(data.platform); // Careful: This could cause a loop if data.platform is different
+          // Find the corresponding length setting object
+          const lengthSetting = lengthSettings.find(
+            (l) => l.key === data.length
+          );
+          setLength(lengthSetting || null);
           setModel(data.aiModel);
           const modelDetails = findModelById(data.aiModel);
           if (modelDetails) {
@@ -277,9 +369,19 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         // Silently fail or set an error state if default prompt loading is critical
         console.warn(`No default prompt found for platform: ${platform}`);
       });
-  }, [platform, selectedPrompt, promptLoading]); // Ensure all relevant dependencies are here. `promptList` was considered but might cause too many re-runs.
+  }, [platform, selectedPrompt, promptLoading, lengthSettings]); // Ensure all relevant dependencies are here. `promptList` was considered but might cause too many re-runs.
 
   const handleGenerate = async (_captionId?: string) => {
+    if (!selectedSystemPromptId) {
+      setError("Please select a system prompt to generate captions");
+      return;
+    }
+
+    if (!length) {
+      setError("Please select a caption length to generate captions");
+      return;
+    }
+
     setIsGenerating(true);
     setError(null);
     try {
@@ -332,9 +434,10 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
           temperature,
           tone,
           style,
-          length,
+          length: length?.key,
           template,
           aiModel: model,
+          systemPromptId: selectedSystemPromptId,
         }),
       });
 
@@ -554,7 +657,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                 setContext("");
                 setTone("professional");
                 setStyle("descriptive");
-                setLength("concise");
+                setLength(null);
                 setModel("claude-3-5-sonnet-20241022");
                 setProvider("anthropic");
                 return;
@@ -647,7 +750,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
             setContext(""); // Default or empty context for new prompt
             setTone("professional"); // Default tone
             setStyle("descriptive"); // Default style
-            setLength("concise"); // Default length
+            setLength(null); // Default length
             // setPlatform("instagram"); // Keep current platform or set a default
             setModel("claude-3-5-sonnet-20241022"); // Default model
             setProvider("anthropic"); // Default provider
@@ -1021,14 +1124,126 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
           <span>
             Length:{" "}
             <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">
-              {length}
+              {length?.name}
             </span>
           </span>
         </div>
       </div>
+
+      {/* Length Selection */}
+      <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
+            Caption Length
+          </h3>
+          {lengthSettingsError && (
+            <span className="text-xs text-red-500">{lengthSettingsError}</span>
+          )}
+        </div>
+
+        {loadingLengthSettings ? (
+          <div className="text-sm text-[hsl(var(--foreground-muted))]">
+            Loading length settings...
+          </div>
+        ) : lengthSettings.length > 0 ? (
+          <div className="space-y-2">
+            <Select
+              value={length?.key || ""}
+              onValueChange={(value) => {
+                const selectedLength = lengthSettings.find(
+                  (l) => l.key === value
+                );
+                setLength(selectedLength || null);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select caption length" />
+              </SelectTrigger>
+              <SelectContent>
+                {lengthSettings.map((lengthSetting) => (
+                  <SelectItem key={lengthSetting.key} value={lengthSetting.key}>
+                    <div className="flex flex-col gap-1 w-full">
+                      <span className="font-medium">{lengthSetting.name}</span>
+                      <span className="text-xs text-[hsl(var(--foreground-muted))]">
+                        {lengthSetting.description}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {length && (
+              <div className="text-xs text-[hsl(var(--foreground-muted))]">
+                {length.instructions}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-[hsl(var(--foreground-muted))]">
+            No length settings available. Please configure them in admin
+            settings.
+          </div>
+        )}
+      </div>
+
+      {/* System Prompt Selection */}
+      <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
+            System Prompt
+          </h3>
+          {systemPromptError && (
+            <span className="text-xs text-red-500">{systemPromptError}</span>
+          )}
+        </div>
+
+        {loadingSystemPrompts ? (
+          <div className="text-sm text-[hsl(var(--foreground-muted))]">
+            Loading system prompts...
+          </div>
+        ) : systemPrompts.length > 0 ? (
+          <div className="space-y-2">
+            <Select
+              value={selectedSystemPromptId}
+              onValueChange={setSelectedSystemPromptId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a system prompt" />
+              </SelectTrigger>
+              <SelectContent>
+                {systemPrompts.map((prompt) => (
+                  <SelectItem key={prompt._id} value={prompt._id}>
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="truncate">{prompt.name}</span>
+                      {prompt.isActive && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedSystemPromptId && (
+              <div className="text-xs text-[hsl(var(--foreground-muted))]">
+                {
+                  systemPrompts.find((p) => p._id === selectedSystemPromptId)
+                    ?.description
+                }
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-[hsl(var(--foreground-muted))]">
+            No system prompts available for this length setting.
+          </div>
+        )}
+      </div>
+
       <Button
         onClick={() => handleGenerate()}
-        disabled={isGenerating}
+        disabled={isGenerating || !selectedSystemPromptId || !length}
         variant="outline"
         className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
       >

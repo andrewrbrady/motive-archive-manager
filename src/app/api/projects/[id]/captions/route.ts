@@ -79,7 +79,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { platform, context, caption, carIds } = body;
+    const { platform, context, caption, carIds, eventIds } = body;
 
     if (!platform || !caption) {
       return NextResponse.json(
@@ -120,6 +120,7 @@ export async function POST(
       _id: new ObjectId(),
       projectId: id,
       carIds: carIds || [],
+      eventIds: eventIds || [],
       platform,
       context: context || "",
       caption,
@@ -166,7 +167,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { platform, context, caption, carIds } = body;
+    const { platform, context, caption, carIds, eventIds } = body;
 
     if (!caption) {
       return NextResponse.json(
@@ -212,6 +213,7 @@ export async function PATCH(
     if (platform) updateData.platform = platform;
     if (context !== undefined) updateData.context = context;
     if (carIds) updateData.carIds = carIds;
+    if (eventIds) updateData.eventIds = eventIds;
 
     const result = await db
       .collection("project_captions")

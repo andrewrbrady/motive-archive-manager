@@ -23,6 +23,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import CaptionPromptsContent from "./CaptionPromptsContent";
 import SystemPromptsContent from "./SystemPromptsContent";
+import LengthSettingsContent from "./LengthSettingsContent";
 
 export default function AdminTabs() {
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
@@ -283,6 +284,11 @@ export default function AdminTabs() {
       value: "system-prompts",
       label: "System Prompts",
       content: <SystemPromptsContent />,
+    },
+    {
+      value: "length-settings",
+      label: "Length Settings",
+      content: <LengthSettingsContent />,
     },
   ];
 

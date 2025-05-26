@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       length,
       template,
       aiModel,
+      systemPromptId,
     } = await request.json();
 
     // Log received data for debugging
@@ -260,8 +261,8 @@ export async function POST(request: NextRequest) {
     const guidelines =
       CAPTION_GUIDELINES[platform as keyof typeof CAPTION_GUIDELINES];
 
-    // Define length guidelines
-    const lengthGuidelines = {
+    // Fetch custom length guidelines from database
+    let lengthGuidelines: { [key: string]: string } = {
       concise: "Keep the caption very brief, 1-2 lines maximum.",
       standard: "Write a standard length caption of 2-3 lines.",
       detailed:
@@ -269,6 +270,31 @@ export async function POST(request: NextRequest) {
       comprehensive:
         "Write a comprehensive caption of 4+ lines with extensive details.",
     };
+
+    try {
+      const lengthSettingsResponse = await fetch(
+        `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/length-settings`,
+        {
+          headers: {
+            Cookie: request.headers.get("cookie") || "",
+          },
+        }
+      );
+      if (lengthSettingsResponse.ok) {
+        const lengthSettings = await lengthSettingsResponse.json();
+        // Convert array to object for easy lookup
+        lengthGuidelines = lengthSettings.reduce(
+          (acc: { [key: string]: string }, setting: any) => {
+            acc[setting.key] = setting.instructions;
+            return acc;
+          },
+          {}
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching length settings:", error);
+      // Continue with default guidelines
+    }
 
     // Define tone guidelines
     const toneGuidelines = {
@@ -315,47 +341,34 @@ ${template === "dealer" ? "- Do not include the dealer reference - it will be ad
 - Each caption needs to include the hashtags #motivearchive and #thecollectorsresrouce at the very end, without exception`;
 
     // Build system prompt that works across providers
-    // Fetch the active system prompt from database
+    // Fetch the selected system prompt from database
     let systemPrompt = "";
     try {
-      const systemPromptResponse = await fetch(
-        `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active?type=car_caption`
-      );
-      if (systemPromptResponse.ok) {
-        const systemPromptData = await systemPromptResponse.json();
-        systemPrompt = systemPromptData.prompt;
-      } else {
-        // Fallback to default if API fails
-        systemPrompt = `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
-
-${guidelines.map((g) => `- ${g}`).join("\n")}
-
-Length Guideline: ${
-          lengthGuidelines[length as keyof typeof lengthGuidelines] ||
-          lengthGuidelines.standard
+      if (systemPromptId) {
+        // Fetch specific system prompt by ID
+        const systemPromptResponse = await fetch(
+          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/${systemPromptId}`,
+          {
+            headers: {
+              Cookie: request.headers.get("cookie") || "",
+            },
+          }
+        );
+        if (systemPromptResponse.ok) {
+          const systemPromptData = await systemPromptResponse.json();
+          systemPrompt = systemPromptData.prompt;
         }
-Tone Guideline: ${
-          toneGuidelines[tone as keyof typeof toneGuidelines] ||
-          toneGuidelines.professional
+      }
+
+      // Fallback to active system prompt if no specific prompt selected or fetch failed
+      if (!systemPrompt) {
+        const systemPromptResponse = await fetch(
+          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active?type=car_caption`
+        );
+        if (systemPromptResponse.ok) {
+          const systemPromptData = await systemPromptResponse.json();
+          systemPrompt = systemPromptData.prompt;
         }
-Style Guideline: ${
-          styleGuidelines[style as keyof typeof styleGuidelines] ||
-          styleGuidelines.descriptive
-        }
-
-${context ? `USER'S SPECIFIC INSTRUCTIONS: ${context}` : ""}
-
-The first line of every caption must follow this format:
-[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
-Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
-
-${
-  clientInfo && clientInfo.includeInCaption && clientInfo.handle
-    ? `IMPORTANT: You MUST include the client/dealer handle ${clientInfo.handle} in the caption.`
-    : ""
-}
-
-Important: End the caption with relevant hashtags on a new line.`;
       }
     } catch (error) {
       console.error("Error fetching system prompt:", error);
@@ -426,17 +439,28 @@ ${
 Important: End the caption with relevant hashtags on a new line.`;
 
     // User prompt construction
-    let userPrompt = `Create a caption for this car${
-      template === "dealer" ? " that will lead into a dealer reference" : ""
-    }:
+    const userPromptParts = [];
 
-Car Specifications:
-${specs}
+    // Add additional context/instructions at the top if provided
+    if (context) {
+      userPromptParts.push("ADDITIONAL INSTRUCTIONS:");
+      userPromptParts.push(context);
+      userPromptParts.push("");
+    }
 
-User's specific instructions: ${context}
+    userPromptParts.push(
+      `Create a caption for this car${
+        template === "dealer" ? " that will lead into a dealer reference" : ""
+      }:`
+    );
+    userPromptParts.push("");
+    userPromptParts.push("Car Specifications:");
+    userPromptParts.push(specs);
+    userPromptParts.push("");
+    userPromptParts.push("Follow these rules:");
+    userPromptParts.push(promptInstructions);
 
-Follow these rules:
-${promptInstructions}`;
+    let userPrompt = userPromptParts.join("\n");
 
     // Add client handle instruction to the user prompt as well for emphasis
     if (clientInfo && clientInfo.includeInCaption && clientInfo.handle) {
@@ -445,13 +469,26 @@ ${promptInstructions}`;
 
     // If this is a question template, adapt the prompt accordingly
     if (template === "question") {
-      userPrompt = `Create a caption for this car that will lead into this specific question: ${context}
+      const questionPromptParts = [];
 
-Car Specifications:
-${specs}
+      // Add additional context/instructions at the top if provided
+      if (context) {
+        questionPromptParts.push("ADDITIONAL INSTRUCTIONS:");
+        questionPromptParts.push(context);
+        questionPromptParts.push("");
+      }
 
-Follow these rules:
-${promptInstructions}`;
+      questionPromptParts.push(
+        `Create a caption for this car that will lead into this specific question: ${context}`
+      );
+      questionPromptParts.push("");
+      questionPromptParts.push("Car Specifications:");
+      questionPromptParts.push(specs);
+      questionPromptParts.push("");
+      questionPromptParts.push("Follow these rules:");
+      questionPromptParts.push(promptInstructions);
+
+      userPrompt = questionPromptParts.join("\n");
     }
 
     // Log the final prompt
