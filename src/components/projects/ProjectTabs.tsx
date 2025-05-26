@@ -7,7 +7,7 @@ import { ProjectTeamTab } from "./ProjectTeamTab";
 import { ProjectAssetsTab } from "./ProjectAssetsTab";
 import { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 import { ProjectCarsTab } from "./ProjectCarsTab";
-import { ProjectCaptionGenerator } from "./ProjectCaptionGenerator";
+import { RevisedProjectCaptionGenerator as ProjectCaptionGenerator } from "./RevisedProjectCaptionGenerator";
 import ProjectEventsTab from "./ProjectEventsTab";
 import { ProjectCalendarTab } from "./ProjectCalendarTab";
 import { Project } from "@/types/project";
