@@ -61,10 +61,17 @@ interface Car {
   description: string;
 }
 
+interface Gallery {
+  _id: ObjectId;
+  imageIds: ObjectId[];
+  updatedAt: string;
+}
+
 // Add type for MongoDB collections
 interface Collections {
   images: Collection<Image>;
   cars: Collection<Car>;
+  galleries: Collection<Gallery>;
 }
 
 // Batch size for MongoDB operations
@@ -428,6 +435,7 @@ export async function POST(request: NextRequest) {
       const collections: Collections = {
         images: db.collection("images"),
         cars: db.collection("cars"),
+        galleries: db.collection("galleries"),
       };
 
       // Fetch car information first
@@ -596,6 +604,7 @@ export async function DELETE(request: NextRequest) {
     const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
     const imagesCollection = db.collection("images");
     const carsCollection = db.collection("cars");
+    const galleriesCollection = db.collection("galleries");
 
     // First check if these are UUIDs rather than ObjectIds (Cloudflare IDs)
     // Handle both ObjectIds and string IDs to maximize compatibility
@@ -659,6 +668,7 @@ export async function DELETE(request: NextRequest) {
           imageId: string;
           cloudflareId: string;
           carUpdateResult?: boolean;
+          galleryUpdateResult?: boolean;
           imageDeleteResult?: boolean;
           error?: string;
           success: boolean;
@@ -700,15 +710,53 @@ export async function DELETE(request: NextRequest) {
           `Processing deletion for image: ${image._id}, carId: ${image.carId}, cloudflareId: ${image.cloudflareId}`
         );
 
-        // 1. Remove image ID from the car document
-        const carUpdateResult = await carsCollection.updateOne(
-          { _id: image.carId },
-          { $pull: { imageIds: image._id } as any }
+        // 1. Remove image ID from the car document (both imageIds and processedImageIds)
+        let carUpdateResult = { modifiedCount: 0 };
+
+        if (image.carId) {
+          // Handle both string and ObjectId carIds
+          let carObjectId;
+          if (typeof image.carId === "string") {
+            if (ObjectId.isValid(image.carId)) {
+              carObjectId = new ObjectId(image.carId);
+            } else {
+              console.log(
+                `Invalid carId string: ${image.carId}, skipping car update`
+              );
+              carObjectId = null;
+            }
+          } else {
+            carObjectId = image.carId;
+          }
+
+          if (carObjectId) {
+            carUpdateResult = await carsCollection.updateOne(
+              { _id: carObjectId },
+              {
+                $pull: {
+                  imageIds: image._id,
+                  processedImageIds: image._id,
+                } as any,
+              }
+            );
+          }
+        }
+
+        // 2. Remove image ID from all galleries (both imageIds and orderedImages)
+        const galleryUpdateResult = await galleriesCollection.updateMany(
+          {
+            $or: [{ imageIds: image._id }, { "orderedImages.id": image._id }],
+          },
+          {
+            $pull: {
+              imageIds: image._id,
+              orderedImages: { id: image._id },
+            } as any,
+            $set: { updatedAt: new Date().toISOString() },
+          }
         );
 
-        // [REMOVED] // [REMOVED] console.log(`Car update result: ${JSON.stringify(carUpdateResult)}`);
-
-        // 2. Delete the image document
+        // 3. Delete the image document
         const deleteResult = await imagesCollection.deleteOne({
           _id: image._id,
         });
@@ -718,9 +766,9 @@ export async function DELETE(request: NextRequest) {
           imageId: image._id.toString(),
           cloudflareId: image.cloudflareId,
           carUpdateResult: carUpdateResult.modifiedCount > 0,
+          galleryUpdateResult: galleryUpdateResult.modifiedCount > 0,
           imageDeleteResult: deleteResult.deletedCount > 0,
-          success:
-            carUpdateResult.modifiedCount > 0 && deleteResult.deletedCount > 0,
+          success: deleteResult.deletedCount > 0, // Main success criteria is image deletion
         };
 
         mongoDeleteResults.push(resultItem);

@@ -338,8 +338,8 @@ export default function GalleryPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* <Navbar /> */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
+      <main className="container-wide px-6 py-8">
+        <div className="space-y-6 sm:space-y-8">
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -362,7 +362,7 @@ export default function GalleryPage() {
                       }))
                     }
                     placeholder="Gallery name"
-                    className="text-2xl font-semibold"
+                    className="text-lg font-medium"
                   />
                   <Textarea
                     value={editedGallery.description}
@@ -377,11 +377,11 @@ export default function GalleryPage() {
                 </div>
               ) : (
                 <div>
-                  <h1 className="text-3xl font-semibold tracking-tight">
+                  <h1 className="text-lg uppercase tracking-wide font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
                     {gallery.name}
                   </h1>
                   {gallery.description && (
-                    <p className="text-muted-foreground mt-2">
+                    <p className="text-muted-foreground mt-1">
                       {gallery.description}
                     </p>
                   )}

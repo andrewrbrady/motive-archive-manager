@@ -85,6 +85,7 @@ export async function DELETE(request: Request) {
     const db = await getDatabase();
     const imagesCollection = db.collection<Image>("images");
     const carsCollection = db.collection<CarDocument>("cars");
+    const galleriesCollection = db.collection("galleries");
 
     // First, try to find the images directly by their IDs
     const query = {
@@ -117,6 +118,7 @@ export async function DELETE(request: Request) {
       deletedFromMongoDB: 0,
       removedFromCar: false,
       deletedFromCloudflare: 0,
+      removedFromGalleries: false,
       errors: [] as any[],
     };
 
@@ -133,12 +135,13 @@ export async function DELETE(request: Request) {
     // [REMOVED] // [REMOVED] console.log("Cloudflare IDs to delete:", cloudflareIdsToDelete);
 
     try {
-      // 1. First, update the car document to remove image references
+      // 1. First, update the car document to remove image references (both imageIds and processedImageIds)
       const updateResult = await carsCollection.updateOne(
         { _id: carObjectId },
         {
           $pull: {
             imageIds: { $in: imageIdsToDelete.map((id) => id.toString()) },
+            processedImageIds: { $in: imageIdsToDelete },
           },
         }
       );
@@ -146,7 +149,26 @@ export async function DELETE(request: Request) {
       results.removedFromCar = updateResult.modifiedCount > 0;
       // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
 
-      // 2. Then, delete from MongoDB images collection
+      // 2. Remove images from all galleries (both imageIds and orderedImages)
+      const galleryUpdateResult = await galleriesCollection.updateMany(
+        {
+          $or: [
+            { imageIds: { $in: imageIdsToDelete } },
+            { "orderedImages.id": { $in: imageIdsToDelete } },
+          ],
+        },
+        {
+          $pull: {
+            imageIds: { $in: imageIdsToDelete },
+            orderedImages: { id: { $in: imageIdsToDelete } },
+          } as any,
+          $set: { updatedAt: new Date().toISOString() },
+        }
+      );
+
+      results.removedFromGalleries = galleryUpdateResult.modifiedCount > 0;
+
+      // 3. Then, delete from MongoDB images collection
       const deleteResult = await imagesCollection.deleteMany({
         _id: { $in: imageIdsToDelete },
       });
@@ -154,7 +176,7 @@ export async function DELETE(request: Request) {
       results.deletedFromMongoDB = deleteResult.deletedCount || 0;
       // [REMOVED] // [REMOVED] console.log("MongoDB delete result:", deleteResult);
 
-      // 3. Finally, delete from Cloudflare if requested
+      // 4. Finally, delete from Cloudflare if requested
       if (deleteFromStorage && cloudflareIdsToDelete.length > 0) {
         const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
         const apiToken = process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN;
@@ -212,6 +234,7 @@ export async function DELETE(request: Request) {
         message: `Deleted ${results.deletedFromMongoDB} images`,
         deletedFromMongoDB: results.deletedFromMongoDB,
         removedFromCar: results.removedFromCar,
+        removedFromGalleries: results.removedFromGalleries,
         deletedFromCloudflare: results.deletedFromCloudflare,
         errors: results.errors.length > 0 ? results.errors : undefined,
       });

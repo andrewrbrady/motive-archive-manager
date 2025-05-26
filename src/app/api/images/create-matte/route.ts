@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
                     },
                     processedAt: now,
                   },
-                  carId: originalCarId || "",
+                  carId: originalCarId ? new ObjectId(originalCarId) : null,
                   createdAt: now,
                   updatedAt: now,
                 };
@@ -480,7 +480,7 @@ export async function POST(request: NextRequest) {
               },
               processedAt: now,
             },
-            carId: originalCarId || "",
+            carId: originalCarId ? new ObjectId(originalCarId) : null,
             createdAt: now,
             updatedAt: now,
           };

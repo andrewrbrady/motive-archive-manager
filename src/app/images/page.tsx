@@ -26,6 +26,9 @@ import {
   FilterX,
   ChevronsUpDown,
   Check,
+  ZoomIn,
+  ZoomOut,
+  List,
 } from "lucide-react";
 import {
   Dialog,
@@ -53,6 +56,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
+import { PageTitle } from "@/components/ui/PageTitle";
 
 // Define the allowed values for each field (from CarImageGalleryV2)
 const allowedValues = {
@@ -113,6 +117,29 @@ export default function ImagesPage() {
   const [isImageViewModalOpen, setIsImageViewModalOpen] = useState(false);
   const [selectedImageForView, setSelectedImageForView] =
     useState<ImageData | null>(null);
+
+  // Zoom control state (1 = smallest, 5 = largest)
+  const [zoomLevel, setZoomLevel] = useState(3); // Always start with default
+
+  // Load zoom level from localStorage after hydration
+  useEffect(() => {
+    const saved = localStorage.getItem("images-zoom-level");
+    if (saved) {
+      const parsedZoom = parseInt(saved, 10);
+      if (parsedZoom >= 1 && parsedZoom <= 5) {
+        setZoomLevel(parsedZoom);
+      }
+    }
+  }, []);
+
+  // Zoom level configurations
+  const zoomConfigs = {
+    1: { cols: "xl:grid-cols-8", label: "8 cols" },
+    2: { cols: "xl:grid-cols-6", label: "6 cols" },
+    3: { cols: "xl:grid-cols-4", label: "4 cols" },
+    4: { cols: "xl:grid-cols-3", label: "3 cols" },
+    5: { cols: "xl:grid-cols-2", label: "2 cols" },
+  };
 
   // Fetch cars for car filter
   const { data: carsData } = useCars({ limit: 1000, sortDirection: "desc" });
@@ -335,6 +362,14 @@ export default function ImagesPage() {
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
+  // Handle page size change
+  const handlePageSizeChange = (newPageSize: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", "1"); // Reset to first page when changing page size
+    params.set("limit", newPageSize);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   // Handle image upload
   const handleUpload = async (files: FileList) => {
     if (files.length === 0) return;
@@ -398,301 +433,380 @@ export default function ImagesPage() {
     setSelectedImageForView(image);
   };
 
+  // Zoom control functions
+  const handleZoomIn = () => {
+    const newZoomLevel = Math.min(5, zoomLevel + 1);
+    setZoomLevel(newZoomLevel);
+    localStorage.setItem("images-zoom-level", newZoomLevel.toString());
+  };
+
+  const handleZoomOut = () => {
+    const newZoomLevel = Math.max(1, zoomLevel - 1);
+    setZoomLevel(newZoomLevel);
+    localStorage.setItem("images-zoom-level", newZoomLevel.toString());
+  };
+
   return (
-    <div className="container mx-auto py-10">
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Image Gallery
-            </h1>
-            <p className="text-muted-foreground">
-              Browse and manage your car images
-            </p>
-          </div>
+    <div className="min-h-screen bg-background">
+      <main className="container-wide px-6 py-8">
+        <div className="space-y-6 sm:space-y-8">
+          <PageTitle title="Image Gallery" count={data?.pagination.total} />
 
-          <Dialog
-            open={isUploadDialogOpen}
-            onOpenChange={setIsUploadDialogOpen}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Upload Images
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Upload Images</DialogTitle>
-                <DialogDescription>
-                  Select images to upload to your gallery
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <ImageUploadWithProgress
-                  multiple={true}
-                  onComplete={() => {
-                    mutate();
-                    setIsUploadDialogOpen(false);
-                    toast({
-                      title: "Success",
-                      description: "Images uploaded successfully",
-                    });
-                  }}
-                  onError={() => {
-                    toast({
-                      title: "Error",
-                      description: "Failed to upload images",
-                      variant: "destructive",
-                    });
-                  }}
+          <div className="space-y-4">
+            {/* Search, Filters, and Controls Row */}
+            <div className="flex flex-wrap items-center gap-3 justify-between">
+              {/* Left side: Search and Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Search */}
+                <Input
+                  placeholder="Search images..."
+                  value={searchInput}
+                  onChange={handleSearchInput}
+                  className="w-[200px]"
                 />
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsUploadDialogOpen(false)}
-                  disabled={isUploading}
-                >
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
 
-        <div className="space-y-4">
-          {/* Search */}
-          <div className="flex items-center space-x-2 max-w-sm">
-            <Input
-              placeholder="Search images..."
-              value={searchInput}
-              onChange={handleSearchInput}
-              className="max-w-sm"
-            />
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 items-center">
-            {/* Angle filter */}
-            <Select value={angle} onValueChange={handleAngleChange}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Angle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All angles</SelectItem>
-                {metadataOptions.angles.map((angleOption) => (
-                  <SelectItem key={angleOption} value={angleOption}>
-                    {angleOption}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Movement filter */}
-            <Select value={movement} onValueChange={handleMovementChange}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Movement" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All movements</SelectItem>
-                {metadataOptions.movements.map((movementOption) => (
-                  <SelectItem key={movementOption} value={movementOption}>
-                    {movementOption}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Time of Day filter */}
-            <Select value={tod} onValueChange={handleTodChange}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Time of Day" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All times</SelectItem>
-                {metadataOptions.tods.map((todOption) => (
-                  <SelectItem key={todOption} value={todOption}>
-                    {todOption}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* View filter */}
-            <Select value={view} onValueChange={handleViewChange}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="View" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All views</SelectItem>
-                {metadataOptions.views.map((viewOption) => (
-                  <SelectItem key={viewOption} value={viewOption}>
-                    {viewOption}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Car filter */}
-            <Popover open={carSearchOpen} onOpenChange={setCarSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={carSearchOpen}
-                  className="w-[200px] justify-between"
-                >
-                  {currentCarName}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-[250px] p-0 bg-background border shadow-md"
-                align="start"
-                side="bottom"
-                sideOffset={4}
-              >
-                <Command
-                  className="w-full rounded-lg bg-background"
-                  shouldFilter={false}
-                >
-                  <CommandInput
-                    placeholder="Search cars..."
-                    value={carSearchQuery}
-                    onValueChange={setCarSearchQuery}
-                    className="h-9 border-none focus:ring-0"
-                  />
-                  <CommandEmpty className="py-2 px-4 text-sm text-muted-foreground">
-                    No cars found.
-                  </CommandEmpty>
-                  <CommandGroup className="max-h-[300px] overflow-y-auto p-1">
-                    <CommandItem
-                      value="all"
-                      onSelect={() => {
-                        handleCarChange("all");
-                        setCarSearchOpen(false);
-                        setCarSearchQuery("");
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4 flex-shrink-0 pointer-events-none",
-                          carFilter === "all" || !carFilter
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      <span className="pointer-events-none">All Cars</span>
-                    </CommandItem>
-                    {sortedCars.map((car) => (
-                      <CommandItem
-                        key={car._id}
-                        value={car._id}
-                        onSelect={() => {
-                          handleCarChange(car._id);
-                          setCarSearchOpen(false);
-                          setCarSearchQuery("");
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4 flex-shrink-0 pointer-events-none",
-                            carFilter === car._id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <span className="pointer-events-none">
-                          {car.year} {car.make} {car.model}
-                        </span>
-                      </CommandItem>
+                {/* Angle filter */}
+                <Select value={angle} onValueChange={handleAngleChange}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Angle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All angles</SelectItem>
+                    {metadataOptions.angles.map((angleOption) => (
+                      <SelectItem key={angleOption} value={angleOption}>
+                        {angleOption}
+                      </SelectItem>
                     ))}
-                  </CommandGroup>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                  </SelectContent>
+                </Select>
 
-            {/* Reset filters button */}
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={resetAllFilters}
-                title="Reset filters"
-              >
-                <FilterX className="h-4 w-4" />
-              </Button>
-            )}
+                {/* Movement filter */}
+                <Select value={movement} onValueChange={handleMovementChange}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Movement" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All movements</SelectItem>
+                    {metadataOptions.movements.map((movementOption) => (
+                      <SelectItem key={movementOption} value={movementOption}>
+                        {movementOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Time of Day filter */}
+                <Select value={tod} onValueChange={handleTodChange}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Time of Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All times</SelectItem>
+                    {metadataOptions.tods.map((todOption) => (
+                      <SelectItem key={todOption} value={todOption}>
+                        {todOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* View filter */}
+                <Select value={view} onValueChange={handleViewChange}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="View" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All views</SelectItem>
+                    {metadataOptions.views.map((viewOption) => (
+                      <SelectItem key={viewOption} value={viewOption}>
+                        {viewOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Car filter */}
+                <Popover open={carSearchOpen} onOpenChange={setCarSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={carSearchOpen}
+                      className="w-[200px] justify-between"
+                    >
+                      {currentCarName}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[250px] p-0 bg-background border shadow-md"
+                    align="start"
+                    side="bottom"
+                    sideOffset={4}
+                  >
+                    <Command
+                      className="w-full rounded-lg bg-background"
+                      shouldFilter={false}
+                    >
+                      <CommandInput
+                        placeholder="Search cars..."
+                        value={carSearchQuery}
+                        onValueChange={setCarSearchQuery}
+                        className="h-9 border-none focus:ring-0"
+                      />
+                      <CommandEmpty className="py-2 px-4 text-sm text-muted-foreground">
+                        No cars found.
+                      </CommandEmpty>
+                      <CommandGroup className="max-h-[300px] overflow-y-auto p-1">
+                        <CommandItem
+                          value="all"
+                          onSelect={() => {
+                            handleCarChange("all");
+                            setCarSearchOpen(false);
+                            setCarSearchQuery("");
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4 flex-shrink-0 pointer-events-none",
+                              carFilter === "all" || !carFilter
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          <span className="pointer-events-none">All Cars</span>
+                        </CommandItem>
+                        {sortedCars.map((car) => (
+                          <CommandItem
+                            key={car._id}
+                            value={car._id}
+                            onSelect={() => {
+                              handleCarChange(car._id);
+                              setCarSearchOpen(false);
+                              setCarSearchQuery("");
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 flex-shrink-0 pointer-events-none",
+                                carFilter === car._id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            <span className="pointer-events-none">
+                              {car.year} {car.make} {car.model}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Reset filters button */}
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={resetAllFilters}
+                    title="Reset filters"
+                  >
+                    <FilterX className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Right side: Zoom Controls and Upload Button */}
+              <div className="flex items-center gap-2">
+                {/* Page Size Selector */}
+                <div className="flex items-center gap-1">
+                  <List className="h-4 w-4 text-muted-foreground" />
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={handlePageSizeChange}
+                  >
+                    <SelectTrigger className="w-[80px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="40">40</SelectItem>
+                      <SelectItem value="60">60</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value="200">200</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Zoom Controls */}
+                <div className="hidden lg:flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel === 1}
+                    title="Zoom out (more columns)"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground px-3 min-w-[60px] text-center">
+                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel === 5}
+                    title="Zoom in (fewer columns)"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Upload Button */}
+                <Dialog
+                  open={isUploadDialogOpen}
+                  onOpenChange={setIsUploadDialogOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Upload Images
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Upload Images</DialogTitle>
+                      <DialogDescription>
+                        Select images to upload to your gallery
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <ImageUploadWithProgress
+                        multiple={true}
+                        onComplete={() => {
+                          mutate();
+                          setIsUploadDialogOpen(false);
+                          toast({
+                            title: "Success",
+                            description: "Images uploaded successfully",
+                          });
+                        }}
+                        onError={() => {
+                          toast({
+                            title: "Error",
+                            description: "Failed to upload images",
+                            variant: "destructive",
+                          });
+                        }}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsUploadDialogOpen(false)}
+                        disabled={isUploading}
+                      >
+                        Cancel
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            <SimpleImageGallery
-              data={mappedImages}
-              isLoading={isLoading}
-              error={error || undefined}
-              onCanvasExtension={handleCanvasExtension}
-              onImageMatte={handleImageMatte}
-              onImageView={handleImageView}
-            />
-
-            {data?.pagination && data.pagination.pages > 1 && (
-              <Pagination
-                className="mt-8 flex justify-center"
-                currentPage={data.pagination.page}
-                totalPages={data.pagination.pages}
-                onPageChange={handlePageChange}
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <SimpleImageGallery
+                data={mappedImages}
+                isLoading={isLoading}
+                error={error || undefined}
+                onCanvasExtension={handleCanvasExtension}
+                onImageMatte={handleImageMatte}
+                onImageView={handleImageView}
+                zoomLevel={zoomLevel}
+                mutate={mutate}
               />
-            )}
-          </>
-        )}
 
-        {/* Canvas Extension Modal */}
-        <CanvasExtensionModal
-          isOpen={isCanvasModalOpen}
-          onClose={() => {
-            setIsCanvasModalOpen(false);
-            setSelectedImageForCanvas(null);
-          }}
-          image={selectedImageForCanvas}
-        />
+              {data?.pagination && (
+                <div className="mt-8 space-y-4">
+                  {/* Pagination Info */}
+                  <div className="flex justify-center">
+                    <p className="text-sm text-muted-foreground">
+                      Showing{" "}
+                      {(data.pagination.page - 1) * data.pagination.limit + 1}{" "}
+                      to{" "}
+                      {Math.min(
+                        data.pagination.page * data.pagination.limit,
+                        data.pagination.total
+                      )}{" "}
+                      of {data.pagination.total} images
+                    </p>
+                  </div>
 
-        {/* Image Matte Modal */}
-        <ImageMatteModal
-          isOpen={isMatteModalOpen}
-          onClose={() => {
-            setIsMatteModalOpen(false);
-            setSelectedImageForMatte(null);
-          }}
-          image={selectedImageForMatte}
-        />
+                  {/* Pagination Controls - only show if more than 1 page */}
+                  {data.pagination.pages > 1 && (
+                    <Pagination
+                      className="flex justify-center"
+                      currentPage={data.pagination.page}
+                      totalPages={data.pagination.pages}
+                      onPageChange={handlePageChange}
+                    />
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
-        {/* Image View Modal */}
-        <ImageViewModal
-          isOpen={isImageViewModalOpen}
-          onClose={() => {
-            setIsImageViewModalOpen(false);
-            setSelectedImageForView(null);
-          }}
-          image={selectedImageForView}
-          images={mappedImages}
-          onCanvasExtension={handleCanvasExtension}
-          onImageMatte={handleImageMatte}
-          onNavigate={handleImageNavigate}
-        />
-      </div>
+          {/* Canvas Extension Modal */}
+          <CanvasExtensionModal
+            isOpen={isCanvasModalOpen}
+            onClose={() => {
+              setIsCanvasModalOpen(false);
+              setSelectedImageForCanvas(null);
+            }}
+            image={selectedImageForCanvas}
+          />
+
+          {/* Image Matte Modal */}
+          <ImageMatteModal
+            isOpen={isMatteModalOpen}
+            onClose={() => {
+              setIsMatteModalOpen(false);
+              setSelectedImageForMatte(null);
+            }}
+            image={selectedImageForMatte}
+          />
+
+          {/* Image View Modal */}
+          <ImageViewModal
+            isOpen={isImageViewModalOpen}
+            onClose={() => {
+              setIsImageViewModalOpen(false);
+              setSelectedImageForView(null);
+            }}
+            image={selectedImageForView}
+            images={mappedImages}
+            onCanvasExtension={handleCanvasExtension}
+            onImageMatte={handleImageMatte}
+            onNavigate={handleImageNavigate}
+          />
+        </div>
+      </main>
     </div>
   );
 }

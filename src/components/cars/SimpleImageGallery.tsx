@@ -67,6 +67,8 @@ interface SimpleImageGalleryProps {
   onCanvasExtension?: (image: ImageData) => void;
   onImageMatte?: (image: ImageData) => void;
   onImageView?: (image: ImageData) => void;
+  zoomLevel?: number;
+  mutate?: () => void;
 }
 
 const categories = ["Exterior", "Interior", "Detail", "Action", "Studio"];
@@ -87,7 +89,27 @@ export function SimpleImageGallery({
   onCanvasExtension,
   onImageMatte,
   onImageView,
+  zoomLevel,
+  mutate,
 }: SimpleImageGalleryProps) {
+  // Zoom level configurations
+  const zoomConfigs = {
+    1: "xl:grid-cols-8",
+    2: "xl:grid-cols-6",
+    3: "xl:grid-cols-4",
+    4: "xl:grid-cols-3",
+    5: "xl:grid-cols-2",
+  };
+
+  // Get grid classes based on zoom level
+  const getGridClasses = () => {
+    const baseClasses = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+    const zoomClass = zoomLevel
+      ? zoomConfigs[zoomLevel as keyof typeof zoomConfigs]
+      : "xl:grid-cols-4";
+    return `${baseClasses} ${zoomClass} gap-6`;
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[200px] items-center justify-center">
@@ -144,8 +166,8 @@ export function SimpleImageGallery({
         throw new Error(result.error || JSON.stringify(result));
       }
       toast({ title: "Deleted!", description: "Image deleted successfully" });
-      if (typeof window !== "undefined" && window.location) {
-        window.location.reload();
+      if (mutate) {
+        mutate();
       }
     } catch (err) {
       toast({
@@ -158,7 +180,7 @@ export function SimpleImageGallery({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className={getGridClasses()}>
       {data.map((image) => (
         <ImageCard
           key={image._id}

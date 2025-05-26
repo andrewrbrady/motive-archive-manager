@@ -107,7 +107,7 @@ export function ImageCard({
       className={cn(
         "relative overflow-hidden rounded-lg cursor-pointer group",
         "border border-border hover:shadow-md transition-all duration-200",
-        "min-h-[200px] max-h-[400px]",
+        "min-h-[200px] max-h-[400px] flex items-center",
         isSelected && "ring-2 ring-primary"
       )}
       onClick={() => onImageView?.(image)}

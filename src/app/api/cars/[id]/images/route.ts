@@ -502,11 +502,32 @@ export async function DELETE(request: Request) {
           foundCloudflareIds
         );
 
-        // Update the car document to remove the image IDs - using $pullAll with type assertion
+        // Update the car document to remove the image IDs (both imageIds and processedImageIds)
         const updateResult = await db.collection("cars").updateOne(
           { _id: carObjectId },
           {
-            $pullAll: { imageIds: foundImageObjectIds } as any,
+            $pullAll: {
+              imageIds: foundImageObjectIds,
+              processedImageIds: foundImageObjectIds,
+            } as any,
+            $set: { updatedAt: new Date().toISOString() },
+          },
+          { session }
+        );
+
+        // Remove images from all galleries (both imageIds and orderedImages)
+        const galleryUpdateResult = await db.collection("galleries").updateMany(
+          {
+            $or: [
+              { imageIds: { $in: foundImageObjectIds } },
+              { "orderedImages.id": { $in: foundImageObjectIds } },
+            ],
+          },
+          {
+            $pull: {
+              imageIds: { $in: foundImageObjectIds },
+              orderedImages: { id: { $in: foundImageObjectIds } },
+            } as any,
             $set: { updatedAt: new Date().toISOString() },
           },
           { session }
