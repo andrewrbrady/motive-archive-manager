@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -25,7 +25,7 @@ export async function GET(
     }
 
     const db = await getDatabase();
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
@@ -68,7 +68,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -80,7 +80,7 @@ export async function PUT(
     }
 
     const db = await getDatabase();
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const data: UpdateProjectRequest = await request.json();
 
     // Validate ObjectId
@@ -216,7 +216,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -228,7 +228,7 @@ export async function DELETE(
     }
 
     const db = await getDatabase();
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
@@ -238,49 +238,28 @@ export async function DELETE(
       );
     }
 
-    // Check if user is the owner or has delete permissions
-    const project = await db.collection("projects").findOne({
+    // Check if user has permission to delete this project (only owner)
+    const existingProject = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
-      $or: [
-        { ownerId: session.user.id },
-        {
-          members: {
-            $elemMatch: {
-              userId: session.user.id,
-              permissions: { $in: ["delete"] },
-            },
-          },
-        },
-      ],
+      ownerId: session.user.id,
     });
 
-    if (!project) {
+    if (!existingProject) {
       return NextResponse.json(
         { error: "Project not found or insufficient permissions" },
         { status: 404 }
       );
     }
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Deleting project:", {
-        id: projectId,
-        title: project.title,
-        ownerId: project.ownerId,
-      });
-    }
-
-    const result = await db.collection("projects").deleteOne({
-      _id: new ObjectId(projectId),
-    });
+    const result = await db
+      .collection("projects")
+      .deleteOne({ _id: new ObjectId(projectId) });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    return NextResponse.json(
-      { message: "Project deleted successfully" },
-      { status: 200 }
-    );
+    return NextResponse.json({ message: "Project deleted successfully" });
   } catch (error) {
     console.error("Error deleting project:", error);
     const errorMessage =

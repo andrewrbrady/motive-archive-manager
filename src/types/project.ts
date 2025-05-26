@@ -10,9 +10,9 @@ export type ProjectStatus =
 export type ProjectPriority = "low" | "medium" | "high" | "urgent";
 
 export type ProjectType =
-  | "bring_a_trailer"
   | "documentation"
   | "media_campaign"
+  | "event_coverage"
   | "custom";
 
 export type ProjectMemberRole =

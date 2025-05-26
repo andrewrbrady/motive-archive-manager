@@ -118,12 +118,12 @@ export default function ProjectsPage() {
 
   const getTypeLabel = (type: ProjectType) => {
     switch (type) {
-      case "bring_a_trailer":
-        return "Bring a Trailer";
       case "documentation":
         return "Documentation";
       case "media_campaign":
         return "Media Campaign";
+      case "event_coverage":
+        return "Event Coverage";
       case "custom":
         return "Custom";
       default:
@@ -195,11 +195,9 @@ export default function ProjectsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="bring_a_trailer">
-                    Bring a Trailer
-                  </SelectItem>
                   <SelectItem value="documentation">Documentation</SelectItem>
                   <SelectItem value="media_campaign">Media Campaign</SelectItem>
+                  <SelectItem value="event_coverage">Event Coverage</SelectItem>
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectContent>
               </Select>
