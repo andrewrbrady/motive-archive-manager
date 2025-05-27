@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Event, EventStatus, EventType } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import {
   Table,
   TableBody,
@@ -44,7 +44,6 @@ export default function EventsContent() {
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
-    status: "",
     type: "",
     from: "",
     to: "",
@@ -87,7 +86,6 @@ export default function EventsContent() {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
-      if (filters.status) queryParams.append("status", filters.status);
       if (filters.type) queryParams.append("type", filters.type);
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
@@ -167,39 +165,6 @@ export default function EventsContent() {
     fetchEvents();
   }, [filters]);
 
-  const handleUpdateStatus = async (
-    eventId: string | undefined,
-    carId: string | undefined,
-    newStatus: EventStatus
-  ) => {
-    try {
-      if (!eventId) {
-        toast.error("Event ID is missing");
-        return;
-      }
-
-      if (!carId) {
-        toast.error("Car ID is missing");
-        return;
-      }
-
-      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update event");
-      }
-
-      await fetchEvents();
-      toast.success("Event status updated");
-    } catch (error) {
-      toast.error("Failed to update event status");
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-end items-center gap-2">
@@ -210,27 +175,7 @@ export default function EventsContent() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Select
-          value={filters.status}
-          onValueChange={(value) => setFilters({ ...filters, status: value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Statuses</SelectItem>
-            {Object.values(EventStatus).map((status) => (
-              <SelectItem key={status} value={status}>
-                {status
-                  .split("_")
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(" ")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Select
           value={filters.type}
           onValueChange={(value) => setFilters({ ...filters, type: value })}
@@ -274,7 +219,6 @@ export default function EventsContent() {
               <TableRow>
                 <TableHead>Car</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -296,35 +240,6 @@ export default function EventsContent() {
                     )}
                   </TableCell>
                   <TableCell>{formatEventType(event.type)}</TableCell>
-                  <TableCell>
-                    <Select
-                      value={event.status}
-                      onValueChange={(value) =>
-                        handleUpdateStatus(
-                          event._id,
-                          event.car_id,
-                          value as EventStatus
-                        )
-                      }
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.values(EventStatus).map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {status
-                              .split("_")
-                              .map(
-                                (word) =>
-                                  word.charAt(0).toUpperCase() + word.slice(1)
-                              )
-                              .join(" ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
                   <TableCell>{formatDate(event.start_date)}</TableCell>
                   <TableCell>{formatDate(event.end_date)}</TableCell>
                   <TableCell>

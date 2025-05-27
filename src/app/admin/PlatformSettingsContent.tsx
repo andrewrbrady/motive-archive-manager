@@ -317,7 +317,7 @@ const PlatformSettingsContent: React.FC = () => {
               Create a new platform configuration for caption generation
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="pt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="new-key">Platform Key</Label>
@@ -425,7 +425,7 @@ const PlatformSettingsContent: React.FC = () => {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor={`name-${setting.key}`}>Display Name</Label>

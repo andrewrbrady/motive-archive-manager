@@ -194,7 +194,7 @@ export function CustomDropdown({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border border-input bg-background h-10 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border border-input bg-background h-10 hover:bg-transparent hover:border-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         <div className="flex items-center gap-2 truncate">
           {selectedOption ? (

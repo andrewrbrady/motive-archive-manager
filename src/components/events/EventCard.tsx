@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { Event, EventType, EventStatus } from "@/types/event";
-import { Card, CardContent } from "@/components/ui/card";
+import { Event, EventType } from "@/types/event";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,8 +33,8 @@ import { LocationResponse } from "@/models/location";
 
 interface EventCardProps {
   event: Event;
-  onEdit?: (event: Event) => void;
-  onDelete?: (eventId: string) => void;
+  onEdit: (event: Event) => void;
+  onDelete: (eventId: string) => void;
 }
 
 // Icon mapping for event types
@@ -56,33 +56,6 @@ const getEventTypeIcon = (type: EventType) => {
       return <Truck className="w-4 h-4 flex-shrink-0" />;
     default:
       return <MoreHorizontal className="w-4 h-4 flex-shrink-0" />;
-  }
-};
-
-// Icon mapping for event statuses
-const getEventStatusIcon = (status: EventStatus) => {
-  switch (status) {
-    case EventStatus.NOT_STARTED:
-      return <CircleDot className="w-4 h-4 flex-shrink-0" />;
-    case EventStatus.IN_PROGRESS:
-      return <Play className="w-4 h-4 flex-shrink-0" />;
-    case EventStatus.COMPLETED:
-      return <CheckCircle className="w-4 h-4 flex-shrink-0" />;
-    default:
-      return <CircleDot className="w-4 h-4 flex-shrink-0" />;
-  }
-};
-
-const getStatusColor = (status: EventStatus) => {
-  switch (status) {
-    case EventStatus.NOT_STARTED:
-      return "bg-gray-100 text-gray-800";
-    case EventStatus.IN_PROGRESS:
-      return "bg-blue-100 text-blue-800";
-    case EventStatus.COMPLETED:
-      return "bg-green-100 text-green-800";
-    default:
-      return "bg-gray-100 text-gray-800";
   }
 };
 
@@ -314,16 +287,6 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
               >
                 {getEventTypeIcon(event.type)}
                 {event.type.replace(/_/g, " ")}
-              </Badge>
-
-              <Badge
-                className={cn(
-                  "flex items-center gap-1",
-                  getStatusColor(event.status)
-                )}
-              >
-                {getEventStatusIcon(event.status)}
-                {event.status.replace(/_/g, " ")}
               </Badge>
             </div>
           </div>

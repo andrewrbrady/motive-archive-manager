@@ -172,7 +172,7 @@ export function FullCalendarComponent({
               end: event.end ? new Date(event.end) : new Date(event.start),
               allDay: event.isAllDay || !event.end,
               backgroundColor: `hsl(var(--event-${event.type.toLowerCase()}))`,
-              borderColor: `hsl(var(--status-${event.status.toLowerCase()}))`,
+              borderColor: `hsl(var(--border))`,
               textColor: "white",
               editable: true,
               startEditable: true,

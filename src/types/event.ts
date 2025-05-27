@@ -14,12 +14,6 @@ export enum EventType {
   OTHER = "OTHER",
 }
 
-export enum EventStatus {
-  NOT_STARTED = "NOT_STARTED",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
-}
-
 export interface Event {
   id: string;
   car_id?: string;
@@ -27,7 +21,7 @@ export interface Event {
   type: EventType;
   title: string;
   description: string;
-  status: EventStatus;
+  url?: string;
   start: string;
   end?: string;
   isAllDay?: boolean;
@@ -35,6 +29,7 @@ export interface Event {
   locationId?: string;
   primaryImageId?: string;
   imageIds?: string[];
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,14 +42,15 @@ export interface DbEvent {
   type: EventType;
   title: string;
   description: string;
-  status: EventStatus;
+  url?: string;
   start: Date;
   end?: Date;
   is_all_day?: boolean;
-  teamMemberIds: ObjectId[];
+  teamMemberIds: string[];
   location_id?: ObjectId;
   primary_image_id?: ObjectId;
   image_ids?: ObjectId[];
+  created_by: string;
   created_at: Date;
   updated_at: Date;
 }

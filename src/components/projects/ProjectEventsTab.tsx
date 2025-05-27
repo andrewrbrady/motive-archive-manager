@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Event, EventType, EventStatus } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,9 +31,6 @@ import {
   Package,
   Truck,
   MoreHorizontal,
-  CircleDot,
-  Play,
-  CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -49,6 +46,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import EventCard from "@/components/events/EventCard";
 import EditEventDialog from "@/components/events/EditEventDialog";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { EventTypeSelector } from "@/components/events/EventTypeSelector";
 
 interface ProjectEventsTabProps {
   projectId: string;
@@ -73,20 +72,6 @@ const getEventTypeIcon = (type: EventType) => {
       return <Truck className="w-4 h-4 flex-shrink-0" />;
     default:
       return <MoreHorizontal className="w-4 h-4 flex-shrink-0" />;
-  }
-};
-
-// Icon mapping for event statuses
-const getEventStatusIcon = (status: EventStatus) => {
-  switch (status) {
-    case EventStatus.NOT_STARTED:
-      return <CircleDot className="w-4 h-4 flex-shrink-0" />;
-    case EventStatus.IN_PROGRESS:
-      return <Play className="w-4 h-4 flex-shrink-0" />;
-    case EventStatus.COMPLETED:
-      return <CheckCircle className="w-4 h-4 flex-shrink-0" />;
-    default:
-      return <CircleDot className="w-4 h-4 flex-shrink-0" />;
   }
 };
 
@@ -290,7 +275,6 @@ function CreateEventDialog({
     description: "",
     start: "",
     end: "",
-    status: EventStatus.NOT_STARTED,
     isAllDay: false,
     locationId: "",
   });
@@ -325,7 +309,6 @@ function CreateEventDialog({
         description: "",
         start: "",
         end: "",
-        status: EventStatus.NOT_STARTED,
         isAllDay: false,
         locationId: "",
       });
@@ -344,7 +327,6 @@ function CreateEventDialog({
       description: "",
       start: "",
       end: "",
-      status: EventStatus.NOT_STARTED,
       isAllDay: false,
       locationId: "",
     });
@@ -445,15 +427,13 @@ function CreateEventDialog({
                   >
                     Start Date & Time
                   </Label>
-                  <Input
-                    id="start"
-                    type="datetime-local"
+                  <DateTimePicker
                     value={formData.start}
-                    onChange={(e) =>
-                      setFormData({ ...formData, start: e.target.value })
+                    onChange={(value) =>
+                      setFormData({ ...formData, start: value })
                     }
-                    required
-                    className="text-sm"
+                    placeholder="Select start date and time"
+                    isAllDay={formData.isAllDay}
                   />
                 </div>
 
@@ -464,14 +444,13 @@ function CreateEventDialog({
                   >
                     End Date & Time
                   </Label>
-                  <Input
-                    id="end"
-                    type="datetime-local"
+                  <DateTimePicker
                     value={formData.end}
-                    onChange={(e) =>
-                      setFormData({ ...formData, end: e.target.value })
+                    onChange={(value) =>
+                      setFormData({ ...formData, end: value })
                     }
-                    className="text-sm"
+                    placeholder="Select end date and time"
+                    isAllDay={formData.isAllDay}
                   />
                 </div>
               </div>
@@ -490,95 +469,27 @@ function CreateEventDialog({
               </div>
             </div>
 
-            {/* Type and Status Section */}
+            {/* Type Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
                 <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
-                  Type and Status
+                  Type
                 </span>
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    Event Type
-                  </Label>
-                  <CustomDropdown
-                    value={formData.type}
-                    onChange={(value) =>
-                      setFormData({ ...formData, type: value as EventType })
-                    }
-                    options={[
-                      {
-                        value: EventType.PRODUCTION,
-                        label: "Production",
-                        icon: <Camera className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventType.POST_PRODUCTION,
-                        label: "Post-Production",
-                        icon: <Video className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventType.MARKETING,
-                        label: "Marketing",
-                        icon: <Sparkles className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventType.INSPECTION,
-                        label: "Inspection",
-                        icon: <Search className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventType.DETAIL,
-                        label: "Detail",
-                        icon: <Wrench className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventType.PICKUP,
-                        label: "Pickup",
-                        icon: <Package className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventType.DELIVERY,
-                        label: "Delivery",
-                        icon: <Truck className="w-4 h-4 flex-shrink-0" />,
-                      },
-                    ]}
-                    placeholder="Select type"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    Status
-                  </Label>
-                  <CustomDropdown
-                    value={formData.status}
-                    onChange={(value) =>
-                      setFormData({ ...formData, status: value as EventStatus })
-                    }
-                    options={[
-                      {
-                        value: EventStatus.NOT_STARTED,
-                        label: "Not Started",
-                        icon: <CircleDot className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventStatus.IN_PROGRESS,
-                        label: "In Progress",
-                        icon: <Play className="w-4 h-4 flex-shrink-0" />,
-                      },
-                      {
-                        value: EventStatus.COMPLETED,
-                        label: "Completed",
-                        icon: <CheckCircle className="w-4 h-4 flex-shrink-0" />,
-                      },
-                    ]}
-                    placeholder="Select status"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Event Type
+                </Label>
+                <EventTypeSelector
+                  value={formData.type}
+                  onValueChange={(value: string) =>
+                    setFormData({ ...formData, type: value as EventType })
+                  }
+                  label=""
+                />
               </div>
             </div>
           </form>

@@ -5,7 +5,7 @@ import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { enUS } from "date-fns/locale";
-import { Event as ApiEvent, EventStatus, EventType } from "@/types/event";
+import { Event as ApiEvent, EventType } from "@/types/event";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -93,17 +93,6 @@ const localizer = dateFnsLocalizer({
 });
 
 const DragAndDropCalendar = withDragAndDrop(Calendar);
-
-const statusColors = {
-  NOT_STARTED: "var(--destructive)",
-  IN_PROGRESS: "var(--warning)",
-  COMPLETED: "var(--success)",
-  CANCELLED: "var(--destructive)",
-  PENDING: "var(--info)",
-  APPROVED: "var(--success)",
-  REJECTED: "var(--destructive)",
-  default: "var(--zinc-500)",
-};
 
 const typeColors: Record<EventType, string> = {
   [EventType.AUCTION_SUBMISSION]: "var(--destructive)",
@@ -198,14 +187,11 @@ export default function EventsCalendar({
     return {
       style: {
         backgroundColor:
-          typeColors[typedEvent.type] ||
-          statusColors[typedEvent.status] ||
-          statusColors.default,
+          typeColors[typedEvent.type] || typeColors[EventType.OTHER],
         color: "var(--background-primary)",
         border: "none",
         borderRadius: "4px",
         padding: "2px 5px",
-        opacity: typedEvent.status === EventStatus.COMPLETED ? 0.5 : 1,
       },
     };
   };

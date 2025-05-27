@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Event, EventStatus, EventType } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pencil, Save, Trash2, X, CheckSquare, Square } from "lucide-react";
@@ -39,6 +39,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import isEqual from "lodash/isEqual";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Edit, Calendar, Clock, User, MapPin } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { EventTypeSelector } from "./EventTypeSelector";
+import EditEventDialog from "./EditEventDialog";
 
 export interface ListViewProps {
   events: Event[];
@@ -62,6 +70,7 @@ interface User {
   roles: string[];
   creativeRoles: string[];
   status: string;
+  firebaseUid?: string; // Firebase UID for team member tracking and reporting
 }
 
 interface EditingEvent extends Event {
@@ -81,6 +90,9 @@ export default function ListView({
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Use parent's edit mode if provided, otherwise use local state
   const isEditMode =
@@ -107,10 +119,28 @@ export default function ListView({
         const response = await fetch("/api/users");
         if (!response.ok) throw new Error("Failed to fetch users");
         const data = await response.json();
-        setUsers(data.filter((user: User) => user.status === "active"));
+
+        // Handle different possible response structures
+        let usersArray = [];
+        if (Array.isArray(data)) {
+          usersArray = data;
+        } else if (data && Array.isArray(data.users)) {
+          usersArray = data.users;
+        } else if (data && typeof data === "object") {
+          console.warn("Unexpected users API response structure:", data);
+          usersArray = [];
+        } else {
+          console.error("Invalid users API response:", data);
+          usersArray = [];
+        }
+
+        setUsers(usersArray.filter((user: User) => user.status === "active"));
       } catch (error) {
         console.error("Error fetching users:", error);
         toast.error("Failed to fetch users");
+        setUsers([]); // Set empty array as fallback
+      } finally {
+        setUsersLoading(false);
       }
     };
 
@@ -242,31 +272,6 @@ export default function ListView({
     }
   };
 
-  const handleStatusChange = async (event: Event, newStatus: EventStatus) => {
-    try {
-      const response = await fetch(
-        `/api/cars/${event.car_id}/events/${event.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ...event, status: newStatus }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update event status");
-      }
-
-      toast.success("Event status updated successfully");
-      onEventUpdated();
-    } catch (error) {
-      console.error("Error updating event status:", error);
-      toast.error("Failed to update event status");
-    }
-  };
-
   const toggleBatchMode = () => {
     setIsBatchMode(!isBatchMode);
     setSelectedEvents([]);
@@ -337,17 +342,22 @@ export default function ListView({
               </TableHead>
             )}
             <TableHead>Type</TableHead>
+            <TableHead>Title</TableHead>
             <TableHead>Description</TableHead>
+            <TableHead>URL</TableHead>
             <TableHead>Start Date</TableHead>
             <TableHead>End Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Assignees</TableHead>
-            {isEditMode && <TableHead>Actions</TableHead>}
+            <TableHead>Team Members</TableHead>
+            <TableHead>Created By</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {editingEvents.map((event) => (
-            <TableRow key={event.id}>
+            <TableRow
+              key={event.id}
+              className="hover:border-r-4 hover:border-r-primary hover:bg-transparent transition-all duration-200"
+            >
               {isBatchMode && (
                 <TableCell>
                   <Button
@@ -390,6 +400,18 @@ export default function ListView({
               <TableCell>
                 {isEditMode ? (
                   <Input
+                    value={event.title || ""}
+                    onChange={(e) =>
+                      updateEventField(event.id, "title", e.target.value)
+                    }
+                  />
+                ) : (
+                  event.title
+                )}
+              </TableCell>
+              <TableCell>
+                {isEditMode ? (
+                  <Input
                     value={event.description || ""}
                     onChange={(e) =>
                       updateEventField(event.id, "description", e.target.value)
@@ -397,6 +419,27 @@ export default function ListView({
                   />
                 ) : (
                   event.description
+                )}
+              </TableCell>
+              <TableCell>
+                {isEditMode ? (
+                  <Input
+                    value={event.url || ""}
+                    onChange={(e) =>
+                      updateEventField(event.id, "url", e.target.value)
+                    }
+                  />
+                ) : event.url ? (
+                  <a
+                    href={event.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 hover:underline truncate block max-w-[200px]"
+                  >
+                    {event.url}
+                  </a>
+                ) : (
+                  "-"
                 )}
               </TableCell>
               <TableCell>
@@ -425,19 +468,6 @@ export default function ListView({
                   formatDate(event.end)
                 )}
               </TableCell>
-              <TableCell>
-                <Badge
-                  variant={
-                    event.status === EventStatus.COMPLETED
-                      ? "default"
-                      : event.status === EventStatus.IN_PROGRESS
-                        ? "secondary"
-                        : "outline"
-                  }
-                >
-                  {event.status}
-                </Badge>
-              </TableCell>
               <TableCell className="min-w-[200px]">
                 {isEditMode ? (
                   <Popover>
@@ -450,17 +480,18 @@ export default function ListView({
                         {Array.isArray(event.teamMemberIds) &&
                         event.teamMemberIds.length > 0
                           ? `${event.teamMemberIds.length} selected`
-                          : "Select assignees"}
+                          : "Select team members"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[300px] p-0" align="start">
                       <ScrollArea className="h-[200px]">
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="p-2 space-y-1">
                           {users.map((user) => {
+                            const userUid = user.firebaseUid || user._id; // Fallback to _id if no firebaseUid
                             const isSelected =
                               Array.isArray(event.teamMemberIds) &&
-                              event.teamMemberIds.includes(user.name);
+                              event.teamMemberIds.includes(userUid);
                             return (
                               <button
                                 key={user._id}
@@ -474,26 +505,26 @@ export default function ListView({
                                     updateEventField(
                                       event.id,
                                       "teamMemberIds",
-                                      [...currentTeamMemberIds, user.name]
+                                      [...currentTeamMemberIds, userUid]
                                     );
                                   } else {
                                     updateEventField(
                                       event.id,
                                       "teamMemberIds",
                                       currentTeamMemberIds.filter(
-                                        (name) => name !== user.name
+                                        (uid) => uid !== userUid
                                       )
                                     );
                                   }
                                 }}
-                                className={`flex items-center space-x-2 p-2 rounded-md transition-colors text-left ${
+                                className={`flex items-center w-full rounded-md px-3 py-2 transition-colors text-left ${
                                   isSelected
                                     ? "bg-primary/10 text-primary hover:bg-primary/20"
                                     : "hover:bg-accent"
                                 }`}
                               >
                                 <div
-                                  className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors ${
+                                  className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors mr-3 flex-shrink-0 ${
                                     isSelected
                                       ? "bg-primary border-primary text-primary-foreground"
                                       : "border-input"
@@ -501,9 +532,7 @@ export default function ListView({
                                 >
                                   {isSelected && <Check className="h-3 w-3" />}
                                 </div>
-                                <span className="text-sm truncate">
-                                  {user.name}
-                                </span>
+                                <span className="text-sm">{user.name}</span>
                               </button>
                             );
                           })}
@@ -515,57 +544,126 @@ export default function ListView({
                   <div className="flex flex-wrap gap-1">
                     {Array.isArray(event.teamMemberIds) &&
                     event.teamMemberIds.length > 0 ? (
-                      event.teamMemberIds.map((name) => (
-                        <Badge
-                          key={name}
-                          variant="secondary"
-                          className="text-xs py-0.5 px-2"
-                        >
-                          {name}
-                        </Badge>
-                      ))
+                      event.teamMemberIds.map((uid) => {
+                        // Find user by Firebase UID or fallback to _id
+                        const user = users.find(
+                          (u) => (u.firebaseUid || u._id) === uid
+                        );
+
+                        // If users haven't loaded yet, show loading state
+                        if (usersLoading) {
+                          return (
+                            <Badge
+                              key={uid}
+                              variant="secondary"
+                              className="text-xs py-0.5 px-2 min-w-[60px] animate-pulse bg-muted"
+                            >
+                              Loading...
+                            </Badge>
+                          );
+                        }
+
+                        // If user not found after loading, show a placeholder
+                        const displayName = user ? user.name : "Unknown User";
+                        return (
+                          <Badge
+                            key={uid}
+                            variant="secondary"
+                            className="text-xs py-0.5 px-2"
+                            title={
+                              user
+                                ? `${user.name} (${user.email})`
+                                : `User ID: ${uid}`
+                            }
+                          >
+                            {displayName}
+                          </Badge>
+                        );
+                      })
                     ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
+                      <span className="text-muted-foreground">
+                        No team members
+                      </span>
                     )}
                   </div>
                 )}
               </TableCell>
-              {isEditMode && (
-                <TableCell>
-                  <div className="flex gap-2">
+              <TableCell>
+                {/* Created By column */}
+                {(() => {
+                  if (!event.createdBy) {
+                    return (
+                      <span className="text-muted-foreground">Unknown</span>
+                    );
+                  }
+
+                  // Try to find user by Firebase UID first, then by _id, then by name
+                  const creator = users.find(
+                    (u) =>
+                      u.firebaseUid === event.createdBy ||
+                      u._id === event.createdBy ||
+                      u.name === event.createdBy
+                  );
+
+                  if (creator) {
+                    return creator.name;
+                  }
+
+                  // If no user found, show the createdBy value (could be a UID or name)
+                  return (
+                    <span
+                      className="text-muted-foreground text-xs"
+                      title={event.createdBy}
+                    >
+                      {event.createdBy.length > 20
+                        ? `${event.createdBy.substring(0, 20)}...`
+                        : event.createdBy}
+                    </span>
+                  );
+                })()}
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setEditingEvent(event);
+                      setIsEditModalOpen(true);
+                    }}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  {isEditMode && (
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(event.id)}
-                      className="text-destructive-500 hover:text-destructive-700 hover:bg-destructive-100 dark:hover:bg-destructive-900 bg-opacity-20"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-muted"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    {event.status !== EventStatus.COMPLETED && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          handleStatusChange(
-                            event,
-                            event.status === EventStatus.NOT_STARTED
-                              ? EventStatus.IN_PROGRESS
-                              : EventStatus.COMPLETED
-                          )
-                        }
-                      >
-                        {event.status === EventStatus.NOT_STARTED
-                          ? "Start"
-                          : "Complete"}
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              )}
+                  )}
+                </div>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {/* Edit Event Modal */}
+      <EditEventDialog
+        event={editingEvent}
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onUpdate={async (eventId: string, updates: Partial<Event>) => {
+          await onUpdateEvent(eventId, updates);
+          setIsEditModalOpen(false);
+          setEditingEvent(null);
+          onEventUpdated();
+        }}
+      />
     </div>
   );
 }

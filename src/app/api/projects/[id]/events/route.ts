@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { Event, EventStatus, DbEvent } from "@/types/event";
+import { Event, DbEvent } from "@/types/event";
 import { EventModel } from "@/models/Event";
 import { auth } from "@/auth";
 
@@ -151,7 +151,7 @@ export async function POST(
       type: data.type,
       title: data.title.trim(),
       description: data.description || "",
-      status: data.status || EventStatus.NOT_STARTED,
+      url: data.url || undefined,
       start: new Date(data.start),
       end: data.end ? new Date(data.end) : undefined,
       is_all_day: data.isAllDay || false,
@@ -159,6 +159,7 @@ export async function POST(
       location_id: locationId,
       primary_image_id: primaryImageId,
       image_ids: imageIds.length > 0 ? imageIds : undefined,
+      created_by: session.user.id, // Track who created the event
     };
 
     const newEventId = await eventModel.create(eventData);

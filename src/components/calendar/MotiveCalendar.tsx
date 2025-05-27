@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Components, EventProps } from "react-big-calendar";
 import BaseCalendar, { BaseCalendarEvent } from "./BaseCalendar";
-import { Event, EventStatus } from "@/types/event";
+import { Event } from "@/types/event";
 import { Deliverable } from "@/types/deliverable";
 import { ProjectMilestone } from "@/types/project";
 import EventTooltip from "../events/EventTooltip";
@@ -277,14 +277,11 @@ export function MotiveCalendar({
       // Use event type for primary color grouping
       const backgroundColor = `hsl(var(--event-${eventResource.type.toLowerCase()}))`;
 
-      // Add a border color based on status for secondary visual cue
-      const borderColor = `hsl(var(--status-${eventResource.status.toLowerCase()}))`;
-
       return {
         style: {
           backgroundColor,
           color: "white",
-          border: `2px solid ${borderColor}`,
+          border: `2px solid hsl(var(--border))`,
           borderRadius: "4px",
           padding: "2px 4px",
           opacity: 0.9,

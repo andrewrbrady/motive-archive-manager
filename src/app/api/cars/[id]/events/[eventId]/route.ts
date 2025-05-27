@@ -9,17 +9,47 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
-    const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/events/[eventId]
+    const carId = segments[segments.length - 3]; // -3 because URL is /cars/[id]/events/[eventId]
     const eventId = segments[segments.length - 1]; // -1 for the eventId
 
     const db = await getDatabase();
     const eventModel = new EventModel(db);
     const eventObjectId = new ObjectId(eventId);
 
-    const success = await eventModel.delete(eventObjectId);
-
-    if (!success) {
+    // First, get the event to verify it exists and belongs to this car
+    const event = await eventModel.findById(eventObjectId);
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    // Verify the event belongs to the specified car
+    if (event.car_id !== carId) {
+      return NextResponse.json(
+        { error: "Event does not belong to this car" },
+        { status: 400 }
+      );
+    }
+
+    // Delete the event from the events collection
+    const success = await eventModel.delete(eventObjectId);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Failed to delete event" },
+        { status: 500 }
+      );
+    }
+
+    // Remove the eventId from the car's eventIds array to prevent orphaned references
+    try {
+      await db
+        .collection("cars")
+        .updateOne(
+          { _id: new ObjectId(carId) },
+          { $pull: { eventIds: eventObjectId } as any }
+        );
+    } catch (error) {
+      console.warn("Failed to remove eventId from car:", error);
+      // Don't fail the entire operation if this cleanup fails
     }
 
     return NextResponse.json({ success: true });
@@ -47,11 +77,9 @@ export async function PUT(request: Request) {
     const eventObjectId = new ObjectId(eventId);
     const data = await request.json();
 
-    // Ensure teamMemberIds is always an array and convert to ObjectIds
+    // Ensure teamMemberIds is always an array - keep as strings since they are Firebase UIDs
     const teamMemberIds = Array.isArray(data.teamMemberIds || data.assignees)
-      ? (data.teamMemberIds || data.assignees).map(
-          (id: string) => new ObjectId(id)
-        )
+      ? data.teamMemberIds || data.assignees
       : [];
 
     // Map the frontend fields to database fields
@@ -60,9 +88,10 @@ export async function PUT(request: Request) {
     };
 
     if (data.type) mappedUpdates.type = data.type;
+    if (data.title !== undefined) mappedUpdates.title = data.title.trim();
     if (data.description !== undefined)
       mappedUpdates.description = data.description;
-    if (data.status) mappedUpdates.status = data.status;
+    if (data.url !== undefined) mappedUpdates.url = data.url;
     if (data.start) mappedUpdates.start = new Date(data.start);
     if (data.end) mappedUpdates.end = new Date(data.end);
     if (typeof data.isAllDay === "boolean")

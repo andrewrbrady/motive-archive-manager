@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Event, EventStatus, EventType } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import { toast } from "sonner";
 import ListView from "@/components/events/ListView";
 import EventBatchTemplates from "@/components/events/EventBatchTemplates";
@@ -22,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,28 +49,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { EventTypeSelector } from "./EventTypeSelector";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TeamMemberPicker } from "@/components/ui/team-member-picker";
+import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 
 interface Option {
   label: string;
   value: string;
 }
 
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  creativeRoles: string[];
-  status: string;
-}
-
 interface NewEvent {
   type: EventType;
+  title: string;
   description: string;
+  url: string;
   start: string;
   end?: string;
-  assignees: string[];
-  status: EventStatus;
+  teamMemberIds: string[];
   isAllDay: boolean;
 }
 
@@ -78,17 +77,17 @@ export default function EventsTab({ carId }: { carId: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingEvent, setIsAddingEvent] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [newEvent, setNewEvent] = useState<NewEvent>({
     type: EventType.DETAIL,
+    title: "",
     description: "",
+    url: "",
     start: "",
     end: "",
-    assignees: [],
-    status: EventStatus.NOT_STARTED,
+    teamMemberIds: [],
     isAllDay: false,
   });
 
@@ -131,13 +130,19 @@ export default function EventsTab({ carId }: { carId: string }) {
       const transformedEvents: Event[] = data.map((event: any) => ({
         id: event.id,
         car_id: event.car_id,
-        description: event.description || "",
+        project_id: event.project_id,
         type: event.type,
-        status: event.status,
+        title: event.title || "",
+        description: event.description || "",
+        url: event.url || "",
         start: event.start,
         end: event.end,
-        assignees: event.assignees || [],
         isAllDay: event.isAllDay || false,
+        teamMemberIds: event.teamMemberIds || [],
+        locationId: event.locationId,
+        primaryImageId: event.primaryImageId,
+        imageIds: event.imageIds || [],
+        createdBy: event.createdBy || "",
         createdAt: event.createdAt,
         updatedAt: event.updatedAt,
       }));
@@ -155,22 +160,6 @@ export default function EventsTab({ carId }: { carId: string }) {
   useEffect(() => {
     fetchEvents();
   }, [carId]);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await fetch("/api/users");
-        if (!response.ok) throw new Error("Failed to fetch users");
-        const data = await response.json();
-        setUsers(data.filter((user: User) => user.status === "active"));
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        toast.error("Failed to fetch users");
-      }
-    };
-
-    fetchUsers();
-  }, []);
 
   const handleUpdateEvent = async (
     eventId: string,
@@ -240,13 +229,13 @@ export default function EventsTab({ carId }: { carId: string }) {
         },
         body: JSON.stringify({
           type: newEvent.type,
+          title: newEvent.title,
           description: newEvent.description,
-          scheduled_date: newEvent.start,
-          end_date: newEvent.end,
-          assignees: newEvent.assignees,
-          status: newEvent.status,
-          is_all_day: newEvent.isAllDay,
-          car_id: carId,
+          url: newEvent.url,
+          start: newEvent.start,
+          end: newEvent.end,
+          teamMemberIds: newEvent.teamMemberIds,
+          isAllDay: newEvent.isAllDay,
         }),
       });
 
@@ -255,11 +244,12 @@ export default function EventsTab({ carId }: { carId: string }) {
       setIsAddingEvent(false);
       setNewEvent({
         type: EventType.DETAIL,
+        title: "",
         description: "",
+        url: "",
         start: "",
         end: "",
-        assignees: [],
-        status: EventStatus.NOT_STARTED,
+        teamMemberIds: [],
         isAllDay: false,
       });
       toast.success("Event created successfully");
@@ -348,159 +338,220 @@ export default function EventsTab({ carId }: { carId: string }) {
       />
 
       <Dialog open={isAddingEvent} onOpenChange={setIsAddingEvent}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add New Event</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+          <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+            <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
+              Create New Event
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Event Type</Label>
-              <Select
-                value={newEvent.type}
-                onValueChange={(value) =>
-                  setNewEvent({ ...newEvent, type: value as EventType })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(EventType).map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea
-                value={newEvent.description}
-                onChange={(e) =>
-                  setNewEvent({
-                    ...newEvent,
-                    description: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div>
-              <Label>Start Date</Label>
-              <Input
-                type="datetime-local"
-                value={newEvent.start}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, start: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label>End Date (Optional)</Label>
-              <Input
-                type="datetime-local"
-                value={newEvent.end}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, end: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label>Assignees</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
+
+          <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddEvent();
+              }}
+              className="space-y-4"
+            >
+              {/* Basic Information Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1">
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                  <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                    Basic Information
+                  </span>
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="title"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
                   >
-                    {Array.isArray(newEvent.assignees) &&
-                    newEvent.assignees.length > 0
-                      ? `${newEvent.assignees.length} selected`
-                      : "Select assignees"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <ScrollArea className="h-[200px]">
-                    <div className="grid grid-cols-2 p-2 gap-2">
-                      {users.map((user) => {
-                        const isSelected =
-                          Array.isArray(newEvent.assignees) &&
-                          newEvent.assignees.includes(user.name);
-                        return (
-                          <button
-                            key={user._id}
-                            onClick={() => {
-                              const currentAssignees = Array.isArray(
-                                newEvent.assignees
-                              )
-                                ? [...newEvent.assignees]
-                                : [];
-                              if (!isSelected) {
-                                setNewEvent({
-                                  ...newEvent,
-                                  assignees: [...currentAssignees, user.name],
-                                });
-                              } else {
-                                setNewEvent({
-                                  ...newEvent,
-                                  assignees: currentAssignees.filter(
-                                    (name) => name !== user.name
-                                  ),
-                                });
-                              }
-                            }}
-                            className={`flex items-center rounded-md px-3 py-2 transition-colors text-left ${
-                              isSelected
-                                ? "bg-primary/10 text-primary hover:bg-primary/20"
-                                : "hover:bg-accent"
-                            }`}
-                          >
-                            <div
-                              className={`w-4 h-4 border rounded-sm flex items-center justify-center transition-colors ${
-                                isSelected
-                                  ? "bg-primary border-primary text-primary-foreground"
-                                  : "border-input"
-                              }`}
-                            >
-                              {isSelected && <Check className="h-3 w-3" />}
-                            </div>
-                            <span className="text-sm truncate ml-3">
-                              {user.name}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select
-                value={newEvent.status}
-                onValueChange={(value) =>
-                  setNewEvent({
-                    ...newEvent,
-                    status: value as EventStatus,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(EventStatus).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleAddEvent}>Create Event</Button>
+                    Title
+                  </Label>
+                  <Input
+                    id="title"
+                    value={newEvent.title}
+                    onChange={(e) =>
+                      setNewEvent({
+                        ...newEvent,
+                        title: e.target.value,
+                      })
+                    }
+                    placeholder="Event title"
+                    required
+                    className="text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="description"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={newEvent.description}
+                    onChange={(e) =>
+                      setNewEvent({
+                        ...newEvent,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Event description"
+                    className="text-sm"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="url"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    URL
+                  </Label>
+                  <Input
+                    id="url"
+                    type="url"
+                    value={newEvent.url}
+                    onChange={(e) =>
+                      setNewEvent({
+                        ...newEvent,
+                        url: e.target.value,
+                      })
+                    }
+                    placeholder="https://example.com"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Schedule Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1">
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                  <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                    Schedule
+                  </span>
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="start"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Start {newEvent.isAllDay ? "Date" : "Date & Time"} *
+                    </Label>
+                    <DateTimePicker
+                      value={newEvent.start}
+                      onChange={(value) =>
+                        setNewEvent({ ...newEvent, start: value })
+                      }
+                      required
+                      className="text-sm"
+                      isAllDay={newEvent.isAllDay}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="end"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      End {newEvent.isAllDay ? "Date" : "Date & Time"}
+                    </Label>
+                    <DateTimePicker
+                      value={newEvent.end || ""}
+                      onChange={(value) =>
+                        setNewEvent({ ...newEvent, end: value })
+                      }
+                      className="text-sm"
+                      isAllDay={newEvent.isAllDay}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <CustomCheckbox
+                    id="allDay"
+                    checked={newEvent.isAllDay}
+                    onCheckedChange={(checked) =>
+                      setNewEvent({ ...newEvent, isAllDay: checked as boolean })
+                    }
+                    label="All Day Event"
+                  />
+                </div>
+              </div>
+
+              {/* Event Type Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1">
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                  <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                    Event Type
+                  </span>
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                    Event Type
+                  </Label>
+                  <EventTypeSelector
+                    value={newEvent.type}
+                    onValueChange={(value: string) =>
+                      setNewEvent({ ...newEvent, type: value as EventType })
+                    }
+                    label=""
+                    className="space-y-2"
+                  />
+                </div>
+              </div>
+
+              {/* Team Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1">
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                  <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                    Team
+                  </span>
+                  <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                    Team Members
+                  </Label>
+                  <TeamMemberPicker
+                    selectedMemberIds={newEvent.teamMemberIds}
+                    onSelectionChange={(memberIds: string[]) =>
+                      setNewEvent({ ...newEvent, teamMemberIds: memberIds })
+                    }
+                    placeholder="Select team members"
+                  />
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Footer with buttons */}
+          <div className="flex-shrink-0 pt-4 border-t border-[hsl(var(--border-subtle))] flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddingEvent(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleAddEvent}>
+              Create Event
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

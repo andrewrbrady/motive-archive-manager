@@ -261,39 +261,63 @@ export function IconPicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0" align="start">
-        <div className="p-4 border-b">
+      <PopoverContent
+        className="w-96 p-0 bg-transparent border-[hsl(var(--border))] backdrop-blur-sm"
+        align="start"
+      >
+        <div className="p-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/80 backdrop-blur-sm">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search icons..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
+              className="pl-9 bg-transparent"
             />
           </div>
         </div>
 
-        <Tabs defaultValue="social" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-auto p-1">
-            <TabsTrigger value="social" className="text-xs">
+        <Tabs
+          defaultValue="social"
+          className="w-full bg-[hsl(var(--background))]/80 backdrop-blur-sm"
+        >
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-transparent">
+            <TabsTrigger
+              value="social"
+              className="text-xs bg-transparent data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-[hsl(var(--foreground))]/50 border border-transparent hover:border-[hsl(var(--foreground))] transition-all duration-200"
+            >
               Social
             </TabsTrigger>
-            <TabsTrigger value="video" className="text-xs">
+            <TabsTrigger
+              value="video"
+              className="text-xs bg-transparent data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-[hsl(var(--foreground))]/50 border border-transparent hover:border-[hsl(var(--foreground))] transition-all duration-200"
+            >
               Video
             </TabsTrigger>
-            <TabsTrigger value="writing" className="text-xs">
+            <TabsTrigger
+              value="writing"
+              className="text-xs bg-transparent data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-[hsl(var(--foreground))]/50 border border-transparent hover:border-[hsl(var(--foreground))] transition-all duration-200"
+            >
               Writing
             </TabsTrigger>
           </TabsList>
-          <TabsList className="grid w-full grid-cols-3 h-auto p-1 mt-1">
-            <TabsTrigger value="marketing" className="text-xs">
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1 mt-1 bg-transparent">
+            <TabsTrigger
+              value="marketing"
+              className="text-xs bg-transparent data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-[hsl(var(--foreground))]/50 border border-transparent hover:border-[hsl(var(--foreground))] transition-all duration-200"
+            >
               Marketing
             </TabsTrigger>
-            <TabsTrigger value="communication" className="text-xs">
+            <TabsTrigger
+              value="communication"
+              className="text-xs bg-transparent data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-[hsl(var(--foreground))]/50 border border-transparent hover:border-[hsl(var(--foreground))] transition-all duration-200"
+            >
               Comm
             </TabsTrigger>
-            <TabsTrigger value="general" className="text-xs">
+            <TabsTrigger
+              value="general"
+              className="text-xs bg-transparent data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-[hsl(var(--foreground))]/50 border border-transparent hover:border-[hsl(var(--foreground))] transition-all duration-200"
+            >
               General
             </TabsTrigger>
           </TabsList>
@@ -302,7 +326,7 @@ export function IconPicker({
             <TabsContent
               key={key}
               value={key}
-              className="p-4 max-h-64 overflow-y-auto"
+              className="mt-0 px-4 pb-4 pt-0 max-h-64 overflow-y-auto bg-transparent"
             >
               <div className="grid grid-cols-6 gap-2">
                 {category?.icons.map((icon) => {
@@ -312,16 +336,20 @@ export function IconPicker({
                   return (
                     <Button
                       key={icon.name}
-                      variant={isSelected ? "default" : "ghost"}
+                      variant="ghost"
                       size="sm"
-                      className="h-10 w-10 p-0"
+                      className={`h-12 w-12 p-0 bg-transparent hover:bg-[hsl(var(--accent))]/20 ${
+                        isSelected
+                          ? "border-2 border-[hsl(var(--foreground))] bg-transparent"
+                          : "border-2 border-transparent"
+                      }`}
                       onClick={() => {
                         onIconSelect(icon.name);
                         setIsOpen(false);
                       }}
                       title={icon.name}
                     >
-                      <IconComponent className="h-4 w-4" />
+                      <IconComponent className="h-6 w-6" />
                     </Button>
                   );
                 })}

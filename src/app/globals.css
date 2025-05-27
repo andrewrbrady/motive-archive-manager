@@ -1556,3 +1556,35 @@ dialog.modal[open]::backdrop {
 .dark .snap-section {
   background: #111827;
 }
+
+/* Fix react-day-picker weekday header alignment */
+.rdp-weekday {
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: 0.8rem !important;
+  font-weight: normal !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.rdp-weekdays {
+  display: flex !important;
+  width: 100% !important;
+}
+
+/* Ensure calendar cells match header width */
+.rdp-week {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.rdp-week td {
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}

@@ -328,7 +328,7 @@ const LengthSettingsContent: React.FC = () => {
               Add New Length Setting
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="pt-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="new-key" className="text-sm font-medium">
@@ -447,7 +447,7 @@ const LengthSettingsContent: React.FC = () => {
                 </code>
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-4 space-y-4">
               <div className="space-y-2">
                 <Label htmlFor={`${setting.key}-name`}>Display Name</Label>
                 <Input

@@ -84,7 +84,7 @@ export async function PUT(
     if (data.title !== undefined) mappedUpdates.title = data.title.trim();
     if (data.description !== undefined)
       mappedUpdates.description = data.description;
-    if (data.status) mappedUpdates.status = data.status;
+    if (data.url !== undefined) mappedUpdates.url = data.url;
     if (data.start) mappedUpdates.start = new Date(data.start);
     if (data.end) mappedUpdates.end = new Date(data.end);
     if (typeof data.isAllDay === "boolean")

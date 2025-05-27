@@ -1,0 +1,138 @@
+/* DateTimePicker Calendar Overrides */
+.datetime-picker-calendar .rdp-button_previous,
+.datetime-picker-calendar .rdp-button_next,
+.datetime-picker-calendar .rdp-nav_button {
+  color: white !important;
+  border: none !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.datetime-picker-calendar .rdp-button_previous:hover,
+.datetime-picker-calendar .rdp-button_next:hover,
+.datetime-picker-calendar .rdp-nav_button:hover {
+  color: white !important;
+  opacity: 1 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.datetime-picker-calendar .rdp-button_previous:focus,
+.datetime-picker-calendar .rdp-button_next:focus,
+.datetime-picker-calendar .rdp-nav_button:focus {
+  color: white !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.datetime-picker-calendar .rdp-button_previous svg,
+.datetime-picker-calendar .rdp-button_next svg,
+.datetime-picker-calendar .rdp-nav_button svg {
+  color: white !important;
+  fill: white !important;
+}
+
+.datetime-picker-calendar .rdp-button_previous:hover svg,
+.datetime-picker-calendar .rdp-button_next:hover svg,
+.datetime-picker-calendar .rdp-nav_button:hover svg {
+  color: white !important;
+  fill: white !important;
+}
+
+.datetime-picker-calendar .rdp-caption_label {
+  color: white !important;
+}
+
+/* Remove any left margin/padding causing right shift */
+.datetime-picker-calendar .rdp-root {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.datetime-picker-calendar .rdp-root > div {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.datetime-picker-calendar .rdp-root .space-y-4 {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Target the flex container that might have space-x-4 */
+.datetime-picker-calendar .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.datetime-picker-calendar .flex.flex-col > * {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Center the month and year text */
+.datetime-picker-calendar .rdp-month_caption {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  margin-bottom: 0 !important;
+}
+
+.datetime-picker-calendar .rdp-month_caption span {
+  text-align: center !important;
+  width: 100% !important;
+}
+
+/* Override global CSS with higher specificity */
+.datetime-picker-calendar .rdp-root .rdp-month_grid {
+  width: 100% !important;
+  table-layout: fixed !important;
+  margin: 0 !important;
+}
+
+.datetime-picker-calendar .rdp-root .rdp-weekdays {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.datetime-picker-calendar .rdp-root .rdp-weekdays .rdp-weekday {
+  flex: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+.datetime-picker-calendar .rdp-root .rdp-week {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.datetime-picker-calendar .rdp-root .rdp-week td {
+  flex: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.datetime-picker-calendar .rdp-root .rdp-day_button {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin: 0 auto !important;
+}
+
+.datetime-picker-calendar .rdp-nav {
+  gap: 0.5rem !important;
+}

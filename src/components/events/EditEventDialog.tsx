@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Event, EventType, EventStatus } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,25 +15,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  CustomDropdown,
-  LocationDropdown,
-} from "@/components/ui/custom-dropdown";
+import { LocationDropdown } from "@/components/ui/custom-dropdown";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import {
-  Camera,
-  Video,
-  Search,
-  Wrench,
-  Sparkles,
-  Package,
-  Truck,
-  MoreHorizontal,
-  CircleDot,
-  Play,
-  CheckCircle,
-} from "lucide-react";
+import { EventTypeSelector } from "./EventTypeSelector";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { TeamMemberPicker } from "@/components/ui/team-member-picker";
+import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 
 interface EditEventDialogProps {
   event: Event | null;
@@ -41,69 +29,6 @@ interface EditEventDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpdate: (eventId: string, data: Partial<Event>) => void;
 }
-
-// Event type options with icons
-const eventTypeOptions = [
-  {
-    value: EventType.PRODUCTION,
-    label: "Production",
-    icon: <Camera className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.POST_PRODUCTION,
-    label: "Post Production",
-    icon: <Video className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.MARKETING,
-    label: "Marketing",
-    icon: <Sparkles className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.INSPECTION,
-    label: "Inspection",
-    icon: <Search className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.DETAIL,
-    label: "Detail",
-    icon: <Wrench className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.PICKUP,
-    label: "Pickup",
-    icon: <Package className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.DELIVERY,
-    label: "Delivery",
-    icon: <Truck className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventType.OTHER,
-    label: "Other",
-    icon: <MoreHorizontal className="w-4 h-4 flex-shrink-0" />,
-  },
-];
-
-// Event status options with icons
-const eventStatusOptions = [
-  {
-    value: EventStatus.NOT_STARTED,
-    label: "Not Started",
-    icon: <CircleDot className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventStatus.IN_PROGRESS,
-    label: "In Progress",
-    icon: <Play className="w-4 h-4 flex-shrink-0" />,
-  },
-  {
-    value: EventStatus.COMPLETED,
-    label: "Completed",
-    icon: <CheckCircle className="w-4 h-4 flex-shrink-0" />,
-  },
-];
 
 export default function EditEventDialog({
   event,
@@ -114,12 +39,13 @@ export default function EditEventDialog({
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    type: EventType.PRODUCTION,
-    status: EventStatus.NOT_STARTED,
+    url: "",
+    type: EventType.DETAIL,
     start: "",
     end: "",
     isAllDay: false,
     locationId: "",
+    teamMemberIds: [] as string[],
   });
 
   // Reset form when event changes
@@ -131,8 +57,8 @@ export default function EditEventDialog({
       setFormData({
         title: event.title,
         description: event.description,
+        url: event.url || "",
         type: event.type,
-        status: event.status,
         start: event.isAllDay
           ? format(startDate, "yyyy-MM-dd")
           : format(startDate, "yyyy-MM-dd'T'HH:mm"),
@@ -143,6 +69,7 @@ export default function EditEventDialog({
           : "",
         isAllDay: event.isAllDay || false,
         locationId: event.locationId || "",
+        teamMemberIds: event.teamMemberIds || [],
       });
     }
   }, [event]);
@@ -175,12 +102,13 @@ export default function EditEventDialog({
       const eventData: Partial<Event> = {
         title: formData.title.trim(),
         description: formData.description.trim(),
+        url: formData.url.trim() || undefined,
         type: formData.type,
-        status: formData.status,
         start: startDate.toISOString(),
         end: endDate ? endDate.toISOString() : undefined,
         isAllDay: formData.isAllDay,
         locationId: formData.locationId || undefined,
+        teamMemberIds: formData.teamMemberIds,
       };
 
       onUpdate(event.id, eventData);
@@ -197,12 +125,13 @@ export default function EditEventDialog({
     setFormData({
       title: "",
       description: "",
-      type: EventType.PRODUCTION,
-      status: EventStatus.NOT_STARTED,
+      url: "",
+      type: EventType.DETAIL,
       start: "",
       end: "",
       isAllDay: false,
       locationId: "",
+      teamMemberIds: [],
     });
   };
 
@@ -232,7 +161,12 @@ export default function EditEventDialog({
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="col-span-2 space-y-1.5">
-                <Label htmlFor="title">Title *</Label>
+                <Label
+                  htmlFor="title"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Title *
+                </Label>
                 <Input
                   id="title"
                   value={formData.title}
@@ -246,7 +180,12 @@ export default function EditEventDialog({
               </div>
 
               <div className="col-span-2 space-y-1.5">
-                <Label htmlFor="description">Description</Label>
+                <Label
+                  htmlFor="description"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Description
+                </Label>
                 <Textarea
                   id="description"
                   value={formData.description}
@@ -260,7 +199,31 @@ export default function EditEventDialog({
               </div>
 
               <div className="col-span-2 space-y-1.5">
-                <Label htmlFor="location">Location</Label>
+                <Label
+                  htmlFor="url"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  URL
+                </Label>
+                <Input
+                  id="url"
+                  type="url"
+                  value={formData.url}
+                  onChange={(e) =>
+                    setFormData({ ...formData, url: e.target.value })
+                  }
+                  placeholder="https://example.com"
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="col-span-2 space-y-1.5">
+                <Label
+                  htmlFor="location"
+                  className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                >
+                  Location
+                </Label>
                 <LocationDropdown
                   value={formData.locationId}
                   onChange={(value) =>
@@ -271,31 +234,43 @@ export default function EditEventDialog({
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="type">Type *</Label>
-                <CustomDropdown
+              <div className="col-span-2 space-y-1.5">
+                <EventTypeSelector
                   value={formData.type}
-                  onChange={(value) =>
+                  onValueChange={(value) =>
                     setFormData({ ...formData, type: value as EventType })
                   }
-                  options={eventTypeOptions}
+                  label="Type *"
                   placeholder="Select event type"
-                  className="w-full"
+                  required
+                  className="space-y-1.5"
                 />
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="status">Status *</Label>
-                <CustomDropdown
-                  value={formData.status}
-                  onChange={(value) =>
-                    setFormData({ ...formData, status: value as EventStatus })
-                  }
-                  options={eventStatusOptions}
-                  placeholder="Select event status"
-                  className="w-full"
-                />
+            {/* ─────────────────────────────────────────────────────────────── */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
               </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Team
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                Team Members
+              </Label>
+              <TeamMemberPicker
+                selectedMemberIds={formData.teamMemberIds}
+                onSelectionChange={(memberIds: string[]) =>
+                  setFormData({ ...formData, teamMemberIds: memberIds })
+                }
+                placeholder="Select team members"
+              />
             </div>
 
             {/* ─────────────────────────────────────────────────────────────── */}
@@ -311,48 +286,48 @@ export default function EditEventDialog({
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isAllDay"
-                  checked={formData.isAllDay}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, isAllDay: checked as boolean })
-                  }
-                />
-                <Label htmlFor="isAllDay" className="text-sm">
-                  All day event
-                </Label>
-              </div>
+              <CustomCheckbox
+                id="isAllDay"
+                checked={formData.isAllDay}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, isAllDay: checked as boolean })
+                }
+                label="All day event"
+              />
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="space-y-1.5">
-                  <Label htmlFor="start">
+                  <Label
+                    htmlFor="start"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
                     Start {formData.isAllDay ? "Date" : "Date & Time"} *
                   </Label>
-                  <Input
-                    id="start"
-                    type={formData.isAllDay ? "date" : "datetime-local"}
+                  <DateTimePicker
                     value={formData.start}
-                    onChange={(e) =>
-                      setFormData({ ...formData, start: e.target.value })
+                    onChange={(value) =>
+                      setFormData({ ...formData, start: value })
                     }
                     className="text-sm"
                     required
+                    isAllDay={formData.isAllDay}
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="end">
+                  <Label
+                    htmlFor="end"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
                     End {formData.isAllDay ? "Date" : "Date & Time"}
                   </Label>
-                  <Input
-                    id="end"
-                    type={formData.isAllDay ? "date" : "datetime-local"}
+                  <DateTimePicker
                     value={formData.end}
-                    onChange={(e) =>
-                      setFormData({ ...formData, end: e.target.value })
+                    onChange={(value) =>
+                      setFormData({ ...formData, end: value })
                     }
                     className="text-sm"
+                    isAllDay={formData.isAllDay}
                   />
                 </div>
               </div>

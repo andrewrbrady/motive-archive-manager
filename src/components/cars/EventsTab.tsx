@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Event, EventStatus, EventType } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import { toast } from "sonner";
 import EventsCalendar from "@/components/events/EventsCalendar";
 import ListView from "@/components/events/ListView";

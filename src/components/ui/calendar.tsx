@@ -41,7 +41,7 @@ function Calendar({
         table: "w-full border-collapse space-y-1",
         head_row: "flex w-full",
         head_cell:
-          "text-muted-foreground flex-1 font-normal text-[0.8rem] text-center w-9 m-auto",
+          "text-muted-foreground flex-1 font-normal text-[0.8rem] text-center h-9 flex items-center justify-center",
         row: "flex w-full mt-2",
         cell: "flex-1 h-9 text-center text-sm p-0 relative flex items-center justify-center [&:has([aria-selected])]:bg-primary/20 [&:has([aria-selected].day-outside)]:bg-primary/10",
         day: cn(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Event, EventStatus, EventType } from "@/types/event";
+import { Event, EventType } from "@/types/event";
 import {
   Table,
   TableBody,
@@ -41,7 +41,6 @@ export default function EventsPage() {
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
-    status: "",
     type: "",
     from: "",
     to: "",
@@ -85,7 +84,6 @@ export default function EventsPage() {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
-      if (filters.status) queryParams.append("status", filters.status);
       if (filters.type) queryParams.append("type", filters.type);
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
@@ -126,33 +124,6 @@ export default function EventsPage() {
     fetchEvents();
   }, [filters]);
 
-  const handleUpdateStatus = async (
-    eventId: string,
-    carId: string,
-    newStatus: EventStatus
-  ) => {
-    try {
-      // [REMOVED] // [REMOVED] console.log("Updating status:", { eventId, carId, newStatus }); // Debug log
-      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error response:", errorData); // Debug log
-        throw new Error("Failed to update event");
-      }
-
-      await fetchEvents();
-      toast.success("Event status updated");
-    } catch (error) {
-      console.error("Update error:", error); // Debug log
-      toast.error("Failed to update event status");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8">
@@ -168,33 +139,7 @@ export default function EventsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <Select
-                value={filters.status}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, status: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {Object.values(EventStatus).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status
-                        .split("_")
-                        .map(
-                          (word) => word.charAt(0).toUpperCase() + word.slice(1)
-                        )
-                        .join(" ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Select
                 value={filters.type}
@@ -258,7 +203,6 @@ export default function EventsPage() {
                   <TableHead>Description</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
-                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -280,33 +224,6 @@ export default function EventsPage() {
                     <TableCell>{event.description}</TableCell>
                     <TableCell>{formatDate(event.start)}</TableCell>
                     <TableCell>{formatDate(event.end)}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={event.status}
-                        onValueChange={(value) =>
-                          handleUpdateStatus(
-                            event.id,
-                            event.car?._id || getCarId(event.id),
-                            value as EventStatus
-                          )
-                        }
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={EventStatus.NOT_STARTED}>
-                            Not Started
-                          </SelectItem>
-                          <SelectItem value={EventStatus.IN_PROGRESS}>
-                            In Progress
-                          </SelectItem>
-                          <SelectItem value={EventStatus.COMPLETED}>
-                            Completed
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

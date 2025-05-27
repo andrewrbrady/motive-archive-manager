@@ -199,7 +199,7 @@ export default function UserDashboard() {
               {
                 value: "events",
                 label: "Events",
-                content: <UserEvents userName={user.name} />,
+                content: <UserEvents userId={user._id} />,
               },
             ]}
             defaultValue="deliverables"

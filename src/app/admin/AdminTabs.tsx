@@ -25,6 +25,7 @@ import CaptionPromptsContent from "./CaptionPromptsContent";
 import SystemPromptsContent from "./SystemPromptsContent";
 import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
+import EventTypeSettingsContent from "./EventTypeSettingsContent";
 
 export default function AdminTabs() {
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
@@ -71,7 +72,7 @@ export default function AdminTabs() {
             Debug OAuth configuration and troubleshoot authentication issues
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="pt-4 space-y-4">
           <Button onClick={fetchOAuthDebug} disabled={debugLoading}>
             {debugLoading ? "Loading..." : "Check OAuth Configuration"}
           </Button>
@@ -180,7 +181,7 @@ export default function AdminTabs() {
             Debug specific user authentication and data
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="pt-4 space-y-4">
           <div className="flex gap-2">
             <Input
               placeholder="Enter user email or UID"
@@ -295,6 +296,11 @@ export default function AdminTabs() {
       value: "length-settings",
       label: "Length Settings",
       content: <LengthSettingsContent />,
+    },
+    {
+      value: "event-type-settings",
+      label: "Event Type Settings",
+      content: <EventTypeSettingsContent />,
     },
   ];
 

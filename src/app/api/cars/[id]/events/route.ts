@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId, UpdateFilter } from "mongodb";
-import { Event, EventStatus, DbEvent } from "@/types/event";
+import { Event, DbEvent } from "@/types/event";
 import { EventModel } from "@/models/Event";
+import { auth } from "@/auth";
 
 interface Car {
   _id: ObjectId;
@@ -46,6 +47,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Get the current session to identify who is creating the event
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/events
@@ -87,7 +97,7 @@ export async function POST(request: Request) {
       type: data.type,
       title: data.title.trim(),
       description: data.description || "",
-      status: data.status || EventStatus.NOT_STARTED,
+      url: data.url || undefined,
       start: new Date(data.start),
       end: data.end ? new Date(data.end) : undefined,
       is_all_day: data.isAllDay || false,
@@ -95,6 +105,7 @@ export async function POST(request: Request) {
       location_id: locationId,
       primary_image_id: primaryImageId,
       image_ids: imageIds.length > 0 ? imageIds : undefined,
+      created_by: session.user.id, // Track who created the event
     };
 
     const newEventId = await eventModel.create(eventData);
@@ -173,6 +184,7 @@ export async function PUT(request: Request) {
     if (data.title !== undefined) mappedUpdates.title = data.title.trim();
     if (data.description !== undefined)
       mappedUpdates.description = data.description;
+    if (data.url !== undefined) mappedUpdates.url = data.url;
     if (data.status) mappedUpdates.status = data.status;
     if (data.start) mappedUpdates.start = new Date(data.start);
     if (data.end) mappedUpdates.end = new Date(data.end);
@@ -240,7 +252,35 @@ export async function DELETE(request: Request) {
     const eventId = new ObjectId(eventIdStr);
     const eventModel = new EventModel(db);
 
-    await eventModel.delete(eventId);
+    // First, get the event to find which car it belongs to
+    const event = await eventModel.findById(eventId);
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    // Delete the event from the events collection
+    const deleteSuccess = await eventModel.delete(eventId);
+    if (!deleteSuccess) {
+      return NextResponse.json(
+        { error: "Failed to delete event" },
+        { status: 500 }
+      );
+    }
+
+    // Remove the eventId from the car's eventIds array to prevent orphaned references
+    if (event.car_id) {
+      try {
+        await db
+          .collection<Car>("cars")
+          .updateOne(
+            { _id: new ObjectId(event.car_id) },
+            { $pull: { eventIds: eventId } }
+          );
+      } catch (error) {
+        console.warn("Failed to remove eventId from car:", error);
+        // Don't fail the entire operation if this cleanup fails
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

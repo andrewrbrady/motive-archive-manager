@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { EventType, EventStatus } from "@/types/event";
+import { EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -44,7 +44,6 @@ interface User {
 const eventFormSchema = z.object({
   type: z.nativeEnum(EventType),
   description: z.string().min(1, "Description is required"),
-  status: z.nativeEnum(EventStatus),
   start: z.string(),
   end: z.string().optional(),
   isAllDay: z.boolean().default(false),
@@ -68,7 +67,6 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
     defaultValues: event || {
       type: EventType.OTHER,
       description: "",
-      status: EventStatus.NOT_STARTED,
       start: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       end: "",
       isAllDay: false,
@@ -154,31 +152,6 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
               <FormControl>
                 <Textarea {...field} placeholder="Event description" />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {Object.values(EventStatus).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <FormMessage />
             </FormItem>
           )}

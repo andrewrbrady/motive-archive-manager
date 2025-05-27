@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { EventType, EventStatus } from "@/types/event";
+import { EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -106,7 +106,6 @@ export default function EventBatchTemplates({
           body: JSON.stringify({
             type: event.type,
             description: event.description,
-            status: EventStatus.NOT_STARTED,
             start: startISOString,
             end: endISOString,
             isAllDay: event.isAllDay,

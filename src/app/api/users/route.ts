@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { connectToDatabase } from "@/lib/mongodb";
-import { User } from "@/models/User";
 import { logger } from "@/lib/logging";
 import { getUsers } from "@/lib/users/cache";
 
@@ -26,8 +24,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await connectToDatabase();
-
     logger.info({
       message: "Fetching users for team member selection",
       requestId,
@@ -35,27 +31,29 @@ export async function GET(request: NextRequest) {
       userId: session.user.id,
     });
 
-    // Fetch all users with basic information
-    const users = await User.find(
-      {},
-      {
-        _id: 1,
-        name: 1,
-        email: 1,
-        image: 1,
-        createdAt: 1,
-      }
-    ).sort({ name: 1 });
+    // Fetch users from Firestore using the cached function
+    const users = await getUsers();
+
+    // Transform to match the expected interface for backward compatibility
+    const transformedUsers = users.map((user) => ({
+      _id: user.uid, // Use Firebase UID as _id for backward compatibility
+      name: user.name,
+      email: user.email,
+      roles: user.roles,
+      creativeRoles: user.creativeRoles,
+      status: user.status,
+      firebaseUid: user.uid, // Include Firebase UID explicitly
+    }));
 
     logger.info({
-      message: "Successfully fetched users",
+      message: "Successfully fetched users from Firestore",
       requestId,
-      userCount: users.length,
+      userCount: transformedUsers.length,
     });
 
     return NextResponse.json({
-      users,
-      total: users.length,
+      users: transformedUsers,
+      total: transformedUsers.length,
     });
   } catch (error) {
     console.error("Error fetching users:", error);

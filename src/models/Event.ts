@@ -1,12 +1,12 @@
 import { Collection, Db, ObjectId, Filter } from "mongodb";
-import { Event, EventStatus, EventType, DbEvent } from "@/types/event";
+import { Event, EventType, DbEvent } from "@/types/event";
 
 type EventQuery = {
   type?: EventType;
-  status?: EventStatus;
   teamMemberIds?: string | { $in: string[] };
   car_id?: string;
   project_id?: string;
+  createdBy?: string;
   start?:
     | Date
     | {
@@ -32,7 +32,7 @@ export class EventModel {
       await this.collection.createIndex({ project_id: 1 });
       await this.collection.createIndex({ type: 1 });
       await this.collection.createIndex({ start: 1 });
-      await this.collection.createIndex({ status: 1 });
+      await this.collection.createIndex({ created_by: 1 });
       await this.collection.createIndex({ created_at: -1 });
       await this.collection.createIndex({ teamMemberIds: 1 });
     }
@@ -79,11 +79,6 @@ export class EventModel {
       filter.type = query.type;
     }
 
-    // Add status filter
-    if (query.status) {
-      filter.status = query.status;
-    }
-
     // Add car_id filter
     if (query.car_id) {
       filter.car_id = query.car_id;
@@ -94,13 +89,18 @@ export class EventModel {
       filter.project_id = query.project_id;
     }
 
+    // Add createdBy filter
+    if (query.createdBy) {
+      filter.created_by = query.createdBy;
+    }
+
     // Add team member filter
     if (query.teamMemberIds) {
       if (typeof query.teamMemberIds === "string") {
-        filter.teamMemberIds = { $in: [new ObjectId(query.teamMemberIds)] };
+        filter.teamMemberIds = { $in: [query.teamMemberIds] };
       } else {
         filter.teamMemberIds = {
-          $in: query.teamMemberIds.$in.map((id) => new ObjectId(id)),
+          $in: query.teamMemberIds.$in,
         };
       }
     }
@@ -131,9 +131,9 @@ export class EventModel {
           console.error("Invalid teamMemberIds format:", updates.teamMemberIds);
           return false;
         }
-        // Ensure all teamMemberIds are ObjectIds
-        updates.teamMemberIds = updates.teamMemberIds.map((id) =>
-          typeof id === "string" ? new ObjectId(id) : id
+        // Keep teamMemberIds as strings since they are Firebase UIDs
+        updates.teamMemberIds = updates.teamMemberIds.map((id: any) =>
+          typeof id === "string" ? id : String(id)
         );
       }
 
@@ -165,14 +165,6 @@ export class EventModel {
     return result.deletedCount > 0;
   }
 
-  async updateStatus(id: ObjectId, status: EventStatus): Promise<boolean> {
-    const result = await this.collection.updateOne(
-      { _id: id },
-      { $set: { status, updated_at: new Date() } }
-    );
-    return result.modifiedCount > 0;
-  }
-
   async getUpcomingEvents(limit: number = 10) {
     const now = new Date();
     return await this.collection
@@ -193,14 +185,15 @@ export class EventModel {
       type: dbEvent.type,
       title: dbEvent.title,
       description: dbEvent.description,
-      status: dbEvent.status,
+      url: dbEvent.url,
       start: dbEvent.start.toISOString(),
       end: dbEvent.end?.toISOString(),
       isAllDay: dbEvent.is_all_day || false,
-      teamMemberIds: dbEvent.teamMemberIds.map((id) => id.toString()),
+      teamMemberIds: dbEvent.teamMemberIds || [],
       locationId: dbEvent.location_id?.toString(),
       primaryImageId: dbEvent.primary_image_id?.toString(),
       imageIds: dbEvent.image_ids?.map((id) => id.toString()) || [],
+      createdBy: dbEvent.created_by,
       createdAt: dbEvent.created_at.toISOString(),
       updatedAt: dbEvent.updated_at.toISOString(),
     };
