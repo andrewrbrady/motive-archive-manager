@@ -32,10 +32,12 @@ export interface GenerationResponse {
 // Initialize provider clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  timeout: 50000, // 50 second timeout
 });
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 50000, // 50 second timeout
 });
 
 /**
@@ -79,13 +81,25 @@ async function handleAnthropicRequest(
   params: ProviderParams
 ): Promise<GenerationResponse> {
   try {
-    const response = await anthropic.messages.create({
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Anthropic API timeout")), 45000)
+    );
+
+    // Create the API request promise
+    const requestPromise = anthropic.messages.create({
       model: model.id,
       max_tokens: params.maxTokens || model.maxTokens,
       temperature: params.temperature || model.defaultTemperature,
       system: systemPrompt,
       messages: [{ role: "user", content: prompt }],
     });
+
+    // Race between the request and timeout
+    const response = (await Promise.race([
+      requestPromise,
+      timeoutPromise,
+    ])) as any;
 
     const content = response.content[0];
     if (!content || content.type !== "text") {
@@ -106,6 +120,14 @@ async function handleAnthropicRequest(
     };
   } catch (error) {
     console.error("Anthropic API error:", error);
+
+    // Handle timeout errors specifically
+    if (error instanceof Error && error.message.includes("timeout")) {
+      throw new Error(
+        "Anthropic API request timed out. Please try again with a shorter prompt or different model."
+      );
+    }
+
     throw new Error(
       `Anthropic API error: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -122,7 +144,13 @@ async function handleOpenAIRequest(
   params: ProviderParams
 ): Promise<GenerationResponse> {
   try {
-    const response = await openai.chat.completions.create({
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("OpenAI API timeout")), 45000)
+    );
+
+    // Create the API request promise
+    const requestPromise = openai.chat.completions.create({
       model: model.id,
       messages: [
         { role: "system", content: systemPrompt },
@@ -136,6 +164,12 @@ async function handleOpenAIRequest(
       stop: params.stopSequences,
     });
 
+    // Race between the request and timeout
+    const response = (await Promise.race([
+      requestPromise,
+      timeoutPromise,
+    ])) as any;
+
     return {
       text: response.choices[0]?.message?.content || "",
       usage: {
@@ -148,6 +182,14 @@ async function handleOpenAIRequest(
     };
   } catch (error) {
     console.error("OpenAI API error:", error);
+
+    // Handle timeout errors specifically
+    if (error instanceof Error && error.message.includes("timeout")) {
+      throw new Error(
+        "OpenAI API request timed out. Please try again with a shorter prompt or different model."
+      );
+    }
+
     throw new Error(
       `OpenAI API error: ${error instanceof Error ? error.message : String(error)}`
     );

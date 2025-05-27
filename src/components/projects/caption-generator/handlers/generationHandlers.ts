@@ -71,49 +71,39 @@ export function useGenerationHandlers() {
       // Validate inputs
       const validationError = validateGeneration(context, formState);
       if (validationError) {
-        updateGenerationState({ error: validationError });
+        updateGenerationState({
+          error: validationError,
+          isGenerating: false,
+        });
         return null;
       }
 
       updateGenerationState({
         isGenerating: true,
         error: null,
+        generatedCaption: "",
       });
 
       try {
-        // Combine context with additional context
-        let contextToUse = formState.context;
-        if (formState.additionalContext.trim()) {
-          contextToUse = contextToUse
-            ? `${contextToUse}\n\nAdditional Context:\n${formState.additionalContext}`
-            : formState.additionalContext;
-        }
-
-        const clientInfo =
-          context.clientHandle && context.clientHandle
-            ? {
-                handle: context.clientHandle,
-                includeInCaption: true,
-              }
-            : null;
-
-        // Combine car details for multi-car captions
+        // Prepare car details for the API
         const combinedCarDetails = {
+          count: context.selectedCarIds.length,
           cars: context.carDetails,
-          count: context.carDetails.length,
           makes: [...new Set(context.carDetails.map((car) => car.make))],
           years: [...new Set(context.carDetails.map((car) => car.year))].sort(),
           colors: [
             ...new Set(
-              context.carDetails.map((car) => car.color).filter(Boolean)
+              context.carDetails
+                .map((car) => car.color)
+                .filter((color) => color)
             ),
           ],
         };
 
-        // Combine event details for multi-event captions
+        // Prepare event details for the API
         const combinedEventDetails = {
+          count: context.selectedEventIds.length,
           events: context.eventDetails,
-          count: context.eventDetails.length,
           types: [...new Set(context.eventDetails.map((event) => event.type))],
           upcomingEvents: context.eventDetails.filter(
             (event) => new Date(event.start) > new Date()
@@ -122,6 +112,17 @@ export function useGenerationHandlers() {
             (event) => new Date(event.start) <= new Date()
           ),
         };
+
+        // Determine context to use
+        let contextToUse = formState.context;
+
+        // Client info handling
+        const clientInfo = context.clientHandle
+          ? {
+              handle: context.clientHandle,
+              includeInCaption: true,
+            }
+          : null;
 
         // Prepare the request payload
         const requestPayload: any = {
@@ -148,8 +149,21 @@ export function useGenerationHandlers() {
           requestPayload.customLLMText = context.editableLLMText;
         }
 
+        // Create timeout for the entire request (55 seconds to stay under Vercel's 60s limit)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Request timeout - the server took too long to respond"
+                )
+              ),
+            55000
+          )
+        );
+
         // Generate new caption text
-        const response = await fetch("/api/openai/generate-project-caption", {
+        const fetchPromise = fetch("/api/openai/generate-project-caption", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -157,8 +171,21 @@ export function useGenerationHandlers() {
           body: JSON.stringify(requestPayload),
         });
 
+        const response = (await Promise.race([
+          fetchPromise,
+          timeoutPromise,
+        ])) as Response;
+
         if (!response.ok) {
           const errorData = await response.json();
+
+          // Handle specific timeout errors
+          if (response.status === 408) {
+            throw new Error(
+              "The caption generation timed out. Please try again with a simpler prompt or fewer details."
+            );
+          }
+
           throw new Error(errorData.error || "Failed to generate caption");
         }
 
@@ -175,14 +202,30 @@ export function useGenerationHandlers() {
           description:
             context.editableLLMText && context.editableLLMText.trim()
               ? "Caption generated using your custom LLM input"
-              : "Caption generated successfully",
+              : `Caption generated successfully${data.processingTime ? ` in ${(data.processingTime / 1000).toFixed(1)}s` : ""}`,
         });
 
         return caption;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error generating caption:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to generate caption";
+
+        let errorMessage = "Failed to generate caption";
+
+        // Handle different types of errors
+        if (error instanceof Error) {
+          if (
+            error.message.includes("timeout") ||
+            error.message.includes("Timeout")
+          ) {
+            errorMessage =
+              "The caption generation timed out. This can happen with complex prompts or when the AI service is busy. Please try again.";
+          } else if (error.message.includes("Failed to fetch")) {
+            errorMessage =
+              "Network error - please check your connection and try again.";
+          } else {
+            errorMessage = error.message;
+          }
+        }
 
         updateGenerationState({
           error: errorMessage,
