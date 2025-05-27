@@ -178,6 +178,16 @@ export class EventModel {
 
   // Transform database event to API event
   transformToApiEvent(dbEvent: DbEvent): Event {
+    // Helper function to safely convert to ISO string
+    const toISOString = (
+      date: Date | string | undefined
+    ): string | undefined => {
+      if (!date) return undefined;
+      if (typeof date === "string") return date;
+      if (date instanceof Date) return date.toISOString();
+      return undefined;
+    };
+
     return {
       id: dbEvent._id.toString(),
       car_id: dbEvent.car_id,
@@ -186,16 +196,16 @@ export class EventModel {
       title: dbEvent.title,
       description: dbEvent.description,
       url: dbEvent.url,
-      start: dbEvent.start.toISOString(),
-      end: dbEvent.end?.toISOString(),
+      start: toISOString(dbEvent.start) || new Date().toISOString(),
+      end: toISOString(dbEvent.end),
       isAllDay: dbEvent.is_all_day || false,
       teamMemberIds: dbEvent.teamMemberIds || [],
       locationId: dbEvent.location_id?.toString(),
       primaryImageId: dbEvent.primary_image_id?.toString(),
       imageIds: dbEvent.image_ids?.map((id) => id.toString()) || [],
       createdBy: dbEvent.created_by,
-      createdAt: dbEvent.created_at.toISOString(),
-      updatedAt: dbEvent.updated_at.toISOString(),
+      createdAt: toISOString(dbEvent.created_at) || new Date().toISOString(),
+      updatedAt: toISOString(dbEvent.updated_at) || new Date().toISOString(),
     };
   }
 }

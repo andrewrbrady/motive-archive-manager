@@ -18,7 +18,6 @@ export interface ProjectEvent {
   type: string;
   title: string;
   description: string;
-  status: string;
   start: string;
   end?: string;
   isAllDay?: boolean;

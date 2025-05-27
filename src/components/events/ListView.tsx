@@ -85,7 +85,6 @@ export default function ListView({
   onEventUpdated,
   isEditMode: parentEditMode,
 }: ListViewProps) {
-  const [editingEvents, setEditingEvents] = useState<EditingEvent[]>(events);
   const [localEditMode, setLocalEditMode] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
@@ -93,25 +92,13 @@ export default function ListView({
   const [usersLoading, setUsersLoading] = useState(true);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [eventsWithCars, setEventsWithCars] = useState<
+    (Event & { car?: Car })[]
+  >([]);
 
   // Use parent's edit mode if provided, otherwise use local state
   const isEditMode =
     parentEditMode !== undefined ? parentEditMode : localEditMode;
-
-  // Update useEffect to preserve more state when syncing events
-  useEffect(() => {
-    setEditingEvents((prevEditingEvents) =>
-      events.map((event) => {
-        const existingEvent = prevEditingEvents.find((e) => e.id === event.id);
-        return {
-          ...event,
-          car: existingEvent?.car,
-          teamMemberIds:
-            event.teamMemberIds || existingEvent?.teamMemberIds || [],
-        };
-      })
-    );
-  }, [events]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -148,28 +135,39 @@ export default function ListView({
   }, []);
 
   useEffect(() => {
-    if (events.length === 0) return;
+    if (events.length > 0) {
+      setEventsWithCars(
+        events.map((event) => ({
+          ...event,
+          teamMemberIds: event.teamMemberIds || [],
+        }))
+      );
+    }
+  }, [events]);
+
+  useEffect(() => {
+    if (eventsWithCars.length === 0) return;
 
     const fetchCarInfo = async () => {
+      // Only fetch car info for events that don't have it yet
+      const eventsNeedingCarInfo = eventsWithCars.filter(
+        (event) => event.car_id && !event.car
+      );
+
+      if (eventsNeedingCarInfo.length === 0) return;
+
       const updatedEvents = await Promise.all(
-        editingEvents.map(async (event) => {
+        eventsWithCars.map(async (event) => {
           try {
             // Only fetch car info if we don't already have it
-            if (event.car) return event;
+            if (event.car || !event.car_id) return event;
 
-            const carId = event.car_id;
-            if (!carId) {
-              console.error("No car_id found for event:", event);
-              return event;
-            }
-
-            const response = await fetch(`/api/cars/${carId}`);
+            const response = await fetch(`/api/cars/${event.car_id}`);
             if (!response.ok) throw new Error("Failed to fetch car");
             const car = await response.json();
             return {
               ...event,
               car,
-              teamMemberIds: event.teamMemberIds || [],
             };
           } catch (error) {
             console.error("Error fetching car:", error);
@@ -177,11 +175,11 @@ export default function ListView({
           }
         })
       );
-      setEditingEvents(updatedEvents);
+      setEventsWithCars(updatedEvents);
     };
 
     fetchCarInfo();
-  }, [events]);
+  }, [eventsWithCars.length]); // Only run when eventsWithCars length changes
 
   const formatEventType = (type: string) => {
     return type
@@ -193,7 +191,18 @@ export default function ListView({
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return "-";
     try {
-      return format(new Date(dateString), "PP");
+      const date = new Date(dateString);
+
+      // Format the date using UTC methods to avoid timezone conversion
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth();
+      const day = date.getUTCDate();
+
+      // Create a new date in local timezone with the same year/month/day
+      const localDate = new Date(year, month, day);
+
+      const result = format(localDate, "PP");
+      return result;
     } catch (error) {
       console.error("Invalid date:", dateString);
       return "-";
@@ -215,7 +224,7 @@ export default function ListView({
     if (isEditMode) {
       // Save all changes
       Promise.all(
-        editingEvents.map(async (event) => {
+        eventsWithCars.map(async (event) => {
           const originalEvent = events.find((e) => e.id === event.id);
           if (originalEvent && !isEqual(event, originalEvent)) {
             await onUpdateEvent(event.id, event);
@@ -229,7 +238,7 @@ export default function ListView({
         .catch((error) => {
           console.error("Error saving changes:", error);
           toast.error("Failed to save some changes");
-          setEditingEvents(events);
+          setEventsWithCars(events);
         });
     }
     setLocalEditMode(!localEditMode);
@@ -241,33 +250,10 @@ export default function ListView({
     value: any
   ) => {
     try {
-      // Optimistically update the UI
-      setEditingEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === eventId
-            ? {
-                ...event,
-                [field]: field === "teamMemberIds" ? [...value] : value,
-              }
-            : event
-        )
-      );
-
-      // Call the update function
+      // Just call the parent's update function - it handles optimistic updates
       await onUpdateEvent(eventId, { [field]: value });
     } catch (error) {
       console.error("Error updating event:", error);
-      // If there's an error, revert the optimistic update
-      setEditingEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === eventId
-            ? {
-                ...event,
-                [field]: events.find((e) => e.id === eventId)?.[field],
-              }
-            : event
-        )
-      );
       toast.error("Failed to update event");
     }
   };
@@ -324,7 +310,7 @@ export default function ListView({
     <div className="space-y-4">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="hover:bg-transparent">
             {isBatchMode && (
               <TableHead className="w-[50px]">
                 <Button
@@ -347,16 +333,17 @@ export default function ListView({
             <TableHead>URL</TableHead>
             <TableHead>Start Date</TableHead>
             <TableHead>End Date</TableHead>
+            <TableHead>Car</TableHead>
             <TableHead>Team Members</TableHead>
             <TableHead>Created By</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {editingEvents.map((event) => (
+          {eventsWithCars.map((event) => (
             <TableRow
               key={event.id}
-              className="hover:border-r-4 hover:border-r-primary hover:bg-transparent transition-all duration-200"
+              className="hover:bg-neutral-800/20 transition-all duration-200"
             >
               {isBatchMode && (
                 <TableCell>
@@ -446,7 +433,22 @@ export default function ListView({
                 {isEditMode ? (
                   <Input
                     type="date"
-                    value={event.start?.split("T")[0] || ""}
+                    value={
+                      event.start
+                        ? (() => {
+                            const date = new Date(event.start);
+                            const year = date.getUTCFullYear();
+                            const month = String(
+                              date.getUTCMonth() + 1
+                            ).padStart(2, "0");
+                            const day = String(date.getUTCDate()).padStart(
+                              2,
+                              "0"
+                            );
+                            return `${year}-${month}-${day}`;
+                          })()
+                        : ""
+                    }
                     onChange={(e) =>
                       updateEventField(event.id, "start", e.target.value)
                     }
@@ -459,13 +461,39 @@ export default function ListView({
                 {isEditMode ? (
                   <Input
                     type="date"
-                    value={event.end?.split("T")[0] || ""}
+                    value={
+                      event.end
+                        ? (() => {
+                            const date = new Date(event.end);
+                            const year = date.getUTCFullYear();
+                            const month = String(
+                              date.getUTCMonth() + 1
+                            ).padStart(2, "0");
+                            const day = String(date.getUTCDate()).padStart(
+                              2,
+                              "0"
+                            );
+                            return `${year}-${month}-${day}`;
+                          })()
+                        : ""
+                    }
                     onChange={(e) =>
                       updateEventField(event.id, "end", e.target.value)
                     }
                   />
                 ) : (
                   formatDate(event.end)
+                )}
+              </TableCell>
+              <TableCell>
+                {event.car ? (
+                  <div className="text-sm">
+                    <div className="font-medium">
+                      {event.car.year} {event.car.make} {event.car.model}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground text-sm">No car</span>
                 )}
               </TableCell>
               <TableCell className="min-w-[200px]">
@@ -661,7 +689,7 @@ export default function ListView({
           await onUpdateEvent(eventId, updates);
           setIsEditModalOpen(false);
           setEditingEvent(null);
-          onEventUpdated();
+          // onEventUpdated(); // Removed to prevent page reload
         }}
       />
     </div>

@@ -48,10 +48,52 @@ export async function GET(
     }
 
     const eventModel = new EventModel(db);
-    const events = await eventModel.findByProjectId(projectId);
+
+    // Get events created directly for this project
+    const createdEvents = await eventModel.findByProjectId(projectId);
+
+    // Get attached events from project_events collection
+    const attachments = await db
+      .collection("project_events")
+      .find({
+        project_id: new ObjectId(projectId),
+      })
+      .toArray();
+
+    const attachedEventIds = attachments.map(
+      (attachment) => attachment.event_id
+    );
+    const attachedEvents =
+      attachedEventIds.length > 0
+        ? await db
+            .collection("events")
+            .find({
+              _id: { $in: attachedEventIds },
+            })
+            .toArray()
+        : [];
+
+    // Combine both sets of events
+    const allEvents = [
+      ...createdEvents,
+      ...attachedEvents.map(
+        (event) =>
+          ({
+            ...event,
+            project_id: projectId, // Ensure project_id is set for attached events
+          }) as DbEvent
+      ),
+    ];
+
+    // Remove duplicates (in case an event is both created for and attached to the project)
+    const uniqueEvents = allEvents.filter(
+      (event, index, self) =>
+        index ===
+        self.findIndex((e) => e._id.toString() === event._id.toString())
+    );
 
     // Transform events to API format
-    const transformedEvents = events.map((event) =>
+    const transformedEvents = uniqueEvents.map((event) =>
       eventModel.transformToApiEvent(event)
     );
 
@@ -126,23 +168,25 @@ export async function POST(
       );
     }
 
-    // Convert teamMemberIds to ObjectIds
-    const teamMemberIds = (data.teamMemberIds || []).map(
-      (id: string) => new ObjectId(id)
-    );
+    // Convert teamMemberIds to ObjectIds with validation
+    const teamMemberIds = (data.teamMemberIds || [])
+      .filter((id: string) => id && ObjectId.isValid(id))
+      .map((id: string) => new ObjectId(id));
 
-    // Convert image IDs to ObjectIds if provided
-    const primaryImageId = data.primaryImageId
-      ? new ObjectId(data.primaryImageId)
-      : undefined;
-    const imageIds = (data.imageIds || []).map(
-      (id: string) => new ObjectId(id)
-    );
+    // Convert image IDs to ObjectIds if provided with validation
+    const primaryImageId =
+      data.primaryImageId && ObjectId.isValid(data.primaryImageId)
+        ? new ObjectId(data.primaryImageId)
+        : undefined;
+    const imageIds = (data.imageIds || [])
+      .filter((id: string) => id && ObjectId.isValid(id))
+      .map((id: string) => new ObjectId(id));
 
-    // Convert location ID to ObjectId if provided
-    const locationId = data.locationId
-      ? new ObjectId(data.locationId)
-      : undefined;
+    // Convert location ID to ObjectId if provided with validation
+    const locationId =
+      data.locationId && ObjectId.isValid(data.locationId)
+        ? new ObjectId(data.locationId)
+        : undefined;
 
     // Create event object
     const eventData: Omit<DbEvent, "_id" | "created_at" | "updated_at"> = {

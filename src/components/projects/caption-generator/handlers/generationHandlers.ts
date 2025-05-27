@@ -115,9 +115,6 @@ export function useGenerationHandlers() {
           events: context.eventDetails,
           count: context.eventDetails.length,
           types: [...new Set(context.eventDetails.map((event) => event.type))],
-          statuses: [
-            ...new Set(context.eventDetails.map((event) => event.status)),
-          ],
           upcomingEvents: context.eventDetails.filter(
             (event) => new Date(event.start) > new Date()
           ),

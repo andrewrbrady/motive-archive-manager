@@ -191,3 +191,83 @@ export async function POST(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const url = new URL(request.url);
+    const milestoneId = url.searchParams.get("milestoneId");
+
+    if (!milestoneId) {
+      return NextResponse.json(
+        { error: "Milestone ID is required" },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Check if user has permission to edit this project
+    const canEdit =
+      project.ownerId === session.user.id ||
+      project.members.some(
+        (member: any) =>
+          member.userId === session.user.id &&
+          ["owner", "manager"].includes(member.role)
+      );
+
+    if (!canEdit) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    // Check if milestone exists
+    const milestoneExists = project.timeline.milestones.some(
+      (milestone: any) => milestone.id === milestoneId
+    );
+
+    if (!milestoneExists) {
+      return NextResponse.json(
+        { error: "Milestone not found" },
+        { status: 404 }
+      );
+    }
+
+    // Remove milestone from project
+    const updatedProject = await Project.findByIdAndUpdate(
+      id,
+      { $pull: { "timeline.milestones": { id: milestoneId } } },
+      { new: true }
+    );
+
+    if (!updatedProject) {
+      return NextResponse.json(
+        { error: "Failed to delete milestone" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Milestone deleted successfully",
+      timeline: updatedProject.timeline,
+    });
+  } catch (error) {
+    console.error("Error deleting milestone:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

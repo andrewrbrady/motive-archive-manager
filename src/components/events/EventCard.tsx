@@ -23,6 +23,7 @@ import {
   Edit,
   Trash2,
   MapPin,
+  Car,
 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
@@ -32,7 +33,15 @@ import { cn } from "@/lib/utils";
 import { LocationResponse } from "@/models/location";
 
 interface EventCardProps {
-  event: Event;
+  event: Event & {
+    car?: {
+      _id: string;
+      make: string;
+      model: string;
+      year: number;
+      primaryImageId?: string;
+    };
+  };
   onEdit: (event: Event) => void;
   onDelete: (eventId: string) => void;
 }
@@ -87,6 +96,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
   } | null>(null);
   const [location, setLocation] = useState<LocationResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [usingCarImage, setUsingCarImage] = useState(false);
 
   useEffect(() => {
     const fetchEventData = async () => {
@@ -107,7 +117,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
         }
       }
 
-      // Fetch primary image logic (existing code)
+      // Fetch primary image logic with car fallback
       if (event.primaryImageId) {
         try {
           const response = await fetch(`/api/images/${event.primaryImageId}`);
@@ -117,6 +127,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
               id: imageData._id,
               url: getFormattedImageUrl(imageData.url),
             });
+            setUsingCarImage(false);
           } else {
             // If primary image fetch fails, try the first image
             if (
@@ -133,16 +144,20 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
                   id: fallbackImageData._id,
                   url: getFormattedImageUrl(fallbackImageData.url),
                 });
+                setUsingCarImage(false);
               } else {
-                setPrimaryImage(null);
+                // Try car's primary image as final fallback
+                await tryCarPrimaryImage();
               }
             } else {
-              setPrimaryImage(null);
+              // Try car's primary image as final fallback
+              await tryCarPrimaryImage();
             }
           }
         } catch (error) {
           console.error("Error fetching event image:", error);
-          setPrimaryImage(null);
+          // Try car's primary image as fallback
+          await tryCarPrimaryImage();
         }
       } else if (event.imageIds && event.imageIds.length > 0) {
         // If no primary image but we have image IDs, use the first one
@@ -154,22 +169,61 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
               id: imageData._id,
               url: getFormattedImageUrl(imageData.url),
             });
+            setUsingCarImage(false);
           } else {
-            setPrimaryImage(null);
+            // Try car's primary image as fallback
+            await tryCarPrimaryImage();
           }
         } catch (error) {
           console.error("Error fetching event image:", error);
-          setPrimaryImage(null);
+          // Try car's primary image as fallback
+          await tryCarPrimaryImage();
         }
       } else {
-        setPrimaryImage(null);
+        // No event images, try car's primary image
+        await tryCarPrimaryImage();
+      }
+
+      // Helper function to try car's primary image
+      async function tryCarPrimaryImage() {
+        if (event.car?.primaryImageId) {
+          try {
+            const carImageResponse = await fetch(
+              `/api/images/${event.car.primaryImageId}`
+            );
+            if (carImageResponse.ok) {
+              const carImageData = await carImageResponse.json();
+              setPrimaryImage({
+                id: carImageData._id,
+                url: getFormattedImageUrl(carImageData.url),
+              });
+              setUsingCarImage(true);
+            } else {
+              setPrimaryImage(null);
+              setUsingCarImage(false);
+            }
+          } catch (error) {
+            console.error("Error fetching car primary image:", error);
+            setPrimaryImage(null);
+            setUsingCarImage(false);
+          }
+        } else {
+          setPrimaryImage(null);
+          setUsingCarImage(false);
+        }
       }
 
       setLoading(false);
     };
 
     fetchEventData();
-  }, [event.id, event.primaryImageId, event.imageIds, event.locationId]);
+  }, [
+    event.id,
+    event.primaryImageId,
+    event.imageIds,
+    event.locationId,
+    event.car?.primaryImageId,
+  ]);
 
   const formatEventDate = () => {
     const startDate = new Date(event.start);
@@ -223,6 +277,16 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
                 No Image
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Car image indicator */}
+        {usingCarImage && (
+          <div className="absolute top-2 left-2">
+            <Badge variant="secondary" className="text-xs">
+              <Car className="w-3 h-3 mr-1" />
+              Car Image
+            </Badge>
           </div>
         )}
 

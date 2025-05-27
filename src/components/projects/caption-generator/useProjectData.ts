@@ -490,7 +490,6 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
         events: eventDetails,
         count: eventDetails.length,
         types: [...new Set(eventDetails.map((event) => event.type))],
-        statuses: [...new Set(eventDetails.map((event) => event.status))],
         upcomingEvents: eventDetails.filter(
           (event) => new Date(event.start) > new Date()
         ),
@@ -501,7 +500,6 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
 
       llmText += `Total Events: ${combinedEventDetails.count}\n`;
       llmText += `Event Types: ${combinedEventDetails.types.join(", ")}\n`;
-      llmText += `Event Statuses: ${combinedEventDetails.statuses.join(", ")}\n`;
       llmText += `Upcoming Events: ${combinedEventDetails.upcomingEvents.length}\n`;
       llmText += `Past Events: ${combinedEventDetails.pastEvents.length}\n`;
       llmText += "\nIndividual Event Details:\n";
@@ -513,7 +511,6 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
         llmText += `\nEvent ${index + 1}:\n`;
         llmText += `  Title: ${event.title}\n`;
         llmText += `  Type: ${event.type}\n`;
-        llmText += `  Status: ${event.status}\n`;
         llmText += `  Start Date: ${eventDate.toLocaleDateString()} ${eventDate.toLocaleTimeString()}\n`;
         if (event.end) {
           const endDate = new Date(event.end);

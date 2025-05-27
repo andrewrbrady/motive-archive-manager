@@ -150,10 +150,6 @@ function formatEventSpecifications(eventDetails: any): string {
     eventSpecs.push(`Event Types: ${eventDetails.types.join(", ")}`);
   }
 
-  if (eventDetails.statuses && eventDetails.statuses.length > 0) {
-    eventSpecs.push(`Event Statuses: ${eventDetails.statuses.join(", ")}`);
-  }
-
   if (eventDetails.upcomingEvents && eventDetails.upcomingEvents.length > 0) {
     eventSpecs.push(`Upcoming Events: ${eventDetails.upcomingEvents.length}`);
   }
@@ -179,7 +175,6 @@ function formatEventSpecifications(eventDetails: any): string {
       // Basic event info
       addSpec("Title", event.title);
       addSpec("Type", event.type);
-      addSpec("Status", event.status);
       addSpec("Description", event.description);
 
       // Date information

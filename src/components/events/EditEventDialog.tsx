@@ -54,19 +54,37 @@ export default function EditEventDialog({
       const startDate = new Date(event.start);
       const endDate = event.end ? new Date(event.end) : null;
 
+      // Format dates for datetime-local input, preserving the actual date/time
+      const formatForInput = (date: Date, isAllDay: boolean) => {
+        if (isAllDay) {
+          // For all-day events, use UTC date components to avoid timezone conversion
+          const year = date.getUTCFullYear();
+          const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(date.getUTCDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        } else {
+          // For timed events, use UTC components to preserve the actual time
+          const year = date.getUTCFullYear();
+          const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(date.getUTCDate()).padStart(2, "0");
+          const hours = String(date.getUTCHours()).padStart(2, "0");
+          const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+          return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+      };
+
+      const formattedStart = formatForInput(startDate, event.isAllDay || false);
+      const formattedEnd = endDate
+        ? formatForInput(endDate, event.isAllDay || false)
+        : "";
+
       setFormData({
         title: event.title,
         description: event.description,
         url: event.url || "",
         type: event.type,
-        start: event.isAllDay
-          ? format(startDate, "yyyy-MM-dd")
-          : format(startDate, "yyyy-MM-dd'T'HH:mm"),
-        end: endDate
-          ? event.isAllDay
-            ? format(endDate, "yyyy-MM-dd")
-            : format(endDate, "yyyy-MM-dd'T'HH:mm")
-          : "",
+        start: formattedStart,
+        end: formattedEnd,
         isAllDay: event.isAllDay || false,
         locationId: event.locationId || "",
         teamMemberIds: event.teamMemberIds || [],
@@ -90,8 +108,26 @@ export default function EditEventDialog({
     }
 
     try {
-      const startDate = new Date(formData.start);
-      const endDate = formData.end ? new Date(formData.end) : null;
+      // Create dates in UTC to match what we display and store
+      const createUTCDate = (dateTimeString: string) => {
+        if (formData.isAllDay) {
+          // For all-day events, treat the date as UTC
+          const [year, month, day] = dateTimeString.split("-").map(Number);
+          return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+        } else {
+          // For timed events, parse the datetime-local value as UTC
+          const [datePart, timePart] = dateTimeString.split("T");
+          const [year, month, day] = datePart.split("-").map(Number);
+          const [hours, minutes] = timePart.split(":").map(Number);
+          return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+        }
+      };
+
+      const startDate = createUTCDate(formData.start);
+      const endDate =
+        formData.end && formData.end.trim()
+          ? createUTCDate(formData.end)
+          : null;
 
       // Validate dates
       if (endDate && endDate <= startDate) {

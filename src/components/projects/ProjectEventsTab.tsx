@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Event, EventType } from "@/types/event";
+import type { Event } from "@/types/event";
+import { EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,12 @@ import {
   Package,
   Truck,
   MoreHorizontal,
+  Link as LinkIcon,
+  Filter,
+  List,
+  Pencil,
+  Copy,
+  Grid3X3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -44,13 +51,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import EventCard from "@/components/events/EventCard";
 import EditEventDialog from "@/components/events/EditEventDialog";
+import ListView from "@/components/events/ListView";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "@/components/events/EventTypeSelector";
+import { LoadingContainer } from "@/components/ui/loading";
 
 interface ProjectEventsTabProps {
   projectId: string;
+}
+
+interface Car {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
+  primaryImageId?: string;
+}
+
+interface EventWithCar extends Event {
+  car?: Car;
+  isAttached?: boolean; // Flag to distinguish attached vs created events
 }
 
 // Icon mapping for event types
@@ -76,9 +119,12 @@ const getEventTypeIcon = (type: EventType) => {
 };
 
 export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [view, setView] = useState("grid"); // Start with grid view for projects
+  const [isEditMode, setIsEditMode] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [showAttachEvent, setShowAttachEvent] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [showEditEvent, setShowEditEvent] = useState(false);
 
@@ -94,7 +140,40 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
       }
 
       const data = await response.json();
-      setEvents(data);
+
+      // Fetch car information for events that have car_id
+      // Also check which events are attached vs created
+      const eventsWithCars = await Promise.all(
+        data.map(async (event: Event) => {
+          try {
+            let car = null;
+            if (event.car_id) {
+              const carResponse = await fetch(`/api/cars/${event.car_id}`);
+              if (carResponse.ok) {
+                car = await carResponse.json();
+              }
+            }
+
+            // Check if this event was created specifically for this project
+            // vs attached from elsewhere
+            const isCreatedForProject = event.project_id === projectId;
+
+            return {
+              ...event,
+              car,
+              isAttached: !isCreatedForProject,
+            };
+          } catch (error) {
+            console.error("Error fetching car:", error);
+            return {
+              ...event,
+              isAttached: event.project_id !== projectId,
+            };
+          }
+        })
+      );
+
+      setEvents(eventsWithCars);
     } catch (error) {
       console.error("Error fetching events:", error);
       toast.error("Failed to fetch events");
@@ -132,11 +211,63 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
     }
   };
 
+  const handleAttachEvent = async (eventId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/events/attach`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ eventId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to attach event");
+      }
+
+      await fetchEvents();
+      toast.success("Event attached successfully");
+      setShowAttachEvent(false);
+    } catch (error) {
+      console.error("Error attaching event:", error);
+      toast.error("Failed to attach event");
+    }
+  };
+
+  const handleDetachEvent = async (eventId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/events/detach`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ eventId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to detach event");
+      }
+
+      await fetchEvents();
+      toast.success("Event detached successfully");
+    } catch (error) {
+      console.error("Error detaching event:", error);
+      toast.error("Failed to detach event");
+    }
+  };
+
   const handleUpdateEvent = async (
     eventId: string,
     updates: Partial<Event>
   ) => {
     try {
+      // Optimistically update local state
+      setEvents((currentEvents) =>
+        currentEvents.map((event) =>
+          event.id === eventId ? { ...event, ...updates } : event
+        )
+      );
+
       const response = await fetch(
         `/api/projects/${projectId}/events/${eventId}`,
         {
@@ -152,16 +283,23 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
         throw new Error("Failed to update event");
       }
 
-      await fetchEvents();
       toast.success("Event updated successfully");
     } catch (error) {
+      // Revert the optimistic update on error
+      fetchEvents();
       console.error("Error updating event:", error);
       toast.error("Failed to update event");
+      throw error;
     }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
+      // Optimistically update local state
+      setEvents((currentEvents) =>
+        currentEvents.filter((event) => event.id !== eventId)
+      );
+
       const response = await fetch(
         `/api/projects/${projectId}/events/${eventId}`,
         {
@@ -173,11 +311,13 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
         throw new Error("Failed to delete event");
       }
 
-      await fetchEvents();
       toast.success("Event deleted successfully");
     } catch (error) {
+      // Revert the optimistic update on error
+      fetchEvents();
       console.error("Error deleting event:", error);
       toast.error("Failed to delete event");
+      throw error;
     }
   };
 
@@ -187,75 +327,184 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading events...</div>
-      </div>
-    );
+    return <LoadingContainer />;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Events</h2>
-          <p className="text-muted-foreground">
-            Manage project events and milestones
-          </p>
+    <TooltipProvider delayDuration={0}>
+      <div className="space-y-4">
+        {/* Header with View Controls */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Events</h2>
+            <p className="text-muted-foreground">
+              Manage project events and milestones
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* View Toggle Controls */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={view === "list" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setView("list")}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>List View</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={view === "grid" ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setView("grid")}
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Grid View</TooltipContent>
+            </Tooltip>
+
+            <div className="border-l pl-2" />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={isEditMode ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setIsEditMode(!isEditMode)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit All</TooltipContent>
+            </Tooltip>
+
+            <div className="border-l pl-2" />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAttachEvent(true)}
+                >
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Attach Event
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Attach Existing Event</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={() => setShowCreateEvent(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Event
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Create New Event</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
-        <Button onClick={() => setShowCreateEvent(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Event
-        </Button>
+
+        {/* Conditional View Rendering */}
+        {view === "list" ? (
+          <ListView
+            events={events}
+            onUpdateEvent={handleUpdateEvent}
+            onDeleteEvent={handleDeleteEvent}
+            onEventUpdated={fetchEvents}
+            isEditMode={isEditMode}
+          />
+        ) : /* Grid View - Original Implementation */
+        events.length === 0 ? (
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-center py-12">
+                <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No events yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first event or attach an existing one
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAttachEvent(true)}
+                  >
+                    <LinkIcon className="w-4 h-4 mr-2" />
+                    Attach Event
+                  </Button>
+                  <Button onClick={() => setShowCreateEvent(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Event
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
+              <div key={event.id} className="group relative">
+                <EventCard
+                  event={event}
+                  onEdit={handleEditEvent}
+                  onDelete={
+                    event.isAttached
+                      ? () => handleDetachEvent(event.id)
+                      : handleDeleteEvent
+                  }
+                />
+                {event.isAttached && (
+                  <Badge
+                    variant="secondary"
+                    className="absolute top-2 right-2 text-xs"
+                  >
+                    <LinkIcon className="w-3 h-3 mr-1" />
+                    Attached
+                  </Badge>
+                )}
+                {event.car && (
+                  <Badge
+                    variant="outline"
+                    className="absolute bottom-2 left-2 text-xs"
+                  >
+                    {event.car.year} {event.car.make} {event.car.model}
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Create Event Dialog */}
+        <CreateEventDialog
+          open={showCreateEvent}
+          onOpenChange={setShowCreateEvent}
+          onCreate={handleCreateEvent}
+        />
+
+        {/* Attach Event Dialog */}
+        <AttachEventDialog
+          open={showAttachEvent}
+          onOpenChange={setShowAttachEvent}
+          onAttach={handleAttachEvent}
+          projectId={projectId}
+        />
+
+        {/* Edit Event Dialog */}
+        <EditEventDialog
+          event={editingEvent}
+          open={showEditEvent}
+          onOpenChange={setShowEditEvent}
+          onUpdate={handleUpdateEvent}
+        />
       </div>
-
-      {/* Events Grid */}
-      {events.length === 0 ? (
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-center py-12">
-              <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No events yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first event to get started
-              </p>
-              <Button onClick={() => setShowCreateEvent(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Event
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((event) => (
-            <div key={event.id} className="group">
-              <EventCard
-                event={event}
-                onEdit={handleEditEvent}
-                onDelete={handleDeleteEvent}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Create Event Dialog */}
-      <CreateEventDialog
-        open={showCreateEvent}
-        onOpenChange={setShowCreateEvent}
-        onCreate={handleCreateEvent}
-      />
-
-      {/* Edit Event Dialog */}
-      <EditEventDialog
-        event={editingEvent}
-        open={showEditEvent}
-        onOpenChange={setShowEditEvent}
-        onUpdate={handleUpdateEvent}
-      />
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -502,6 +751,318 @@ function CreateEventDialog({
           <Button onClick={handleSubmit} size="sm">
             Create Event
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Attach event dialog component
+function AttachEventDialog({
+  open,
+  onOpenChange,
+  onAttach,
+  projectId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAttach: (eventId: string) => void;
+  projectId: string;
+}) {
+  const [availableEvents, setAvailableEvents] = useState<EventWithCar[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
+  const [filters, setFilters] = useState({
+    type: "all",
+    search: "",
+  });
+
+  const formatEventType = (type: string) => {
+    return type
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "-";
+      return format(date, "PPp");
+    } catch (error) {
+      console.error("Error formatting date:", dateString, error);
+      return "-";
+    }
+  };
+
+  const fetchAvailableEvents = async () => {
+    try {
+      setIsLoading(true);
+      const queryParams = new URLSearchParams();
+      if (filters.type && filters.type !== "all") {
+        queryParams.append("type", filters.type);
+      }
+
+      const response = await fetch(`/api/events?${queryParams.toString()}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Error fetching events:", errorData);
+        throw new Error(errorData.error || "Failed to fetch events");
+      }
+      const data = await response.json();
+
+      // Filter out events that are already attached to this project
+      let projectEvents = [];
+      try {
+        const projectEventsResponse = await fetch(
+          `/api/projects/${projectId}/events`
+        );
+        if (projectEventsResponse.ok) {
+          projectEvents = await projectEventsResponse.json();
+        }
+      } catch (error) {
+        console.warn("Could not fetch project events for filtering:", error);
+        // Continue without filtering - better to show all events than none
+      }
+
+      const attachedEventIds = new Set(projectEvents.map((e: Event) => e.id));
+
+      // Fetch car information for events that have car_id
+      const eventsWithCars = await Promise.all(
+        data
+          .filter((event: Event) => !attachedEventIds.has(event.id))
+          .map(async (event: Event) => {
+            try {
+              if (event.car_id) {
+                const carResponse = await fetch(`/api/cars/${event.car_id}`);
+                if (carResponse.ok) {
+                  const car = await carResponse.json();
+                  return { ...event, car };
+                }
+              }
+              return event;
+            } catch (error) {
+              console.error("Error fetching car:", error);
+              return event;
+            }
+          })
+      );
+
+      setAvailableEvents(eventsWithCars);
+    } catch (error) {
+      console.error("Error fetching available events:", error);
+      toast.error("Failed to fetch available events");
+      setAvailableEvents([]); // Set empty array on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchAvailableEvents();
+    }
+  }, [open, filters, projectId]);
+
+  const handleAttachSelected = async () => {
+    if (selectedEvents.size === 0) {
+      toast.error("Please select at least one event to attach");
+      return;
+    }
+
+    try {
+      for (const eventId of selectedEvents) {
+        await onAttach(eventId);
+      }
+      setSelectedEvents(new Set());
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error attaching events:", error);
+    }
+  };
+
+  const toggleEventSelection = (eventId: string) => {
+    const newSelection = new Set(selectedEvents);
+    if (newSelection.has(eventId)) {
+      newSelection.delete(eventId);
+    } else {
+      newSelection.add(eventId);
+    }
+    setSelectedEvents(newSelection);
+  };
+
+  const filteredEvents = availableEvents.filter((event) => {
+    const matchesSearch =
+      !filters.search ||
+      event.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+      event.description?.toLowerCase().includes(filters.search.toLowerCase());
+
+    return matchesSearch;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+        <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+          <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
+            Attach Existing Events
+          </DialogTitle>
+          <DialogDescription>
+            Select events from the system to attach to this project
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Filters */}
+          <div className="flex gap-4 mb-4 flex-shrink-0">
+            <div className="flex-1">
+              <Input
+                placeholder="Search events..."
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value })
+                }
+                className="text-sm"
+              />
+            </div>
+            <div className="w-48">
+              <Select
+                value={filters.type}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {Object.values(EventType).map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {formatEventType(type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Events Table */}
+          <div className="flex-1 overflow-y-auto border rounded-md">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-lg">Loading events...</div>
+              </div>
+            ) : filteredEvents.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No events available
+                  </h3>
+                  <p className="text-muted-foreground">
+                    No events found matching your criteria
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={
+                          selectedEvents.size === filteredEvents.length &&
+                          filteredEvents.length > 0
+                        }
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedEvents(
+                              new Set(filteredEvents.map((e) => e.id))
+                            );
+                          } else {
+                            setSelectedEvents(new Set());
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Car</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEvents.map((event) => (
+                    <TableRow key={event.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedEvents.has(event.id)}
+                          onCheckedChange={() => toggleEventSelection(event.id)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{event.title}</div>
+                          {event.description && (
+                            <div className="text-sm text-muted-foreground truncate max-w-xs">
+                              {event.description}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getEventTypeIcon(event.type)}
+                          <span className="text-sm">
+                            {formatEventType(event.type)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatDate(event.start)}
+                      </TableCell>
+                      <TableCell>
+                        {event.car ? (
+                          <div className="text-sm">
+                            {event.car.year} {event.car.make} {event.car.model}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            No car
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-shrink-0 flex justify-between items-center pt-4 border-t border-[hsl(var(--border-subtle))]">
+          <div className="text-sm text-muted-foreground">
+            {selectedEvents.size} event{selectedEvents.size !== 1 ? "s" : ""}{" "}
+            selected
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              size="sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAttachSelected}
+              size="sm"
+              disabled={selectedEvents.size === 0}
+            >
+              Attach Selected ({selectedEvents.size})
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

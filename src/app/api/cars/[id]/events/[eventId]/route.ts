@@ -93,7 +93,12 @@ export async function PUT(request: Request) {
       mappedUpdates.description = data.description;
     if (data.url !== undefined) mappedUpdates.url = data.url;
     if (data.start) mappedUpdates.start = new Date(data.start);
-    if (data.end) mappedUpdates.end = new Date(data.end);
+
+    // Handle end date - explicitly check if it's in the data object
+    if ("end" in data) {
+      mappedUpdates.end = data.end ? new Date(data.end) : null;
+    }
+
     if (typeof data.isAllDay === "boolean")
       mappedUpdates.is_all_day = data.isAllDay;
 

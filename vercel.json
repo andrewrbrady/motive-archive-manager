@@ -33,6 +33,14 @@
     "app/api/images/extend-canvas-remote/route.ts": {
       "maxDuration": 60,
       "memory": 1536
+    },
+    "app/api/openai/generate-project-caption/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/openai/generate-caption/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   }
 }

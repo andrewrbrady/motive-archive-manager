@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -29,6 +29,7 @@ interface DateTimePickerProps {
   className?: string;
   required?: boolean;
   isAllDay?: boolean;
+  allowClear?: boolean;
 }
 
 export function DateTimePicker({
@@ -38,12 +39,24 @@ export function DateTimePicker({
   className,
   required = false,
   isAllDay = false,
+  allowClear = true,
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = React.useState(false);
 
   // Parse the current value
-  const currentDate = value ? new Date(value) : undefined;
+  const currentDate = value
+    ? (() => {
+        if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          // For all-day events with date-only format, parse as UTC to avoid timezone shifts
+          const [year, month, day] = value.split("-").map(Number);
+          return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+        } else {
+          // For datetime strings, parse normally
+          return new Date(value);
+        }
+      })()
+    : undefined;
   const currentTime =
     currentDate && !isAllDay ? format(currentDate, "HH:mm") : "09:00";
 
@@ -124,6 +137,11 @@ export function DateTimePicker({
     handleTimeSelect(hour24, currentMinute);
   };
 
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange("");
+  };
+
   return (
     <div className="space-y-2">
       <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -137,17 +155,52 @@ export function DateTimePicker({
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {currentDate ? (
-              <span>
-                {format(currentDate, "MMM d, yyyy")}
-                {!isAllDay && (
-                  <span className="text-muted-foreground ml-2">
-                    {format(currentDate, "h:mm a")}
-                  </span>
-                )}
-              </span>
-            ) : (
-              <span>{placeholder}</span>
+            <span className="flex-1">
+              {currentDate ? (
+                <span>
+                  {(() => {
+                    let formatted;
+                    if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                      // For all-day events, format using UTC methods to avoid timezone conversion
+                      const months = [
+                        "Jan",
+                        "Feb",
+                        "Mar",
+                        "Apr",
+                        "May",
+                        "Jun",
+                        "Jul",
+                        "Aug",
+                        "Sep",
+                        "Oct",
+                        "Nov",
+                        "Dec",
+                      ];
+                      const month = months[currentDate.getUTCMonth()];
+                      const day = currentDate.getUTCDate();
+                      const year = currentDate.getUTCFullYear();
+                      formatted = `${month} ${day}, ${year}`;
+                    } else {
+                      // For timed events, use date-fns format normally
+                      formatted = format(currentDate, "MMM d, yyyy");
+                    }
+                    return formatted;
+                  })()}
+                  {!isAllDay && (
+                    <span className="text-muted-foreground ml-2">
+                      {format(currentDate, "h:mm a")}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span>{placeholder}</span>
+              )}
+            </span>
+            {allowClear && currentDate && (
+              <X
+                className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors ml-2 cursor-pointer"
+                onClick={handleClear}
+              />
             )}
           </Button>
         </PopoverTrigger>
@@ -260,11 +313,26 @@ export function DateTimePicker({
               </div>
             )}
 
-            <div className="flex justify-end pt-2 border-t">
+            <div className="flex justify-between pt-2 border-t">
+              {allowClear && currentDate && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    onChange("");
+                    setIsOpen(false);
+                  }}
+                  variant="outline"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={() => setIsOpen(false)}
                 variant="outline"
+                className={allowClear && currentDate ? "" : "ml-auto"}
               >
                 Done
               </Button>

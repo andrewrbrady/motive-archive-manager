@@ -63,6 +63,13 @@ export default function EventsTab({ carId }: EventsTabProps) {
     updates: Partial<Event>
   ) => {
     try {
+      // Optimistically update local state
+      setEvents((currentEvents) =>
+        currentEvents.map((event) =>
+          event.id === eventId ? { ...event, ...updates } : event
+        )
+      );
+
       const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
         method: "PUT",
         headers: {
@@ -75,16 +82,23 @@ export default function EventsTab({ carId }: EventsTabProps) {
         throw new Error("Failed to update event");
       }
 
-      await fetchEvents();
       toast.success("Event updated successfully");
     } catch (error) {
+      // Revert the optimistic update on error
+      fetchEvents();
       console.error("Error updating event:", error);
       toast.error("Failed to update event");
+      throw error;
     }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
+      // Optimistically update local state
+      setEvents((currentEvents) =>
+        currentEvents.filter((event) => event.id !== eventId)
+      );
+
       const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
         method: "DELETE",
       });
@@ -93,11 +107,13 @@ export default function EventsTab({ carId }: EventsTabProps) {
         throw new Error("Failed to delete event");
       }
 
-      await fetchEvents();
       toast.success("Event deleted successfully");
     } catch (error) {
+      // Revert the optimistic update on error
+      fetchEvents();
       console.error("Error deleting event:", error);
       toast.error("Failed to delete event");
+      throw error;
     }
   };
 

@@ -92,17 +92,6 @@ export function EventSelection({
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <span
-                  className={`px-2 py-1 rounded text-xs font-medium border ${
-                    event.status === "completed"
-                      ? "bg-green-100 text-green-800 border-green-200"
-                      : event.status === "in_progress"
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : "bg-gray-100 text-gray-800 border-gray-200"
-                  }`}
-                >
-                  {event.status.replace("_", " ")}
-                </span>
                 {isUpcoming && (
                   <span className="text-xs text-blue-600 font-medium">
                     Upcoming

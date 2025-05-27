@@ -90,18 +90,89 @@ export function MotiveCalendar({
   const [showDeliverables, setShowDeliverables] = useState(true);
   const [showMilestones, setShowMilestones] = useState(true);
   const [eventTypeFilters, setEventTypeFilters] = useState<string[]>([]);
-  const [deliverableTypeFilters, setDeliverableTypeFilters] = useState<
+  const [deliverableEventFilters, setDeliverableEventFilters] = useState<
     string[]
   >([]);
   const [deliverablePlatformFilters, setDeliverablePlatformFilters] = useState<
     string[]
   >([]);
-  const [deliverableEventFilters, setDeliverableEventFilters] = useState<
+  const [deliverableTypeFilters, setDeliverableTypeFilters] = useState<
     string[]
   >([]);
   const [milestoneStatusFilters, setMilestoneStatusFilters] = useState<
     string[]
   >([]);
+  const [eventsWithCars, setEventsWithCars] = useState<
+    (Event & { car?: { make: string; model: string; year: number } })[]
+  >([]);
+
+  // Fetch car information for events when in project context
+  useEffect(() => {
+    if (projectId && events.length > 0) {
+      const fetchCarsForEvents = async () => {
+        const eventsWithCarData = await Promise.all(
+          events.map(async (event) => {
+            if (event.car_id) {
+              try {
+                const carResponse = await fetch(`/api/cars/${event.car_id}`);
+                if (carResponse.ok) {
+                  const car = await carResponse.json();
+                  return {
+                    ...event,
+                    car: { make: car.make, model: car.model, year: car.year },
+                  };
+                }
+              } catch (error) {
+                console.error("Error fetching car:", error);
+              }
+            }
+            return event;
+          })
+        );
+        setEventsWithCars(eventsWithCarData);
+      };
+      fetchCarsForEvents();
+    } else {
+      setEventsWithCars(events);
+    }
+  }, [events, projectId]);
+
+  // Helper function to format event title for project calendar
+  const formatEventTitle = (
+    event: Event & { car?: { make: string; model: string; year: number } }
+  ) => {
+    const eventType = event.type
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+
+    // Check if title is just a formatted version of the event type
+    const normalizedTitle = event.title
+      ?.trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+    const normalizedEventType = eventType.toLowerCase().replace(/\s+/g, " ");
+    const titleMatchesEventType = normalizedTitle === normalizedEventType;
+
+    if (projectId && event.car) {
+      const carInfo = `${event.car.year} ${event.car.make} ${event.car.model}`;
+
+      if (titleMatchesEventType || !event.title?.trim()) {
+        // If title matches event type or is empty, show: "SOLD | CAR"
+        return `${eventType} | ${carInfo}`;
+      } else {
+        // If title is different from event type, show: "SOLD | TITLE | CAR"
+        return `${eventType} | ${event.title.trim()} | ${carInfo}`;
+      }
+    }
+
+    // For non-project calendars, return title if it's different from event type, otherwise just event type
+    if (titleMatchesEventType || !event.title?.trim()) {
+      return eventType;
+    }
+
+    return event.title.trim();
+  };
 
   // Get unique event types
   const uniqueEventTypes = useMemo(() => {
@@ -137,37 +208,21 @@ export function MotiveCalendar({
 
   const calendarEvents = useMemo(() => {
     const eventItems: MotiveCalendarEvent[] = showEvents
-      ? events
+      ? eventsWithCars
           .filter(
             (event) =>
               eventTypeFilters.length === 0 ||
               eventTypeFilters.includes(event.type)
           )
           .map((event): MotiveCalendarEvent => {
-            const formattedEventType = event.type
-              .replace(/_/g, " ")
-              .toLowerCase()
-              .replace(/\b\w/g, (l) => l.toUpperCase());
-
-            // Use title as primary, fall back to description if no title, then event type
-            let title = formattedEventType;
-            if (event.title?.trim()) {
-              title =
-                event.description?.trim() && event.description !== event.title
-                  ? `${event.title.trim()} | ${formattedEventType}`
-                  : `${event.title.trim()} | ${formattedEventType}`;
-            } else if (event.description?.trim()) {
-              title = `${event.description.trim()} | ${formattedEventType}`;
-            }
-
             return {
               id: event.id,
-              title,
+              title: formatEventTitle(event),
               start: new Date(event.start),
               end: event.end ? new Date(event.end) : new Date(event.start),
               type: "event",
               resource: event,
-              allDay: event.isAllDay || !event.end,
+              allDay: event.isAllDay || false,
             };
           })
       : [];
@@ -257,7 +312,7 @@ export function MotiveCalendar({
       (a, b) => a.start.getTime() - b.start.getTime()
     );
   }, [
-    events,
+    eventsWithCars,
     deliverables,
     milestones,
     eventTypeFilters,

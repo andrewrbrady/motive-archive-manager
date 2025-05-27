@@ -57,23 +57,29 @@ export async function PUT(
     const eventObjectId = new ObjectId(eventId);
     const data = await request.json();
 
-    // Ensure teamMemberIds is always an array and convert to ObjectIds
+    // Ensure teamMemberIds is always an array and convert to ObjectIds with validation
     const teamMemberIds = Array.isArray(data.teamMemberIds)
-      ? data.teamMemberIds.map((id: string) => new ObjectId(id))
+      ? data.teamMemberIds
+          .filter((id: string) => id && ObjectId.isValid(id))
+          .map((id: string) => new ObjectId(id))
       : [];
 
-    // Convert image IDs to ObjectIds if provided
-    const primaryImageId = data.primaryImageId
-      ? new ObjectId(data.primaryImageId)
-      : undefined;
+    // Convert image IDs to ObjectIds if provided with validation
+    const primaryImageId =
+      data.primaryImageId && ObjectId.isValid(data.primaryImageId)
+        ? new ObjectId(data.primaryImageId)
+        : undefined;
     const imageIds = Array.isArray(data.imageIds)
-      ? data.imageIds.map((id: string) => new ObjectId(id))
+      ? data.imageIds
+          .filter((id: string) => id && ObjectId.isValid(id))
+          .map((id: string) => new ObjectId(id))
       : [];
 
-    // Convert location ID to ObjectId if provided
-    const locationId = data.locationId
-      ? new ObjectId(data.locationId)
-      : undefined;
+    // Convert location ID to ObjectId if provided with validation
+    const locationId =
+      data.locationId && ObjectId.isValid(data.locationId)
+        ? new ObjectId(data.locationId)
+        : undefined;
 
     // Map the frontend fields to database fields
     const mappedUpdates: any = {
@@ -86,7 +92,12 @@ export async function PUT(
       mappedUpdates.description = data.description;
     if (data.url !== undefined) mappedUpdates.url = data.url;
     if (data.start) mappedUpdates.start = new Date(data.start);
-    if (data.end) mappedUpdates.end = new Date(data.end);
+
+    // Handle end date - explicitly check if it's in the data object
+    if ("end" in data) {
+      mappedUpdates.end = data.end ? new Date(data.end) : null;
+    }
+
     if (typeof data.isAllDay === "boolean")
       mappedUpdates.is_all_day = data.isAllDay;
     if (data.car_id !== undefined) mappedUpdates.car_id = data.car_id;
