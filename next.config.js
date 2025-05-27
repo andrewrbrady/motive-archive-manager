@@ -13,10 +13,6 @@ const nextConfig = {
       "./extend_canvas_macos",
     ],
   },
-  // Prevent static optimization for API routes during build
-  experimental: {
-    isrMemoryCacheSize: 0, // Disable ISR memory cache
-  },
   // Skip static optimization for API routes
   generateBuildId: async () => {
     // Return a unique build ID to prevent caching issues

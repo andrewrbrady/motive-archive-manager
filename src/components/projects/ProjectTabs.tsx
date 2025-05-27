@@ -7,7 +7,7 @@ import { ProjectTeamTab } from "./ProjectTeamTab";
 import { ProjectAssetsTab } from "./ProjectAssetsTab";
 import { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 import { ProjectCarsTab } from "./ProjectCarsTab";
-import { RevisedProjectCaptionGenerator as ProjectCaptionGenerator } from "./RevisedProjectCaptionGenerator";
+import { ProjectCopywriter } from "./ProjectCopywriter";
 import ProjectEventsTab from "./ProjectEventsTab";
 import { ProjectCalendarTab } from "./ProjectCalendarTab";
 import { Project } from "@/types/project";
@@ -79,10 +79,10 @@ export function ProjectTabs({
           Deliverables
         </TabsTrigger>
         <TabsTrigger
-          value="captions"
+          value="copywriter"
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
         >
-          Captions
+          Copywriter
         </TabsTrigger>
         <TabsTrigger
           value="calendar"
@@ -134,8 +134,8 @@ export function ProjectTabs({
         />
       </TabsContent>
 
-      <TabsContent value="captions" className="space-y-6">
-        <ProjectCaptionGenerator
+      <TabsContent value="copywriter" className="space-y-6">
+        <ProjectCopywriter
           project={project}
           onProjectUpdate={onProjectUpdate}
         />

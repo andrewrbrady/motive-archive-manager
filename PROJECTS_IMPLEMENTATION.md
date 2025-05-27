@@ -302,7 +302,7 @@ Implementing a comprehensive "Projects" feature for the Motive Archive Manager a
     - **Implemented URL state management** - Tab state is now stored in URL searchParams (?tab=timeline)
     - **Browser navigation support** - Back/forward buttons work correctly with tab changes
     - **Refresh persistence** - Page refreshes maintain the current tab selection
-    - **Valid tab validation** - Only allows valid tab names (overview, timeline, team, cars, assets, deliverables, captions)
+    - **Valid tab validation** - Only allows valid tab names (overview, timeline, team, cars, assets, deliverables, copywriter)
     - **Seamless UX** - URL updates without page reload using window.history.pushState
     - **Popstate handling** - Listens for browser navigation events to update tab state
 

@@ -36,10 +36,20 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     >
   >({});
 
+  // Check for URL parameters on mount
   useEffect(() => {
-    // Get tab from URL on mount
     const urlParams = new URLSearchParams(window.location.search);
     const tabFromUrl = urlParams.get("tab");
+
+    // Migration: redirect old "captions" tab to new "copywriter" tab
+    if (tabFromUrl === "captions") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", "copywriter");
+      window.history.replaceState({}, "", url.toString());
+      setActiveTab("copywriter");
+      return;
+    }
+
     if (
       tabFromUrl &&
       [
@@ -50,7 +60,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         "cars",
         "assets",
         "deliverables",
-        "captions",
+        "copywriter",
         "calendar",
       ].includes(tabFromUrl)
     ) {
@@ -63,6 +73,16 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     const handlePopState = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const tabFromUrl = urlParams.get("tab");
+
+      // Migration: redirect old "captions" tab to new "copywriter" tab
+      if (tabFromUrl === "captions") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", "copywriter");
+        window.history.replaceState({}, "", url.toString());
+        setActiveTab("copywriter");
+        return;
+      }
+
       if (
         tabFromUrl &&
         [
@@ -73,7 +93,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           "cars",
           "assets",
           "deliverables",
-          "captions",
+          "copywriter",
           "calendar",
         ].includes(tabFromUrl)
       ) {

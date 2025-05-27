@@ -27,20 +27,20 @@ import type {
 } from "./caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
 
-interface RevisedProjectCaptionGeneratorProps {
+interface ProjectCopywriterProps {
   project: Project;
   onProjectUpdate: () => void;
 }
 
-export function RevisedProjectCaptionGenerator({
+export function ProjectCopywriter({
   project,
   onProjectUpdate,
-}: RevisedProjectCaptionGeneratorProps) {
+}: ProjectCopywriterProps) {
   // Client handle state
   const [clientHandle, setClientHandle] = useState<string | null>(null);
 
-  // Caption preview view mode state
-  const [captionViewMode, setCaptionViewMode] = useState<"preview" | "saved">(
+  // Content preview view mode state
+  const [contentViewMode, setContentViewMode] = useState<"preview" | "saved">(
     "preview"
   );
 
@@ -67,10 +67,10 @@ export function RevisedProjectCaptionGenerator({
   const { generationState, generateCaption, updateGeneratedCaption } =
     useGenerationHandlers();
 
-  // Caption saving - must be called before any early returns
+  // Content saving - must be called before any early returns
   const { saveCaption } = useCaptionSaver();
 
-  // Saved captions management - must be called before any early returns
+  // Saved content management - must be called before any early returns
   const savedCaptionsHook = useSavedCaptions();
 
   // Helper function to update form values from prompt values
@@ -103,7 +103,7 @@ export function RevisedProjectCaptionGenerator({
     promptHandlers.fetchPrompts();
   }, []);
 
-  // Initialize savedCaptionsHook with project captions - must be called before any early returns
+  // Initialize savedCaptionsHook with project content - must be called before any early returns
   useEffect(() => {
     if (projectDataHook.savedCaptions) {
       savedCaptionsHook.setSavedCaptions(projectDataHook.savedCaptions);
@@ -114,7 +114,7 @@ export function RevisedProjectCaptionGenerator({
   if (!project._id) {
     return (
       <div className="text-center py-8 text-[hsl(var(--foreground-muted))]">
-        <p>Project ID is required to generate captions.</p>
+        <p>Project ID is required to generate content.</p>
       </div>
     );
   }
@@ -146,7 +146,7 @@ export function RevisedProjectCaptionGenerator({
     // Length settings
     lengthSettings,
 
-    // Saved captions
+    // Saved content
     savedCaptions,
 
     // Data filtering
@@ -169,7 +169,7 @@ export function RevisedProjectCaptionGenerator({
     refetchCaptions,
   } = projectDataHook;
 
-  const handleGenerate = async () => {
+  const handleGenerateContent = async () => {
     const context: GenerationContext = {
       projectId: project._id!,
       selectedCarIds,
@@ -186,13 +186,13 @@ export function RevisedProjectCaptionGenerator({
     await generateCaption(context, formState);
   };
 
-  const handleSaveCaption = async () => {
-    const captionToSave = generationState.generatedCaption;
-    if (!captionToSave) return;
+  const handleSaveContent = async () => {
+    const contentToSave = generationState.generatedCaption;
+    if (!contentToSave) return;
 
     const success = await saveCaption(
       project._id!,
-      captionToSave,
+      contentToSave,
       formState.platform,
       formState.context,
       selectedCarIds,
@@ -200,36 +200,36 @@ export function RevisedProjectCaptionGenerator({
     );
 
     if (success) {
-      // Refresh saved captions from the project
+      // Refresh saved content from the project
       await refetchCaptions();
-      // Switch to saved view to show the newly saved caption
-      setCaptionViewMode("saved");
+      // Switch to saved view to show the newly saved content
+      setContentViewMode("saved");
     }
   };
 
-  const handleUpdatePreviewCaption = (newCaption: string) => {
-    // Update the generated caption state when preview is edited
-    updateGeneratedCaption(newCaption);
+  const handleUpdatePreviewContent = (newContent: string) => {
+    // Update the generated content state when preview is edited
+    updateGeneratedCaption(newContent);
   };
 
-  const handleDeleteCaption = async (captionId: string) => {
+  const handleDeleteContent = async (contentId: string) => {
     const success = await savedCaptionsHook.handleDeleteCaption(
       project._id!,
-      captionId
+      contentId
     );
     if (success) {
-      // Refresh saved captions from the project to sync state
+      // Refresh saved content from the project to sync state
       await refetchCaptions();
     }
   };
 
-  const handleSaveEdit = async (captionId: string) => {
+  const handleSaveEdit = async (contentId: string) => {
     const success = await savedCaptionsHook.handleSaveEdit(
       project._id!,
-      captionId
+      contentId
     );
     if (success) {
-      // Refresh saved captions from the project to sync state
+      // Refresh saved content from the project to sync state
       await refetchCaptions();
     }
   };
@@ -300,21 +300,21 @@ export function RevisedProjectCaptionGenerator({
             model={formState.model}
             temperature={formState.temperature}
             isGenerating={generationState.isGenerating}
-            onGenerate={handleGenerate}
+            onGenerate={handleGenerateContent}
             error={generationState.error}
           />
         </div>
 
-        {/* Right Column - Preview and Saved Captions */}
+        {/* Right Column - Preview and Saved Content */}
         <div className="flex flex-col h-full min-h-[600px]">
           <CaptionPreview
             generatedCaption={generationState.generatedCaption}
             platform={formState.platform}
             copiedId={savedCaptionsHook.copiedId}
             onCopyCaption={savedCaptionsHook.handleCopy}
-            onSaveCaption={handleSaveCaption}
-            viewMode={captionViewMode}
-            onViewModeChange={setCaptionViewMode}
+            onSaveCaption={handleSaveContent}
+            viewMode={contentViewMode}
+            onViewModeChange={setContentViewMode}
             savedCaptions={savedCaptionsHook.savedCaptions}
             editingCaptionId={savedCaptionsHook.editingCaptionId}
             editingText={savedCaptionsHook.editingText}
@@ -322,8 +322,8 @@ export function RevisedProjectCaptionGenerator({
             onCancelEdit={savedCaptionsHook.handleCancelEdit}
             onSaveEdit={handleSaveEdit}
             onEditTextChange={savedCaptionsHook.handleEditTextChange}
-            onDeleteCaption={handleDeleteCaption}
-            onUpdatePreviewCaption={handleUpdatePreviewCaption}
+            onDeleteCaption={handleDeleteContent}
+            onUpdatePreviewCaption={handleUpdatePreviewContent}
           />
         </div>
       </div>

@@ -19,7 +19,7 @@ const getContextMap = (): Record<string, string[]> => {
     "tab:shot-lists": ["tab", "template"],
     "tab:scripts": ["tab", "template"],
     "tab:bat": ["tab"],
-    "tab:captions": ["tab"],
+    "tab:copywriter": ["tab"],
     "tab:service": ["tab"],
     "tab:research": ["tab"],
     "tab:documentation": ["tab"],
