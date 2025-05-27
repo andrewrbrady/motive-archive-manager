@@ -46,6 +46,7 @@ yarn-error.log*
 # temp files
 .temp-env-*
 cookies.txt
+/temp/
 
 # typescript
 *.tsbuildinfo
