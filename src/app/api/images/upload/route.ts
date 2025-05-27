@@ -23,6 +23,24 @@ export async function POST(request: NextRequest) {
 
     console.log("[API] FormData parsed, files count:", files.length);
 
+    // Get car association and metadata from FormData
+    const carId = formData.get("carId") as string;
+    const metadataString = formData.get("metadata") as string;
+    let customMetadata = {};
+
+    if (metadataString) {
+      try {
+        customMetadata = JSON.parse(metadataString);
+        console.log("[API] Custom metadata parsed:", customMetadata);
+      } catch (e) {
+        console.warn("[API] Failed to parse metadata:", e);
+      }
+    }
+
+    if (carId) {
+      console.log("[API] Car association found:", carId);
+    }
+
     if (!files || files.length === 0) {
       console.error("[API] No files provided in request");
       return NextResponse.json(
@@ -183,14 +201,17 @@ export async function POST(request: NextRequest) {
         const imageUrl = result.result.variants[0].replace(/\/public$/, "");
         console.log(`[API] Image URL for "${file.name}":`, imageUrl);
 
-        // Create basic metadata
-        const metadata = {
-          category: "unclassified",
-          angle: "unknown",
-          movement: "unknown",
-          tod: "unknown",
-          view: "unknown",
-        };
+        // Create metadata - use custom metadata if provided, otherwise default
+        const metadata =
+          Object.keys(customMetadata).length > 0
+            ? customMetadata
+            : {
+                category: "unclassified",
+                angle: "unknown",
+                movement: "unknown",
+                tod: "unknown",
+                view: "unknown",
+              };
 
         try {
           // Store in MongoDB
@@ -202,6 +223,7 @@ export async function POST(request: NextRequest) {
             url: imageUrl,
             filename: file.name,
             metadata,
+            carId: carId ? new ObjectId(carId) : null,
             createdAt: now,
             updatedAt: now,
           };
@@ -212,12 +234,35 @@ export async function POST(request: NextRequest) {
             imageDoc._id.toString()
           );
 
+          // If this processed image is associated with a car, add it to the car's processedImageIds array
+          if (carId && (metadata as any).category === "processed") {
+            try {
+              await db.collection("cars").updateOne(
+                { _id: new ObjectId(carId) },
+                {
+                  $addToSet: { processedImageIds: imageDoc._id },
+                  $set: { updatedAt: now },
+                }
+              );
+              console.log(
+                `[API] Added processed image ${imageDoc._id} to car ${carId}`
+              );
+            } catch (carUpdateError) {
+              console.error(
+                "[API] Failed to update car with processed image:",
+                carUpdateError
+              );
+              // Don't fail the whole operation if car update fails
+            }
+          }
+
           uploadedImages.push({
             id: imageDoc._id.toString(),
             cloudflareId: result.result.id,
             filename: file.name,
             url: imageUrl,
             metadata,
+            carId: carId || null,
           });
         } catch (dbError) {
           console.error(`[API] MongoDB error for "${file.name}":`, dbError);

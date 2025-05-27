@@ -72,4 +72,36 @@ else
     exit 0  # Don't fail the build
 fi
 
+# Compile the image cropper
+echo "🔨 Compiling image_cropper..."
+if g++ -std=c++17 -O2 -Wall -o image_cropper image_cropper.cpp $OPENCV_CFLAGS $OPENCV_LIBS; then
+    echo "✅ Image cropper compiled successfully!"
+    
+    # Verify the executable works
+    if ./image_cropper 2>&1 | grep -q "Usage:"; then
+        echo "✅ Image cropper executable is working"
+    else
+        echo "⚠️  Image cropper compiled but may not be working correctly"
+    fi
+else
+    echo "❌ Image cropper compilation failed"
+    echo "   Image cropper feature will be disabled"
+fi
+
+# Compile the matte generator
+echo "🔨 Compiling matte_generator..."
+if g++ -std=c++17 -O2 -Wall -o matte_generator matte_generator.cpp $OPENCV_CFLAGS $OPENCV_LIBS; then
+    echo "✅ Matte generator compiled successfully!"
+    
+    # Verify the executable works
+    if ./matte_generator 2>&1 | grep -q "Error:"; then
+        echo "✅ Matte generator executable is working"
+    else
+        echo "⚠️  Matte generator compiled but may not be working correctly"
+    fi
+else
+    echo "❌ Matte generator compilation failed"
+    echo "   Matte generator feature will be disabled"
+fi
+
 echo "🎉 Build completed successfully!" 

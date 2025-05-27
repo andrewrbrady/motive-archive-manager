@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
 import { CanvasExtensionModal } from "@/components/cars/CanvasExtensionModal";
 import { ImageMatteModal } from "@/components/cars/ImageMatteModal";
+import { ImageCropModal } from "@/components/cars/ImageCropModal";
 import { ImageViewModal } from "@/components/cars/ImageViewModal";
 import { useImages } from "@/hooks/use-images";
 import { ImageData } from "@/app/images/columns";
@@ -111,6 +112,11 @@ export default function ImagesPage() {
   // Image matte modal state
   const [isMatteModalOpen, setIsMatteModalOpen] = useState(false);
   const [selectedImageForMatte, setSelectedImageForMatte] =
+    useState<ImageData | null>(null);
+
+  // Image crop modal state
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [selectedImageForCrop, setSelectedImageForCrop] =
     useState<ImageData | null>(null);
 
   // Image view modal state
@@ -420,6 +426,12 @@ export default function ImagesPage() {
   const handleImageMatte = (image: ImageData) => {
     setSelectedImageForMatte(image);
     setIsMatteModalOpen(true);
+  };
+
+  // Handle image crop
+  const handleImageCrop = (image: ImageData) => {
+    setSelectedImageForCrop(image);
+    setIsCropModalOpen(true);
   };
 
   // Handle image view
@@ -737,6 +749,7 @@ export default function ImagesPage() {
                 error={error || undefined}
                 onCanvasExtension={handleCanvasExtension}
                 onImageMatte={handleImageMatte}
+                onImageCrop={handleImageCrop}
                 onImageView={handleImageView}
                 zoomLevel={zoomLevel}
                 mutate={mutate}
@@ -792,6 +805,16 @@ export default function ImagesPage() {
             image={selectedImageForMatte}
           />
 
+          {/* Image Crop Modal */}
+          <ImageCropModal
+            isOpen={isCropModalOpen}
+            onClose={() => {
+              setIsCropModalOpen(false);
+              setSelectedImageForCrop(null);
+            }}
+            image={selectedImageForCrop}
+          />
+
           {/* Image View Modal */}
           <ImageViewModal
             isOpen={isImageViewModalOpen}
@@ -803,6 +826,7 @@ export default function ImagesPage() {
             images={mappedImages}
             onCanvasExtension={handleCanvasExtension}
             onImageMatte={handleImageMatte}
+            onImageCrop={handleImageCrop}
             onNavigate={handleImageNavigate}
           />
         </div>

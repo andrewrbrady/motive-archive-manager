@@ -2,7 +2,15 @@ import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ImageData } from "@/app/images/columns";
-import { Copy, Check, Trash2, Loader2, Expand, Palette } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Trash2,
+  Loader2,
+  Expand,
+  Palette,
+  Crop,
+} from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface ImageCardProps {
@@ -12,6 +20,7 @@ interface ImageCardProps {
   onDelete?: (image: ImageData) => Promise<void>;
   onCanvasExtension?: (image: ImageData) => void;
   onImageMatte?: (image: ImageData) => void;
+  onImageCrop?: (image: ImageData) => void;
   onImageView?: (image: ImageData) => void;
 }
 
@@ -22,6 +31,7 @@ export function ImageCard({
   onDelete,
   onCanvasExtension,
   onImageMatte,
+  onImageCrop,
   onImageView,
 }: ImageCardProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -98,6 +108,11 @@ export function ImageCard({
     onImageMatte?.(image);
   };
 
+  const handleImageCrop = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onImageCrop?.(image);
+  };
+
   if (onDelete) {
     // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
   }
@@ -135,6 +150,18 @@ export function ImageCard({
             title="Create image matte"
           >
             <Palette className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Image Crop button */}
+        {onImageCrop && (
+          <button
+            onClick={handleImageCrop}
+            className="p-1 bg-background/80 rounded-full hover:bg-orange-600/80 hover:text-white transition-colors focus:outline-none"
+            aria-label="Crop image"
+            title="Crop image"
+          >
+            <Crop className="h-4 w-4" />
           </button>
         )}
 

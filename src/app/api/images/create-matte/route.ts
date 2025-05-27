@@ -173,7 +173,8 @@ export async function POST(request: NextRequest) {
                   );
                 }
 
-                const cloudflareImageUrl = `${cloudflareResult.result.variants[0]}/public`;
+                const cloudflareImageUrl =
+                  cloudflareResult.result.variants[0].replace(/\/public$/, "");
 
                 // Store in MongoDB
                 const db = await getDatabase();
@@ -457,7 +458,8 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          const cloudflareImageUrl = `${cloudflareResult.result.variants[0]}/public`;
+          const cloudflareImageUrl =
+            cloudflareResult.result.variants[0].replace(/\/public$/, "");
 
           // Store in MongoDB
           const db = await getDatabase();

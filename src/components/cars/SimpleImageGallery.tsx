@@ -66,6 +66,7 @@ interface SimpleImageGalleryProps {
   setFilter?: (key: string, value: string | boolean) => void;
   onCanvasExtension?: (image: ImageData) => void;
   onImageMatte?: (image: ImageData) => void;
+  onImageCrop?: (image: ImageData) => void;
   onImageView?: (image: ImageData) => void;
   zoomLevel?: number;
   mutate?: () => void;
@@ -88,6 +89,7 @@ export function SimpleImageGallery({
   selectedImageId,
   onCanvasExtension,
   onImageMatte,
+  onImageCrop,
   onImageView,
   zoomLevel,
   mutate,
@@ -191,6 +193,7 @@ export function SimpleImageGallery({
           onCanvasExtension={onCanvasExtension}
           onImageView={onImageView}
           onImageMatte={onImageMatte}
+          onImageCrop={onImageCrop}
         />
       ))}
       {isFetchingNextPage && (

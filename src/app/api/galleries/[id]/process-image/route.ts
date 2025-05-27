@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 
 interface ProcessImageRequest {
   imageId: string;
-  processingType: "canvas-extension" | "image-matte";
+  processingType: "canvas-extension" | "image-matte" | "image-crop";
   parameters: any;
 }
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
       };
-    } else {
+    } else if (processingType === "image-matte") {
       processingEndpoint = "/api/images/create-matte";
 
       processingParams = {
@@ -99,6 +99,27 @@ export async function POST(request: NextRequest) {
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
       };
+    } else if (processingType === "image-crop") {
+      processingEndpoint = "/api/images/crop-image";
+
+      processingParams = {
+        imageUrl: originalImage.url,
+        cropX: parameters.cropX,
+        cropY: parameters.cropY,
+        cropWidth: parameters.cropWidth,
+        cropHeight: parameters.cropHeight,
+        outputWidth: parameters.outputWidth,
+        outputHeight: parameters.outputHeight,
+        scale: parameters.scale,
+        uploadToCloudflare: true,
+        originalFilename: originalImage.filename,
+        originalCarId: originalImage.carId,
+      };
+    } else {
+      return NextResponse.json(
+        { error: "Invalid processing type" },
+        { status: 400 }
+      );
     }
 
     // Process the image

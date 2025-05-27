@@ -18,6 +18,7 @@ import {
   Expand,
   ExternalLink,
   Palette,
+  Crop,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
@@ -29,6 +30,7 @@ interface ImageViewModalProps {
   images?: ImageData[];
   onCanvasExtension?: (image: ImageData) => void;
   onImageMatte?: (image: ImageData) => void;
+  onImageCrop?: (image: ImageData) => void;
   onNavigate?: (image: ImageData) => void;
 }
 
@@ -44,6 +46,7 @@ export function ImageViewModal({
   images = [],
   onCanvasExtension,
   onImageMatte,
+  onImageCrop,
   onNavigate,
 }: ImageViewModalProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -190,6 +193,13 @@ export function ImageViewModal({
   const handleImageMatte = () => {
     if (image && onImageMatte) {
       onImageMatte(image);
+      onClose();
+    }
+  };
+
+  const handleImageCrop = () => {
+    if (image && onImageCrop) {
+      onImageCrop(image);
       onClose();
     }
   };
@@ -418,6 +428,18 @@ export function ImageViewModal({
                   >
                     <Palette className="h-4 w-4 mr-2" />
                     Create Matte
+                  </Button>
+                )}
+
+                {onImageCrop && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleImageCrop}
+                    className="justify-start bg-green-600 hover:bg-green-700"
+                  >
+                    <Crop className="h-4 w-4 mr-2" />
+                    Crop Image
                   </Button>
                 )}
               </div>
