@@ -4,6 +4,7 @@ export { ProjectOverviewTab } from "./ProjectOverviewTab";
 export { ProjectTimelineTab } from "./ProjectTimelineTab";
 export { ProjectTeamTab } from "./ProjectTeamTab";
 export { ProjectCarsTab } from "./ProjectCarsTab";
+export { ProjectGalleriesTab } from "./ProjectGalleriesTab";
 export { ProjectAssetsTab } from "./ProjectAssetsTab";
 export { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 export { ProjectCopywriter } from "./ProjectCopywriter";

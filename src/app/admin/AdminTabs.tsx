@@ -5,6 +5,7 @@ import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
 import UserManagement from "@/components/users/UserManagement";
 import LocationsClient from "../locations/LocationsClient";
 import ClientsContent from "@/app/admin/ClientsContent";
+import ContactsContent from "@/app/admin/ContactsContent";
 import MakesContent from "@/app/admin/MakesContent";
 import CreativeRolesManagement from "@/components/users/CreativeRolesManagement";
 import { Loader2 } from "lucide-react";
@@ -266,6 +267,11 @@ export default function AdminTabs() {
       value: "clients",
       label: "Clients",
       content: <ClientsContent />,
+    },
+    {
+      value: "contacts",
+      label: "Contacts",
+      content: <ContactsContent />,
     },
     {
       value: "locations",

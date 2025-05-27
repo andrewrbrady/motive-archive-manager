@@ -4,9 +4,9 @@ export interface Contact {
   _id: ObjectId;
   firstName: string;
   lastName: string;
-  email: string;
-  phone: string;
-  role: string;
+  email?: string;
+  phone?: string;
+  role?: string;
   company?: string;
   status: "active" | "inactive";
   notes?: string;

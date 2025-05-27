@@ -7,6 +7,7 @@ import { ProjectTeamTab } from "./ProjectTeamTab";
 import { ProjectAssetsTab } from "./ProjectAssetsTab";
 import { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
 import { ProjectCarsTab } from "./ProjectCarsTab";
+import { ProjectGalleriesTab } from "./ProjectGalleriesTab";
 import { ProjectCopywriter } from "./ProjectCopywriter";
 import ProjectEventsTab from "./ProjectEventsTab";
 import { ProjectCalendarTab } from "./ProjectCalendarTab";
@@ -35,7 +36,7 @@ export function ProjectTabs({
 }: ProjectTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-      <TabsList className="grid w-full grid-cols-9 bg-transparent border rounded-md h-auto p-1 gap-1">
+      <TabsList className="grid w-full grid-cols-10 bg-transparent border rounded-md h-auto p-1 gap-1">
         <TabsTrigger
           value="overview"
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
@@ -65,6 +66,12 @@ export function ProjectTabs({
           className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
         >
           Cars
+        </TabsTrigger>
+        <TabsTrigger
+          value="galleries"
+          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
+        >
+          Galleries
         </TabsTrigger>
         <TabsTrigger
           value="assets"
@@ -120,6 +127,13 @@ export function ProjectTabs({
 
       <TabsContent value="cars" className="space-y-6">
         <ProjectCarsTab project={project} onProjectUpdate={onProjectUpdate} />
+      </TabsContent>
+
+      <TabsContent value="galleries" className="space-y-6">
+        <ProjectGalleriesTab
+          project={project}
+          onProjectUpdate={onProjectUpdate}
+        />
       </TabsContent>
 
       <TabsContent value="assets" className="space-y-6">
