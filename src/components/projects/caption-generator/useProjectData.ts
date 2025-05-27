@@ -358,9 +358,28 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     setSelectedPrompt(found || null);
   };
 
-  const buildLLMText = (derivedLengthParam?: any) => {
+  const buildLLMText = (
+    derivedLengthParam?: any,
+    formStateParams?: {
+      platform?: string;
+      tone?: string;
+      style?: string;
+      template?: string;
+      context?: string;
+      additionalContext?: string;
+    }
+  ) => {
     // Use the parameter if provided, otherwise fall back to the prop
     const lengthToUse = derivedLengthParam;
+
+    // Use form state parameters if provided, otherwise fall back to local state
+    const platformToUse = formStateParams?.platform || platform;
+    const toneToUse = formStateParams?.tone || tone;
+    const styleToUse = formStateParams?.style || style;
+    const templateToUse = formStateParams?.template || template;
+    const contextToUse = formStateParams?.context || context;
+    const additionalContextToUse =
+      formStateParams?.additionalContext || additionalContext;
 
     if (!selectedSystemPromptId) {
       return "Please select a system prompt to generate LLM input.";
@@ -379,14 +398,33 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     llmText += "USER PROMPT (what gets sent to LLM):\n\n";
 
     // Base context from selected prompt template
-    if (context) {
-      llmText += "ADDITIONAL INSTRUCTIONS:\n" + context + "\n\n";
+    if (contextToUse) {
+      llmText += "ADDITIONAL INSTRUCTIONS:\n" + contextToUse + "\n\n";
     }
 
     // Additional context
-    if (additionalContext) {
-      llmText += "ADDITIONAL CONTEXT:\n" + additionalContext + "\n\n";
+    if (additionalContextToUse) {
+      llmText += "ADDITIONAL CONTEXT:\n" + additionalContextToUse + "\n\n";
     }
+
+    // Copywriting requirements - moved to top for better visibility
+    llmText += "COPYWRITING REQUIREMENTS:\n";
+    llmText += `- Platform: ${platformToUse}\n`;
+    llmText += `- Tone: ${toneToUse}\n`;
+    llmText += `- Style: ${styleToUse}\n`;
+    llmText += `- Length: ${lengthToUse?.key || "Will be selected during generation"}\n`;
+
+    if (templateToUse && templateToUse !== "none") {
+      llmText += `- Template: ${templateToUse}\n`;
+    }
+
+    // Length instructions (if available)
+    if (lengthToUse) {
+      llmText += "\nLENGTH INSTRUCTIONS:\n";
+      llmText += lengthToUse.instructions + "\n";
+    }
+
+    llmText += "\n";
 
     // Car details - show full details like what's sent to the API
     if (selectedCarIds.length > 0 && carDetails.length > 0) {
@@ -496,50 +534,37 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
       llmText += "Event details are loading...\n\n";
     }
 
-    // Caption requirements
-    llmText += "CAPTION REQUIREMENTS:\n";
-    llmText += `- Platform: ${platform}\n`;
-    llmText += `- Tone: ${tone}\n`;
-    llmText += `- Style: ${style}\n`;
-    llmText += `- Length: ${lengthToUse?.key || "Will be selected during generation"}\n`;
-
-    if (template && template !== "none") {
-      llmText += `- Template: ${template}\n`;
-    }
-
-    // Length instructions (if available)
-    if (lengthToUse) {
-      llmText += "\nLENGTH INSTRUCTIONS:\n";
-      llmText += lengthToUse.instructions + "\n";
-    }
-
-    llmText += "\nGenerate a caption that follows the requirements above.";
+    llmText += "Generate a caption that follows the requirements above.";
 
     return llmText;
   };
 
-  const handleShowPreviewToggle = (derivedLength?: any) => {
+  const handleShowPreviewToggle = (
+    derivedLength?: any,
+    formStateParams?: any
+  ) => {
     if (!showPreview) {
       // Generate the LLM text when opening preview
-      const generatedText = buildLLMText(derivedLength);
+      const generatedText = buildLLMText(derivedLength, formStateParams);
       setEditableLLMText(generatedText);
     }
     setShowPreview(!showPreview);
   };
 
-  const handleRefreshLLMText = (derivedLength?: any) => {
-    const generatedText = buildLLMText(derivedLength);
+  const handleRefreshLLMText = (derivedLength?: any, formStateParams?: any) => {
+    const generatedText = buildLLMText(derivedLength, formStateParams);
     setEditableLLMText(generatedText);
   };
 
   const handleUseMinimalCarDataChange = (
     checked: boolean,
-    derivedLength?: any
+    derivedLength?: any,
+    formStateParams?: any
   ) => {
     setUseMinimalCarData(checked);
     // Regenerate LLM text if preview is open
     if (showPreview) {
-      const generatedText = buildLLMText(derivedLength);
+      const generatedText = buildLLMText(derivedLength, formStateParams);
       setEditableLLMText(generatedText);
     }
   };

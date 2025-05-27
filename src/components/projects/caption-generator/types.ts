@@ -72,7 +72,8 @@ export interface PromptTemplate {
   };
 }
 
-export type Platform = "instagram" | "youtube";
+// Platform is now dynamic and configurable through admin settings
+export type Platform = string;
 export type Template = "none" | "bat" | "dealer" | "question";
 export type Tone = "professional" | "casual" | "enthusiastic" | "technical";
 export type Style = "descriptive" | "minimal" | "storytelling";

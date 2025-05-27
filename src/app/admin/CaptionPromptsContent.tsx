@@ -1,16 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,11 +22,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { ICaptionPrompt as ICaptionPromptFromModel } from "@/models/CaptionPrompt";
-import PromptForm, {
-  PromptFormData,
-  PromptFormRef,
-} from "@/components/admin/PromptForm"; // Assuming PromptForm is in this path
-import { Document } from "mongoose"; // Import Document for Omit
+import { PromptEditModal } from "@/components/projects/caption-generator/PromptEditModal";
+import { llmProviders, ProviderId } from "@/lib/llmProviders";
+import { Document } from "mongoose";
 
 // Client-side interface, ensuring _id is string and no Mongoose Document methods
 // Export this to be used by PromptForm.tsx
@@ -56,17 +46,33 @@ interface CaptionPromptDataFromAPI
   _id: string;
   createdAt: string;
   updatedAt: string;
-  isDefault?: boolean; // API might not always return it if false, though our model defaults it
+  isDefault?: boolean;
+}
+
+// Convert ICaptionPrompt to PromptTemplate format for the modal
+interface PromptTemplate {
+  _id: string;
+  name: string;
+  prompt: string;
+  aiModel: string;
+  llmProvider: string;
+  platform: string;
+  tone: string;
+  style: string;
+  length: string;
+  modelParams?: {
+    temperature?: number;
+  };
 }
 
 // Normalize data to match client-side ICaptionPrompt interface
 function normalizePromptData(data: any): ICaptionPrompt {
   const normalized = {
-    _id: String(data._id), // Ensure _id is string
+    _id: String(data._id),
     name: data.name,
     prompt: data.prompt,
     aiModel: data.aiModel,
-    llmProvider: data.llmProvider || "anthropic", // Added with default
+    llmProvider: data.llmProvider || "anthropic",
     platform: data.platform,
     tone: data.tone,
     style: data.style,
@@ -75,12 +81,12 @@ function normalizePromptData(data: any): ICaptionPrompt {
     includeClientHandle:
       data.includeClientHandle === undefined
         ? false
-        : !!data.includeClientHandle, // Added with default
-    modelParams: data.modelParams || {}, // Ensure modelParams is always an object
+        : !!data.includeClientHandle,
+    modelParams: data.modelParams || {},
     createdAt: new Date(data.createdAt),
     updatedAt: new Date(data.updatedAt),
   };
-  // Remove any unexpected properties, ensuring clean object
+
   const cleanNormalized: ICaptionPrompt = {
     _id: normalized._id,
     name: normalized.name,
@@ -93,11 +99,31 @@ function normalizePromptData(data: any): ICaptionPrompt {
     length: normalized.length,
     isDefault: normalized.isDefault,
     includeClientHandle: normalized.includeClientHandle,
-    modelParams: normalized.modelParams,
+    modelParams: {
+      temperature: normalized.modelParams?.temperature,
+    },
     createdAt: normalized.createdAt,
     updatedAt: normalized.updatedAt,
   };
   return cleanNormalized;
+}
+
+// Convert ICaptionPrompt to PromptTemplate for the modal
+function convertToPromptTemplate(prompt: ICaptionPrompt): PromptTemplate {
+  return {
+    _id: prompt._id,
+    name: prompt.name,
+    prompt: prompt.prompt,
+    aiModel: prompt.aiModel,
+    llmProvider: prompt.llmProvider,
+    platform: prompt.platform,
+    tone: prompt.tone,
+    style: prompt.style,
+    length: prompt.length,
+    modelParams: {
+      temperature: prompt.modelParams?.temperature,
+    },
+  };
 }
 
 const CaptionPromptsContent: React.FC = () => {
@@ -113,8 +139,11 @@ const CaptionPromptsContent: React.FC = () => {
   const [promptToDelete, setPromptToDelete] = useState<ICaptionPrompt | null>(
     null
   );
-  // Add ref for PromptForm
-  const promptFormRef = useRef<PromptFormRef>(null);
+
+  // Modal state for AI configuration
+  const [modalModel, setModalModel] = useState("claude-3-5-sonnet-20241022");
+  const [modalProvider, setModalProvider] = useState<ProviderId>("anthropic");
+  const [modalTemperature, setModalTemperature] = useState(1.0);
 
   const fetchPrompts = useCallback(async () => {
     setIsLoading(true);
@@ -144,81 +173,58 @@ const CaptionPromptsContent: React.FC = () => {
 
   const handleOpenAddModal = () => {
     setEditingPrompt(null);
+    // Reset modal state for new prompt
+    setModalModel("claude-3-5-sonnet-20241022");
+    setModalProvider("anthropic");
+    setModalTemperature(1.0);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (prompt: ICaptionPrompt) => {
     setEditingPrompt(prompt);
+    // Set modal state from existing prompt
+    setModalModel(prompt.aiModel);
+    setModalProvider((prompt.llmProvider as ProviderId) || "anthropic");
+    setModalTemperature(prompt.modelParams?.temperature || 1.0);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    if (isSubmitting) return; // Prevent closing while submitting
+    if (isSubmitting) return;
     setIsModalOpen(false);
     setEditingPrompt(null);
   };
 
-  const handleSubmitPrompt = async (formData: PromptFormData) => {
-    setIsSubmitting(true);
-    const method = editingPrompt ? "PATCH" : "POST";
-    const url = "/api/caption-prompts";
-
-    // Construct payload carefully. `id` is only for PATCH.
-    // `aiModel` is part of PromptFormData.
-    const payload: any = {
-      name: formData.name,
-      prompt: formData.prompt,
-      aiModel: formData.aiModel, // Ensure this is correct based on PromptFormData
-      platform: formData.platform,
-      tone: formData.tone,
-      style: formData.style,
-      length: formData.length,
-      isDefault: formData.isDefault === undefined ? false : formData.isDefault, // Handle optional boolean
+  const handlePromptSaved = (savedPrompt: PromptTemplate) => {
+    // Convert back to ICaptionPrompt and update the list
+    const updatedPrompt: ICaptionPrompt = {
+      ...savedPrompt,
+      isDefault: editingPrompt?.isDefault || false,
+      includeClientHandle: editingPrompt?.includeClientHandle || false,
+      createdAt: editingPrompt?.createdAt || new Date(),
+      updatedAt: new Date(),
     };
 
     if (editingPrompt) {
-      payload.id = editingPrompt._id;
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error ||
-            `Failed to ${editingPrompt ? "update" : "create"} prompt`
-        );
-      }
-
-      toast.success(
-        `Prompt ${editingPrompt ? "updated" : "created"} successfully!`
+      // Update existing prompt
+      setPrompts((prev) =>
+        prev.map((p) => (p._id === savedPrompt._id ? updatedPrompt : p))
       );
-      fetchPrompts();
-      handleCloseModal();
-    } catch (err) {
-      console.error(err);
-      const errorMessage =
-        err instanceof Error ? err.message : "An unknown error occurred";
-      toast.error(`Error ${editingPrompt ? "updating" : "creating"} prompt`, {
-        description: errorMessage,
-      });
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      // Add new prompt
+      setPrompts((prev) => [...prev, updatedPrompt]);
     }
+
+    // Refresh the list to get the latest data from server
+    fetchPrompts();
   };
 
   const handleSetDefault = async (promptId: string) => {
-    const originalPrompts = prompts.map((p) => ({ ...p })); // Clone existing plain objects
+    const originalPrompts = prompts.map((p) => ({ ...p }));
 
     setPrompts((prevPrompts) =>
       prevPrompts.map((p) =>
         normalizePromptData({
-          // Ensure the new object conforms to ICaptionPrompt
           ...p,
           isDefault: p._id === promptId,
         })
@@ -236,10 +242,10 @@ const CaptionPromptsContent: React.FC = () => {
         throw new Error(errorData.error || "Failed to set default prompt");
       }
       toast.success("Default prompt updated successfully!");
-      fetchPrompts(); // Re-fetch to get canonical state from DB
+      fetchPrompts();
     } catch (err) {
       console.error(err);
-      setPrompts(originalPrompts); // Revert to cloned plain objects
+      setPrompts(originalPrompts);
       toast.error("Error setting default prompt", {
         description:
           err instanceof Error ? err.message : "An unknown error occurred",
@@ -259,7 +265,7 @@ const CaptionPromptsContent: React.FC = () => {
 
   const confirmDeletePrompt = async () => {
     if (!promptToDelete) return;
-    setIsSubmitting(true); // Use for delete operation as well
+    setIsSubmitting(true);
     try {
       const response = await fetch(`/api/caption-prompts`, {
         method: "DELETE",
@@ -335,6 +341,11 @@ const CaptionPromptsContent: React.FC = () => {
                   | Model:{" "}
                   <span className="font-medium text-foreground">
                     {prompt.aiModel}
+                  </span>{" "}
+                  | Provider:{" "}
+                  <span className="font-medium text-foreground">
+                    {llmProviders[prompt.llmProvider as ProviderId]?.name ||
+                      prompt.llmProvider}
                   </span>
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -350,6 +361,15 @@ const CaptionPromptsContent: React.FC = () => {
                   <span className="font-medium text-foreground">
                     {prompt.length}
                   </span>
+                  {prompt.modelParams?.temperature && (
+                    <>
+                      {" "}
+                      | Temperature:{" "}
+                      <span className="font-medium text-foreground">
+                        {prompt.modelParams.temperature}
+                      </span>
+                    </>
+                  )}
                 </p>
                 <details className="mt-2 text-xs cursor-pointer">
                   <summary className="hover:underline text-muted-foreground">
@@ -409,56 +429,24 @@ const CaptionPromptsContent: React.FC = () => {
         ))}
       </div>
 
-      <Dialog
-        open={isModalOpen}
-        onOpenChange={(isOpen) => !isOpen && handleCloseModal()}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
-          <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
-            <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
-              {editingPrompt ? "Edit Prompt" : "Add New Prompt"}
-            </DialogTitle>
-            {editingPrompt && (
-              <DialogDescription className="text-sm text-[hsl(var(--foreground-muted))]">
-                Editing prompt: {editingPrompt.name}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
-            <PromptForm
-              ref={promptFormRef}
-              key={(editingPrompt?._id as string) || "new"} // Ensures form resets when editingPrompt changes
-              prompt={editingPrompt || undefined}
-              onSubmit={handleSubmitPrompt}
-              onCancel={handleCloseModal}
-              isSubmitting={isSubmitting}
-            />
-          </div>
-
-          <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
-            <Button
-              variant="outline"
-              onClick={handleCloseModal}
-              disabled={isSubmitting}
-              size="sm"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => promptFormRef.current?.submit()}
-              disabled={isSubmitting}
-              size="sm"
-            >
-              {isSubmitting
-                ? "Submitting..."
-                : editingPrompt
-                  ? "Save Changes"
-                  : "Create Prompt"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* New PromptEditModal */}
+      <PromptEditModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        isCreating={!editingPrompt}
+        selectedPrompt={
+          editingPrompt ? convertToPromptTemplate(editingPrompt) : null
+        }
+        model={modalModel}
+        provider={modalProvider}
+        temperature={modalTemperature}
+        clientHandle={null} // No client handle in admin context
+        onPromptSaved={handlePromptSaved}
+        onModelChange={setModalModel}
+        onProviderChange={setModalProvider}
+        onTemperatureChange={setModalTemperature}
+        onFormValuesUpdate={() => {}} // Not needed in admin context
+      />
 
       <AlertDialog
         open={showDeleteConfirm}

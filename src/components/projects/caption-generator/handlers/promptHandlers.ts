@@ -94,6 +94,44 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
     }
   }, [updatePromptList, updatePromptError, updatePromptLoading]);
 
+  // Select prompt and update form values
+  const selectPrompt = useCallback(
+    (prompt: PromptTemplate | null) => {
+      updateSelectedPrompt(prompt);
+
+      if (prompt) {
+        const formValues = {
+          context: prompt.prompt || "",
+          tone: prompt.tone as Tone,
+          style: prompt.style as Style,
+          platform: prompt.platform as Platform,
+          model: prompt.aiModel || "claude-3-5-sonnet-20241022",
+          provider: prompt.llmProvider || "anthropic",
+          temperature: prompt.modelParams?.temperature || 1.0,
+        };
+
+        // Use the new form handlers approach if available
+        if (callbacks?.formHandlers) {
+          callbacks.formHandlers.updateFormValues({
+            context: formValues.context,
+            additionalContext: callbacks.formState?.additionalContext || "", // Keep existing
+            tone: formValues.tone,
+            style: formValues.style,
+            platform: formValues.platform,
+            model: formValues.model,
+            provider: formValues.provider,
+            temperature: formValues.temperature,
+          });
+        }
+        // Fallback to the old callback approach
+        else if (callbacks?.onFormValuesUpdate) {
+          callbacks.onFormValuesUpdate(formValues);
+        }
+      }
+    },
+    [updateSelectedPrompt, callbacks]
+  );
+
   // Save prompt (create or update)
   const savePrompt = useCallback(
     async (
@@ -138,7 +176,8 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
           );
         }
 
-        updateSelectedPrompt(savedPrompt);
+        // Use selectPrompt to update both the selected prompt and form values
+        selectPrompt(savedPrompt);
 
         toast({
           title: "Success",
@@ -166,6 +205,7 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
       updatePromptList,
       updateSelectedPrompt,
       updatePromptError,
+      selectPrompt,
     ]
   );
 
@@ -216,44 +256,6 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
       updateSelectedPrompt,
       updatePromptError,
     ]
-  );
-
-  // Select prompt and update form values
-  const selectPrompt = useCallback(
-    (prompt: PromptTemplate | null) => {
-      updateSelectedPrompt(prompt);
-
-      if (prompt) {
-        const formValues = {
-          context: prompt.prompt || "",
-          tone: prompt.tone as Tone,
-          style: prompt.style as Style,
-          platform: prompt.platform as Platform,
-          model: prompt.aiModel || "claude-3-5-sonnet-20241022",
-          provider: prompt.llmProvider || "anthropic",
-          temperature: prompt.modelParams?.temperature || 1.0,
-        };
-
-        // Use the new form handlers approach if available
-        if (callbacks?.formHandlers) {
-          callbacks.formHandlers.updateFormValues({
-            context: formValues.context,
-            additionalContext: callbacks.formState?.additionalContext || "", // Keep existing
-            tone: formValues.tone,
-            style: formValues.style,
-            platform: formValues.platform,
-            model: formValues.model,
-            provider: formValues.provider,
-            temperature: formValues.temperature,
-          });
-        }
-        // Fallback to the old callback approach
-        else if (callbacks?.onFormValuesUpdate) {
-          callbacks.onFormValuesUpdate(formValues);
-        }
-      }
-    },
-    [updateSelectedPrompt, callbacks]
   );
 
   return {

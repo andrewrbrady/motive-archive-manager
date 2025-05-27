@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import CaptionPromptsContent from "./CaptionPromptsContent";
 import SystemPromptsContent from "./SystemPromptsContent";
 import LengthSettingsContent from "./LengthSettingsContent";
+import PlatformSettingsContent from "./PlatformSettingsContent";
 
 export default function AdminTabs() {
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
@@ -284,6 +285,11 @@ export default function AdminTabs() {
       value: "system-prompts",
       label: "System Prompts",
       content: <SystemPromptsContent />,
+    },
+    {
+      value: "platform-settings",
+      label: "Platform Settings",
+      content: <PlatformSettingsContent />,
     },
     {
       value: "length-settings",

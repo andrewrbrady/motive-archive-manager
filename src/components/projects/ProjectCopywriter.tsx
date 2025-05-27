@@ -286,13 +286,38 @@ export function ProjectCopywriter({
             selectedEventIds={selectedEventIds}
             useMinimalCarData={useMinimalCarData}
             onUseMinimalCarDataChange={(checked) =>
-              handleUseMinimalCarDataChange(checked, derivedLength)
+              handleUseMinimalCarDataChange(checked, derivedLength, {
+                platform: formState.platform,
+                tone: formState.tone,
+                style: formState.style,
+                template: "none", // template is not used in current form state
+                context: formState.context,
+                additionalContext: formState.additionalContext,
+              })
             }
             showPreview={showPreview}
-            onShowPreviewToggle={() => handleShowPreviewToggle(derivedLength)}
+            onShowPreviewToggle={() =>
+              handleShowPreviewToggle(derivedLength, {
+                platform: formState.platform,
+                tone: formState.tone,
+                style: formState.style,
+                template: "none", // template is not used in current form state
+                context: formState.context,
+                additionalContext: formState.additionalContext,
+              })
+            }
             editableLLMText={editableLLMText}
             onEditableLLMTextChange={setEditableLLMText}
-            onRefreshLLMText={() => handleRefreshLLMText(derivedLength)}
+            onRefreshLLMText={() =>
+              handleRefreshLLMText(derivedLength, {
+                platform: formState.platform,
+                tone: formState.tone,
+                style: formState.style,
+                template: "none", // template is not used in current form state
+                context: formState.context,
+                additionalContext: formState.additionalContext,
+              })
+            }
             selectedSystemPromptId={selectedSystemPromptId}
             systemPrompts={systemPrompts}
             projectCars={projectCars}
@@ -345,6 +370,12 @@ export function ProjectCopywriter({
         onProviderChange={formHandlers.updateProvider}
         onTemperatureChange={formHandlers.updateTemperature}
         onFormValuesUpdate={updateFormFromPromptValues}
+        currentFormValues={{
+          context: formState.context,
+          platform: formState.platform,
+          tone: formState.tone,
+          style: formState.style,
+        }}
       />
 
       {promptHandlers.promptError && (

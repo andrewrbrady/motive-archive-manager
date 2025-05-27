@@ -42,8 +42,9 @@ const CaptionPromptSchema = new Schema<ICaptionPrompt>(
     platform: {
       type: String,
       required: true,
-      enum: ["instagram", "facebook", "twitter", "threads"],
-      default: "instagram",
+      trim: true,
+      // Platform is now dynamic and configurable through admin settings
+      // No enum restriction to allow any platform configured in admin panel
     },
     tone: {
       type: String,

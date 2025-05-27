@@ -270,6 +270,8 @@ export function useCaptionSaver() {
           throw new Error("Failed to save caption");
         }
 
+        const responseData = await response.json();
+
         toast({
           title: "Success",
           description: "Caption saved successfully",

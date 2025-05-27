@@ -40,6 +40,12 @@ interface PromptEditModalProps {
     provider: string;
     temperature: number;
   }) => void;
+  currentFormValues?: {
+    context: string;
+    platform: string;
+    tone: string;
+    style: string;
+  };
 }
 
 export function PromptEditModal({
@@ -56,6 +62,7 @@ export function PromptEditModal({
   onProviderChange,
   onTemperatureChange,
   onFormValuesUpdate,
+  currentFormValues,
 }: PromptEditModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,16 +108,9 @@ export function PromptEditModal({
 
       const result = await response.json();
 
-      // Update form values to match the saved prompt
-      onFormValuesUpdate({
-        context: result.prompt || "",
-        tone: result.tone || "professional",
-        style: result.style || "descriptive",
-        platform: result.platform || "instagram",
-        model: result.aiModel || "claude-3-5-sonnet-20241022",
-        provider: result.llmProvider || "anthropic",
-        temperature: result.modelParams?.temperature || 1.0,
-      });
+      // Don't update form values here - let the prompt selection logic handle it
+      // The onPromptSaved callback will trigger the prompt selection which will
+      // properly update the form values with the actual saved prompt data
 
       onPromptSaved(result);
       onClose();
@@ -185,6 +185,19 @@ export function PromptEditModal({
                   : selectedPrompt
                     ? ({
                         ...selectedPrompt,
+                        platform:
+                          currentFormValues?.platform ||
+                          selectedPrompt.platform,
+                        tone: currentFormValues?.tone || selectedPrompt.tone,
+                        style: currentFormValues?.style || selectedPrompt.style,
+                        prompt:
+                          currentFormValues?.context || selectedPrompt.prompt,
+                        length: selectedPrompt.length,
+                        aiModel: model,
+                        llmProvider: provider,
+                        modelParams: {
+                          temperature: temperature,
+                        },
                         createdAt: new Date(),
                         updatedAt: new Date(),
                         isDefault: false,

@@ -3,18 +3,9 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Check,
-  Copy,
-  Pencil,
-  Trash2,
-  X,
-  Instagram,
-  Youtube,
-  Eye,
-  FileText,
-} from "lucide-react";
+import { Check, Copy, Pencil, Trash2, X, Eye, FileText } from "lucide-react";
 import { Platform, SavedCaption } from "./types";
+import { getIconComponent } from "@/components/ui/IconPicker";
 
 type ViewMode = "preview" | "saved";
 
@@ -188,10 +179,12 @@ export function CaptionPreview({
                 </div>
                 <div className="flex-1 p-4 bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] rounded-lg overflow-hidden flex flex-col">
                   <div className="flex items-center gap-2 mb-3">
-                    {platform === "instagram" && (
-                      <Instagram className="w-4 h-4" />
-                    )}
-                    {platform === "youtube" && <Youtube className="w-4 h-4" />}
+                    {(() => {
+                      const IconComponent = getIconComponent(platform);
+                      return IconComponent ? (
+                        <IconComponent className="w-4 h-4" />
+                      ) : null;
+                    })()}
                     <span className="text-sm font-medium capitalize">
                       {platform}
                     </span>
@@ -252,12 +245,14 @@ export function CaptionPreview({
                       className="group relative p-4 bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-3">
-                        {caption.platform === "instagram" && (
-                          <Instagram className="w-4 h-4" />
-                        )}
-                        {caption.platform === "youtube" && (
-                          <Youtube className="w-4 h-4" />
-                        )}
+                        {(() => {
+                          const IconComponent = getIconComponent(
+                            caption.platform
+                          );
+                          return IconComponent ? (
+                            <IconComponent className="w-4 h-4" />
+                          ) : null;
+                        })()}
                         <span className="text-xs font-medium capitalize">
                           {caption.platform}
                         </span>

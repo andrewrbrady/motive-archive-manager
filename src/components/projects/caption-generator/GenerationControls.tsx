@@ -14,6 +14,7 @@ import {
 import { Instagram, Youtube, Eye, EyeOff } from "lucide-react";
 import type { LengthSetting } from "./types";
 import { findModelById } from "@/lib/llmProviders";
+import { getIconComponent } from "@/components/ui/IconPicker";
 
 interface GenerationControlsProps {
   selectedCarIds: string[];
@@ -127,12 +128,15 @@ export function GenerationControls({
               >
                 {selectedPrompt && (
                   <div className="flex items-center gap-2 truncate">
-                    {selectedPrompt.platform === "instagram" && (
-                      <Instagram className="w-4 h-4 flex-shrink-0" />
-                    )}
-                    {selectedPrompt.platform === "youtube" && (
-                      <Youtube className="w-4 h-4 flex-shrink-0" />
-                    )}
+                    {selectedPrompt.platform &&
+                      (() => {
+                        const IconComponent = getIconComponent(
+                          selectedPrompt.platform
+                        );
+                        return IconComponent ? (
+                          <IconComponent className="w-4 h-4 flex-shrink-0" />
+                        ) : null;
+                      })()}
                     <span className="truncate">{selectedPrompt.name}</span>
                   </div>
                 )}
@@ -157,12 +161,13 @@ export function GenerationControls({
               {promptList.map((prompt) => (
                 <SelectItem key={prompt._id} value={prompt._id}>
                   <div className="flex items-center gap-2 w-full">
-                    {prompt.platform === "instagram" && (
-                      <Instagram className="w-4 h-4 flex-shrink-0" />
-                    )}
-                    {prompt.platform === "youtube" && (
-                      <Youtube className="w-4 h-4 flex-shrink-0" />
-                    )}
+                    {prompt.platform &&
+                      (() => {
+                        const IconComponent = getIconComponent(prompt.platform);
+                        return IconComponent ? (
+                          <IconComponent className="w-4 h-4 flex-shrink-0" />
+                        ) : null;
+                      })()}
                     <span className="truncate">{prompt.name}</span>
                   </div>
                 </SelectItem>

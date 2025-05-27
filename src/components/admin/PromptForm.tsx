@@ -5,6 +5,7 @@ import React, {
   useImperativeHandle,
   useEffect,
   useState,
+  useMemo,
 } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,20 +23,19 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ICaptionPrompt } from "../../app/admin/CaptionPromptsContent";
+import { getIconComponent } from "@/components/ui/IconPicker";
 
-// Define the Zod schema for form validation
-const promptFormSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  aiModel: z.string().min(1, "AI Model is required"),
-  platform: z.string().min(1, "Platform is required"),
-  tone: z.string().min(1, "Tone is required"),
-  style: z.string().min(1, "Style is required"),
-  length: z.string().min(1, "Length is required"),
-  prompt: z.string().min(10, "Prompt text must be at least 10 characters"),
-  isDefault: z.boolean().optional(),
-});
-
-export type PromptFormData = z.infer<typeof promptFormSchema>;
+// Base type for form data
+export type PromptFormData = {
+  name: string;
+  aiModel: string;
+  platform: string;
+  tone: string;
+  style: string;
+  length: string;
+  prompt: string;
+  isDefault?: boolean;
+};
 
 export interface PromptFormRef {
   submit: () => void;
@@ -55,6 +55,14 @@ interface LengthSetting {
   name: string;
   description: string;
   instructions: string;
+}
+
+interface PlatformSetting {
+  key: string;
+  name: string;
+  description: string;
+  instructions: string;
+  icon?: string;
 }
 
 const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
@@ -96,25 +104,70 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
       },
     ]);
 
+    const [platformSettings, setPlatformSettings] = useState<PlatformSetting[]>(
+      []
+    );
+
+    // Create dynamic validation schema based on available settings
+    const promptFormSchema = useMemo(() => {
+      const platformKeys = platformSettings.map((s) => s.key);
+      const lengthKeys = lengthSettings.map((s) => s.key);
+
+      return z.object({
+        name: z.string().min(3, "Name must be at least 3 characters"),
+        aiModel: z.string().min(1, "AI Model is required"),
+        platform: z.string().refine((val) => platformKeys.includes(val), {
+          message: `Platform must be one of: ${platformKeys.join(", ")}`,
+        }),
+        tone: z.string().min(1, "Tone is required"),
+        style: z.string().min(1, "Style is required"),
+        length: z.string().refine((val) => lengthKeys.includes(val), {
+          message: `Length must be one of: ${lengthKeys.join(", ")}`,
+        }),
+        prompt: z
+          .string()
+          .min(10, "Prompt text must be at least 10 characters"),
+        isDefault: z.boolean().optional(),
+      });
+    }, [platformSettings, lengthSettings]);
+
     const {
       register,
       handleSubmit,
       control,
       setValue,
+      watch,
+      reset,
       formState: { errors },
     } = useForm<PromptFormData>({
       resolver: zodResolver(promptFormSchema),
       defaultValues: {
         name: prompt?.name || "",
-        aiModel: prompt?.aiModel || "claude-3-5-sonnet-20241022", // Default model
-        platform: prompt?.platform || "instagram",
+        aiModel: prompt?.aiModel || "claude-3-5-sonnet-20241022",
+        platform: prompt?.platform || platformSettings[0]?.key || "",
         tone: prompt?.tone || "professional",
         style: prompt?.style || "descriptive",
-        length: prompt?.length || "standard",
+        length: prompt?.length || lengthSettings[0]?.key || "",
         prompt: prompt?.prompt || "",
         isDefault: prompt?.isDefault ?? false,
       },
     });
+
+    // Reset form values when prompt prop changes
+    useEffect(() => {
+      if (prompt) {
+        reset({
+          name: prompt.name || "",
+          aiModel: prompt.aiModel || "claude-3-5-sonnet-20241022",
+          platform: prompt.platform || platformSettings[0]?.key || "",
+          tone: prompt.tone || "professional",
+          style: prompt.style || "descriptive",
+          length: prompt.length || lengthSettings[0]?.key || "",
+          prompt: prompt.prompt || "",
+          isDefault: prompt.isDefault ?? false,
+        });
+      }
+    }, [prompt, reset, platformSettings, lengthSettings]);
 
     useImperativeHandle(ref, () => ({
       submit: () => {
@@ -145,6 +198,48 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
 
       fetchLengthSettings();
     }, []);
+
+    // Fetch platform settings on component mount
+    useEffect(() => {
+      const fetchPlatformSettings = async () => {
+        try {
+          const response = await fetch("/api/platform-settings");
+          if (response.ok) {
+            const settings = await response.json();
+            setPlatformSettings(settings);
+          } else {
+            console.error(
+              "Failed to fetch platform settings:",
+              response.status,
+              response.statusText
+            );
+          }
+        } catch (error) {
+          console.error("Error fetching platform settings:", error);
+          // Keep default settings on error
+        }
+      };
+
+      fetchPlatformSettings();
+    }, []);
+
+    // Update form values when settings are loaded to handle invalid existing values
+    useEffect(() => {
+      if (prompt && platformSettings.length > 0 && lengthSettings.length > 0) {
+        const currentPlatform = watch("platform");
+        const currentLength = watch("length");
+
+        // Check if current platform is valid, if not set to first available
+        if (!platformSettings.some((p) => p.key === currentPlatform)) {
+          setValue("platform", platformSettings[0]?.key || "");
+        }
+
+        // Check if current length is valid, if not set to first available
+        if (!lengthSettings.some((l) => l.key === currentLength)) {
+          setValue("length", lengthSettings[0]?.key || "");
+        }
+      }
+    }, [prompt, platformSettings, lengthSettings, setValue, watch]);
 
     useEffect(() => {
       if (renderModelSelector && externalAiModel) {
@@ -248,16 +343,41 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      disabled={platformSettings.length === 0}
                     >
                       <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select platform" />
+                        <SelectValue
+                          placeholder={
+                            platformSettings.length === 0
+                              ? "Loading platforms..."
+                              : "Select platform"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="instagram">Instagram</SelectItem>
-                        <SelectItem value="youtube">YouTube</SelectItem>
-                        <SelectItem value="twitter">Twitter/X</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="threads">Threads</SelectItem>
+                        {platformSettings.length === 0 ? (
+                          <SelectItem value="loading" disabled>
+                            Loading platforms...
+                          </SelectItem>
+                        ) : (
+                          platformSettings.map((setting) => {
+                            const IconComponent = setting.icon
+                              ? getIconComponent(setting.icon)
+                              : null;
+                            return (
+                              <SelectItem key={setting.key} value={setting.key}>
+                                <div className="flex items-center gap-2">
+                                  {IconComponent && (
+                                    <IconComponent className="h-4 w-4" />
+                                  )}
+                                  <span>
+                                    {setting.name} ({setting.description})
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })
+                        )}
                       </SelectContent>
                     </Select>
                   )}
