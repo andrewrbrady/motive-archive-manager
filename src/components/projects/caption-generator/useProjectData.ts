@@ -175,9 +175,7 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
-      const response = await fetch(
-        `/api/system-prompts/list?type=project_caption`
-      );
+      const response = await fetch("/api/system-prompts/list");
 
       if (!response.ok) {
         throw new Error("Failed to fetch system prompts");

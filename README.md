@@ -9,6 +9,8 @@ A modern archive management system built with Next.js, featuring a powerful MDX 
 - Media insertion capabilities
 - Modern UI with dark mode support
 - Responsive design
+- Vercel Analytics integration for usage tracking
+- Performance monitoring with Speed Insights
 
 ## Prerequisites
 
@@ -67,6 +69,21 @@ src/
 - [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Code editor
 - [Radix UI](https://www.radix-ui.com/) - UI primitives
 - [Tailwind CSS](https://tailwindcss.com/) - CSS framework
+- [Vercel Analytics](https://vercel.com/analytics) - Usage analytics and insights
+- [Vercel Speed Insights](https://vercel.com/docs/speed-insights) - Performance monitoring
+
+## Analytics
+
+This project includes Vercel Analytics and Speed Insights for tracking user interactions and performance metrics. The analytics are automatically enabled when deployed to Vercel and require no additional configuration.
+
+### What's Tracked
+
+- **Analytics**: Page views, user interactions, and custom events
+- **Speed Insights**: Core Web Vitals, performance metrics, and loading times
+
+### Privacy
+
+All analytics data is processed in compliance with privacy regulations and Vercel's privacy policy. No personally identifiable information is collected without explicit consent.
 
 ## License
 

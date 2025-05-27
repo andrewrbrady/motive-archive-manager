@@ -8,7 +8,7 @@ export interface SystemPrompt {
   name: string;
   description: string;
   prompt: string;
-  type: "car_caption" | "project_caption";
+  type?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -26,7 +26,7 @@ export async function GET() {
     const systemPrompts = await db
       .collection("systemPrompts")
       .find({})
-      .sort({ type: 1, name: 1 })
+      .sort({ name: 1 })
       .toArray();
 
     return NextResponse.json(systemPrompts);
@@ -50,34 +50,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, description, prompt, type, isActive } = body;
 
-    if (!name || !description || !prompt || !type) {
+    if (!name || !description || !prompt) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    if (!["car_caption", "project_caption"].includes(type)) {
-      return NextResponse.json(
-        { error: "Invalid prompt type" },
-        { status: 400 }
-      );
-    }
-
     const { db } = await connectToDatabase();
 
-    // If this is being set as active, deactivate other prompts of the same type
+    // If this is being set as active, deactivate all other prompts
     if (isActive) {
       await db
         .collection("systemPrompts")
-        .updateMany({ type }, { $set: { isActive: false } });
+        .updateMany({}, { $set: { isActive: false } });
     }
 
     const newSystemPrompt: Omit<SystemPrompt, "_id"> = {
       name,
       description,
       prompt,
-      type,
+      type: type || "",
       isActive: isActive || false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -111,7 +104,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { id, name, description, prompt, type, isActive } = body;
 
-    if (!id || !name || !description || !prompt || !type) {
+    if (!id || !name || !description || !prompt) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -124,12 +117,12 @@ export async function PUT(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // If this is being set as active, deactivate other prompts of the same type
+    // If this is being set as active, deactivate all other prompts
     if (isActive) {
       await db
         .collection("systemPrompts")
         .updateMany(
-          { type, _id: { $ne: new ObjectId(id) } },
+          { _id: { $ne: new ObjectId(id) } },
           { $set: { isActive: false } }
         );
     }
@@ -138,7 +131,7 @@ export async function PUT(request: NextRequest) {
       name,
       description,
       prompt,
-      type,
+      type: type || "",
       isActive: isActive || false,
       updatedAt: new Date(),
     };

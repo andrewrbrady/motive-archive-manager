@@ -363,7 +363,7 @@ ${template === "dealer" ? "- Do not include the dealer reference - it will be ad
       // Fallback to active system prompt if no specific prompt selected or fetch failed
       if (!systemPrompt) {
         const systemPromptResponse = await fetch(
-          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active?type=car_caption`
+          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active`
         );
         if (systemPromptResponse.ok) {
           const systemPromptData = await systemPromptResponse.json();

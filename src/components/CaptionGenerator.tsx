@@ -261,10 +261,8 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       setSystemPromptError(null);
 
       // Include length parameter if one is selected
-      const lengthParam = length ? `&length=${length.key}` : "";
-      const response = await fetch(
-        `/api/system-prompts/list?type=car_caption${lengthParam}`
-      );
+      const lengthParam = length ? `?length=${length.key}` : "";
+      const response = await fetch(`/api/system-prompts/list${lengthParam}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch system prompts");

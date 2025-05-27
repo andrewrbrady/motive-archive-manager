@@ -1,27 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
-// GET - Fetch active system prompt by type
+// GET - Fetch active system prompt
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type");
-
-    if (!type || !["car_caption", "project_caption"].includes(type)) {
-      return NextResponse.json(
-        { error: "Invalid or missing type parameter" },
-        { status: 400 }
-      );
-    }
-
     const { db } = await connectToDatabase();
     const activePrompt = await db
       .collection("systemPrompts")
-      .findOne({ type, isActive: true });
+      .findOne({ isActive: true });
 
     if (!activePrompt) {
       // Return a default system prompt if none is found
-      const defaultPrompt = getDefaultSystemPrompt(type);
+      const defaultPrompt = getDefaultSystemPrompt();
       return NextResponse.json({ prompt: defaultPrompt, isDefault: true });
     }
 
@@ -35,10 +25,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function getDefaultSystemPrompt(type: string): string {
-  switch (type) {
-    case "car_caption":
-      return `You are an expert automotive content creator specializing in social media captions for luxury and performance vehicles. Your task is to create engaging, informative captions that highlight the unique features and appeal of each car.
+function getDefaultSystemPrompt(): string {
+  return `You are an expert automotive content creator specializing in social media captions for luxury and performance vehicles. Your task is to create engaging, informative captions that highlight the unique features and appeal of each car or automotive project.
 
 Guidelines:
 - Write in an enthusiastic but professional tone
@@ -46,12 +34,8 @@ Guidelines:
 - Include relevant automotive terminology and technical details
 - Make the content engaging for car enthusiasts
 - Keep captions concise but informative
-- Focus on what makes this specific car special or noteworthy
-
-Please generate a compelling caption based on the provided car information.`;
-
-    case "project_caption":
-      return `You are an expert automotive content creator specializing in social media captions for automotive projects and collections. Your task is to create engaging captions that showcase multiple vehicles and tell a cohesive story about the project or collection.
+- Focus on what makes the specific car or project special or noteworthy
+- Adapt your approach based on whether you're writing about individual cars or automotive projects/collections
 
 TONE GUIDELINES:
 - Professional: Maintain a formal, business-like tone
@@ -93,7 +77,7 @@ CRITICAL LENGTH ENFORCEMENT RULES:
 - Count your lines carefully and stop when you reach the maximum
 - If you reach the length limit, conclude the caption naturally rather than cutting off mid-sentence
 - Always respect the tone and style requirements provided
-- Create captions that showcase what makes this group of vehicles special as a collection
+- Create captions that showcase what makes vehicles or projects special
 - Highlight unique aspects, shared themes, or interesting contrasts between vehicles
 - Make content compelling for automotive enthusiasts while being accessible to a broader audience
 - If a client handle is provided and should be included, incorporate it naturally into the caption
@@ -104,8 +88,4 @@ CRITICAL LENGTH ENFORCEMENT RULES:
 REMEMBER: Length compliance is more important than including every detail. Better to have a perfect-length caption than a too-long one.
 
 Generate only the caption text, no additional commentary.`;
-
-    default:
-      return "You are an expert content creator. Please generate an engaging caption based on the provided information.";
-  }
 }

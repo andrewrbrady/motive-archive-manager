@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
         );
 
         const systemPromptPromise = fetch(
-          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active?type=project_caption`
+          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active`
         );
 
         const systemPromptResponse = (await Promise.race([

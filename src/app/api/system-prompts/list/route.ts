@@ -11,20 +11,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type");
     const length = searchParams.get("length");
-
-    if (!type || !["car_caption", "project_caption"].includes(type)) {
-      return NextResponse.json(
-        { error: "Invalid or missing type parameter" },
-        { status: 400 }
-      );
-    }
 
     const { db } = await connectToDatabase();
 
-    // Build query filter
-    const filter: any = { type };
+    // Build query filter - removed type filtering
+    const filter: any = {};
 
     // If length is specified, include prompts that either match the length or have no length specified (general prompts)
     if (length) {

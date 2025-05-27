@@ -44,7 +44,7 @@ const SystemPromptsContent: React.FC = () => {
     name: "",
     description: "",
     prompt: "",
-    type: "car_caption" as "car_caption" | "project_caption",
+    type: "",
     isActive: false,
   });
 
@@ -74,7 +74,7 @@ const SystemPromptsContent: React.FC = () => {
       name: "",
       description: "",
       prompt: "",
-      type: "car_caption",
+      type: "",
       isActive: false,
     });
     setIsModalOpen(true);
@@ -86,7 +86,7 @@ const SystemPromptsContent: React.FC = () => {
       name: prompt.name,
       description: prompt.description,
       prompt: prompt.prompt,
-      type: prompt.type,
+      type: prompt.type || "",
       isActive: prompt.isActive,
     });
     setIsModalOpen(true);
@@ -99,7 +99,7 @@ const SystemPromptsContent: React.FC = () => {
       name: "",
       description: "",
       prompt: "",
-      type: "car_caption",
+      type: "",
       isActive: false,
     });
   };
@@ -215,6 +215,7 @@ const SystemPromptsContent: React.FC = () => {
   };
 
   const getTypeLabel = (type: string) => {
+    if (!type) return "General";
     switch (type) {
       case "car_caption":
         return "Car Caption";
@@ -226,6 +227,7 @@ const SystemPromptsContent: React.FC = () => {
   };
 
   const getTypeBadgeVariant = (type: string) => {
+    if (!type) return "outline";
     switch (type) {
       case "car_caption":
         return "default";
@@ -266,13 +268,6 @@ const SystemPromptsContent: React.FC = () => {
     );
   }
 
-  const carCaptionPrompts = systemPrompts.filter(
-    (p) => p.type === "car_caption"
-  );
-  const projectCaptionPrompts = systemPrompts.filter(
-    (p) => p.type === "project_caption"
-  );
-
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -287,156 +282,75 @@ const SystemPromptsContent: React.FC = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Car Caption Prompts */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="h-5 w-5" />
-            <h3 className="text-lg font-semibold">
-              Car Caption System Prompts
-            </h3>
-            <Badge variant="default">Individual Cars</Badge>
-          </div>
-          <div className="space-y-4">
-            {carCaptionPrompts.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-muted-foreground text-center">
-                    No car caption system prompts found. Create one to get
-                    started.
-                  </p>
-                </CardContent>
-              </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>All System Prompts</CardTitle>
+            <CardDescription>
+              Unified collection of system prompts for both cars and projects
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {systemPrompts.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No system prompts found. Create your first system prompt to get
+                started.
+              </p>
             ) : (
-              carCaptionPrompts.map((prompt) => (
-                <Card
-                  key={prompt._id}
-                  className={prompt.isActive ? "ring-2 ring-primary" : ""}
-                >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">
-                            {prompt.name}
-                          </CardTitle>
-                          {prompt.isActive && (
-                            <Badge variant="default">Active</Badge>
-                          )}
-                        </div>
-                        <CardDescription>{prompt.description}</CardDescription>
+              <div className="space-y-4">
+                {systemPrompts.map((prompt) => (
+                  <div
+                    key={prompt._id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold">{prompt.name}</h3>
+                        <Badge variant={getTypeBadgeVariant(prompt.type || "")}>
+                          {getTypeLabel(prompt.type || "")}
+                        </Badge>
+                        {prompt.isActive && (
+                          <Badge variant="default">Active</Badge>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={prompt.isActive}
-                          onCheckedChange={() => handleToggleActive(prompt)}
-                          aria-label="Toggle active status"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEditModal(prompt)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(prompt)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border border-border rounded-md p-4 max-h-96 overflow-y-auto">
-                      <p className="text-sm font-mono whitespace-pre-wrap">
-                        {prompt.prompt}
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {prompt.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {prompt.prompt.length > 100
+                          ? `${prompt.prompt.substring(0, 100)}...`
+                          : prompt.prompt}
                       </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Project Caption Prompts */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="h-5 w-5" />
-            <h3 className="text-lg font-semibold">
-              Project Caption System Prompts
-            </h3>
-            <Badge variant="secondary">Multiple Cars</Badge>
-          </div>
-          <div className="space-y-4">
-            {projectCaptionPrompts.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-muted-foreground text-center">
-                    No project caption system prompts found. Create one to get
-                    started.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              projectCaptionPrompts.map((prompt) => (
-                <Card
-                  key={prompt._id}
-                  className={prompt.isActive ? "ring-2 ring-primary" : ""}
-                >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">
-                            {prompt.name}
-                          </CardTitle>
-                          {prompt.isActive && (
-                            <Badge variant="default">Active</Badge>
-                          )}
-                        </div>
-                        <CardDescription>{prompt.description}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={prompt.isActive}
-                          onCheckedChange={() => handleToggleActive(prompt)}
-                          aria-label="Toggle active status"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEditModal(prompt)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(prompt)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={prompt.isActive}
+                        onCheckedChange={() => handleToggleActive(prompt)}
+                        disabled={isSubmitting}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenEditModal(prompt)}
+                        disabled={isSubmitting}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(prompt)}
+                        disabled={isSubmitting}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border border-border rounded-md p-4 max-h-96 overflow-y-auto">
-                      <p className="text-sm font-mono whitespace-pre-wrap">
-                        {prompt.prompt}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Add/Edit Modal */}
@@ -480,25 +394,35 @@ const SystemPromptsContent: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
+              <Label htmlFor="type">Type (Optional)</Label>
               <Select
-                value={formData.type}
-                onValueChange={(value: "car_caption" | "project_caption") =>
-                  setFormData({ ...formData, type: value })
+                value={formData.type || "none"}
+                onValueChange={(value: string) =>
+                  setFormData({
+                    ...formData,
+                    type: value === "none" ? "" : value,
+                  })
                 }
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select type (optional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">
+                    General (No specific type)
+                  </SelectItem>
                   <SelectItem value="car_caption">
-                    Car Caption (Individual Cars)
+                    Car Caption (Legacy)
                   </SelectItem>
                   <SelectItem value="project_caption">
-                    Project Caption (Multiple Cars)
+                    Project Caption (Legacy)
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Type is now optional. All prompts are available to both cars and
+                projects.
+              </p>
             </div>
 
             <div className="space-y-2">

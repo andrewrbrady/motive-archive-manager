@@ -23,7 +23,7 @@ import PhotoShoots from "@/components/cars/PhotoShoots";
 import { GalleryContainer } from "@/components/cars/GalleryContainer";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { generateCarTitle } from "@/utils/car-helpers";
-import CaptionGenerator from "@/components/CaptionGenerator";
+import { CarCopywriter } from "@/components/cars/CarCopywriter";
 import BaTListingGenerator from "@/components/BaTListingGenerator";
 import DocumentationFiles from "@/components/DocumentationFiles";
 import { ArticleGenerator } from "@/components/cars/ArticleGenerator";
@@ -93,8 +93,8 @@ export default function CarPage() {
       },
       {
         value: "captions",
-        label: "Social Media",
-        content: <CaptionGenerator carId={id} />,
+        label: "Copywriter",
+        content: <CarCopywriter carId={id} />,
       },
       {
         value: "inspections",

@@ -7,6 +7,8 @@ import Script from "next/script";
 import { cn } from "@/lib/utils";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -47,6 +49,8 @@ export default function RootLayout({
           <Footer />
           <Toaster />
         </Providers>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
