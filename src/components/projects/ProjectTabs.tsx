@@ -1,6 +1,13 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ProjectOverviewTab } from "./ProjectOverviewTab";
 import { ProjectTimelineTab } from "./ProjectTimelineTab";
 import { ProjectTeamTab } from "./ProjectTeamTab";
@@ -27,6 +34,20 @@ interface ProjectTabsProps {
   onProjectUpdate: () => void;
 }
 
+// Define tab configuration
+const tabs = [
+  { value: "overview", label: "Overview" },
+  { value: "timeline", label: "Timeline" },
+  { value: "events", label: "Events" },
+  { value: "team", label: "Team" },
+  { value: "cars", label: "Cars" },
+  { value: "galleries", label: "Galleries" },
+  { value: "assets", label: "Assets" },
+  { value: "deliverables", label: "Deliverables" },
+  { value: "copywriter", label: "Copywriter" },
+  { value: "calendar", label: "Calendar" },
+];
+
 export function ProjectTabs({
   project,
   activeTab,
@@ -34,130 +55,110 @@ export function ProjectTabs({
   memberDetails,
   onProjectUpdate,
 }: ProjectTabsProps) {
+  const currentTab = tabs.find((tab) => tab.value === activeTab);
+
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-6">
-      <TabsList className="grid w-full grid-cols-10 bg-transparent border rounded-md h-auto p-1 gap-1">
-        <TabsTrigger
-          value="overview"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Overview
-        </TabsTrigger>
-        <TabsTrigger
-          value="timeline"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Timeline
-        </TabsTrigger>
-        <TabsTrigger
-          value="events"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Events
-        </TabsTrigger>
-        <TabsTrigger
-          value="team"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Team
-        </TabsTrigger>
-        <TabsTrigger
-          value="cars"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Cars
-        </TabsTrigger>
-        <TabsTrigger
-          value="galleries"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Galleries
-        </TabsTrigger>
-        <TabsTrigger
-          value="assets"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Assets
-        </TabsTrigger>
-        <TabsTrigger
-          value="deliverables"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Deliverables
-        </TabsTrigger>
-        <TabsTrigger
-          value="copywriter"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Copywriter
-        </TabsTrigger>
-        <TabsTrigger
-          value="calendar"
-          className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-        >
-          Calendar
-        </TabsTrigger>
-      </TabsList>
+    <div className="space-y-6">
+      {/* Mobile Dropdown - visible on small screens */}
+      <div className="block lg:hidden">
+        <Select value={activeTab} onValueChange={onTabChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue>{currentTab?.label || "Select Tab"}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {tabs.map((tab) => (
+              <SelectItem key={tab.value} value={tab.value}>
+                {tab.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <TabsContent value="overview" className="space-y-6">
-        <ProjectOverviewTab
-          project={project}
-          onProjectUpdate={onProjectUpdate}
-        />
-      </TabsContent>
+      {/* Desktop Tabs - hidden on small screens */}
+      <Tabs
+        value={activeTab}
+        onValueChange={onTabChange}
+        className="hidden lg:block space-y-6"
+      >
+        <TabsList className="grid w-full grid-cols-10 bg-transparent border rounded-md h-auto p-1 gap-1">
+          {tabs.map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
-      <TabsContent value="timeline" className="space-y-6">
-        <ProjectTimelineTab
-          project={project}
-          onProjectUpdate={onProjectUpdate}
-        />
-      </TabsContent>
+      {/* Tab Content - always visible */}
+      <div className="space-y-6">
+        {activeTab === "overview" && (
+          <ProjectOverviewTab
+            project={project}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
 
-      <TabsContent value="events" className="space-y-6">
-        <ProjectEventsTab projectId={project._id!} />
-      </TabsContent>
+        {activeTab === "timeline" && (
+          <ProjectTimelineTab
+            project={project}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
 
-      <TabsContent value="team" className="space-y-6">
-        <ProjectTeamTab
-          project={project}
-          memberDetails={memberDetails}
-          onProjectUpdate={onProjectUpdate}
-        />
-      </TabsContent>
+        {activeTab === "events" && (
+          <ProjectEventsTab projectId={project._id!} />
+        )}
 
-      <TabsContent value="cars" className="space-y-6">
-        <ProjectCarsTab project={project} onProjectUpdate={onProjectUpdate} />
-      </TabsContent>
+        {activeTab === "team" && (
+          <ProjectTeamTab
+            project={project}
+            memberDetails={memberDetails}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
 
-      <TabsContent value="galleries" className="space-y-6">
-        <ProjectGalleriesTab
-          project={project}
-          onProjectUpdate={onProjectUpdate}
-        />
-      </TabsContent>
+        {activeTab === "cars" && (
+          <ProjectCarsTab project={project} onProjectUpdate={onProjectUpdate} />
+        )}
 
-      <TabsContent value="assets" className="space-y-6">
-        <ProjectAssetsTab project={project} onProjectUpdate={onProjectUpdate} />
-      </TabsContent>
+        {activeTab === "galleries" && (
+          <ProjectGalleriesTab
+            project={project}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
 
-      <TabsContent value="deliverables" className="space-y-6">
-        <ProjectDeliverablesTab
-          project={project}
-          memberDetails={memberDetails}
-          onProjectUpdate={onProjectUpdate}
-        />
-      </TabsContent>
+        {activeTab === "assets" && (
+          <ProjectAssetsTab
+            project={project}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
 
-      <TabsContent value="copywriter" className="space-y-6">
-        <ProjectCopywriter
-          project={project}
-          onProjectUpdate={onProjectUpdate}
-        />
-      </TabsContent>
+        {activeTab === "deliverables" && (
+          <ProjectDeliverablesTab
+            project={project}
+            memberDetails={memberDetails}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
 
-      <TabsContent value="calendar" className="space-y-6">
-        <ProjectCalendarTab projectId={project._id!} />
-      </TabsContent>
-    </Tabs>
+        {activeTab === "copywriter" && (
+          <ProjectCopywriter
+            project={project}
+            onProjectUpdate={onProjectUpdate}
+          />
+        )}
+
+        {activeTab === "calendar" && (
+          <ProjectCalendarTab projectId={project._id!} />
+        )}
+      </div>
+    </div>
   );
 }

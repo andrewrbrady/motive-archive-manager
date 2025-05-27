@@ -9,6 +9,7 @@ const publicNavItems = [{ href: "/", label: "Home" }];
 
 const protectedNavItems = [
   { href: "/production", label: "Production" },
+  { href: "/projects", label: "Projects" },
   { href: "/inventory", label: "Inventory" },
   { href: "/cars", label: "Cars" },
   { href: "/images", label: "Images" },
