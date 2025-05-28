@@ -1,298 +1,350 @@
 # Cars API Documentation
 
-This guide provides details on how to access the Motive Archive Manager Cars API deployed on Vercel. The API offers optimized querying capabilities for car data with features for field selection, image filtering, and efficient data retrieval.
+## Overview
 
-## Base URL
+The Cars API provides endpoints for creating, reading, updating, and deleting car records in the Motive Archive Manager system. This documentation focuses on the car creation endpoint and JSON upload functionality.
 
-All API requests should be made to your Vercel instance:
+## POST `/api/cars` - Create New Car
 
-```
-https://https://motive-archive-manager.vercel.app/api
-```
+### Endpoint Details
 
-## Authentication
+- **URL**: `/api/cars`
+- **Method**: `POST`
+- **Content-Type**: `application/json`
+- **Authentication**: Required (handled by middleware)
 
-Most endpoints require authentication. Use one of the following methods:
+### Request Body Structure
 
-1. **Bearer Token Authentication**:
+The API accepts a JSON object with the following structure. Only `make` and `model` are required fields.
 
-   - Include an `Authorization` header with a Firebase token:
+#### Required Fields
 
-   ```
-   Authorization: Bearer your-firebase-token
-   ```
-
-   - Generate a token using the `/api/auth/get-token` endpoint when authenticated via the application
-
-2. **API Token (for programmatic access)**:
-   - Admin users can generate API tokens via `/api/auth/generate-token`
-   - Include the token in the `Authorization` header:
-   ```
-   Authorization: Bearer your-api-token
-   ```
-
-## Endpoints
-
-### 1. List Cars
-
-```
-GET /api/cars
+```json
+{
+  "make": "string",
+  "model": "string"
+}
 ```
 
-Retrieves a collection of cars with filtering, sorting, and pagination options.
+#### Complete Optional Fields Structure
 
-#### Query Parameters
-
-| Parameter     | Type    | Description                                |
-| ------------- | ------- | ------------------------------------------ |
-| page          | number  | Page number (default: 1)                   |
-| pageSize      | number  | Items per page (default: 48, max: 96)      |
-| search        | string  | Search term for car make, model, etc.      |
-| sort          | string  | Sort order (e.g., "createdAt_desc")        |
-| fields        | string  | Comma-separated list of fields to include  |
-| includeImages | boolean | Whether to include images (default: false) |
-| imageCategory | string  | Only include images from this category     |
-| make          | string  | Filter by car make                         |
-| minYear       | number  | Filter by minimum year                     |
-| maxYear       | number  | Filter by maximum year                     |
-| clientId      | string  | Filter by client ID                        |
-| minPrice      | number  | Filter by minimum price                    |
-| maxPrice      | number  | Filter by maximum price                    |
-
-#### Examples
-
-Get cars with only basic info:
-
+```json
+{
+  "year": "number",
+  "price": {
+    "listPrice": "number | null",
+    "soldPrice": "number | null",
+    "priceHistory": [
+      {
+        "type": "list | sold",
+        "price": "number | null",
+        "date": "string (ISO date)",
+        "notes": "string (optional)"
+      }
+    ]
+  },
+  "mileage": {
+    "value": "number | null",
+    "unit": "string (default: 'mi')"
+  },
+  "color": "string",
+  "interior_color": "string",
+  "vin": "string",
+  "type": "string",
+  "location": "string",
+  "description": "string",
+  "status": "available | sold | pending (default: 'available')",
+  "client": "string (ObjectId reference)",
+  "horsepower": "number",
+  "engine": {
+    "type": "string",
+    "displacement": {
+      "value": "number | null",
+      "unit": "string (default: 'L')"
+    },
+    "power": {
+      "hp": "number",
+      "kW": "number",
+      "ps": "number"
+    },
+    "torque": {
+      "lb-ft": "number",
+      "Nm": "number"
+    },
+    "features": ["string"]
+  },
+  "dimensions": {
+    "wheelbase": {
+      "value": "number | null",
+      "unit": "string (default: 'in')"
+    },
+    "weight": {
+      "value": "number | null",
+      "unit": "string (default: 'lbs')"
+    },
+    "gvwr": {
+      "value": "number | null",
+      "unit": "string (default: 'lbs')"
+    },
+    "trackWidth": {
+      "value": "number | null",
+      "unit": "string (default: 'in')"
+    },
+    "length": {
+      "value": "number | null",
+      "unit": "string"
+    },
+    "width": {
+      "value": "number | null",
+      "unit": "string"
+    },
+    "height": {
+      "value": "number | null",
+      "unit": "string"
+    }
+  },
+  "manufacturing": {
+    "series": "string",
+    "trim": "string",
+    "bodyClass": "string",
+    "plant": {
+      "city": "string",
+      "country": "string",
+      "company": "string"
+    }
+  },
+  "safety": {
+    "tpms": "boolean"
+  },
+  "doors": "number",
+  "imageIds": ["string"],
+  "eventIds": ["string (ObjectId references)"]
+}
 ```
-GET /api/cars?fields=make,model,year,price,status
+
+### Field Descriptions
+
+#### Basic Information
+
+- **make**: Vehicle manufacturer (e.g., "Toyota", "Ford", "BMW")
+- **model**: Vehicle model name (e.g., "Camry", "F-150", "X3")
+- **year**: Model year as a number
+- **color**: Exterior color
+- **interior_color**: Interior color/material
+- **vin**: Vehicle Identification Number (17 characters)
+- **type**: Vehicle type (e.g., "Sedan", "SUV", "Truck")
+- **location**: Current location of the vehicle
+- **description**: Detailed description of the vehicle
+- **status**: Current status - "available", "sold", or "pending"
+- **doors**: Number of doors
+
+#### Pricing Information
+
+- **price.listPrice**: Current listing price
+- **price.soldPrice**: Final sold price (if applicable)
+- **price.priceHistory**: Array of price changes over time
+
+#### Measurements
+
+All measurement objects follow the pattern:
+
+```json
+{
+  "value": "number | null",
+  "unit": "string"
+}
 ```
 
-Get cars with only exterior images:
+Common units:
 
-```
-GET /api/cars?includeImages=true&imageCategory=exterior
-```
+- **Distance**: "mi" (miles), "km" (kilometers)
+- **Weight**: "lbs" (pounds), "kg" (kilograms)
+- **Length**: "in" (inches), "cm" (centimeters), "ft" (feet), "m" (meters)
+- **Engine Displacement**: "L" (liters), "cc" (cubic centimeters)
 
-### 2. Get Car by ID
+#### Engine Information
 
-```
-GET /api/cars/{id}
-```
+- **engine.type**: Engine configuration (e.g., "V6", "4-Cylinder", "V8")
+- **engine.displacement**: Engine size
+- **engine.power**: Power output in multiple units (hp, kW, ps)
+- **engine.torque**: Torque output in multiple units (lb-ft, Nm)
+- **engine.features**: Array of engine features/technologies
 
-Retrieves detailed information about a specific car.
+#### Manufacturing Information
 
-#### Query Parameters
+- **manufacturing.series**: Vehicle series/generation
+- **manufacturing.trim**: Trim level (e.g., "LE", "Sport", "Limited")
+- **manufacturing.bodyClass**: Body style classification
+- **manufacturing.plant**: Manufacturing facility information
 
-| Parameter     | Type    | Description                                |
-| ------------- | ------- | ------------------------------------------ |
-| fields        | string  | Comma-separated list of fields to include  |
-| includeImages | boolean | Whether to include images (default: false) |
-| imageCategory | string  | Only include images from this category     |
+### Example Requests
 
-#### Examples
+#### Minimal Request (Required Fields Only)
 
-Get basic car info:
-
-```
-GET /api/cars/123?fields=make,model,year,price,status
-```
-
-Get car with interior images only:
-
-```
-GET /api/cars/123?includeImages=true&imageCategory=interior
+```json
+{
+  "make": "Honda",
+  "model": "Civic"
+}
 ```
 
-### 3. Create Car
-
-```
-POST /api/cars
-```
-
-Creates a new car entry.
-
-#### Request Body
-
-JSON object with car properties. Required fields:
-
-- make
-- model
-- year
-
-#### Example Request
+#### Complete Request Example
 
 ```json
 {
   "make": "Toyota",
   "model": "Camry",
-  "year": 2020,
+  "year": 2023,
   "price": {
-    "listPrice": 25000
+    "listPrice": 25000,
+    "soldPrice": null,
+    "priceHistory": [
+      {
+        "type": "list",
+        "price": 25000,
+        "date": "2024-01-01T00:00:00.000Z",
+        "notes": "Initial listing price"
+      }
+    ]
   },
   "mileage": {
     "value": 15000,
-    "unit": "miles"
+    "unit": "mi"
   },
-  "status": "available"
+  "color": "Silver",
+  "interior_color": "Black",
+  "vin": "1HGBH41JXMN109186",
+  "type": "Sedan",
+  "location": "Los Angeles, CA",
+  "description": "Well-maintained vehicle with excellent condition",
+  "status": "available",
+  "horsepower": 203,
+  "engine": {
+    "type": "4-Cylinder",
+    "displacement": {
+      "value": 2.5,
+      "unit": "L"
+    },
+    "power": {
+      "hp": 203,
+      "kW": 151,
+      "ps": 206
+    },
+    "torque": {
+      "lb-ft": 184,
+      "Nm": 249
+    },
+    "features": ["Direct Injection", "Variable Valve Timing"]
+  },
+  "dimensions": {
+    "weight": {
+      "value": 3340,
+      "unit": "lbs"
+    },
+    "gvwr": {
+      "value": 4200,
+      "unit": "lbs"
+    }
+  },
+  "doors": 4
 }
 ```
 
-### 4. Update Car
+### Response Format
 
-```
-PUT /api/cars/{id}
-```
-
-Updates all fields of a car record.
-
-#### Request Body
-
-Complete JSON object with all car properties to be updated.
-
-### 5. Partial Update Car
-
-```
-PATCH /api/cars/{id}
-```
-
-Updates specific fields of a car record.
-
-#### Request Body
-
-JSON object with only the car properties to be updated.
-
-### 6. Delete Car
-
-```
-DELETE /api/cars/{id}
-```
-
-Deletes a car record.
-
-### 7. Get Client's Cars
-
-```
-GET /api/clients/{clientId}/cars
-```
-
-Retrieves all cars associated with a specific client.
-
-## Optimizing Search Requests for LLMs
-
-When working with LLMs that have token limitations, use these strategies to minimize response size:
-
-### 1. Limit Fields
-
-Always use the `fields` parameter to request only essential data:
-
-```
-GET /api/cars?fields=_id,make,model,year,price.listPrice,status
-```
-
-### 2. Pagination with Small Page Sizes
-
-Reduce page size to get smaller result sets:
-
-```
-GET /api/cars?page=1&pageSize=5
-```
-
-### 3. Specific Filtering
-
-Use multiple filters together to narrow results:
-
-```
-GET /api/cars?make=Toyota&minYear=2018&maxYear=2022&status=available
-```
-
-### 4. Avoid Image Data
-
-Unless absolutely necessary, set `includeImages=false` (default) to prevent large base64 image data.
-
-### 5. Two-Step Search Pattern
-
-For the most efficient workflow:
-
-1. First request: Get minimal list of matching car IDs
-   ```
-   GET /api/cars?fields=_id,make,model&make=Toyota
-   ```
-2. Second request: Get detailed data only for specific cars
-   ```
-   GET /api/cars/123?fields=make,model,year,specifications,price
-   ```
-
-### 6. Meta-Information Requests
-
-For analytics or summaries, use aggregations when available:
-
-```
-GET /api/cars/stats?groupBy=make
-```
-
-## Image Categories
-
-When requesting car images, you can filter by these categories:
-
-- `exterior`: External shots of the car
-- `interior`: Inside the cabin
-- `engine`: Engine bay and mechanical components
-- `damage`: Any damage or issues with the car
-- `documents`: Documents related to the car
-- `other`: Miscellaneous images
-
-## Response Format
-
-All successful responses return JSON in the following format:
+#### Success Response (201 Created)
 
 ```json
 {
-  "cars": [
-    {
-      "_id": "car-id",
-      "make": "Toyota",
-      "model": "Camry",
-      "year": 2020
-      // other fields based on your request parameters
-    }
-  ]
+  "_id": "ObjectId",
+  "make": "Toyota",
+  "model": "Camry",
+  // ... all submitted fields
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
 }
 ```
 
-For single car requests, the response will be a direct car object without the "cars" wrapper.
+#### Error Response (500 Internal Server Error)
 
-## Error Handling
-
-The API returns appropriate HTTP status codes and error messages:
-
-- 200: Success
-- 201: Resource created successfully
-- 400: Bad request (invalid parameters)
-- 401: Unauthorized (missing authentication)
-- 403: Forbidden (insufficient permissions)
-- 404: Resource not found
-- 500: Internal server error
-
-## Code Example
-
-```javascript
-// Example: Fetching cars with authentication
-async function fetchCars() {
-  const response = await fetch(
-    "https://motive-archive-manager.vercel.app/api/cars?fields=make,model,year,price",
-    {
-      method: "GET",
-      headers: {
-        Authorization: "Bearer your-token-here",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  return await response.json();
+```json
+{
+  "error": "Failed to create car"
 }
 ```
+
+## JSON Upload Feature
+
+### Overview
+
+The car creation page includes an "Upload JSON" button that allows users to upload a JSON file to automatically populate the form fields with car data, rather than manually filling out the form.
+
+### Usage Instructions
+
+1. **Prepare JSON File**: Create a JSON file with the car data following the structure above
+2. **Navigate to New Car Page**: Go to `/cars/new`
+3. **Click Upload Button**: Click the "Upload JSON" button in the top-right corner
+4. **Select File**: Choose your JSON file (must have .json extension)
+5. **Review and Edit**: The form fields will be automatically populated with the JSON data
+6. **Submit**: Review the populated data, make any necessary edits, and submit the form
+
+### Key Features
+
+- **Form Population**: JSON data automatically fills the corresponding form fields
+- **Data Validation**: Validates JSON structure and required fields before populating
+- **Editable Results**: Users can review and modify the populated data before submission
+- **Merge Logic**: Intelligently merges JSON data with existing form structure
+- **Error Handling**: Provides clear feedback for invalid files or data
+
+### Validation Rules
+
+- File must have `.json` extension or `application/json` MIME type
+- JSON must be valid (proper syntax)
+- Must contain at least `make` and `model` fields
+- All other fields are optional and will use defaults if not provided
+- Complex nested objects (engine, dimensions, manufacturing) are merged intelligently
+
+### Error Handling
+
+The system provides specific error messages for:
+
+- Invalid file type
+- Malformed JSON syntax
+- Missing required fields (make and model)
+- Form not ready errors
+
+### Workflow Benefits
+
+1. **Speed**: Quickly populate complex forms with pre-prepared data
+2. **Accuracy**: Reduce manual entry errors by using structured data
+3. **Flexibility**: Review and edit populated data before submission
+4. **Reusability**: Save and reuse JSON templates for similar vehicles
+5. **Integration**: Perfect for bulk data entry or API integrations
+
+### Example Files
+
+See `docs/car-json-example.json` for a complete example file that demonstrates all available fields and proper formatting.
+
+## Special Handling
+
+- **Timestamps**: The API automatically adds `createdAt` and `updatedAt` timestamps
+- **Dimensions Validation**: GVWR and weight objects are validated and structured properly
+- **Default Values**: Missing optional fields use sensible defaults
+- **MongoDB Integration**: Returns the complete created document with MongoDB `_id`
+
+## Best Practices
+
+1. **Always include make and model**: These are the only required fields
+2. **Use proper units**: Specify appropriate units for all measurements
+3. **Validate VIN**: Ensure VIN is exactly 17 characters if provided
+4. **Structure nested objects**: Follow the exact structure for complex objects like engine and dimensions
+5. **Use ISO dates**: Format dates as ISO strings for price history
+6. **Test with minimal data first**: Start with just make/model, then add additional fields
+
+## Common Issues
+
+1. **Invalid JSON syntax**: Use a JSON validator to check your file
+2. **Missing quotes**: All string values must be quoted
+3. **Trailing commas**: Remove trailing commas in objects and arrays
+4. **Incorrect nesting**: Ensure nested objects follow the exact structure
+5. **Wrong data types**: Numbers should not be quoted, strings should be quoted

@@ -1,0 +1,92 @@
+{
+  "make": "Toyota",
+  "model": "Camry",
+  "year": 2023,
+  "price": {
+    "listPrice": 25000,
+    "soldPrice": null,
+    "priceHistory": [
+      {
+        "type": "list",
+        "price": 25000,
+        "date": "2024-01-01T00:00:00.000Z",
+        "notes": "Initial listing price"
+      }
+    ]
+  },
+  "mileage": {
+    "value": 15000,
+    "unit": "mi"
+  },
+  "color": "Silver",
+  "interior_color": "Black",
+  "vin": "1HGBH41JXMN109186",
+  "type": "Sedan",
+  "location": "Los Angeles, CA",
+  "description": "Well-maintained vehicle with excellent condition. Single owner, garage kept, full service history available.",
+  "status": "available",
+  "horsepower": 203,
+  "engine": {
+    "type": "4-Cylinder",
+    "displacement": {
+      "value": 2.5,
+      "unit": "L"
+    },
+    "power": {
+      "hp": 203,
+      "kW": 151,
+      "ps": 206
+    },
+    "torque": {
+      "lb-ft": 184,
+      "Nm": 249
+    },
+    "features": ["Direct Injection", "Variable Valve Timing", "Dual VVT-i"]
+  },
+  "dimensions": {
+    "wheelbase": {
+      "value": 111.2,
+      "unit": "in"
+    },
+    "weight": {
+      "value": 3340,
+      "unit": "lbs"
+    },
+    "gvwr": {
+      "value": 4200,
+      "unit": "lbs"
+    },
+    "trackWidth": {
+      "value": 63.1,
+      "unit": "in"
+    },
+    "length": {
+      "value": 192.7,
+      "unit": "in"
+    },
+    "width": {
+      "value": 72.4,
+      "unit": "in"
+    },
+    "height": {
+      "value": 56.9,
+      "unit": "in"
+    }
+  },
+  "manufacturing": {
+    "series": "LE",
+    "trim": "LE",
+    "bodyClass": "Sedan",
+    "plant": {
+      "city": "Georgetown",
+      "country": "USA",
+      "company": "Toyota Motor Manufacturing Kentucky"
+    }
+  },
+  "safety": {
+    "tpms": true
+  },
+  "doors": 4,
+  "imageIds": [],
+  "eventIds": []
+}
