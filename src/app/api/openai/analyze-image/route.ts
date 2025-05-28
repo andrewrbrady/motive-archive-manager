@@ -228,6 +228,173 @@ async function retryOpenAICall<T>(
   throw lastError || new Error("All retry attempts failed");
 }
 
+// Validation function to check if analysis results are acceptable
+function validateAnalysisResults(analysis: ImageAnalysis): {
+  isValid: boolean;
+  missingFields: string[];
+  invalidFields: string[];
+} {
+  const missingFields: string[] = [];
+  const invalidFields: string[] = [];
+
+  // Check required fields
+  if (!analysis.angle) missingFields.push("angle");
+  if (!analysis.view) missingFields.push("view");
+  if (!analysis.movement) missingFields.push("movement");
+
+  // Check field validity
+  if (analysis.angle && !allowedValues.angle.includes(analysis.angle as any)) {
+    invalidFields.push(`angle: "${analysis.angle}"`);
+  }
+  if (analysis.view && !allowedValues.view.includes(analysis.view as any)) {
+    invalidFields.push(`view: "${analysis.view}"`);
+  }
+  if (
+    analysis.movement &&
+    !allowedValues.movement.includes(analysis.movement as any)
+  ) {
+    invalidFields.push(`movement: "${analysis.movement}"`);
+  }
+  if (analysis.tod && !allowedValues.tod.includes(analysis.tod as any)) {
+    invalidFields.push(`tod: "${analysis.tod}"`);
+  }
+  if (analysis.side && !allowedValues.side.includes(analysis.side as any)) {
+    invalidFields.push(`side: "${analysis.side}"`);
+  }
+
+  const isValid = missingFields.length === 0 && invalidFields.length === 0;
+
+  return { isValid, missingFields, invalidFields };
+}
+
+// Enhanced analysis function with validation and retry
+async function analyzeImageWithValidation(
+  publicImageUrl: string,
+  prompt: string,
+  model: string,
+  maxValidationRetries = 2
+): Promise<ImageAnalysis> {
+  let lastAnalysis: ImageAnalysis = {};
+  let lastValidation: {
+    isValid: boolean;
+    missingFields: string[];
+    invalidFields: string[];
+  } = { isValid: false, missingFields: [], invalidFields: [] };
+
+  for (
+    let validationAttempt = 0;
+    validationAttempt <= maxValidationRetries;
+    validationAttempt++
+  ) {
+    let currentPrompt = prompt;
+
+    // Enhance prompt for retry attempts
+    if (validationAttempt > 0) {
+      currentPrompt += `\n\nIMPORTANT: Previous analysis attempt failed validation. Issues found:`;
+
+      if (lastValidation.missingFields.length > 0) {
+        currentPrompt += `\n- Missing required fields: ${lastValidation.missingFields.join(", ")}`;
+      }
+
+      if (lastValidation.invalidFields.length > 0) {
+        currentPrompt += `\n- Invalid values returned: ${lastValidation.invalidFields.join(", ")}`;
+      }
+
+      currentPrompt += `\n\nPlease ensure you ONLY use these exact values:`;
+      currentPrompt += `\n- angle: ${allowedValues.angle.join(", ")}`;
+      currentPrompt += `\n- view: ${allowedValues.view.join(", ")}`;
+      currentPrompt += `\n- movement: ${allowedValues.movement.join(", ")}`;
+      currentPrompt += `\n- tod: ${allowedValues.tod.join(", ")}`;
+      currentPrompt += `\n- side: ${allowedValues.side.join(", ")}`;
+      currentPrompt += `\n\nDo NOT use any other values. If uncertain, choose the closest match from the allowed values.`;
+    }
+
+    console.log(
+      `Analysis attempt ${validationAttempt + 1}/${maxValidationRetries + 1}`
+    );
+
+    const response = await retryOpenAICall(async () => {
+      return openai.chat.completions.create({
+        model: model,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: currentPrompt,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: publicImageUrl,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 800,
+        temperature: validationAttempt > 0 ? 0.05 : 0.1, // Lower temperature for retries
+      });
+    });
+
+    const analysisText = response.choices[0]?.message?.content;
+    if (!analysisText) {
+      throw new Error("No analysis received from OpenAI");
+    }
+
+    // Parse the JSON response
+    const analysis = safeJsonParse(analysisText) as ImageAnalysis;
+
+    // Normalize the analysis values
+    const normalizedAnalysis = normalizeAnalysis(analysis);
+
+    // Validate the results
+    const validation = validateAnalysisResults(normalizedAnalysis);
+
+    console.log(`Validation attempt ${validationAttempt + 1}:`, {
+      isValid: validation.isValid,
+      missingFields: validation.missingFields,
+      invalidFields: validation.invalidFields,
+      analysis: normalizedAnalysis,
+    });
+
+    if (validation.isValid) {
+      console.log(`Analysis successful on attempt ${validationAttempt + 1}`);
+      return normalizedAnalysis;
+    }
+
+    // Store for next iteration
+    lastAnalysis = normalizedAnalysis;
+    lastValidation = validation;
+
+    // If this is the last attempt, we'll return what we have
+    if (validationAttempt === maxValidationRetries) {
+      console.warn(
+        `Analysis validation failed after ${maxValidationRetries + 1} attempts. Returning best attempt.`
+      );
+      console.warn(`Final issues:`, validation);
+
+      // Clean up invalid fields before returning
+      const cleanedAnalysis = { ...normalizedAnalysis };
+      if (validation.invalidFields.some((f) => f.startsWith("angle:")))
+        delete cleanedAnalysis.angle;
+      if (validation.invalidFields.some((f) => f.startsWith("view:")))
+        delete cleanedAnalysis.view;
+      if (validation.invalidFields.some((f) => f.startsWith("movement:")))
+        delete cleanedAnalysis.movement;
+      if (validation.invalidFields.some((f) => f.startsWith("tod:")))
+        delete cleanedAnalysis.tod;
+      if (validation.invalidFields.some((f) => f.startsWith("side:")))
+        delete cleanedAnalysis.side;
+
+      return cleanedAnalysis;
+    }
+  }
+
+  return lastAnalysis;
+}
+
 export async function POST(request: NextRequest) {
   console.time("analyze-image-total");
   try {
@@ -295,45 +462,15 @@ export async function POST(request: NextRequest) {
     // Use lower-resource model and implement retry logic
     const model = "gpt-4o-mini"; // Use mini model for faster response
 
-    const response = await retryOpenAICall(async () => {
-      // [REMOVED] // [REMOVED] console.log(`Making OpenAI API request with model: ${model}`);
-      return openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: prompt,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: publicImageUrl,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 800, // Increase max tokens
-        temperature: 0.1, // Lower temperature for more consistent results
-      });
-    });
+    // Use the enhanced analysis function with validation and retry
+    const normalizedAnalysis = await analyzeImageWithValidation(
+      publicImageUrl,
+      prompt,
+      model,
+      2 // maxValidationRetries
+    );
 
     console.timeEnd("openai-api-call");
-
-    const analysisText = response.choices[0]?.message?.content;
-    if (!analysisText) {
-      throw new Error("No analysis received from OpenAI");
-    }
-
-    // Parse the JSON response, removing any markdown code block syntax
-    const analysis = safeJsonParse(analysisText) as ImageAnalysis;
-
-    // Normalize the analysis values
-    const normalizedAnalysis = normalizeAnalysis(analysis);
-
     console.timeEnd("analyze-image-total");
     console.log(
       "Analysis complete:",

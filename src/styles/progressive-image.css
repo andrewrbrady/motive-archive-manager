@@ -1,0 +1,280 @@
+/**
+ * Progressive Image Loading Styles - Phase 4 Performance Optimization
+ *
+ * CSS animations and transitions for progressive image loading
+ */
+
+/* Progressive skeleton animation */
+.progressive-skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: progressive-skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes progressive-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Progressive error state */
+.progressive-error {
+  background: hsl(var(--destructive) / 0.1);
+  border: 1px solid hsl(var(--destructive) / 0.2);
+  position: relative;
+}
+
+.progressive-error::after {
+  content: "⚠️";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  opacity: 0.5;
+}
+
+/* Smooth fade-in for loaded images */
+.progressive-image-loaded {
+  animation: progressive-fade-in 0.3s ease-out;
+}
+
+@keyframes progressive-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Blur placeholder effect */
+.progressive-blur-placeholder {
+  background: linear-gradient(
+    45deg,
+    hsl(var(--muted)) 25%,
+    transparent 25%,
+    transparent 75%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 20px 20px;
+  animation: progressive-blur-move 2s linear infinite;
+  filter: blur(2px);
+}
+
+@keyframes progressive-blur-move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 20px 20px;
+  }
+}
+
+/* Loading spinner for progressive images */
+.progressive-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid hsl(var(--muted));
+  border-top: 3px solid hsl(var(--primary));
+  border-radius: 50%;
+  animation: progressive-spin 1s linear infinite;
+}
+
+@keyframes progressive-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hover effects for progressive images */
+.progressive-image-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.progressive-image-hover:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.1);
+}
+
+/* Gallery grid optimizations */
+.progressive-gallery {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.progressive-gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: hsl(var(--muted));
+}
+
+/* Responsive breakpoints for progressive gallery */
+@media (max-width: 640px) {
+  .progressive-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .progressive-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+/* Performance optimizations */
+.progressive-image-container {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+.progressive-image-container img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Intersection observer optimization */
+.progressive-image-observer {
+  min-height: 1px;
+  background: transparent;
+}
+
+/* Loading states for different placeholder types */
+.progressive-placeholder-skeleton {
+  background: hsl(var(--muted));
+  animation: progressive-skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.progressive-placeholder-blur {
+  background: hsl(var(--muted));
+  filter: blur(5px);
+  transition: filter 0.3s ease-out;
+}
+
+.progressive-placeholder-none {
+  background: transparent;
+}
+
+/* Zoom overlay styles */
+.progressive-zoom-overlay {
+  backdrop-filter: blur(4px);
+  animation: progressive-zoom-in 0.2s ease-out;
+}
+
+@keyframes progressive-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.progressive-zoom-image {
+  animation: progressive-zoom-image-in 0.3s ease-out;
+}
+
+@keyframes progressive-zoom-image-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Performance stats overlay */
+.progressive-stats-overlay {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 10px;
+  line-height: 1.2;
+  background: rgba(0, 0, 0, 0.8);
+  color: #00ff00;
+  padding: 4px 6px;
+  border-radius: 3px;
+  backdrop-filter: blur(2px);
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .progressive-skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.2) 50%,
+      hsl(var(--muted)) 100%
+    );
+  }
+
+  .progressive-stats-overlay {
+    background: rgba(0, 0, 0, 0.9);
+    color: #00ff88;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .progressive-skeleton,
+  .progressive-blur-placeholder,
+  .progressive-spinner {
+    animation: none;
+  }
+
+  .progressive-image-loaded,
+  .progressive-zoom-overlay,
+  .progressive-zoom-image {
+    animation: none;
+  }
+
+  .progressive-image-hover {
+    transition: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .progressive-skeleton {
+    background: #000;
+    color: #fff;
+  }
+
+  .progressive-error {
+    border: 2px solid #ff0000;
+    background: #ffeeee;
+  }
+}
+
+/* Print styles */
+@media print {
+  .progressive-skeleton,
+  .progressive-spinner,
+  .progressive-stats-overlay {
+    display: none;
+  }
+
+  .progressive-image-container img {
+    opacity: 1 !important;
+    filter: none !important;
+  }
+}

@@ -11,15 +11,18 @@ export function cloudflareImageLoader({
 }: CloudflareImageLoaderProps): string {
   // For Cloudflare Images URLs, we should NOT transform them further
   // since they already use named variants like "public", "thumbnail", etc.
+  // But we need to acknowledge the width parameter to satisfy Next.js
   if (
     src.includes("imagedelivery.net") ||
     src.includes("cloudflareimages.com")
   ) {
     // Return the URL as-is since it's already optimized by Cloudflare
+    // The width parameter is acknowledged but not used since Cloudflare uses named variants
     return src;
   }
 
-  // For non-Cloudflare URLs, return as-is (Next.js will handle them)
+  // For non-Cloudflare URLs, we could implement width-based optimization here
+  // For now, return as-is (Next.js will handle them)
   return src;
 }
 

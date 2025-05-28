@@ -23,9 +23,35 @@ export async function GET(request: Request) {
 
     // Handle special cases
     if (id === "categories") {
-      const categories = await db
+      // Use aggregation pipeline instead of distinct (API Version 1 compatible)
+      const pipeline = [
+        {
+          $match: {
+            category: {
+              $exists: true,
+              $ne: null,
+              $not: { $eq: "" },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$category",
+          },
+        },
+        {
+          $sort: {
+            _id: 1,
+          },
+        },
+      ];
+
+      const result = await db
         .collection("studio_inventory")
-        .distinct("category");
+        .aggregate(pipeline)
+        .toArray();
+      const categories = result.map((doc) => doc._id).filter(Boolean);
+
       return NextResponse.json(categories);
     }
 

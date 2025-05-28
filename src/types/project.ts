@@ -147,6 +147,7 @@ export interface Project {
   tags: string[];
   notes?: string;
   primaryImageId?: string; // ObjectId converted to string
+  primaryImageUrl?: string; // ✅ Pre-loaded image URL from API
   templateId?: string; // ObjectId converted to string
 
   // Timestamps

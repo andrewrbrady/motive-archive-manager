@@ -7,11 +7,12 @@ import { PageTitle } from "@/components/ui/PageTitle";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import ShotListTemplatesTab from "@/components/production/ShotListTemplatesTab";
-import ScriptTemplatesTab from "@/components/production/ScriptTemplatesTab";
-import RawAssetsTab from "@/components/production/RawAssetsTab";
-import HardDrivesTab from "@/components/production/HardDrivesTab";
-import StudioInventoryTab from "@/components/production/StudioInventoryTab";
+// ✅ REMOVED: Direct imports - using lazy imports instead
+// import ShotListTemplatesTab from "@/components/production/ShotListTemplatesTab";
+// import ScriptTemplatesTab from "@/components/production/ScriptTemplatesTab";
+// import RawAssetsTab from "@/components/production/RawAssetsTab";
+// import HardDrivesTab from "@/components/production/HardDrivesTab";
+// import StudioInventoryTab from "@/components/production/StudioInventoryTab";
 import { useUrlParams } from "@/hooks/useUrlParams";
 import { cleanupUrlParameters, getCurrentContext } from "@/utils/urlCleanup";
 import { LoadingContainer } from "@/components/ui/loading-container";
@@ -23,6 +24,39 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+
+// ✅ Import LabelsProvider only where it's needed
+import { LabelsProvider } from "@/contexts/LabelsContext";
+
+// ✅ Lazy load heavy tab components
+import { Suspense, lazy } from "react";
+
+const ShotListTemplatesTab = lazy(
+  () => import("@/components/production/ShotListTemplatesTab")
+);
+const ScriptTemplatesTab = lazy(
+  () => import("@/components/production/ScriptTemplatesTab")
+);
+const RawAssetsTab = lazy(() => import("@/components/production/RawAssetsTab"));
+const HardDrivesTab = lazy(
+  () => import("@/components/production/HardDrivesTab")
+);
+const StudioInventoryTab = lazy(
+  () => import("@/components/production/StudioInventoryTab")
+);
+const ContainersTab = lazy(
+  () => import("@/components/production/ContainersTab")
+);
+const KitsTab = lazy(() => import("@/components/production/KitsTab"));
+
+// Loading component
+const TabSkeleton = () => (
+  <div className="space-y-4">
+    <div className="h-8 bg-muted rounded w-1/4 animate-pulse"></div>
+    <div className="h-32 bg-muted rounded animate-pulse"></div>
+    <div className="h-4 bg-muted rounded w-1/2 animate-pulse"></div>
+  </div>
+);
 
 // Template type selection modal
 function NewTemplateModal({
@@ -260,66 +294,85 @@ export default function ProductionClient() {
   // [REMOVED] // [REMOVED] console.log("Active Tab:", activeTab, "Is Template Tab:", isTemplateTab);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* <Navbar /> */} {/* Removed Navbar component */}
-      <div className="space-y-6">
-        <PageTitle title="Production" />
+    // ✅ Wrap only this page with LabelsProvider
+    <LabelsProvider>
+      <div className="min-h-screen bg-background">
+        {/* <Navbar /> */} {/* Removed Navbar component */}
+        <div className="space-y-6">
+          <PageTitle title="Production" />
 
-        <CustomTabs
-          items={[
-            {
-              value: "shot-lists",
-              label: "Shot List Templates",
-              content: (
-                <ShotListTemplatesTab
-                  shouldCreateTemplate={shouldCreateShotListTemplate}
-                />
-              ),
-            },
-            {
-              value: "scripts",
-              label: "Script Templates",
-              content: (
-                <ScriptTemplatesTab
-                  shouldCreateTemplate={shouldCreateScriptTemplate}
-                />
-              ),
-            },
-            {
-              value: "raw-assets",
-              label: "Raw Assets",
-              content: <RawAssetsTab />,
-            },
-            {
-              value: "upcoming",
-              label: "Upcoming Productions",
-              content: (
-                <div className="text-center py-12 text-muted-foreground">
-                  Upcoming productions feature coming soon
-                </div>
-              ),
-            },
-            {
-              value: "studio-inventory",
-              label: "Studio Inventory",
-              content: <StudioInventoryTab />,
-            },
-            {
-              value: "hard-drives",
-              label: "Hard Drives",
-              content: <HardDrivesTab />,
-            },
-          ]}
-          defaultValue={activeTab}
-          basePath="/production"
+          <CustomTabs
+            items={[
+              {
+                value: "shot-lists",
+                label: "Shot List Templates",
+                content: (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <ShotListTemplatesTab
+                      shouldCreateTemplate={shouldCreateShotListTemplate}
+                    />
+                  </Suspense>
+                ),
+              },
+              {
+                value: "scripts",
+                label: "Script Templates",
+                content: (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <ScriptTemplatesTab
+                      shouldCreateTemplate={shouldCreateScriptTemplate}
+                    />
+                  </Suspense>
+                ),
+              },
+              {
+                value: "raw-assets",
+                label: "Raw Assets",
+                content: (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <RawAssetsTab />
+                  </Suspense>
+                ),
+              },
+              {
+                value: "upcoming",
+                label: "Upcoming Productions",
+                content: (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Upcoming productions feature coming soon
+                  </div>
+                ),
+              },
+              {
+                value: "studio-inventory",
+                label: "Studio Inventory",
+                content: (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <StudioInventoryTab />
+                  </Suspense>
+                ),
+              },
+              {
+                value: "hard-drives",
+                label: "Hard Drives",
+                content: (
+                  <Suspense fallback={<TabSkeleton />}>
+                    <HardDrivesTab />
+                  </Suspense>
+                ),
+              },
+            ]}
+            defaultValue={activeTab}
+            basePath="/production"
+          />
+        </div>
+        {/* Template selection modal */}
+        <NewTemplateModal
+          open={showNewTemplateModal}
+          onOpenChange={setShowNewTemplateModal}
+          onSelectType={handleTemplateTypeSelect}
         />
       </div>
-      {/* Template selection modal */}
-      <NewTemplateModal
-        open={showNewTemplateModal}
-        onOpenChange={setShowNewTemplateModal}
-        onSelectType={handleTemplateTypeSelect}
-      />
-    </div>
+    </LabelsProvider>
   );
 }

@@ -1,11 +1,35 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, lazy, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Project, ProjectStatus } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
-import { ProjectHeader, ProjectTabs } from "@/components/projects";
+
+// ✅ Direct imports to avoid the 20MB barrel export bundle
+const ProjectHeader = lazy(() =>
+  import("@/components/projects/ProjectHeader").then((m) => ({
+    default: m.ProjectHeader,
+  }))
+);
+const ProjectTabs = lazy(() =>
+  import("@/components/projects/ProjectTabs").then((m) => ({
+    default: m.ProjectTabs,
+  }))
+);
+
+// ✅ Simple loading fallback
+const PageSkeleton = () => (
+  <div className="min-h-screen bg-background">
+    <div className="container mx-auto px-4 py-8">
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 bg-muted rounded w-1/3"></div>
+        <div className="h-32 bg-muted rounded"></div>
+        <div className="h-64 bg-muted rounded"></div>
+      </div>
+    </div>
+  </div>
+);
 
 interface ProjectDetailPageProps {
   params: Promise<{
@@ -291,20 +315,24 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       <main className="container-wide px-6 py-8">
         <div>
           {/* Header */}
-          <ProjectHeader
-            project={project}
-            onStatusChange={handleStatusChange}
-            onBack={handleBack}
-          />
+          <Suspense fallback={<PageSkeleton />}>
+            <ProjectHeader
+              project={project}
+              onStatusChange={handleStatusChange}
+              onBack={handleBack}
+            />
+          </Suspense>
 
           {/* Main Content Tabs */}
-          <ProjectTabs
-            project={project}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            memberDetails={memberDetails}
-            onProjectUpdate={fetchProject}
-          />
+          <Suspense fallback={<PageSkeleton />}>
+            <ProjectTabs
+              project={project}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              memberDetails={memberDetails}
+              onProjectUpdate={fetchProject}
+            />
+          </Suspense>
         </div>
       </main>
     </div>

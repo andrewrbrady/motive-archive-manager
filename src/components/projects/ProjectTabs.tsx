@@ -8,17 +8,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ProjectOverviewTab } from "./ProjectOverviewTab";
-import { ProjectTimelineTab } from "./ProjectTimelineTab";
-import { ProjectTeamTab } from "./ProjectTeamTab";
-import { ProjectAssetsTab } from "./ProjectAssetsTab";
-import { ProjectDeliverablesTab } from "./ProjectDeliverablesTab";
-import { ProjectCarsTab } from "./ProjectCarsTab";
-import { ProjectGalleriesTab } from "./ProjectGalleriesTab";
-import { ProjectCopywriter } from "./ProjectCopywriter";
-import ProjectEventsTab from "./ProjectEventsTab";
-import { ProjectCalendarTab } from "./ProjectCalendarTab";
+import { Suspense, lazy, useState, useEffect } from "react";
 import { Project } from "@/types/project";
+import { LoadingSpinner } from "@/components/ui/loading";
+
+// Lazy load heavy tab components
+const ProjectOverviewTab = lazy(() =>
+  import("./ProjectOverviewTab").then((m) => ({
+    default: m.ProjectOverviewTab,
+  }))
+);
+const ProjectTimelineTab = lazy(() =>
+  import("./ProjectTimelineTab").then((m) => ({
+    default: m.ProjectTimelineTab,
+  }))
+);
+const ProjectTeamTab = lazy(() =>
+  import("./ProjectTeamTab").then((m) => ({ default: m.ProjectTeamTab }))
+);
+const ProjectAssetsTab = lazy(() =>
+  import("./ProjectAssetsTab").then((m) => ({ default: m.ProjectAssetsTab }))
+);
+const ProjectDeliverablesTab = lazy(() =>
+  import("./ProjectDeliverablesTab").then((m) => ({
+    default: m.ProjectDeliverablesTab,
+  }))
+);
+const ProjectCarsTab = lazy(() =>
+  import("./ProjectCarsTab").then((m) => ({ default: m.ProjectCarsTab }))
+);
+const ProjectGalleriesTab = lazy(() =>
+  import("./ProjectGalleriesTab").then((m) => ({
+    default: m.ProjectGalleriesTab,
+  }))
+);
+const ProjectCopywriter = lazy(() =>
+  import("./ProjectCopywriter").then((m) => ({ default: m.ProjectCopywriter }))
+);
+const ProjectEventsTab = lazy(() => import("./ProjectEventsTab"));
+const ProjectCalendarTab = lazy(() =>
+  import("./ProjectCalendarTab").then((m) => ({
+    default: m.ProjectCalendarTab,
+  }))
+);
 
 interface MemberDetails {
   name: string;
@@ -48,6 +80,9 @@ const tabs = [
   { value: "calendar", label: "Calendar" },
 ];
 
+// Track which tabs have been loaded
+const loadedTabs = new Set<string>();
+
 export function ProjectTabs({
   project,
   activeTab,
@@ -55,7 +90,29 @@ export function ProjectTabs({
   memberDetails,
   onProjectUpdate,
 }: ProjectTabsProps) {
+  const [hasLoadedTab, setHasLoadedTab] = useState<Record<string, boolean>>({
+    overview: true, // Always load overview first
+  });
+
+  // Mark tab as loaded when it becomes active
+  useEffect(() => {
+    if (activeTab && !hasLoadedTab[activeTab]) {
+      setHasLoadedTab((prev) => ({
+        ...prev,
+        [activeTab]: true,
+      }));
+      loadedTabs.add(activeTab);
+    }
+  }, [activeTab, hasLoadedTab]);
+
   const currentTab = tabs.find((tab) => tab.value === activeTab);
+
+  // Loading fallback component
+  const TabLoadingFallback = () => (
+    <div className="flex items-center justify-center py-12">
+      <LoadingSpinner size="lg" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -94,69 +151,92 @@ export function ProjectTabs({
         </TabsList>
       </Tabs>
 
-      {/* Tab Content - always visible */}
+      {/* Tab Content - lazy loaded */}
       <div className="space-y-6">
         {activeTab === "overview" && (
-          <ProjectOverviewTab
-            project={project}
-            onProjectUpdate={onProjectUpdate}
-          />
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectOverviewTab
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "timeline" && (
-          <ProjectTimelineTab
-            project={project}
-            onProjectUpdate={onProjectUpdate}
-          />
+        {activeTab === "timeline" && hasLoadedTab.timeline && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectTimelineTab
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "events" && (
-          <ProjectEventsTab projectId={project._id!} />
+        {activeTab === "events" && hasLoadedTab.events && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectEventsTab projectId={project._id!} />
+          </Suspense>
         )}
 
-        {activeTab === "team" && (
-          <ProjectTeamTab
-            project={project}
-            memberDetails={memberDetails}
-            onProjectUpdate={onProjectUpdate}
-          />
+        {activeTab === "team" && hasLoadedTab.team && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectTeamTab
+              project={project}
+              memberDetails={memberDetails}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "cars" && (
-          <ProjectCarsTab project={project} onProjectUpdate={onProjectUpdate} />
+        {activeTab === "cars" && hasLoadedTab.cars && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectCarsTab
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "galleries" && (
-          <ProjectGalleriesTab
-            project={project}
-            onProjectUpdate={onProjectUpdate}
-          />
+        {activeTab === "galleries" && hasLoadedTab.galleries && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectGalleriesTab
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "assets" && (
-          <ProjectAssetsTab
-            project={project}
-            onProjectUpdate={onProjectUpdate}
-          />
+        {activeTab === "assets" && hasLoadedTab.assets && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectAssetsTab
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "deliverables" && (
-          <ProjectDeliverablesTab
-            project={project}
-            memberDetails={memberDetails}
-            onProjectUpdate={onProjectUpdate}
-          />
+        {activeTab === "deliverables" && hasLoadedTab.deliverables && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectDeliverablesTab
+              project={project}
+              memberDetails={memberDetails}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "copywriter" && (
-          <ProjectCopywriter
-            project={project}
-            onProjectUpdate={onProjectUpdate}
-          />
+        {activeTab === "copywriter" && hasLoadedTab.copywriter && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectCopywriter
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
         )}
 
-        {activeTab === "calendar" && (
-          <ProjectCalendarTab projectId={project._id!} />
+        {activeTab === "calendar" && hasLoadedTab.calendar && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectCalendarTab projectId={project._id!} />
+          </Suspense>
         )}
       </div>
     </div>

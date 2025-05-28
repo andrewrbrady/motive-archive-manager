@@ -47,6 +47,7 @@ Development-specific documentation:
 - **PERFORMANCE_OPTIMIZATION_PLAN.md** - Comprehensive performance optimization strategy
 - **CLOUDFLARE_IMAGE_OPTIMIZATION.md** - Cloudflare Images implementation guide
 - **CLOUDFLARE_OPTIMIZATION_CHECKLIST.md** - Step-by-step implementation checklist
+- **CLOUDFLARE_IMAGES_FIXES.md** - Resolution of site-wide image issues
 
 ### Root Level Documentation
 

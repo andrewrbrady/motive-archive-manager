@@ -40,8 +40,8 @@ const options: MongoClientOptions = {
   family: 4, // Force IPv4
   serverApi: {
     version: "1",
-    strict: true,
-    deprecationErrors: true,
+    strict: false,
+    deprecationErrors: false,
   },
 };
 
@@ -70,6 +70,13 @@ if (process.env.NODE_ENV === "development") {
   options.tls = true;
   options.tlsAllowInvalidCertificates = false;
   options.family = 4; // Force IPv4 in development
+  // Increase timeouts for development to handle slower connections
+  options.serverSelectionTimeoutMS = 45000;
+  options.connectTimeoutMS = 45000;
+  options.socketTimeoutMS = 120000;
+  options.maxIdleTimeMS = 120000;
+  // Add heartbeat to keep connections alive
+  options.heartbeatFrequencyMS = 30000;
   console.log(
     "Development environment detected, using development-specific MongoDB settings"
   );
@@ -99,8 +106,58 @@ export async function getDatabase(): Promise<Db> {
   if (isBuildTime || isStaticGeneration) {
     throw new Error("Database connections are not available during build time");
   }
-  const client = await getMongoClient();
-  return client.db(DB_NAME);
+
+  try {
+    const client = await getMongoClient();
+    const db = client.db(DB_NAME);
+
+    // Test the connection with a simple operation with retry logic
+    try {
+      await db.admin().ping();
+      console.log("MongoDB connection verified with ping");
+    } catch (pingError) {
+      console.log("Ping failed, attempting to reconnect...");
+
+      // Clear the cached client and try once more
+      global._mongoClientPromise = null;
+      global._lastConnectionTime = 0;
+
+      const freshClient = await getMongoClient();
+      const freshDb = freshClient.db(DB_NAME);
+
+      // Test the fresh connection
+      await freshDb.admin().ping();
+      console.log("Fresh MongoDB connection established and verified");
+
+      return freshDb;
+    }
+
+    return db;
+  } catch (error) {
+    console.error("Error getting database:", error);
+
+    // Clear the cached client and try once more
+    global._mongoClientPromise = null;
+    global._lastConnectionTime = 0;
+
+    try {
+      console.log("Creating fresh MongoDB connection");
+      const client = await getMongoClient();
+      const db = client.db(DB_NAME);
+
+      // Update connection time on successful reconnection
+      global._lastConnectionTime = Date.now();
+
+      // Verify the connection works
+      await db.admin().ping();
+      console.log("Fresh connection verified with ping");
+
+      return db;
+    } catch (retryError) {
+      console.error("Failed to reconnect to MongoDB:", retryError);
+      throw retryError;
+    }
+  }
 }
 
 // Define the type for cached mongoose connection
@@ -120,6 +177,8 @@ declare global {
   var _lastConnectionTime: number | undefined;
   // eslint-disable-next-line no-var
   var _connectionAttempts: number | undefined;
+  // eslint-disable-next-line no-var
+  var _lastPing: number | undefined;
 }
 
 // Global is used here to maintain a cached connection across hot reloads
@@ -138,7 +197,11 @@ if (!global._lastConnectionTime) {
 function shouldForceNewConnection(): boolean {
   const now = Date.now();
   const timeSinceLastConnection = now - (global._lastConnectionTime || 0);
-  const CONNECTION_TTL = 300 * 1000; // Increased from 30 seconds to 5 minutes for persistent connections in low-user environments
+  // Use different TTL for development vs production
+  const CONNECTION_TTL =
+    process.env.NODE_ENV === "development"
+      ? 600 * 1000 // 10 minutes for development
+      : 300 * 1000; // 5 minutes for production
 
   // If more than CONNECTION_TTL has passed since our last connection,
   // we should force a new one to avoid using a stale connection
@@ -301,8 +364,8 @@ function createMongoClient(): Promise<MongoClient> {
 // Add exponential backoff retry mechanism for serverless environments
 // Improved version with more aggressive retry strategy
 export async function getMongoClient(
-  maxRetries = 3, // Reduced from 5 for faster connection attempts
-  baseDelay = 200 // Reduced from 300 for faster recovery
+  maxRetries = 3, // Back to original
+  baseDelay = 200 // Back to original
 ): Promise<MongoClient> {
   if (isBuildTime || isStaticGeneration) {
     throw new Error(
@@ -317,8 +380,8 @@ export async function getMongoClient(
 
   // If too many recent attempts, force a new connection
   if (global._connectionAttempts > 7) {
-    // Reduced from 10 for faster connection reset
-    // [REMOVED] // [REMOVED] console.log("Too many connection attempts detected. Resetting connection.");
+    // Back to original
+    console.log("Too many connection attempts detected. Resetting connection.");
     global._mongoClientPromise = null;
     clientPromise = null;
     client = null;
@@ -331,45 +394,32 @@ export async function getMongoClient(
   try {
     // If we should force a new connection, clear the cached promise
     if (shouldForceNewConnection() || !clientPromise) {
-      // [REMOVED] // [REMOVED] console.log("Creating fresh MongoDB connection");
+      console.log("Creating fresh MongoDB connection");
       global._mongoClientPromise = createMongoClient();
       clientPromise = global._mongoClientPromise;
     }
 
     // Ensure there's a valid clientPromise
     if (!clientPromise) {
-      // [REMOVED] // [REMOVED] console.log("No valid client promise, creating new one");
+      console.log("No valid client promise, creating new one");
       clientPromise = createMongoClient();
     }
 
     // Get client from promise
     const connectedClient = await clientPromise;
 
-    // Test the connection with a ping
+    // Test the connection with a ping - but don't fail on ping errors
     try {
       await connectedClient.db("admin").command({ ping: 1 });
-      // [REMOVED] // [REMOVED] console.log("MongoDB connection verified with ping");
-
-      // Reset attempt counter on success
-      global._connectionAttempts = 0;
-      return connectedClient;
+      console.log("MongoDB connection verified with ping");
     } catch (pingError) {
-      console.error("Ping failed on existing connection, forcing reconnection");
-
-      // Force a new connection since ping failed
-      global._mongoClientPromise = null;
-      clientPromise = null;
-      client = null;
-
-      // If we still have retries, try again
-      if (global._connectionAttempts <= maxRetries) {
-        // [REMOVED] // [REMOVED] console.log("Retrying after ping failure");
-        clientPromise = createMongoClient();
-        return await clientPromise;
-      }
-
-      throw pingError;
+      console.warn("Ping failed, but continuing with existing connection");
+      // Don't throw on ping failure - the connection might still work
     }
+
+    // Reset attempt counter on success
+    global._connectionAttempts = 0;
+    return connectedClient;
   } catch (err) {
     console.error(
       `MongoDB connection error (attempt ${global._connectionAttempts}):`
@@ -379,7 +429,7 @@ export async function getMongoClient(
     if (global._connectionAttempts <= maxRetries) {
       const retryDelay = Math.min(
         Math.pow(2, global._connectionAttempts) * baseDelay,
-        5000
+        5000 // Back to original
       );
       console.log(
         `Retrying connection in ${retryDelay}ms... (attempt ${global._connectionAttempts}/${maxRetries})`

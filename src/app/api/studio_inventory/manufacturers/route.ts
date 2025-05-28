@@ -5,10 +5,34 @@ export async function GET() {
   try {
     const { db } = await connectToDatabase();
 
-    // Get all unique manufacturers from the inventory collection
-    const manufacturers = await db
+    // Use aggregation pipeline instead of distinct (API Version 1 compatible)
+    const pipeline = [
+      {
+        $match: {
+          manufacturer: {
+            $exists: true,
+            $ne: null,
+            $not: { $eq: "" },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$manufacturer",
+        },
+      },
+      {
+        $sort: {
+          _id: 1,
+        },
+      },
+    ];
+
+    const result = await db
       .collection("studio_inventory")
-      .distinct("manufacturer");
+      .aggregate(pipeline)
+      .toArray();
+    const manufacturers = result.map((doc) => doc._id).filter(Boolean);
 
     return NextResponse.json(manufacturers);
   } catch (error) {

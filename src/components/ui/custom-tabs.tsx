@@ -102,7 +102,7 @@ export function CustomTabs({
   const initialTab = tabParam || defaultValue || items[0]?.value;
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Simplified URL update function with shorter debounce
+  // Simplified URL update function with instant navigation
   const updateUrl = useCallback(
     (value: string) => {
       // Skip if we just updated to this value
@@ -113,49 +113,47 @@ export function CustomTabs({
         clearTimeout(urlUpdateTimeoutRef.current);
       }
 
-      // Shorter debounce for more responsive feel
-      urlUpdateTimeoutRef.current = setTimeout(() => {
-        try {
-          lastUrlUpdateRef.current = value;
+      // Immediate URL update for instant feedback
+      try {
+        lastUrlUpdateRef.current = value;
 
-          // Create a new URLSearchParams object from the current search params
-          const params = new URLSearchParams(searchParams?.toString() || "");
+        // Create a new URLSearchParams object from the current search params
+        const params = new URLSearchParams(searchParams?.toString() || "");
 
-          // Check for template parameter when switching to non-template tabs
-          const hasTemplateParam = params.has("template");
-          const isTemplateTab = value === "shot-lists" || value === "scripts";
+        // Check for template parameter when switching to non-template tabs
+        const hasTemplateParam = params.has("template");
+        const isTemplateTab = value === "shot-lists" || value === "scripts";
 
-          // Update the tab parameter
-          params.set(paramName, value);
+        // Update the tab parameter
+        params.set(paramName, value);
 
-          // When switching to a non-template tab, explicitly remove template parameter
-          if (hasTemplateParam && !isTemplateTab) {
-            params.delete("template");
-          }
-
-          // Apply context-based cleanup to the parameters
-          const context = `tab:${value}`;
-          const cleanedParams = cleanupUrlParameters(params, context);
-
-          // Use the cleaned parameters
-          router.push(`${basePath}?${cleanedParams.toString()}`, {
-            scroll: false,
-          });
-        } catch (error) {
-          console.error("Error updating URL:", error);
+        // When switching to a non-template tab, explicitly remove template parameter
+        if (hasTemplateParam && !isTemplateTab) {
+          params.delete("template");
         }
-      }, 50); // Reduced from 150ms to 50ms for more responsive feel
+
+        // Apply context-based cleanup to the parameters
+        const context = `tab:${value}`;
+        const cleanedParams = cleanupUrlParameters(params, context);
+
+        // Use immediate navigation without debouncing
+        router.replace(`${basePath}?${cleanedParams.toString()}`, {
+          scroll: false,
+        });
+      } catch (error) {
+        console.error("Error updating URL:", error);
+      }
     },
     [searchParams, paramName, basePath, router]
   );
 
-  // Simplified tab change handler with immediate UI response
+  // Immediate tab change handler for instant UI response
   const handleTabChange = useCallback(
     (value: string) => {
       // Immediately update component state for instant UI feedback
       setActiveTab(value);
 
-      // Update URL with minimal debouncing
+      // Update URL immediately without debouncing
       updateUrl(value);
     },
     [updateUrl]

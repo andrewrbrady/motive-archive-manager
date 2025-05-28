@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-export default function ErrorPage() {
+function ErrorPageContent() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string>("");
   const [errorCode, setErrorCode] = useState<string>("");
@@ -144,5 +144,23 @@ export default function ErrorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ErrorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center p-4">
+          <div className="w-full max-w-md space-y-6 rounded-lg border border-gray-200 bg-white p-8 shadow-md">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-900">Loading...</h1>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ErrorPageContent />
+    </Suspense>
   );
 }

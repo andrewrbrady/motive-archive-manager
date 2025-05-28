@@ -13,8 +13,6 @@ import { ObjectId } from "mongodb";
 import { ProjectTemplate } from "@/models/ProjectTemplate";
 import { convertProjectForFrontend } from "@/utils/objectId";
 
-export const dynamic = "force-dynamic";
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -321,6 +319,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
     const clientId = searchParams.get("clientId");
     const ownerId = searchParams.get("ownerId");
+    const includeImages = searchParams.get("includeImages") === "true";
 
     console.log("Projects API: Query parameters", {
       search,
@@ -331,6 +330,7 @@ export async function GET(request: NextRequest) {
       type,
       clientId,
       ownerId,
+      includeImages,
     });
 
     // Build query
@@ -420,8 +420,51 @@ export async function GET(request: NextRequest) {
       firstProjectTitle: projects[0]?.title || "No projects",
     });
 
+    // ✅ Fetch primary image URLs if requested
+    let projectsWithImages = projects;
+    if (includeImages) {
+      console.log("Projects API: Fetching primary image URLs...");
+
+      // Get all unique image IDs
+      const imageIds = projects
+        .map((p) => p.primaryImageId)
+        .filter(Boolean)
+        .map((id) => new ObjectId(id));
+
+      if (imageIds.length > 0) {
+        // Batch fetch all images
+        const images = await db
+          .collection("images")
+          .find({
+            _id: { $in: imageIds },
+          })
+          .toArray();
+
+        // Create a map of imageId -> imageUrl
+        const imageUrlMap = new Map();
+        images.forEach((img) => {
+          imageUrlMap.set(img._id.toString(), img.url);
+        });
+
+        // Add image URLs to projects
+        projectsWithImages = projects.map((project) => ({
+          ...project,
+          primaryImageUrl: project.primaryImageId
+            ? imageUrlMap.get(project.primaryImageId)
+            : null,
+        }));
+
+        console.log("Projects API: Added image URLs", {
+          imagesFound: images.length,
+          projectsWithImages: projectsWithImages.filter(
+            (p) => p.primaryImageUrl
+          ).length,
+        });
+      }
+    }
+
     const response: ProjectListResponse = {
-      projects: projects.map((project) =>
+      projects: projectsWithImages.map((project) =>
         convertProjectForFrontend(project)
       ) as IProject[],
       total,

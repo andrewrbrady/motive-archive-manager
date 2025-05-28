@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { getDatabase } from "@/lib/mongodb";
 
 // Set maximum execution time to 30 seconds
 export const maxDuration = 30;
 export const runtime = "nodejs";
 
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(process.env.MONGODB_URI || "");
-  await client.connect();
-  return client;
-}
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  let mongoClient;
   try {
     const { id } = await request.json();
     // [REMOVED] // [REMOVED] console.log("[STATUS API] Checking status for image ID:", id);
@@ -26,8 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     // First check if the image exists in MongoDB
-    mongoClient = await getMongoClient();
-    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
+    const db = await getDatabase();
     const imagesCollection = db.collection("images");
 
     // Try to find the image by cloudflareId
@@ -204,9 +197,5 @@ export async function POST(request: NextRequest) {
       { error: "Failed to check image status", status: "error" },
       { status: 500 }
     );
-  } finally {
-    if (mongoClient) {
-      await mongoClient.close();
-    }
   }
 }

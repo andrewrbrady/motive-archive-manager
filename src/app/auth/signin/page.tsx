@@ -1,82 +1,163 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { MobileOAuthButton } from "@/components/auth/MobileOAuthButton";
+import { useState, useEffect, Suspense } from "react";
+import { signIn, getProviders } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { toast } from "@/components/ui/use-toast";
+import Link from "next/link";
 
-export default function SignIn() {
-  const router = useRouter();
+function SignInContent() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [providers, setProviders] = useState<any>(null);
   const searchParams = useSearchParams();
-  const callbackUrl = (() => {
-    const url = searchParams?.get("callbackUrl") || "/dashboard";
-    // Ensure callback URL is internal and safe
-    if (url.startsWith("/") && !url.startsWith("//")) {
-      return url;
-    }
-    return "/dashboard";
-  })();
-
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    // Check if redirected with error
-    const errorParam = searchParams?.get("error");
-    if (errorParam) {
-      if (errorParam === "OAuthSignin") {
-        setError("Error connecting to Google. Please try again.");
-      } else if (errorParam === "OAuthCallback") {
-        setError("Error during Google authentication. Please try again.");
-      } else if (errorParam === "OAuthCreateAccount") {
-        setError("Unable to create account. Please contact an administrator.");
-      } else if (errorParam === "EmailCreateAccount") {
-        setError(
-          "Unable to create account with this email. Please contact an administrator."
-        );
-      } else if (errorParam === "Callback") {
-        setError("Authentication callback error. Please try again.");
-      } else if (errorParam === "OAuthAccountNotLinked") {
-        setError(
-          "To confirm your identity, sign in with the same account you used originally."
-        );
-      } else if (errorParam === "EmailSignin") {
-        setError("The e-mail could not be sent.");
-      } else if (errorParam === "CredentialsSignin") {
-        setError("Sign in failed. Check the details you provided are correct.");
-      } else if (errorParam === "SessionRequired") {
-        setError("Please sign in to access this page.");
+    const setupProviders = async () => {
+      const res = await getProviders();
+      setProviders(res);
+    };
+    setupProviders();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        toast({
+          title: "Error",
+          description: "Invalid credentials. Please try again.",
+          variant: "destructive",
+        });
       } else {
-        setError("Authentication failed. Please try again.");
+        const callbackUrl = searchParams.get("callbackUrl") || "/";
+        window.location.href = callbackUrl;
       }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [searchParams]);
+  };
+
+  const handleGoogleSignIn = async () => {
+    const callbackUrl = searchParams.get("callbackUrl") || "/";
+    await signIn("google", { callbackUrl });
+  };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg shadow-lg border">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">Welcome</h1>
-          <p className="text-muted-foreground mt-2">
-            Sign in with your company Google account
-          </p>
-        </div>
+    <div className="flex min-h-screen flex-col items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Sign In</CardTitle>
+          <CardDescription>
+            Enter your credentials to access your account
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
+            </Button>
+          </form>
 
-        {error && (
-          <div className="bg-destructive/15 text-destructive p-3 rounded-md text-center text-sm">
-            {error}
+          {providers?.google && (
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleSignIn}
+              >
+                Continue with Google
+              </Button>
+            </div>
+          )}
+
+          <div className="text-center text-sm">
+            <Link
+              href="/auth/forgot-password"
+              className="text-blue-600 hover:underline"
+            >
+              Forgot your password?
+            </Link>
           </div>
-        )}
 
-        <div className="space-y-4">
-          <MobileOAuthButton callbackUrl={callbackUrl} />
-        </div>
-
-        <div className="mt-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Need access? Contact your administrator to get invited to the
-            system.
-          </p>
-        </div>
-      </div>
+          <div className="text-center text-sm">
+            Don't have an account?{" "}
+            <Link href="/auth/signup" className="text-blue-600 hover:underline">
+              Sign up
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Loading...</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }

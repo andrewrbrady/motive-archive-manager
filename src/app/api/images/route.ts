@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/mongodb";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { ObjectId } from "mongodb";
 
-export const dynamic = "force-dynamic";
+// Images can be cached for short periods
 
 export async function GET(request: NextRequest) {
   try {

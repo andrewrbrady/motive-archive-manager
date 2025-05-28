@@ -182,6 +182,7 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@monaco-editor/react": "^4.7.0",
+    "@next/bundle-analyzer": "^15.3.2",
     "@tailwindcss/typography": "^0.5.16",
     "@types/bcrypt": "^5.0.2",
     "@types/body-parser": "^1.19.5",

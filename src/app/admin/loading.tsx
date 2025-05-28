@@ -1,9 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import Navbar from "@/components/layout/navbar";
-// import Footer from "@/components/layout/footer";
-import { PageTitle } from "@/components/ui/PageTitle";
 
 export default function AdminLoading() {
   return (
@@ -13,16 +10,15 @@ export default function AdminLoading() {
         <h1 className="text-3xl font-bold container mx-auto px-4 pt-8 pb-4">
           Admin Dashboard
         </h1>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-row items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]" />
-            <p className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] uppercase tracking-wider">
-              Loading Admin...
-            </p>
+        {/* Minimal loading - no spinner to avoid navigation lag */}
+        <div className="flex-1 container mx-auto px-4">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-muted rounded w-1/4"></div>
+            <div className="h-32 bg-muted rounded"></div>
+            <div className="h-4 bg-muted rounded w-1/2"></div>
           </div>
         </div>
       </div>
-      {/* <Footer /> */}
     </div>
   );
 }

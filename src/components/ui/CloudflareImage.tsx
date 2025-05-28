@@ -27,9 +27,9 @@ export function CloudflareImage({
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Use the existing getFormattedImageUrl function with the appropriate variant
-  const cloudflareVariant = CLOUDFLARE_VARIANTS[variant];
-  const optimizedSrc = getFormattedImageUrl(src, cloudflareVariant);
+  // Use the URL as-is since the API already returns complete Cloudflare URLs
+  // The variant prop is ignored because the URLs already have the correct variant
+  const optimizedSrc = src;
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setImageError(true);

@@ -89,6 +89,9 @@ export default function ProjectsPage() {
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (typeFilter !== "all") params.append("type", typeFilter);
 
+      // ✅ Request projects WITH their primary images in one call
+      params.append("includeImages", "true");
+
       const url = `/api/projects?${params.toString()}`;
       console.log("ProjectsPage: Fetching from URL:", url);
 
@@ -113,7 +116,7 @@ export default function ProjectsPage() {
 
       setProjects(data.projects);
 
-      // Initialize image states and fetch primary images
+      // ✅ Initialize image states with data from the API response
       const newImageStates: Record<
         string,
         {
@@ -124,62 +127,17 @@ export default function ProjectsPage() {
       > = {};
 
       data.projects.forEach((project) => {
-        if (project.primaryImageId) {
-          newImageStates[project._id!] = {
-            loading: true,
-            url: null,
-            error: false,
-          };
-        } else {
-          newImageStates[project._id!] = {
-            loading: false,
-            url: null,
-            error: false,
-          };
-        }
+        newImageStates[project._id!] = {
+          loading: false,
+          url: project.primaryImageUrl || null, // ✅ Use pre-loaded image URL
+          error: false,
+        };
       });
 
       setImageStates(newImageStates);
 
-      // Fetch primary images
-      data.projects.forEach(async (project) => {
-        if (project.primaryImageId) {
-          try {
-            const imageResponse = await fetch(
-              `/api/images/${project.primaryImageId}`
-            );
-            if (imageResponse.ok) {
-              const imageData = await imageResponse.json();
-              setImageStates((prev) => ({
-                ...prev,
-                [project._id!]: {
-                  loading: false,
-                  url: imageData.url,
-                  error: false,
-                },
-              }));
-            } else {
-              setImageStates((prev) => ({
-                ...prev,
-                [project._id!]: {
-                  loading: false,
-                  url: null,
-                  error: true,
-                },
-              }));
-            }
-          } catch (error) {
-            setImageStates((prev) => ({
-              ...prev,
-              [project._id!]: {
-                loading: false,
-                url: null,
-                error: true,
-              },
-            }));
-          }
-        }
-      });
+      // ✅ REMOVED: No more setTimeout + individual fetch calls
+      // This was causing 10-50 simultaneous API requests
     } catch (err) {
       console.error("ProjectsPage: Error fetching projects:", err);
       setError(err instanceof Error ? err.message : "An error occurred");

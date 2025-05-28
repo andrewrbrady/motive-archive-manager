@@ -1,8 +1,9 @@
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { auth } from "@/auth";
+
+// Cache role statistics for 30 minutes since they don't change frequently
+export const revalidate = 1800;
 
 export async function GET(request: NextRequest) {
   try {

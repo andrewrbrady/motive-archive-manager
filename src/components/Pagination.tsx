@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useFastRouter } from "@/lib/navigation/simple-cache";
 
 interface PaginationProps {
   totalPages: number;
@@ -19,6 +20,7 @@ const Pagination = ({
   useUrlPagination = true,
 }: PaginationProps) => {
   const router = useRouter();
+  const { fastPush } = useFastRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pageInput, setPageInput] = useState(currentPage.toString());
@@ -44,7 +46,8 @@ const Pagination = ({
         params.set("tab", "inventory");
       }
 
-      router.push(`${targetPath}?${params.toString()}`);
+      // Use ultra-fast router for instant pagination
+      fastPush(`${targetPath}?${params.toString()}`);
     }
   };
 

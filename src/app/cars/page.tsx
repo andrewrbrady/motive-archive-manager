@@ -9,8 +9,9 @@ import { headers } from "next/headers";
 import { Make } from "@/lib/fetchMakes";
 import { getBaseUrl } from "@/lib/url-utils";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Enable static generation with revalidation for better performance
+export const dynamic = "force-static";
+export const revalidate = 60; // Revalidate every 60 seconds
 
 export const metadata: Metadata = {
   title: "Cars Collection | Premium Vehicles",
@@ -48,17 +49,15 @@ async function getCars(page = 1, pageSize = 48, filters: FilterParams = {}) {
       // Server-side: Use absolute URL
       const baseUrl = getBaseUrl();
       url = `${baseUrl}/api/cars/simple?${queryParams.toString()}`;
-      // [REMOVED] // [REMOVED] console.log("Server-side cars URL:", url);
     } else {
       // Client-side: Use relative URL
       url = `/api/cars/simple?${queryParams.toString()}`;
-      // [REMOVED] // [REMOVED] console.log("Client-side cars URL:", url);
     }
 
-    // Fetch with better error handling
-    // [REMOVED] // [REMOVED] console.log("Fetching cars from:", url);
+    // Fetch with caching enabled for better performance
     const response = await fetch(url, {
-      cache: "no-store",
+      cache: "force-cache",
+      next: { revalidate: 60 }, // Cache for 60 seconds
     });
 
     if (!response.ok) {
@@ -125,44 +124,66 @@ export default async function CarsPage(props: any) {
       }
     });
 
-    // [REMOVED] // [REMOVED] console.log("Applying filters:", filters);
+    // Only fetch makes and clients if no filters are applied (for initial load)
+    // This reduces the number of API calls for filtered requests
+    const shouldFetchMetadata = Object.keys(filters).length === 0 && page === 1;
 
-    const [{ cars, totalPages, currentPage, totalCount }, makes, clients] =
-      await Promise.all([
+    if (shouldFetchMetadata) {
+      // Fetch all data in parallel for initial load
+      const [carsResult, makesResult, clientsResult] = await Promise.all([
         getCars(page, pageSize, filters),
         fetchMakes(),
         fetchClients(),
       ]);
 
-    // Convert MongoDB ObjectId to string for client-side rendering
-    const formattedClients = clients.map((client) => ({
-      ...client,
-      _id: client._id.toString(),
-      primaryContactId: client.primaryContactId?.toString(),
-      documents: (client.documents || []).map((doc) => ({
-        ...doc,
-        _id: doc._id.toString(),
-      })),
-      cars: (client.cars || []).map((car) => ({
-        ...car,
-        _id: car._id.toString(),
-      })),
-    }));
+      // Convert MongoDB ObjectId to string for client-side rendering
+      const formattedClients = clientsResult.map((client) => ({
+        ...client,
+        _id: client._id.toString(),
+        primaryContactId: client.primaryContactId?.toString(),
+        documents: (client.documents || []).map((doc) => ({
+          ...doc,
+          _id: doc._id.toString(),
+        })),
+        cars: (client.cars || []).map((car) => ({
+          ...car,
+          _id: car._id.toString(),
+        })),
+      }));
 
-    return (
-      <CarsPageClient
-        cars={cars}
-        totalPages={totalPages}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        totalCount={totalCount}
-        view={view}
-        isEditMode={isEditMode}
-        filters={filters}
-        makes={makes}
-        clients={formattedClients}
-      />
-    );
+      return (
+        <CarsPageClient
+          cars={carsResult.cars}
+          totalPages={carsResult.totalPages}
+          currentPage={carsResult.currentPage}
+          pageSize={pageSize}
+          totalCount={carsResult.totalCount}
+          view={view}
+          isEditMode={isEditMode}
+          filters={filters}
+          makes={makesResult}
+          clients={formattedClients}
+        />
+      );
+    } else {
+      // For filtered requests, only fetch cars data
+      const carsResult = await getCars(page, pageSize, filters);
+
+      return (
+        <CarsPageClient
+          cars={carsResult.cars}
+          totalPages={carsResult.totalPages}
+          currentPage={carsResult.currentPage}
+          pageSize={pageSize}
+          totalCount={carsResult.totalCount}
+          view={view}
+          isEditMode={isEditMode}
+          filters={filters}
+          makes={[]} // Empty for filtered requests
+          clients={[]} // Empty for filtered requests
+        />
+      );
+    }
   } catch (error) {
     console.error("Error in CarsPage:", error);
     throw error;

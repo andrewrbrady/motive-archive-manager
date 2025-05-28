@@ -28,7 +28,7 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import Image from "next/image";
 import ImageManager from "./ImageManager";
 import { LoadingSpinner } from "@/components/ui/loading";
-import LazyImage from "@/components/LazyImage";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -110,6 +110,7 @@ interface ImageGalleryProps {
   showCategoryTabs?: boolean;
   onImageClick?: (image: Image) => void;
   isLoading?: boolean;
+  zoomLevel?: number; // 1-5, where 1 is most columns, 5 is fewest columns
 }
 
 interface Filters {
@@ -168,6 +169,7 @@ export function ImageGallery({
   showCategoryTabs = true,
   onImageClick,
   isLoading = false,
+  zoomLevel = 3,
 }: ImageGalleryProps) {
   const [mainIndex, setMainIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -195,6 +197,21 @@ export function ImageGallery({
   const [currentTab, setCurrentTab] = useState("all");
   const [galleryImages, setGalleryImages] = useState<Image[]>(images);
   const [showImageDialog, setShowImageDialog] = useState(false);
+
+  // Zoom level configurations
+  const zoomConfigs = {
+    1: "grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8",
+    2: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6",
+    3: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
+    4: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3",
+    5: "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2",
+  };
+
+  const getGridClasses = () => {
+    const zoomClass =
+      zoomConfigs[zoomLevel as keyof typeof zoomConfigs] || zoomConfigs[3];
+    return `grid ${zoomClass} gap-4`;
+  };
 
   useEffect(() => {
     if (uploading && uploadProgress.length > 0) {
@@ -627,15 +644,6 @@ export function ImageGallery({
     (image) => !imageErrors[image.url]
   );
 
-  const getImageUrl = (url: string, variant?: string) => {
-    // Remove /public if it exists at the end
-    const baseUrl = url.replace(/\/public$/, "");
-    if (variant) {
-      return `${baseUrl}/${variant}`;
-    }
-    return `${baseUrl}/public`;
-  };
-
   // Add a function to handle setting a thumbnail image
   const handleSetAsPrimary = (image: Image, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -749,20 +757,16 @@ export function ImageGallery({
 
   if (isLoading) {
     return (
-      <div
-        className={cn(
-          "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4",
-          className
-        )}
-      >
+      <div className={cn(getGridClasses(), className)}>
         {Array.from({ length: 8 }).map((_, index) => (
-          <LazyImage
+          <div
             key={`skeleton-${index}`}
-            src=""
-            alt="Loading"
-            width={thumbnailSize.width}
-            height={thumbnailSize.height}
-            loadingVariant="skeleton"
+            className="animate-pulse bg-muted rounded-md"
+            style={{
+              width: thumbnailSize.width,
+              height: thumbnailSize.height,
+              aspectRatio: `${thumbnailSize.width}/${thumbnailSize.height}`,
+            }}
           />
         ))}
       </div>
@@ -834,10 +838,10 @@ export function ImageGallery({
         </Tabs>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className={getGridClasses()}>
         {galleryImages.map((image) => (
           <div key={image.id} className="relative group cursor-pointer">
-            <LazyImage
+            <CloudflareImage
               src={image.url}
               alt={image.metadata?.description || image.filename || "Car image"}
               width={thumbnailSize.width}
@@ -891,7 +895,7 @@ export function ImageGallery({
 
           <div className="relative flex justify-center items-center">
             {selectedImage && (
-              <LazyImage
+              <CloudflareImage
                 src={selectedImage.url}
                 alt={
                   selectedImage.metadata?.description ||
@@ -900,7 +904,6 @@ export function ImageGallery({
                 }
                 width={fullSize.width}
                 height={fullSize.height}
-                objectFit="contain"
                 className="rounded-md"
                 variant="large"
               />
@@ -944,3 +947,173 @@ export function ImageGallery({
 }
 
 export default ImageGallery;
+
+// Wrapper component that provides data fetching for car images
+import {
+  useCarImages,
+  useUploadImages,
+  useDeleteImages,
+  useSetPrimaryImage,
+} from "@/lib/hooks/query/useImages";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/use-toast";
+import { useSearchParams, useRouter } from "next/navigation";
+
+interface ImageGalleryWithDataProps {
+  carId: string;
+  showFilters?: boolean;
+  vehicleInfo?: any;
+  onFilterOptionsChange?: (options: Record<string, string[]>) => void;
+  onUploadStarted?: () => void;
+  onUploadEnded?: () => void;
+  className?: string;
+  thumbnailsPerRow?: number;
+  rowsPerPage?: number;
+}
+
+export function ImageGalleryWithData({
+  carId,
+  showFilters = false,
+  vehicleInfo,
+  onFilterOptionsChange,
+  onUploadStarted,
+  onUploadEnded,
+  className = "",
+  thumbnailsPerRow = 4,
+  rowsPerPage = 3,
+}: ImageGalleryWithDataProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // URL-based state
+  const isEditMode = searchParams?.get("mode") === "edit";
+
+  // React Query hooks
+  const { data: images = [], isLoading, error, refetch } = useCarImages(carId);
+  const uploadMutation = useUploadImages(carId, vehicleInfo);
+  const deleteMutation = useDeleteImages(carId, queryClient);
+  const setPrimaryMutation = useSetPrimaryImage(carId);
+
+  // Convert images to the format expected by ImageGallery
+  const galleryImages = images.map((img: any) => ({
+    id: img.id || img._id,
+    url: img.url,
+    filename: img.filename || "",
+    metadata: img.metadata || {},
+    variants: img.variants || {},
+    createdAt: img.createdAt || new Date().toISOString(),
+    updatedAt: img.updatedAt || new Date().toISOString(),
+  }));
+
+  // Find primary image
+  const primaryImageId = images.find((img: any) => img.metadata?.isPrimary)?.id || 
+                        images.find((img: any) => img.metadata?.isPrimary)?._id;
+
+  const handleRemoveImage = async (
+    indices: number[],
+    deleteFromStorage = true
+  ) => {
+    try {
+      const imagesToDelete = indices.map((index) => galleryImages[index]);
+      const imageIds = imagesToDelete.map((img) => img.id);
+
+      await deleteMutation.mutateAsync({
+        imageIds,
+        deleteFromStorage,
+      });
+
+      toast({
+        title: "Success",
+        description: `${imageIds.length} image(s) deleted successfully`,
+      });
+
+      refetch();
+    } catch (error) {
+      console.error("Error deleting images:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete images",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImagesChange = async (files: FileList) => {
+    try {
+      onUploadStarted?.();
+
+      const fileArray = Array.from(files);
+      await uploadMutation.mutateAsync({ files: fileArray });
+
+      toast({
+        title: "Success",
+        description: `${fileArray.length} image(s) uploaded successfully`,
+      });
+
+      refetch();
+      onUploadEnded?.();
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      toast({
+        title: "Error",
+        description: "Failed to upload images",
+        variant: "destructive",
+      });
+      onUploadEnded?.();
+    }
+  };
+
+  const handlePrimaryImageChange = async (imageId: string) => {
+    try {
+      await setPrimaryMutation.mutateAsync(imageId);
+
+      toast({
+        title: "Success",
+        description: "Primary image updated successfully",
+      });
+
+      refetch();
+    } catch (error) {
+      console.error("Error setting primary image:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update primary image",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Debug logging
+  console.log("[ImageGalleryWithData] Debug info:", {
+    carId,
+    imagesCount: images.length,
+    isLoading,
+    error,
+    firstImage: images[0],
+    galleryImagesCount: galleryImages.length,
+    primaryImageId,
+  });
+
+  return (
+    <ImageGallery
+      images={galleryImages}
+      isEditMode={isEditMode}
+      onRemoveImage={handleRemoveImage}
+      onImagesChange={handleImagesChange}
+      uploading={uploadMutation.isPending}
+      uploadProgress={[]}
+      showMetadata={true}
+      showFilters={showFilters}
+      title="Car Images"
+      carId={carId}
+      primaryImageId={primaryImageId}
+      onPrimaryImageChange={handlePrimaryImageChange}
+      className={className}
+      thumbnailsPerRow={thumbnailsPerRow}
+      rowsPerPage={rowsPerPage}
+      isLoading={isLoading}
+    />
+  );
+}

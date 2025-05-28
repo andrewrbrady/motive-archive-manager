@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export const dynamic = "force-dynamic";
-
 /**
  * GET /api/cars/simple
  *
@@ -187,24 +185,40 @@ export async function GET(request: NextRequest) {
       // Execute query
       const cars = await db.collection("cars").aggregate(pipeline).toArray();
 
-      // Process data for client
-      const processedCars = cars.map((car) => ({
-        ...car,
-        _id: car._id.toString(),
-        images: (car.images || []).map((img: any) => ({
-          ...img,
-          _id: img._id.toString(),
-          url: img.url.endsWith("/public") ? img.url : `${img.url}/public`,
-        })),
-        client: car.client?.toString(),
-        eventIds: (car.eventIds || []).map((id: ObjectId) => id.toString()),
-        deliverableIds: (car.deliverableIds || []).map((id: ObjectId) =>
-          id.toString()
-        ),
-        documentationIds: (car.documentationIds || []).map((id: ObjectId) =>
-          id.toString()
-        ),
-      }));
+      // Process data for client with better error handling
+      const processedCars = cars.map((car, index) => {
+        try {
+          return {
+            ...car,
+            _id: car._id?.toString() || `unknown-${index}`,
+            images: (car.images || []).map((img: any) => ({
+              ...img,
+              _id: img._id?.toString() || "unknown-image",
+              url:
+                img.url && img.url.endsWith("/public")
+                  ? img.url
+                  : `${img.url || ""}/public`,
+            })),
+            client: car.client?.toString() || null,
+            eventIds: (car.eventIds || [])
+              .filter((id: any) => id != null)
+              .map((id: ObjectId) => id.toString()),
+            deliverableIds: (car.deliverableIds || [])
+              .filter((id: any) => id != null)
+              .map((id: ObjectId) => id.toString()),
+            documentationIds: (car.documentationIds || [])
+              .filter((id: any) => id != null)
+              .map((id: ObjectId) => id.toString()),
+          };
+        } catch (processingError) {
+          console.error(
+            `Error processing car at index ${index}:`,
+            processingError
+          );
+          console.error("Car data:", JSON.stringify(car, null, 2));
+          throw processingError;
+        }
+      });
 
       // Log what we're sending back
       // [REMOVED] // [REMOVED] console.log(`Returning ${processedCars.length} cars with images`);
@@ -220,8 +234,15 @@ export async function GET(request: NextRequest) {
       });
     } catch (dbError) {
       console.error("Database operation error:", dbError);
+      console.error(
+        "Error stack:",
+        dbError instanceof Error ? dbError.stack : "No stack trace"
+      );
       return NextResponse.json(
-        { error: "Database operation failed" },
+        {
+          error: "Database operation failed",
+          details: dbError instanceof Error ? dbError.message : "Unknown error",
+        },
         { status: 500 }
       );
     }

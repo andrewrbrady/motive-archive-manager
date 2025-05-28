@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId, Collection } from "mongodb";
-import { getMongoClient } from "@/lib/mongodb";
+import { getDatabase } from "@/lib/mongodb";
 import { analyzeImage } from "@/lib/imageAnalyzer";
 
 // Set maximum execution time to 300 seconds (5 minutes)
@@ -128,31 +128,36 @@ export async function POST(request: NextRequest) {
     await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
   };
 
-  const initMongoConnection = async (): Promise<MongoClient> => {
+  const initMongoConnection = async (): Promise<Collections> => {
     while (retryCount < MAX_RETRIES) {
       try {
-        const client = await getMongoClient();
-        // Test the connection
-        await client.db("admin").command({ ping: 1 });
-        // [REMOVED] // [REMOVED] console.log("MongoDB connection established successfully");
-        return client;
+        const db = await getDatabase();
+
+        return {
+          images: db.collection<Image>("images"),
+          cars: db.collection<Car>("cars"),
+          galleries: db.collection<Gallery>("galleries"),
+        };
       } catch (error) {
         retryCount++;
         console.error(
           `MongoDB connection attempt ${retryCount} failed:`,
           error
         );
+
         if (retryCount >= MAX_RETRIES) {
           throw new Error(
-            "Failed to establish MongoDB connection after multiple attempts"
+            `Failed to connect to MongoDB after ${MAX_RETRIES} attempts: ${error}`
           );
         }
-        // Wait before retrying
+
+        // Wait before retrying (exponential backoff)
         await new Promise((resolve) =>
-          setTimeout(resolve, Math.min(1000 * Math.pow(2, retryCount), 5000))
+          setTimeout(resolve, Math.pow(2, retryCount) * 1000)
         );
       }
     }
+
     throw new Error("Failed to establish MongoDB connection");
   };
 
@@ -406,23 +411,11 @@ export async function POST(request: NextRequest) {
   };
 
   const processImages = async () => {
+    let mongoClient;
     try {
-      // [REMOVED] // [REMOVED] console.log("Starting image upload process in API route");
-
       const formData = await request.formData();
-      const fileCount = parseInt(formData.get("fileCount") as string) || 0;
       const carId = formData.get("carId") as string;
-
-      console.log("Received upload request:", {
-        fileCount,
-        carId,
-        formDataKeys: Array.from(formData.keys()),
-      });
-
-      if (fileCount === 0) {
-        await sendProgress({ error: "No files provided" });
-        return;
-      }
+      const fileCount = parseInt(formData.get("fileCount") as string);
 
       if (!carId) {
         await sendProgress({ error: "No car ID provided" });
@@ -430,13 +423,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Initialize MongoDB connection with retry logic
-      mongoClient = await initMongoConnection();
-      const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
-      const collections: Collections = {
-        images: db.collection("images"),
-        cars: db.collection("cars"),
-        galleries: db.collection("galleries"),
-      };
+      const collections = await initMongoConnection();
 
       // Fetch car information first
       const car = await collections.cars.findOne({ _id: new ObjectId(carId) });
@@ -507,14 +494,6 @@ export async function POST(request: NextRequest) {
           error instanceof Error ? error.message : "Failed to process images",
       });
     } finally {
-      if (mongoClient) {
-        try {
-          await mongoClient.close();
-          // [REMOVED] // [REMOVED] console.log("MongoDB connection closed successfully");
-        } catch (error) {
-          console.error("Error closing MongoDB connection:", error);
-        }
-      }
       await writer.close();
     }
   };
@@ -531,7 +510,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  let mongoClient;
   try {
     const requestData = await request.json();
     const { imageIds = [], cloudflareIds = [] } = requestData;
@@ -600,8 +578,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 2. Delete from MongoDB
-    mongoClient = await getMongoClient();
-    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
+    const db = await getDatabase();
     const imagesCollection = db.collection("images");
     const carsCollection = db.collection("cars");
     const galleriesCollection = db.collection("galleries");
@@ -810,9 +787,5 @@ export async function DELETE(request: NextRequest) {
       { error: "Failed to delete images", details: String(error) },
       { status: 500 }
     );
-  } finally {
-    if (mongoClient) {
-      await mongoClient.close();
-    }
   }
 }
