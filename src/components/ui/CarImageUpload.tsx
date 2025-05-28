@@ -1,7 +1,16 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Upload, Check, X as XIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface CarImageUploadProps {
   carId: string;
@@ -18,6 +27,14 @@ interface FileProgress {
   error?: string;
 }
 
+interface ImageAnalysisPrompt {
+  _id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isDefault: boolean;
+}
+
 const CarImageUpload: React.FC<CarImageUploadProps> = ({
   carId,
   vehicleInfo,
@@ -29,6 +46,97 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<FileProgress[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedPromptId, setSelectedPromptId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>(
+    IMAGE_ANALYSIS_CONFIG.availableModels.find((m) => m.isDefault)?.id ||
+      "gpt-4o-mini"
+  );
+  const [availablePrompts, setAvailablePrompts] = useState<
+    ImageAnalysisPrompt[]
+  >([]);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
+  const { user } = useFirebaseAuth();
+
+  // Helper function to get auth headers
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!user) return {};
+    try {
+      const token = await user.getIdToken();
+      return {
+        Authorization: `Bearer ${token}`,
+      };
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return {};
+    }
+  };
+
+  // Load available prompts on component mount
+  useEffect(() => {
+    const loadPrompts = async () => {
+      if (!user) {
+        console.log("User not authenticated yet, waiting...");
+        return; // Wait for user to be available
+      }
+
+      try {
+        console.log("Loading prompts for user:", user.email);
+        const headers = await getAuthHeaders();
+        if (Object.keys(headers).length === 0) {
+          console.error("No authentication token available");
+          return;
+        }
+
+        console.log(
+          "Making request to /api/admin/image-analysis-prompts/active with headers:",
+          headers
+        );
+        const response = await fetch(
+          "/api/admin/image-analysis-prompts/active",
+          { headers }
+        );
+
+        console.log("Response status:", response.status);
+        console.log(
+          "Response headers:",
+          Object.fromEntries(response.headers.entries())
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Received prompts data:", data);
+          setAvailablePrompts(data || []);
+
+          // Set default prompt if available
+          const defaultPrompt = data?.find(
+            (p: ImageAnalysisPrompt) => p.isDefault
+          );
+          if (defaultPrompt) {
+            setSelectedPromptId(defaultPrompt._id);
+            console.log("Set default prompt:", defaultPrompt.name);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error(
+            "Failed to fetch prompts:",
+            response.status,
+            response.statusText,
+            errorText
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load prompts:", error);
+      } finally {
+        setIsLoadingPrompts(false);
+      }
+    };
+
+    if (user) {
+      loadPrompts();
+    } else {
+      console.log("No user available, skipping prompt loading");
+    }
+  }, [user]);
 
   // Handle file selection or drop
   const handleFiles = (files: FileList | null) => {
@@ -54,6 +162,12 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       const formData = new FormData();
       formData.append("fileCount", pendingFiles.length.toString());
       formData.append("carId", carId);
+
+      // Add selected prompt and model
+      if (selectedPromptId) {
+        formData.append("selectedPromptId", selectedPromptId);
+      }
+      formData.append("selectedModelId", selectedModelId);
 
       if (vehicleInfo) {
         formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
@@ -224,6 +338,67 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
 
   return (
     <div>
+      {/* Analysis Options - only show if not uploading and no progress yet */}
+      {progress.length === 0 && !isUploading && (
+        <div className="space-y-4 mb-4">
+          {/* Prompt Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Analysis Prompt</label>
+            <Select
+              value={selectedPromptId}
+              onValueChange={setSelectedPromptId}
+              disabled={isLoadingPrompts}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    isLoadingPrompts
+                      ? "Loading prompts..."
+                      : "Select analysis prompt"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePrompts.map((prompt) => (
+                  <SelectItem key={prompt._id} value={prompt._id}>
+                    <div className="flex flex-col">
+                      <span>{prompt.name}</span>
+                      {prompt.description && (
+                        <span className="text-xs text-muted-foreground">
+                          {prompt.description}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Model Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">AI Model</label>
+            <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select AI model" />
+              </SelectTrigger>
+              <SelectContent>
+                {IMAGE_ANALYSIS_CONFIG.availableModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex flex-col">
+                      <span>{model.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {model.description}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
       {/* File select/drop UI, only if not uploading and no progress yet */}
       {progress.length === 0 && !isUploading && (
         <div

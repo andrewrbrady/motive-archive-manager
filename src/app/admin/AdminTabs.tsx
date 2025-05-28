@@ -27,6 +27,7 @@ import SystemPromptsContent from "./SystemPromptsContent";
 import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
+import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
 
 export default function AdminTabs() {
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
@@ -307,6 +308,11 @@ export default function AdminTabs() {
       value: "event-type-settings",
       label: "Event Type Settings",
       content: <EventTypeSettingsContent />,
+    },
+    {
+      value: "image-analysis-prompts",
+      label: "Image Analysis Prompts",
+      content: <ImageAnalysisPromptsContent />,
     },
   ];
 

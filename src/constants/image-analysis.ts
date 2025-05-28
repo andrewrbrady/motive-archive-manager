@@ -32,6 +32,52 @@ export const IMAGE_ANALYSIS_CONFIG = {
     side: ["driver", "passenger", "rear", "overhead"],
   },
 
+  // Available OpenAI models for image analysis
+  availableModels: [
+    {
+      id: "gpt-4o",
+      name: "GPT-4o",
+      description: "Most capable model, best accuracy",
+      isDefault: false,
+    },
+    {
+      id: "gpt-4.1",
+      name: "GPT-4.1",
+      description: "Enhanced version with improved capabilities",
+      isDefault: false,
+    },
+    {
+      id: "gpt-4.5",
+      name: "GPT-4.5",
+      description: "Latest version with advanced features",
+      isDefault: false,
+    },
+    {
+      id: "gpt-4o-mini",
+      name: "GPT-4o Mini",
+      description: "Faster and more cost-effective",
+      isDefault: true,
+    },
+    {
+      id: "o1",
+      name: "o1",
+      description: "Reasoning model for complex analysis",
+      isDefault: false,
+    },
+    {
+      id: "o1-pro",
+      name: "o1-pro",
+      description: "Professional reasoning model",
+      isDefault: false,
+    },
+    {
+      id: "o3",
+      name: "o3",
+      description: "Advanced reasoning capabilities",
+      isDefault: false,
+    },
+  ],
+
   // Format for the description field
   descriptionFormat:
     "concise description (max 250 chars) focusing on key visible features and technical details",

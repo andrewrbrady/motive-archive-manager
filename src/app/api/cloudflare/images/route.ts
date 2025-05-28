@@ -168,7 +168,9 @@ export async function POST(request: NextRequest) {
     carId: string,
     vehicleInfo: any,
     collections: Collections,
-    now: string
+    now: string,
+    selectedPromptId?: string,
+    selectedModelId?: string
   ) => {
     const fileId = `${i}-${file.name}`;
     try {
@@ -246,6 +248,8 @@ export async function POST(request: NextRequest) {
               body: JSON.stringify({
                 imageUrl,
                 vehicleInfo,
+                promptId: selectedPromptId,
+                modelId: selectedModelId,
               }),
               // Adding a longer timeout for the analysis request
               signal: AbortSignal.timeout(60000), // 60 seconds timeout
@@ -336,7 +340,9 @@ export async function POST(request: NextRequest) {
     carId: string,
     vehicleInfo: any,
     collections: Collections,
-    now: string
+    now: string,
+    selectedPromptId?: string,
+    selectedModelId?: string
   ) => {
     try {
       console.log(
@@ -345,7 +351,16 @@ export async function POST(request: NextRequest) {
 
       // Process each file in the batch concurrently
       const imageDocPromises = batch.map((file, i) =>
-        processFile(file, startIndex + i, carId, vehicleInfo, collections, now)
+        processFile(
+          file,
+          startIndex + i,
+          carId,
+          vehicleInfo,
+          collections,
+          now,
+          selectedPromptId,
+          selectedModelId
+        )
       );
 
       // Await all promises, handle errors individually
@@ -416,6 +431,8 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       const carId = formData.get("carId") as string;
       const fileCount = parseInt(formData.get("fileCount") as string);
+      const selectedPromptId = formData.get("selectedPromptId") as string;
+      const selectedModelId = formData.get("selectedModelId") as string;
 
       if (!carId) {
         await sendProgress({ error: "No car ID provided" });
@@ -466,7 +483,9 @@ export async function POST(request: NextRequest) {
             carId,
             vehicleInfo,
             collections,
-            now
+            now,
+            selectedPromptId,
+            selectedModelId
           );
           results.push(...batchResults);
         } catch (error) {

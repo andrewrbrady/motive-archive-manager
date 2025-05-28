@@ -335,6 +335,46 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     [isReanalyzing, carId, toast, mutate]
   );
 
+  const handleSetPrimaryImage = useCallback(
+    async (imageId: string) => {
+      try {
+        const response = await fetch(`/api/cars/${carId}/thumbnail`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ primaryImageId: imageId }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response
+            .json()
+            .catch(() => ({ error: "Failed to update primary image" }));
+          throw new Error(errorData.error || "Failed to update primary image");
+        }
+
+        toast({
+          title: "Success",
+          description: "Primary image updated successfully",
+        });
+
+        await mutate();
+      } catch (error) {
+        console.error("Error setting primary image:", error);
+        toast({
+          title: "Error",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Failed to update primary image",
+          variant: "destructive",
+        });
+        throw error; // Re-throw so the UI can handle the error state
+      }
+    },
+    [carId, toast, mutate]
+  );
+
   return {
     // Data
     images,
@@ -375,6 +415,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     handleUploadComplete,
     handleDeleteSelected,
     reanalyzeImage,
+    handleSetPrimaryImage,
     mutate,
   };
 }

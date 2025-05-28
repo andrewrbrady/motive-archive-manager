@@ -67,7 +67,7 @@ export function ImageViewer({
             className={cn(
               "p-2 rounded-full text-white transition-colors",
               showImageInfo
-                ? "bg-primary hover:bg-primary/80"
+                ? "bg-primary/80 hover:bg-primary"
                 : "bg-black/50 hover:bg-black/70"
             )}
             title="Toggle image info"

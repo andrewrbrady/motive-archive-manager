@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
 import { getBaseUrl } from "@/lib/url-utils";
+import { connectToDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 // Set maximum execution time to 90 seconds (increase from 60)
 export const maxDuration = 90;
@@ -398,7 +400,7 @@ async function analyzeImageWithValidation(
 export async function POST(request: NextRequest) {
   console.time("analyze-image-total");
   try {
-    const { imageUrl, vehicleInfo } = await request.json();
+    const { imageUrl, vehicleInfo, promptId, modelId } = await request.json();
     // [REMOVED] // [REMOVED] console.log("Analyzing image:", imageUrl);
     console.log(
       "Vehicle info:",
@@ -406,6 +408,8 @@ export async function POST(request: NextRequest) {
         ? JSON.stringify(vehicleInfo).substring(0, 200) + "..."
         : "None provided"
     );
+    console.log("Prompt ID:", promptId || "Using default");
+    console.log("Model ID:", modelId || "Using default");
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -419,6 +423,29 @@ export async function POST(request: NextRequest) {
 
     // Build context-aware prompt
     let prompt = IMAGE_ANALYSIS_CONFIG.basePrompt;
+
+    // If a custom prompt ID is provided, fetch it from the database
+    if (promptId) {
+      try {
+        const { db } = await connectToDatabase();
+        const customPrompt = await db
+          .collection("imageAnalysisPrompts")
+          .findOne({
+            _id: new ObjectId(promptId),
+            isActive: true,
+          });
+
+        if (customPrompt) {
+          prompt = customPrompt.prompt;
+          console.log("Using custom prompt:", customPrompt.name);
+        } else {
+          console.warn("Custom prompt not found or inactive, using default");
+        }
+      } catch (error) {
+        console.error("Error fetching custom prompt:", error);
+        console.log("Falling back to default prompt");
+      }
+    }
 
     // Add style guide
     prompt +=
@@ -459,14 +486,34 @@ export async function POST(request: NextRequest) {
 
     console.time("openai-api-call");
 
-    // Use lower-resource model and implement retry logic
-    const model = "gpt-4o-mini"; // Use mini model for faster response
+    // Use the provided model or fall back to default
+    let selectedModel = modelId;
+    if (!selectedModel) {
+      const defaultModel = IMAGE_ANALYSIS_CONFIG.availableModels.find(
+        (model) => model.isDefault
+      );
+      selectedModel = defaultModel?.id || "gpt-4o-mini";
+    }
+
+    // Validate that the selected model is in our allowed list
+    const isValidModel = IMAGE_ANALYSIS_CONFIG.availableModels.some(
+      (model) => model.id === selectedModel
+    );
+    if (!isValidModel) {
+      console.warn(`Invalid model ${selectedModel}, falling back to default`);
+      const defaultModel = IMAGE_ANALYSIS_CONFIG.availableModels.find(
+        (model) => model.isDefault
+      );
+      selectedModel = defaultModel?.id || "gpt-4o-mini";
+    }
+
+    console.log("Using OpenAI model:", selectedModel);
 
     // Use the enhanced analysis function with validation and retry
     const normalizedAnalysis = await analyzeImageWithValidation(
       publicImageUrl,
       prompt,
-      model,
+      selectedModel,
       2 // maxValidationRetries
     );
 

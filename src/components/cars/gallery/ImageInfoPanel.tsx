@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Copy, Download, RefreshCw } from "lucide-react";
+import { X, Copy, Download, RefreshCw, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { ExtendedImageType, getUrlVariations } from "@/types/gallery";
@@ -16,17 +16,20 @@ interface ImageInfoPanelProps {
   currentImage: ExtendedImageType;
   onClose: () => void;
   onReanalyze: (imageId: string) => void;
+  onSetPrimary?: (imageId: string) => void;
 }
 
 export function ImageInfoPanel({
   currentImage,
   onClose,
   onReanalyze,
+  onSetPrimary,
 }: ImageInfoPanelProps) {
   const { toast } = useToast();
   const [selectedUrlOption, setSelectedUrlOption] =
     useState<string>("Original");
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [isSettingPrimary, setIsSettingPrimary] = useState(false);
 
   const urlVariations = getUrlVariations(currentImage.url);
   const urlOptions = [
@@ -93,6 +96,27 @@ export function ImageInfoPanel({
     }
   };
 
+  const handleSetPrimary = async () => {
+    if (!onSetPrimary) return;
+
+    setIsSettingPrimary(true);
+    try {
+      await onSetPrimary(currentImage.id || currentImage._id);
+      toast({
+        title: "Success",
+        description: "Primary image updated",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to set primary image",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSettingPrimary(false);
+    }
+  };
+
   return (
     <div className="bg-background border border-border rounded-lg shadow-lg mb-4 animate-in slide-in-from-top-2 duration-300">
       <div className="p-4 max-h-[400px] overflow-y-auto">
@@ -125,6 +149,38 @@ export function ImageInfoPanel({
         </div>
 
         <div className="space-y-3 text-sm">
+          {/* Primary Image Button */}
+          {onSetPrimary && (
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <span className="font-medium text-muted-foreground">
+                Primary Image:
+              </span>
+              <div className="flex items-center gap-2">
+                {currentImage.metadata?.isPrimary ? (
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <Star className="w-4 h-4 fill-current" />
+                    <span className="text-xs font-medium">Current Primary</span>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleSetPrimary}
+                    disabled={isSettingPrimary}
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                  >
+                    {isSettingPrimary ? (
+                      <RefreshCw className="w-3 h-3 animate-spin mr-1" />
+                    ) : (
+                      <Star className="w-3 h-3 mr-1" />
+                    )}
+                    Set as Primary
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <span className="font-medium text-muted-foreground">Filename:</span>
             <div className="flex items-center gap-2">

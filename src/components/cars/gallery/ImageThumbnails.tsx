@@ -18,6 +18,7 @@ interface ImageThumbnailsProps {
   onPageChange: (page: number) => void;
   onToggleInfo: (show: boolean) => void;
   onReanalyze: (imageId: string) => void;
+  onSetPrimary?: (imageId: string) => void;
 }
 
 const ITEMS_PER_PAGE = 15;
@@ -34,6 +35,7 @@ export function ImageThumbnails({
   onPageChange,
   onToggleInfo,
   onReanalyze,
+  onSetPrimary,
 }: ImageThumbnailsProps) {
   const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
   const startIndex = currentPage * ITEMS_PER_PAGE;
@@ -47,6 +49,7 @@ export function ImageThumbnails({
           currentImage={currentImage}
           onClose={() => onToggleInfo(false)}
           onReanalyze={onReanalyze}
+          onSetPrimary={onSetPrimary}
         />
       )}
 

@@ -18,6 +18,8 @@ interface UseImageUploaderOptions {
   concurrentLimit?: number;
   validateFile?: (file: File) => Promise<string | null>;
   resetOnClose?: boolean;
+  selectedPromptId?: string;
+  selectedModelId?: string;
 }
 
 export function useImageUploader({
@@ -27,6 +29,8 @@ export function useImageUploader({
   concurrentLimit = 3,
   validateFile,
   resetOnClose = false,
+  selectedPromptId,
+  selectedModelId,
 }: UseImageUploaderOptions) {
   const [progress, setProgress] = useState<UploadProgress[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -173,6 +177,12 @@ export function useImageUploader({
         });
         formData.append("fileCount", batch.length.toString());
         formData.append("carId", carId);
+        if (selectedPromptId) {
+          formData.append("selectedPromptId", selectedPromptId);
+        }
+        if (selectedModelId) {
+          formData.append("selectedModelId", selectedModelId);
+        }
 
         // Mark as uploading
         batch.forEach((file) => {
@@ -318,7 +328,17 @@ export function useImageUploader({
         });
       }
     },
-    [carId, actions, toast, concurrentLimit, validateFiles, progress, error]
+    [
+      carId,
+      actions,
+      toast,
+      concurrentLimit,
+      validateFiles,
+      progress,
+      error,
+      selectedPromptId,
+      selectedModelId,
+    ]
   );
 
   return {

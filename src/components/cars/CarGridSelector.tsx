@@ -87,20 +87,43 @@ export function CarGridSelector({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [filters, setFilters] = useState<CarFilters>({
-    search: "",
-    make: "",
-    minYear: "",
-    maxYear: "",
-    status: "",
-  });
+  // Initialize filters from URL params if using URL filters
+  const initialFilters: CarFilters = useMemo(() => {
+    if (useUrlFilters && searchParams) {
+      return {
+        search: searchParams.get("search") || "",
+        make: searchParams.get("make") || "",
+        minYear: searchParams.get("minYear") || "",
+        maxYear: searchParams.get("maxYear") || "",
+        status: searchParams.get("status") || "",
+      };
+    }
+    return {
+      search: "",
+      make: "",
+      minYear: "",
+      maxYear: "",
+      status: "",
+    };
+  }, [useUrlFilters, searchParams]);
 
-  const [debouncedSearch] = useDebounce(filters.search, 300);
+  const [filters, setFilters] = useState<CarFilters>(initialFilters);
+  const [searchQuery, setSearchQuery] = useState(initialFilters.search);
+  const [cars, setCars] = useState<Car[]>(providedCars || []);
+  const [loading, setLoading] = useState(!providedCars);
   const [currentPage, setCurrentPage] = useState(1);
-  const [cars, setCars] = useState<Car[]>([]);
-  const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [makes, setMakes] = useState<string[]>([]);
+
+  // Debounce search query with 500ms delay
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
+
+  // Update filters when debounced search query changes
+  useEffect(() => {
+    if (debouncedSearchQuery !== filters.search) {
+      handleFilterChange("search", debouncedSearchQuery);
+    }
+  }, [debouncedSearchQuery]);
 
   // Initialize filters from URL if using URL filters
   useEffect(() => {
@@ -130,7 +153,8 @@ export function CarGridSelector({
         queryParams.set("page", currentPage.toString());
         queryParams.set("pageSize", pageSize.toString());
 
-        if (debouncedSearch) queryParams.set("search", debouncedSearch);
+        if (debouncedSearchQuery)
+          queryParams.set("search", debouncedSearchQuery);
         if (filters.make) queryParams.set("make", filters.make);
         if (filters.minYear) queryParams.set("minYear", filters.minYear);
         if (filters.maxYear) queryParams.set("maxYear", filters.maxYear);
@@ -154,7 +178,7 @@ export function CarGridSelector({
 
     fetchCars();
   }, [
-    debouncedSearch,
+    debouncedSearchQuery,
     filters.make,
     filters.minYear,
     filters.maxYear,
@@ -222,6 +246,12 @@ export function CarGridSelector({
     }
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    // Update local filters state immediately for UI responsiveness
+    setFilters((prev) => ({ ...prev, search: value }));
+  };
+
   const clearFilters = () => {
     const emptyFilters = {
       search: "",
@@ -231,6 +261,7 @@ export function CarGridSelector({
       status: "",
     };
     setFilters(emptyFilters);
+    setSearchQuery("");
     setCurrentPage(1);
 
     // Update URL if using URL filters
@@ -308,8 +339,8 @@ export function CarGridSelector({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search cars..."
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange("search", e.target.value)}
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>

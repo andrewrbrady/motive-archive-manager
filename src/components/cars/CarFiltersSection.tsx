@@ -13,6 +13,7 @@ import {
   FilterInput,
 } from "@/components/ui/FilterSection";
 import { Search } from "lucide-react";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface CarFiltersSectionProps {
   currentFilters: {
@@ -34,6 +35,19 @@ export default function CarFiltersSection({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = React.useState(currentFilters);
+  const [searchQuery, setSearchQuery] = React.useState(
+    currentFilters.search || ""
+  );
+
+  // Debounce search query with 500ms delay
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
+  // Update URL when debounced search query changes
+  React.useEffect(() => {
+    if (debouncedSearchQuery !== currentFilters.search) {
+      handleFilterChange("search", debouncedSearchQuery);
+    }
+  }, [debouncedSearchQuery]);
 
   const handleFilterChange = (field: keyof typeof filters, value: string) => {
     const newFilters = {
@@ -77,6 +91,12 @@ export default function CarFiltersSection({
     router.push(`/cars?${params.toString()}`);
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    // Update local filters state immediately for UI responsiveness
+    setFilters((prev) => ({ ...prev, search: value }));
+  };
+
   const clearFilters = () => {
     const emptyFilters = {
       make: "",
@@ -86,6 +106,7 @@ export default function CarFiltersSection({
       search: "",
     };
     setFilters(emptyFilters);
+    setSearchQuery("");
 
     const params = new URLSearchParams();
     const view = searchParams?.get("view");
@@ -117,8 +138,8 @@ export default function CarFiltersSection({
             type="text"
             name="search"
             placeholder="Search by make, model, year, VIN, color, etc."
-            value={filters.search || ""}
-            onChange={(e) => handleFilterChange("search", e.target.value)}
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </FilterItem>
 

@@ -60,6 +60,7 @@ export function CarImageGallery({
     handleUploadComplete,
     handleDeleteSelected,
     reanalyzeImage,
+    handleSetPrimaryImage,
   } = useImageGallery(carId, vehicleInfo);
 
   // Loading state
@@ -159,6 +160,7 @@ export function CarImageGallery({
             onPageChange={setCurrentPage}
             onToggleInfo={setShowImageInfo}
             onReanalyze={reanalyzeImage}
+            onSetPrimary={handleSetPrimaryImage}
           />
         </div>
       </div>
