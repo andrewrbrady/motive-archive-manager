@@ -35,17 +35,14 @@ export function AuthGuard({
     }
   }, [status, router, redirectTo, isRedirecting]);
 
-  // Show loading while checking auth status or redirecting
-  if (status === "loading" || isRedirecting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+  // Don't show loading spinner - let the page content handle its own loading states
+  // This prevents the double loading spinner issue
+  if (status === "loading") {
+    return <>{children}</>;
   }
 
-  // If unauthenticated, show nothing (redirect is happening)
-  if (status === "unauthenticated") {
+  // If unauthenticated or redirecting, show nothing (redirect is happening)
+  if (status === "unauthenticated" || isRedirecting) {
     return null;
   }
 

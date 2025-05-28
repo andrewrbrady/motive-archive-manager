@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
       parseInt(searchParams.get("pageSize") || "48"),
       96 // Maximum page size
     );
+    const view = searchParams.get("view") || "grid";
+    const imageLimit = view === "list" ? 1 : 10; // Only get 1 image for list view, 10 for grid
 
     // [REMOVED] // [REMOVED] console.log("Simple cars API request:", { page, pageSize });
 
@@ -175,7 +177,7 @@ export async function GET(request: NextRequest) {
                   },
                 },
               },
-              { $limit: 10 }, // Only get first 10 images for performance
+              { $limit: imageLimit }, // Only get first 10 images for performance
             ],
             as: "images",
           },
@@ -223,7 +225,7 @@ export async function GET(request: NextRequest) {
       // Log what we're sending back
       // [REMOVED] // [REMOVED] console.log(`Returning ${processedCars.length} cars with images`);
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         cars: processedCars,
         pagination: {
           currentPage: page,
@@ -232,6 +234,15 @@ export async function GET(request: NextRequest) {
           pageSize,
         },
       });
+
+      // Add cache headers for better performance
+      response.headers.set(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      response.headers.set("ETag", `"cars-${totalCount}-${page}-${pageSize}"`);
+
+      return response;
     } catch (dbError) {
       console.error("Database operation error:", dbError);
       console.error(

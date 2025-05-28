@@ -103,19 +103,8 @@ export const useSession = () => {
       return "unauthenticated";
     }
 
-    // If we have a Firebase user but haven't attempted to fetch user data yet, we're loading
-    if (!hasAttemptedFetch) {
-      return "loading";
-    }
-
-    // If we're currently fetching user data, we're loading
-    if (userDataLoading) {
-      return "loading";
-    }
-
-    // If we have a Firebase user and have attempted fetch (regardless of success), we're authenticated
-    // This prevents the loop - even if the API call fails, we still consider the user authenticated
-    // because they have a valid Firebase session
+    // If we have a Firebase user, we're authenticated regardless of user data fetch status
+    // This prevents the double loading spinner issue
     return "authenticated";
   };
 

@@ -1,0 +1,98 @@
+{
+  "make": "Porsche",
+  "model": "911 Turbo S",
+  "year": 2023,
+  "color": "Guards Red",
+  "interior_color": "Black Leather",
+  "vin": "WP0AB2A99NS123456",
+  "mileage": {
+    "value": 1250,
+    "unit": "miles"
+  },
+  "engine": {
+    "type": "Twin-Turbocharged Flat-6",
+    "displacement": {
+      "value": 3.8,
+      "unit": "L"
+    },
+    "power": {
+      "hp": 640,
+      "kW": 477,
+      "ps": 650
+    },
+    "torque": {
+      "lb-ft": 590,
+      "Nm": 800
+    },
+    "features": [
+      "Variable Turbine Geometry",
+      "Direct Fuel Injection",
+      "VarioCam Plus"
+    ]
+  },
+  "transmission": {
+    "type": "8-Speed PDK Dual-Clutch Automatic"
+  },
+  "dimensions": {
+    "length": {
+      "value": 177.9,
+      "unit": "in"
+    },
+    "width": {
+      "value": 74.0,
+      "unit": "in"
+    },
+    "height": {
+      "value": 51.0,
+      "unit": "in"
+    },
+    "wheelbase": {
+      "value": 96.5,
+      "unit": "in"
+    },
+    "weight": {
+      "value": 3640,
+      "unit": "lbs"
+    },
+    "gvwr": {
+      "value": 4400,
+      "unit": "lbs"
+    }
+  },
+  "performance": {
+    "0_to_60_mph": {
+      "value": 2.6,
+      "unit": "seconds"
+    },
+    "top_speed": {
+      "value": 205,
+      "unit": "mph"
+    }
+  },
+  "interior_features": {
+    "seats": 4,
+    "upholstery": "Full Leather with Alcantara Inserts"
+  },
+  "manufacturing": {
+    "plant": {
+      "city": "Stuttgart",
+      "country": "Germany",
+      "company": "Porsche AG"
+    },
+    "series": "992",
+    "trim": "Turbo S",
+    "bodyClass": "Coupe"
+  },
+  "doors": 2,
+  "safety": {
+    "tpms": {
+      "type": "Direct TPMS",
+      "present": true
+    }
+  },
+  "status": "available",
+  "condition": "Excellent",
+  "location": "Beverly Hills, CA",
+  "description": "Pristine 2023 Porsche 911 Turbo S in Guards Red with black leather interior. This exceptional example features the legendary twin-turbocharged flat-6 engine producing 640 horsepower. Equipped with Porsche's advanced PDK transmission and all-wheel drive system for unparalleled performance. The vehicle shows minimal wear with only 1,250 miles and has been meticulously maintained. Includes original documentation, spare keys, and car cover.",
+  "type": "Sports Car"
+}

@@ -22,18 +22,12 @@ const PageSizeSelector = ({
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <label
-        htmlFor="pageSize"
-        className="hidden sm:block text-xs uppercase tracking-wider text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] font-medium"
-      >
-        Items per page
-      </label>
+    <div className="flex items-center">
       <select
         id="pageSize"
         value={currentPageSize}
         onChange={(e) => handlePageSizeChange(e.target.value)}
-        className="text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] w-16 sm:w-auto"
+        className="text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] w-full"
         title="Items per page"
       >
         {options.map((size) => (

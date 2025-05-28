@@ -1,7 +1,7 @@
 "use client";
 
 // components/cars/CarCard.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Car, CarImage } from "@/types/car";
@@ -16,7 +16,10 @@ interface CarCardProps {
   currentSearchParams?: string;
 }
 
-export default function CarCard({ car, currentSearchParams }: CarCardProps) {
+const CarCard = memo(function CarCard({
+  car,
+  currentSearchParams,
+}: CarCardProps) {
   if (process.env.NODE_ENV !== "production") {
     // [REMOVED] // [REMOVED] console.log("CarCard: Component rendering with car:", car._id);
     console.log("CarCard: Full car data:", {
@@ -184,7 +187,9 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            priority
+            loading="lazy"
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
             onError={(e) => {
               console.error("CarCard: Image failed to load:", {
                 url: primaryImage.url,
@@ -250,4 +255,6 @@ export default function CarCard({ car, currentSearchParams }: CarCardProps) {
       </div>
     </Link>
   );
-}
+});
+
+export default CarCard;

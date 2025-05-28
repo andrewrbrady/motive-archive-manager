@@ -34,7 +34,16 @@ export async function GET() {
     const result = await db.collection("cars").aggregate(pipeline).toArray();
     const makes = result.map((doc) => doc._id).filter(Boolean);
 
-    return NextResponse.json({ makes });
+    const response = NextResponse.json({ makes });
+
+    // Add cache headers for better performance
+    response.headers.set(
+      "Cache-Control",
+      "public, s-maxage=3600, stale-while-revalidate=7200"
+    );
+    response.headers.set("ETag", `"makes-${makes.length}"`);
+
+    return response;
   } catch (error) {
     console.error("Error fetching makes:", error);
     return NextResponse.json(

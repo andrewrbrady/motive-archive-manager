@@ -1,6 +1,6 @@
 import { Car } from "@/types/car";
 import { MeasurementValue } from "@/types/measurements";
-import { Pencil, Sparkles, Loader2 } from "lucide-react";
+import { Pencil, Sparkles, Loader2, Upload } from "lucide-react";
 import { getUnitsForType } from "@/constants/units";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Client } from "@/types/contact";
 import { toast } from "react-hot-toast";
 import { SpecificationsEnrichment } from "./SpecificationsEnrichment";
+import { JsonUploadModal } from "./JsonUploadModal";
 
 // Define the car data structure as we receive it from the API
 interface CarData {
@@ -320,6 +321,7 @@ const Specifications = ({
   const [localSpecs, setLocalSpecs] = useState<Partial<CarData>>(car);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedId, setLastSavedId] = useState(car._id);
+  const [isJsonUploadModalOpen, setIsJsonUploadModalOpen] = useState(false);
 
   // Update localSpecs when car changes or edit mode is toggled
   useEffect(() => {
@@ -358,6 +360,35 @@ const Specifications = ({
     };
     setLocalSpecs(newSpecs);
     onInputChange?.(parent, value, field);
+  };
+
+  const handleJsonUpload = (jsonData: any, mode: "merge" | "replace") => {
+    if (mode === "replace") {
+      // Replace all specifications with JSON data
+      setLocalSpecs(jsonData);
+    } else {
+      // Merge JSON data with existing specifications
+      const mergeDeep = (target: any, source: any): any => {
+        const result = { ...target };
+
+        for (const key in source) {
+          if (
+            source[key] &&
+            typeof source[key] === "object" &&
+            !Array.isArray(source[key])
+          ) {
+            result[key] = mergeDeep(result[key] || {}, source[key]);
+          } else {
+            result[key] = source[key];
+          }
+        }
+
+        return result;
+      };
+
+      setLocalSpecs(mergeDeep(localSpecs, jsonData));
+    }
+    setIsJsonUploadModalOpen(false);
   };
 
   const handleSave = async () => {
@@ -459,6 +490,14 @@ const Specifications = ({
             <>
               <Button variant="outline" size="sm" onClick={handleCancel}>
                 Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsJsonUploadModalOpen(true)}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Upload JSON
               </Button>
               <Button
                 variant="default"
@@ -1199,6 +1238,14 @@ const Specifications = ({
           </div>
         </div>
       </div>
+
+      {/* JSON Upload Modal */}
+      <JsonUploadModal
+        isOpen={isJsonUploadModalOpen}
+        onClose={() => setIsJsonUploadModalOpen(false)}
+        onApplyJson={handleJsonUpload}
+        currentData={localSpecs}
+      />
     </div>
   );
 };

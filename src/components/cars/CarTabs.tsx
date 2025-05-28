@@ -1,9 +1,10 @@
 "use client";
 
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useState, useEffect } from "react";
 import { CustomTabs } from "@/components/ui/custom-tabs";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { CarImageGallery } from "./CarImageGallery";
+import { toast } from "react-hot-toast";
 
 // Lazy load heavy tab components
 const DeliverablesTab = lazy(() => import("../deliverables/DeliverablesTab"));
@@ -35,6 +36,81 @@ const TabLoadingFallback = () => (
   </div>
 );
 
+// Wrapper component for Specifications that provides edit functionality
+const SpecificationsWrapper = ({
+  carId,
+  vehicleInfo,
+}: {
+  carId: string;
+  vehicleInfo: any;
+}) => {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [vehicleData, setVehicleData] = useState(vehicleInfo);
+
+  // Sync vehicle data when vehicleInfo prop changes
+  useEffect(() => {
+    setVehicleData(vehicleInfo);
+  }, [vehicleInfo]);
+
+  const handleEdit = () => {
+    setIsEditMode(true);
+  };
+
+  const handleSave = async (editedSpecs: any) => {
+    try {
+      const response = await fetch(`/api/cars/${carId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editedSpecs),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save specifications");
+      }
+
+      const updatedCar = await response.json();
+      setVehicleData(updatedCar);
+      setIsEditMode(false);
+      toast.success("Specifications saved successfully");
+    } catch (error) {
+      console.error("Error saving specifications:", error);
+      toast.error("Failed to save specifications");
+      throw error;
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditMode(false);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      const response = await fetch(`/api/cars/${carId}`);
+      if (response.ok) {
+        const updatedCar = await response.json();
+        setVehicleData(updatedCar);
+        toast.success("Specifications refreshed");
+      }
+    } catch (error) {
+      console.error("Error refreshing specifications:", error);
+      toast.error("Failed to refresh specifications");
+    }
+  };
+
+  return (
+    <Specifications
+      car={vehicleData}
+      isEditMode={isEditMode}
+      onEdit={handleEdit}
+      onSave={handleSave}
+      onCancel={handleCancel}
+      onRefresh={handleRefresh}
+    />
+  );
+};
+
 export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
   const tabItems = [
     {
@@ -62,7 +138,7 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       label: "Specifications",
       content: (
         <Suspense fallback={<TabLoadingFallback />}>
-          <Specifications car={vehicleInfo} />
+          <SpecificationsWrapper carId={carId} vehicleInfo={vehicleInfo} />
         </Suspense>
       ),
     },

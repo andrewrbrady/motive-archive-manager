@@ -110,13 +110,15 @@ export function CarGridSelector({
   const [filters, setFilters] = useState<CarFilters>(initialFilters);
   const [searchQuery, setSearchQuery] = useState(initialFilters.search);
   const [cars, setCars] = useState<Car[]>(providedCars || []);
-  const [loading, setLoading] = useState(!providedCars);
+  const [loading, setLoading] = useState(
+    providedCars ? providedLoading || false : true
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [makes, setMakes] = useState<string[]>([]);
 
-  // Debounce search query with 500ms delay
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  // Debounce search query with 300ms delay
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Update filters when debounced search query changes
   useEffect(() => {
@@ -139,16 +141,20 @@ export function CarGridSelector({
     }
   }, [useUrlFilters, searchParams]);
 
-  // Fetch cars if not provided
+  // Update cars and loading state when provided props change, or fetch cars if not provided
   useEffect(() => {
-    if (providedCars) {
+    if (providedCars !== undefined) {
       setCars(providedCars);
+      setLoading(providedLoading || false);
       return;
     }
 
-    const fetchCars = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
+        const fetchPromises = [];
+
+        // Build query params for cars
         const queryParams = new URLSearchParams();
         queryParams.set("page", currentPage.toString());
         queryParams.set("pageSize", pageSize.toString());
@@ -160,24 +166,46 @@ export function CarGridSelector({
         if (filters.maxYear) queryParams.set("maxYear", filters.maxYear);
         if (filters.status) queryParams.set("status", filters.status);
 
-        const response = await fetch(
-          `/api/cars/simple?${queryParams.toString()}`
-        );
-        if (!response.ok) throw new Error("Failed to fetch cars");
+        // Always fetch cars
+        fetchPromises.push(fetch(`/api/cars/simple?${queryParams.toString()}`));
 
-        const data = await response.json();
-        setCars(data.cars || []);
-        setTotalCount(data.pagination?.totalCount || 0);
+        // Fetch makes if filters are shown and we don't have them yet
+        if (showFilters && makes.length === 0) {
+          fetchPromises.push(fetch("/api/cars/makes"));
+        }
+
+        const responses = await Promise.all(fetchPromises);
+
+        // Process cars response
+        const carsResponse = responses[0];
+        if (carsResponse.ok) {
+          const data = await carsResponse.json();
+          setCars(data.cars || []);
+          setTotalCount(data.pagination?.totalCount || 0);
+        } else {
+          throw new Error("Failed to fetch cars");
+        }
+
+        // Process makes response if it exists
+        if (responses.length > 1) {
+          const makesResponse = responses[1];
+          if (makesResponse.ok) {
+            const data = await makesResponse.json();
+            setMakes(data.makes || []);
+          }
+        }
       } catch (error) {
-        console.error("Error fetching cars:", error);
+        console.error("Error fetching data:", error);
         setCars([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCars();
+    fetchData();
   }, [
+    providedCars,
+    providedLoading,
     debouncedSearchQuery,
     filters.make,
     filters.minYear,
@@ -185,11 +213,14 @@ export function CarGridSelector({
     filters.status,
     currentPage,
     pageSize,
-    providedCars,
+    showFilters,
+    makes.length,
   ]);
 
-  // Fetch makes for filter dropdown
+  // Fetch makes separately only if filters are shown and we don't have cars data
   useEffect(() => {
+    if (!showFilters || makes.length > 0 || !providedCars) return;
+
     const fetchMakes = async () => {
       try {
         const response = await fetch("/api/cars/makes");
@@ -202,10 +233,8 @@ export function CarGridSelector({
       }
     };
 
-    if (showFilters) {
-      fetchMakes();
-    }
-  }, [showFilters]);
+    fetchMakes();
+  }, [showFilters, makes.length, providedCars]);
 
   // Filter out excluded cars
   const filteredCars = useMemo(() => {
@@ -428,66 +457,126 @@ export function CarGridSelector({
       )}
 
       {/* Loading State */}
-      {(loading || providedLoading) && (
-        <div className="flex items-center justify-center py-12">
-          <LoadingSpinner size="lg" />
-        </div>
-      )}
-
-      {/* Cars Grid */}
-      {!loading && !providedLoading && (
-        <>
-          {filteredCars.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                {hasActiveFilters
-                  ? "No cars found matching your criteria."
-                  : "No cars available."}
-              </p>
+      {providedCars !== undefined
+        ? providedLoading && (
+            <div className="flex items-center justify-center py-12">
+              <LoadingSpinner size="lg" />
             </div>
-          ) : (
-            <div
-              className={cn(
-                "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
-                gridClassName
-              )}
-            >
-              {filteredCars.map((car) => (
-                <div
-                  key={car._id}
-                  className={cn(
-                    "relative",
-                    selectionMode !== "none" && "cursor-pointer",
-                    isCarSelected(car._id) &&
-                      "ring-2 ring-blue-500 ring-offset-2 rounded-lg"
-                  )}
-                  onClick={() => handleCarClick(car)}
-                >
-                  {/* Selection Indicator */}
-                  {selectionMode !== "none" && (
-                    <div className="absolute top-2 left-2 z-10">
-                      <div
-                        className={cn(
-                          "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                          isCarSelected(car._id)
-                            ? "bg-blue-500 border-blue-500 text-white"
-                            : "bg-white border-gray-300"
-                        )}
-                      >
-                        {isCarSelected(car._id) && (
-                          <Check className="h-4 w-4" />
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <CarCard car={car} />
-                </div>
-              ))}
+          )
+        : loading && (
+            <div className="flex items-center justify-center py-12">
+              <LoadingSpinner size="lg" />
             </div>
           )}
-        </>
-      )}
+
+      {/* Cars Grid */}
+      {providedCars !== undefined
+        ? !providedLoading && (
+            <>
+              {filteredCars.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    {hasActiveFilters
+                      ? "No cars found matching your criteria."
+                      : "No cars available."}
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+                    gridClassName
+                  )}
+                >
+                  {filteredCars.map((car) => (
+                    <div
+                      key={car._id}
+                      className={cn(
+                        "relative",
+                        selectionMode !== "none" && "cursor-pointer",
+                        isCarSelected(car._id) &&
+                          "ring-2 ring-blue-500 ring-offset-2 rounded-lg"
+                      )}
+                      onClick={() => handleCarClick(car)}
+                    >
+                      {/* Selection Indicator */}
+                      {selectionMode !== "none" && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <div
+                            className={cn(
+                              "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                              isCarSelected(car._id)
+                                ? "bg-blue-500 border-blue-500 text-white"
+                                : "bg-white border-gray-300"
+                            )}
+                          >
+                            {isCarSelected(car._id) && (
+                              <Check className="h-4 w-4" />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <CarCard car={car} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )
+        : !loading && (
+            <>
+              {filteredCars.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    {hasActiveFilters
+                      ? "No cars found matching your criteria."
+                      : "No cars available."}
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+                    gridClassName
+                  )}
+                >
+                  {filteredCars.map((car) => (
+                    <div
+                      key={car._id}
+                      className={cn(
+                        "relative",
+                        selectionMode !== "none" && "cursor-pointer",
+                        isCarSelected(car._id) &&
+                          "ring-2 ring-blue-500 ring-offset-2 rounded-lg"
+                      )}
+                      onClick={() => handleCarClick(car)}
+                    >
+                      {/* Selection Indicator */}
+                      {selectionMode !== "none" && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <div
+                            className={cn(
+                              "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                              isCarSelected(car._id)
+                                ? "bg-blue-500 border-blue-500 text-white"
+                                : "bg-white border-gray-300"
+                            )}
+                          >
+                            {isCarSelected(car._id) && (
+                              <Check className="h-4 w-4" />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <CarCard car={car} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
       {/* Pagination */}
       {showPagination && !providedCars && totalPages > 1 && (

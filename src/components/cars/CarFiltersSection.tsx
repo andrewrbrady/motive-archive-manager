@@ -39,8 +39,8 @@ export default function CarFiltersSection({
     currentFilters.search || ""
   );
 
-  // Debounce search query with 500ms delay
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  // Debounce search query with 300ms delay
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Update URL when debounced search query changes
   React.useEffect(() => {

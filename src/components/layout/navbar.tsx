@@ -39,17 +39,13 @@ export default function Navbar({ className }: NavbarProps) {
 
   // Navigation items
   const navigationItems = [
-    { name: "Home", href: "/" },
+    { name: "Dashboard", href: "/dashboard" },
     { name: "Cars", href: "/cars" },
-    { name: "Images", href: "/images" },
     { name: "Galleries", href: "/galleries" },
-    { name: "Documents", href: "/documents" },
-    { name: "Production", href: "/production" },
     { name: "Projects", href: "/projects" },
+    { name: "Contacts", href: "/contacts" },
+    { name: "Events", href: "/events" },
     { name: "Market", href: "/market" },
-    { name: "Schedule", href: "/schedule" },
-    { name: "Copywriting", href: "/copywriting" },
-    { name: "Admin", href: "/admin" },
   ];
 
   const handleLinkClick = () => {

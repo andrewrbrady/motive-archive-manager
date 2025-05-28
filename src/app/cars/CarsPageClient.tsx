@@ -11,9 +11,21 @@ import { Car } from "@/types/car";
 import { Client } from "@/types/contact";
 import { PageTitle } from "@/components/ui/PageTitle";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { Make } from "@/lib/fetchMakes";
 import { CarGridSelector } from "@/components/cars/CarGridSelector";
+import { CarsErrorBoundary } from "@/components/cars/CarsErrorBoundary";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { useDebounce } from "@/hooks/useDebounce";
 
 // Interface for client data with string IDs instead of ObjectIds
 export interface ClientWithStringId {
@@ -96,18 +108,122 @@ export default function CarsPageClient({
   const [makes, setMakes] = useState<Make[]>(initialMakes);
   const [clients, setClients] = useState<ClientWithStringId[]>(initialClients);
   const [isLoading, setIsLoading] = useState(shouldFetchData);
+  const [isDataLoading, setIsDataLoading] = useState(false); // Separate loading state for data only
+
+  // State for inline filters
+  const [searchQuery, setSearchQuery] = useState(filters.search || "");
+  const [selectedMake, setSelectedMake] = useState(filters.make || "");
+  const [minYear, setMinYear] = useState(filters.minYear || "");
+  const [maxYear, setMaxYear] = useState(filters.maxYear || "");
+
+  // Debounce search query to avoid excessive API calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const debouncedMinYear = useDebounce(minYear, 500);
+  const debouncedMaxYear = useDebounce(maxYear, 500);
+
+  // Filter handlers
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    // Don't update URL immediately - let debounced value handle it
+  };
+
+  const handleMakeChange = (value: string) => {
+    const newMake = value === "all" ? "" : value;
+    setSelectedMake(newMake);
+    const newParams = new URLSearchParams(window.location.search);
+    if (newMake) {
+      newParams.set("make", newMake);
+    } else {
+      newParams.delete("make");
+    }
+    newParams.set("page", "1");
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${newParams.toString()}`
+    );
+  };
+
+  const handleYearChange = (type: "min" | "max", value: string) => {
+    if (type === "min") {
+      setMinYear(value);
+    } else {
+      setMaxYear(value);
+    }
+    // Don't update URL immediately - let debounced value handle it
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedMake("");
+    setMinYear("");
+    setMaxYear("");
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.delete("search");
+    newParams.delete("make");
+    newParams.delete("minYear");
+    newParams.delete("maxYear");
+    newParams.set("page", "1");
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${newParams.toString()}`
+    );
+  };
+
+  // Update URL when debounced values change
+  useEffect(() => {
+    const newParams = new URLSearchParams(window.location.search);
+
+    if (debouncedSearchQuery) {
+      newParams.set("search", debouncedSearchQuery);
+    } else {
+      newParams.delete("search");
+    }
+
+    if (debouncedMinYear) {
+      newParams.set("minYear", debouncedMinYear);
+    } else {
+      newParams.delete("minYear");
+    }
+
+    if (debouncedMaxYear) {
+      newParams.set("maxYear", debouncedMaxYear);
+    } else {
+      newParams.delete("maxYear");
+    }
+
+    newParams.set("page", "1"); // Reset to first page
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}?${newParams.toString()}`
+    );
+  }, [debouncedSearchQuery, debouncedMinYear, debouncedMaxYear]);
+
+  const hasActiveFilters =
+    debouncedSearchQuery ||
+    selectedMake ||
+    debouncedMinYear ||
+    debouncedMaxYear;
 
   // Fetch data on client side if needed
   useEffect(() => {
     if (!shouldFetchData) return;
 
     const fetchData = async () => {
-      setIsLoading(true);
+      // Only show full loading on initial load (when we have no cars)
+      if (cars.length === 0) {
+        setIsLoading(true);
+      }
+      setIsDataLoading(true);
+
       try {
         // Build query params
         const queryParams = new URLSearchParams();
         queryParams.set("page", currentPage.toString());
         queryParams.set("pageSize", pageSize.toString());
+        queryParams.set("view", view);
 
         // Add filter parameters if they exist
         Object.entries(filters).forEach(([key, value]) => {
@@ -115,6 +231,13 @@ export default function CarsPageClient({
             queryParams.set(key, value);
           }
         });
+
+        // Add current inline filter values
+        if (debouncedSearchQuery)
+          queryParams.set("search", debouncedSearchQuery);
+        if (selectedMake) queryParams.set("make", selectedMake);
+        if (debouncedMinYear) queryParams.set("minYear", debouncedMinYear);
+        if (debouncedMaxYear) queryParams.set("maxYear", debouncedMaxYear);
 
         // Fetch cars, makes, and clients in parallel
         const [carsResponse, makesResponse, clientsResponse] =
@@ -126,14 +249,58 @@ export default function CarsPageClient({
 
         if (carsResponse.ok) {
           const carsData = await carsResponse.json();
-          setCars(carsData.cars || []);
+          const carsArray = carsData.cars || [];
+
+          // Ensure all cars have valid _id fields and filter out any duplicates
+          const validCars = carsArray
+            .filter((car: any) => car && car._id)
+            .map((car: any, index: number) => ({
+              ...car,
+              _id: car._id.toString(),
+              // Add fallback ID if _id is somehow invalid
+              uniqueKey: car._id?.toString() || `car-${index}-${Date.now()}`,
+            }));
+
+          setCars(validCars);
           setTotalPages(carsData.pagination?.totalPages || 1);
           setTotalCount(carsData.pagination?.totalCount || 0);
+
+          // Debug logging to help identify key issues
+          if (process.env.NODE_ENV !== "production") {
+            console.log("CarsPageClient: Cars loaded:", {
+              count: validCars.length,
+              hasValidIds: validCars.every((car: any) => car._id),
+              uniqueIds:
+                new Set(validCars.map((car: any) => car._id)).size ===
+                validCars.length,
+              sampleIds: validCars.slice(0, 3).map((car: any) => car._id),
+            });
+          }
         }
 
         if (makesResponse.ok) {
           const makesData = await makesResponse.json();
-          setMakes(makesData.makes || []);
+          const makesArray = makesData.makes || [];
+
+          // Debug logging for makes
+          if (process.env.NODE_ENV !== "production") {
+            console.log("CarsPageClient: Makes loaded:", {
+              count: makesArray.length,
+              hasValidIds: makesArray.every((make: any) => make._id),
+              hasValidNames: makesArray.every((make: any) => make.name),
+              uniqueIds:
+                new Set(makesArray.map((make: any) => make._id)).size ===
+                makesArray.length,
+              uniqueNames:
+                new Set(makesArray.map((make: any) => make.name)).size ===
+                makesArray.length,
+              sampleMakes: makesArray
+                .slice(0, 3)
+                .map((make: any) => ({ id: make._id, name: make.name })),
+            });
+          }
+
+          setMakes(makesArray);
         }
 
         if (clientsResponse.ok) {
@@ -160,11 +327,22 @@ export default function CarsPageClient({
         console.error("Error fetching data:", error);
       } finally {
         setIsLoading(false);
+        setIsDataLoading(false);
       }
     };
 
     fetchData();
-  }, [shouldFetchData, currentPage, pageSize, filters]);
+  }, [
+    shouldFetchData,
+    currentPage,
+    pageSize,
+    filters,
+    view,
+    debouncedSearchQuery,
+    selectedMake,
+    debouncedMinYear,
+    debouncedMaxYear,
+  ]);
 
   // Build the current search params string
   const currentSearchParams = new URLSearchParams({
@@ -179,95 +357,161 @@ export default function CarsPageClient({
   // For the new grid selector, we'll use it in grid mode and fall back to the old view wrapper for list mode
   const useNewGridSelector = view === "grid";
 
-  if (isLoading) {
+  if (isLoading && cars.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
-        <main className="container-wide px-6 py-8">
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading cars...</p>
-            </div>
-          </div>
-        </main>
-      </div>
+      <CarsErrorBoundary>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <LoadingSpinner size="lg" />
+        </div>
+      </CarsErrorBoundary>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container-wide px-6 py-8">
-        <div className="space-y-6 sm:space-y-8">
-          <PageTitle title="Cars Collection" count={totalCount}>
-            <Link
-              href="/cars/new"
-              className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Car
-            </Link>
-          </PageTitle>
+    <CarsErrorBoundary>
+      <div className="min-h-screen bg-background">
+        <main className="container-wide px-6 py-8">
+          <div className="space-y-6 sm:space-y-8">
+            <PageTitle title="Cars Collection" count={totalCount}>
+              <Link
+                href="/cars/new"
+                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Car
+              </Link>
+            </PageTitle>
 
-          {/* Controls Section */}
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex flex-wrap gap-2 items-center">
-              <ViewModeSelector currentView={view} />
-              <PageSizeSelector
-                currentPageSize={pageSize}
-                options={[12, 24, 48, 96]}
-              />
-              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
+            {/* Controls and Filters Section - Single Line */}
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {/* View Controls */}
+              <div className="flex-shrink-0">
+                <ViewModeSelector currentView={view} />
+              </div>
+
+              <div className="flex-shrink-0 w-16">
+                <PageSizeSelector
+                  currentPageSize={pageSize}
+                  options={[12, 24, 48, 96]}
+                />
+              </div>
+
+              <div className="flex-shrink-0 w-40">
+                <SortSelector currentSort={filters.sort || "createdAt_desc"} />
+              </div>
+
+              {/* Search */}
+              <div className="relative flex-shrink-0 w-56">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search cars..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Make */}
+              <div className="flex-shrink-0 w-32">
+                <Select
+                  value={selectedMake || "all"}
+                  onValueChange={handleMakeChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Any Make" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any Make</SelectItem>
+                    {makes.map((make) => (
+                      <SelectItem key={make._id} value={make.name}>
+                        {make.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Year Range */}
+              <div className="flex-shrink-0 w-24">
+                <Input
+                  type="number"
+                  placeholder="Min Year"
+                  value={minYear}
+                  onChange={(e) => handleYearChange("min", e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="flex-shrink-0 w-24">
+                <Input
+                  type="number"
+                  placeholder="Max Year"
+                  value={maxYear}
+                  onChange={(e) => handleYearChange("max", e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+
+              {/* Clear filters button */}
+              {hasActiveFilters && (
+                <div className="flex-shrink-0">
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </div>
+              )}
             </div>
-          </div>
 
-          {useNewGridSelector ? (
-            <CarGridSelector
-              selectionMode="none"
-              cars={undefined}
-              loading={false}
-              showFilters={true}
-              showPagination={true}
-              pageSize={pageSize}
-              useUrlFilters={true}
-              className="space-y-6"
-              gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            />
-          ) : (
-            <>
-              <CarFiltersSection
-                currentFilters={{
-                  make: filters.make || "",
-                  minYear: filters.minYear || "",
-                  maxYear: filters.maxYear || "",
-                  clientId: filters.clientId || "",
-                  search: filters.search || "",
-                }}
-                makes={makes.map((make) => make.name)}
-                clients={clients}
-              />
-
-              <CarsViewWrapper
+            {useNewGridSelector ? (
+              <CarGridSelector
+                selectionMode="none"
                 cars={cars}
-                viewMode="grid" // Force grid view on mobile, original view on desktop
-                currentSearchParams={currentSearchParams}
-                forceGridOnMobile={true}
-                actualViewMode={view}
-              />
-            </>
-          )}
-
-          {/* Bottom Pagination - only show if not using CarGridSelector's pagination */}
-          {!useNewGridSelector && totalPages > 1 && (
-            <div className="flex justify-center mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
+                loading={isDataLoading}
+                showFilters={false}
+                showPagination={true}
                 pageSize={pageSize}
+                useUrlFilters={false}
+                className="space-y-6"
+                gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
               />
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
+            ) : (
+              <>
+                <CarFiltersSection
+                  currentFilters={{
+                    make: filters.make || "",
+                    minYear: filters.minYear || "",
+                    maxYear: filters.maxYear || "",
+                    clientId: filters.clientId || "",
+                    search: filters.search || "",
+                  }}
+                  makes={makes.map((make) => make.name)}
+                  clients={clients}
+                />
+
+                <CarsViewWrapper
+                  cars={cars}
+                  viewMode="grid" // Force grid view on mobile, original view on desktop
+                  currentSearchParams={currentSearchParams}
+                  forceGridOnMobile={true}
+                  actualViewMode={view}
+                />
+              </>
+            )}
+
+            {/* Bottom Pagination - only show if not using CarGridSelector's pagination */}
+            {!useNewGridSelector && totalPages > 1 && (
+              <div className="flex justify-center mt-8">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                />
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </CarsErrorBoundary>
   );
 }

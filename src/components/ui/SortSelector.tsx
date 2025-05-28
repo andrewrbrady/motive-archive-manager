@@ -69,7 +69,7 @@ export default function SortSelector({
 
   return (
     <Select value={currentSort} onValueChange={handleSortChange}>
-      <SelectTrigger className="w-full text-sm">
+      <SelectTrigger className="text-sm">
         <SelectValue placeholder="Sort by..." />
       </SelectTrigger>
       <SelectContent>
