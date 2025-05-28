@@ -844,6 +844,7 @@ export function ImageGallery({
               height={thumbnailSize.height}
               className="rounded-md"
               onClick={() => handleImageClick(image)}
+              variant="gallery"
             />
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
               <Button
@@ -901,6 +902,7 @@ export function ImageGallery({
                 height={fullSize.height}
                 objectFit="contain"
                 className="rounded-md"
+                variant="large"
               />
             )}
 

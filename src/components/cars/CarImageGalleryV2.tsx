@@ -39,6 +39,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
 
 // Define the allowed values for each field
 const allowedValues = {
@@ -175,30 +176,6 @@ const useSwipeGesture = (onSwipeLeft: () => void, onSwipeRight: () => void) => {
     swipeOffset: currentSwipeOffset,
     isSwipingActive,
   };
-};
-
-// Helper function to get optimized image URL for Cloudflare Images
-const getOptimizedImageUrl = (
-  url: string,
-  isMobile: boolean,
-  isLightbox: boolean = false
-) => {
-  // Check if the URL is from Cloudflare Images (contains imagedelivery.net)
-  if (!url.includes("imagedelivery.net")) {
-    return url;
-  }
-
-  // Different optimization parameters based on context
-  if (isLightbox) {
-    // High quality for lightbox
-    return `${url}w=2000,q=85`;
-  } else if (isMobile) {
-    // Optimized for mobile
-    return `${url}w=800,q=75`;
-  } else {
-    // High quality for desktop main view
-    return `${url}w=1200,q=75`;
-  }
 };
 
 export function CarImageGalleryV2({
@@ -992,12 +969,8 @@ export function CarImageGalleryV2({
                         : "translateX(0px)",
                   }}
                 >
-                  <Image
-                    src={getOptimizedImageUrl(
-                      selectedImage.url,
-                      isMobile,
-                      false
-                    )}
+                  <CloudflareImage
+                    src={selectedImage.url}
                     alt={
                       selectedImage.metadata?.description ||
                       selectedImage.filename ||
@@ -1006,6 +979,7 @@ export function CarImageGalleryV2({
                     fill
                     className="object-cover"
                     priority
+                    variant="hero"
                     onLoad={() => setMainImageLoaded(true)}
                   />
                 </div>
@@ -1029,12 +1003,8 @@ export function CarImageGalleryV2({
                           transform: `translateX(calc(100% + ${swipeOffset}px))`,
                         }}
                       >
-                        <Image
-                          src={getOptimizedImageUrl(
-                            nextImage.url,
-                            isMobile,
-                            false
-                          )}
+                        <CloudflareImage
+                          src={nextImage.url}
                           alt={
                             nextImage.metadata?.description ||
                             nextImage.filename ||
@@ -1042,6 +1012,7 @@ export function CarImageGalleryV2({
                           }
                           fill
                           className="object-cover"
+                          variant={isMobile ? "medium" : "large"}
                         />
                       </div>
                     ) : null;
@@ -1067,12 +1038,8 @@ export function CarImageGalleryV2({
                           transform: `translateX(calc(-100% + ${swipeOffset}px))`,
                         }}
                       >
-                        <Image
-                          src={getOptimizedImageUrl(
-                            prevImage.url,
-                            isMobile,
-                            false
-                          )}
+                        <CloudflareImage
+                          src={prevImage.url}
                           alt={
                             prevImage.metadata?.description ||
                             prevImage.filename ||
@@ -1080,6 +1047,7 @@ export function CarImageGalleryV2({
                           }
                           fill
                           className="object-cover"
+                          variant={isMobile ? "medium" : "large"}
                         />
                       </div>
                     ) : null;
@@ -1207,8 +1175,8 @@ export function CarImageGalleryV2({
                         : "group-hover:opacity-100"
                     )}
                   >
-                    <Image
-                      src={getOptimizedImageUrl(image.url, isMobile, false)}
+                    <CloudflareImage
+                      src={image.url}
                       alt={
                         image.metadata?.description ||
                         image.filename ||
@@ -1217,6 +1185,7 @@ export function CarImageGalleryV2({
                       fill
                       className="object-cover bg-background"
                       sizes="(max-width: 768px) 33vw, 200px"
+                      variant="gallery"
                     />
                     <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-30 transition-opacity" />
                     {image.metadata?.isPrimary && (
@@ -1328,8 +1297,8 @@ export function CarImageGalleryV2({
           <div className="flex flex-col max-h-[calc(90vh-4rem)] overflow-hidden">
             <div className="relative aspect-[16/9] bg-black shrink-0">
               {selectedImage && (
-                <Image
-                  src={getOptimizedImageUrl(selectedImage.url, isMobile, true)}
+                <CloudflareImage
+                  src={selectedImage.url}
                   alt={
                     selectedImage.metadata?.description ||
                     selectedImage.filename ||
@@ -1338,6 +1307,7 @@ export function CarImageGalleryV2({
                   fill
                   className="object-cover"
                   priority
+                  variant="hero"
                 />
               )}
               <Button

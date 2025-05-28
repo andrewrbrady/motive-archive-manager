@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ImageIcon } from "lucide-react";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
+import { CLOUDFLARE_VARIANTS } from "@/lib/cloudflare-image-loader";
 
 interface LazyImageProps {
   src: string;
@@ -16,6 +17,9 @@ interface LazyImageProps {
   loadingVariant?: "skeleton" | "blur" | "none";
   placeholderSrc?: string;
   onClick?: () => void;
+  // New Cloudflare-specific props (optional for backward compatibility)
+  variant?: keyof typeof CLOUDFLARE_VARIANTS;
+  fallback?: string;
 }
 
 const LazyImage: React.FC<LazyImageProps> = ({
@@ -30,6 +34,8 @@ const LazyImage: React.FC<LazyImageProps> = ({
   loadingVariant = "skeleton",
   placeholderSrc,
   onClick,
+  variant,
+  fallback,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -56,6 +62,18 @@ const LazyImage: React.FC<LazyImageProps> = ({
   const handleError = () => {
     setError(true);
     setLoading(false);
+  };
+
+  // Determine the appropriate variant based on dimensions if not specified
+  const getAutoVariant = (): keyof typeof CLOUDFLARE_VARIANTS => {
+    if (variant) return variant;
+
+    // Auto-select variant based on dimensions
+    if (width <= 200 || height <= 200) return "thumbnail";
+    if (width >= 1200 || height >= 800) return "large";
+    if (width === height) return "square";
+    if (width > height * 1.5) return "wide";
+    return "medium";
   };
 
   if (error || !imgSrc) {
@@ -101,13 +119,15 @@ const LazyImage: React.FC<LazyImageProps> = ({
           )}
         />
       )}
-      <Image
+      <CloudflareImage
         src={imgSrc}
         alt={alt}
         fill
         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         quality={quality}
         priority={priority}
+        variant={getAutoVariant()}
+        fallback={fallback || placeholderSrc}
         onLoad={handleLoad}
         onError={handleError}
         className={cn(
@@ -115,6 +135,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
           loading ? "opacity-0" : "opacity-100",
           objectFit === "contain" ? "object-contain" : "object-cover"
         )}
+        showError={false} // We handle error display ourselves for consistency
       />
     </div>
   );

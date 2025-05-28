@@ -44,6 +44,9 @@ Development-specific documentation:
 - **BAT_SCRAPER_INSTRUCTIONS.md** - BAT scraper development instructions
 - **SECURITY_AUDIT_CHECKLIST.md** - Security audit checklist for development
 - **INSPECTION_FEATURE_CHECKLIST.md** - Inspection feature development checklist
+- **PERFORMANCE_OPTIMIZATION_PLAN.md** - Comprehensive performance optimization strategy
+- **CLOUDFLARE_IMAGE_OPTIMIZATION.md** - Cloudflare Images implementation guide
+- **CLOUDFLARE_OPTIMIZATION_CHECKLIST.md** - Step-by-step implementation checklist
 
 ### Root Level Documentation
 
