@@ -72,6 +72,24 @@ src/
 - [Vercel Analytics](https://vercel.com/analytics) - Usage analytics and insights
 - [Vercel Speed Insights](https://vercel.com/docs/speed-insights) - Performance monitoring
 
+## Documentation
+
+Comprehensive documentation is available in the `/docs` directory, organized by category:
+
+- **📚 [Full Documentation Index](docs/README.md)** - Complete documentation overview
+- **🚀 [Deployment Guides](docs/deployment/)** - Service deployment instructions
+- **⚙️ [Feature Documentation](docs/features/)** - Major feature implementations
+- **📖 [Developer Guides](docs/guides/)** - Styling and development guides
+- **🔧 [Troubleshooting](docs/troubleshooting/)** - Common issues and solutions
+- **💻 [Development](docs/development/)** - Development-specific documentation
+
+### Quick Links
+
+- [API Documentation](docs/cars-api-documentation.md)
+- [Styling Guide](docs/guides/MOTIVE_STYLING_GUIDE.md)
+- [Canvas Extension](docs/features/CANVAS_EXTENSION_README.md)
+- [Projects Implementation](docs/features/PROJECTS_IMPLEMENTATION.md)
+
 ## Analytics
 
 This project includes Vercel Analytics and Speed Insights for tracking user interactions and performance metrics. The analytics are automatically enabled when deployed to Vercel and require no additional configuration.
