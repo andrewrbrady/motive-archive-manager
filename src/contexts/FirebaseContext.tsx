@@ -55,7 +55,9 @@ export const FirebaseProvider = ({ children }: FirebaseProviderProps) => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string): Promise<User> => {

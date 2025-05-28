@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logos } from "@/data/site-content";
 import { useTheme } from "@/components/ThemeProvider";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import React, { useState, lazy, Suspense } from "react";
 import { useFastLink } from "@/lib/navigation/simple-cache";
 

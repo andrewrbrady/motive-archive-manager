@@ -18,6 +18,7 @@ import { UserPlus, RefreshCw, Users } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import UserDetailModal from "./UserDetailModal";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 // Shared User interface to be consistent across components
 export interface User {
@@ -36,6 +37,7 @@ export interface User {
 }
 
 export default function UserManagement() {
+  const { user } = useFirebaseAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,36 +49,26 @@ export default function UserManagement() {
   const [isSyncingUser, setIsSyncingUser] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
 
+  // Helper function to get auth headers
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!user) return {};
+    try {
+      const token = await user.getIdToken();
+      return {
+        Authorization: `Bearer ${token}`,
+      };
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return {};
+    }
+  };
+
   useEffect(() => {
-    // Check session and sync claims when component mounts
-    const syncSession = async () => {
-      try {
-        if (process.env.NODE_ENV !== "production") {
-          // [REMOVED] // [REMOVED] console.log("Refreshing session from Firebase Auth...");
-        }
-        const refreshResponse = await fetch("/api/auth/refresh-session");
-        const refreshData = await refreshResponse.json();
-
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Session refresh result:", {
-            success: !!refreshData,
-            hasData: !!refreshData,
-          });
-        }
-
-        // Now fetch users with the refreshed session
-        await fetchUsers();
-      } catch (error) {
-        console.error(
-          "Error refreshing session:",
-          (error as Error).message || "Unknown error"
-        );
-        fetchUsers(); // Still try to fetch users
-      }
-    };
-
-    syncSession();
-  }, []);
+    // Only fetch users when user is available
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
 
   useEffect(() => {
     filterUsers();
@@ -105,8 +97,16 @@ export default function UserManagement() {
   };
 
   const fetchUsers = async (startAfter?: string) => {
+    if (!user) return; // Wait for user to be available
+
     try {
       setIsLoading(true);
+
+      // Get auth headers
+      const headers = await getAuthHeaders();
+      if (Object.keys(headers).length === 0) {
+        throw new Error("No authentication token available");
+      }
 
       // Try with a simplified approach in case of failures
       let url = new URL("/api/users/index", window.location.origin);
@@ -120,8 +120,9 @@ export default function UserManagement() {
         // [REMOVED] // [REMOVED] console.log("Fetching users from:", url.toString());
       }
 
-      // Make the request directly - authentication will be handled by Next.js session
+      // Make the request with Firebase auth headers
       let response = await fetch(url.toString(), {
+        headers,
         credentials: "include", // This ensures cookies are sent with the request
       });
 
@@ -130,44 +131,25 @@ export default function UserManagement() {
         // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
       }
 
-      // If the main endpoint fails, try a fallback approach
+      // If the main endpoint fails, show proper error
       if (!response.ok) {
         if (process.env.NODE_ENV !== "production") {
-          // [REMOVED] // [REMOVED] console.log("Primary endpoint failed, trying fallback approach...");
+          console.error(
+            "API request failed:",
+            response.status,
+            response.statusText
+          );
         }
 
         // Don't show an error toast on initial load - just inform the user about the issue
         if (!startAfter) {
-          setUsers([
-            {
-              uid: "temp-1",
-              name: "Error Loading Users",
-              email: "Please refresh or check console",
-              roles: ["user"],
-              creativeRoles: [],
-              status: "active",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ]);
-          setFilteredUsers([
-            {
-              uid: "temp-1",
-              name: "Error Loading Users",
-              email: "Please refresh or check console",
-              roles: ["user"],
-              creativeRoles: [],
-              status: "active",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ]);
+          setUsers([]);
+          setFilteredUsers([]);
 
           // Show toast with instructions to fix
           toast({
             title: "Authentication Issue",
-            description:
-              "There might be an issue with your admin permissions. Try visiting /api/auth/grant-admin to fix.",
+            description: `Failed to load users: ${response.status} ${response.statusText}`,
             variant: "destructive",
           });
 
@@ -275,12 +257,19 @@ export default function UserManagement() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+    if (!confirm("Are you sure you want to delete this user?")) {
+      return;
+    }
 
     try {
-      // Updated to use the Firestore API endpoint
+      const headers = await getAuthHeaders();
+      if (Object.keys(headers).length === 0) {
+        throw new Error("No authentication token available");
+      }
+
       const response = await fetch(`/api/users/${userId}`, {
         method: "DELETE",
+        headers,
       });
 
       if (!response.ok) {
@@ -315,9 +304,15 @@ export default function UserManagement() {
   const syncUserAvatar = async (userId: string) => {
     setIsSyncingUser(userId);
     try {
+      const headers = await getAuthHeaders();
+      if (Object.keys(headers).length === 0) {
+        throw new Error("No authentication token available");
+      }
+
       const response = await fetch("/api/users/sync-avatar", {
         method: "POST",
         headers: {
+          ...headers,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ userId }),
@@ -357,9 +352,15 @@ export default function UserManagement() {
   const syncAllAvatars = async () => {
     setIsSyncingAll(true);
     try {
+      const headers = await getAuthHeaders();
+      if (Object.keys(headers).length === 0) {
+        throw new Error("No authentication token available");
+      }
+
       const response = await fetch("/api/users/sync-all-avatars", {
         method: "POST",
         headers: {
+          ...headers,
           "Content-Type": "application/json",
         },
       });

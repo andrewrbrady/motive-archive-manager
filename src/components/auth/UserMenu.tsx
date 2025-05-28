@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +17,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function UserMenu() {
   const { data: session } = useSession();
+  const { signOut } = useFirebaseAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignOut = async () => {
     try {
       setIsLoading(true);
-      await signOut({ callbackUrl: "/" });
+      await signOut();
+      // Firebase auth state change will handle the redirect
     } catch (error) {
       console.error("Error signing out:", error);
       setIsLoading(false);
@@ -35,9 +37,6 @@ export function UserMenu() {
       <div className="flex items-center gap-4">
         <Link href="/auth/signin">
           <Button variant="outline">Sign In</Button>
-        </Link>
-        <Link href="/auth/signup">
-          <Button>Sign Up</Button>
         </Link>
       </div>
     );

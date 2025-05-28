@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withFirebaseAuth } from "@/lib/firebase-auth-middleware";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FirestoreUser } from "@/types/firebase";
-import { auth } from "@/auth";
-import { getToken } from "next-auth/jwt";
 
 // Response types
 type ErrorResponse = {
@@ -29,27 +30,9 @@ type CreateUserResponse = {
  * GET all users from Firestore
  * Returns paginated results with format expected by frontend
  */
-async function getUsers(request: NextRequest) {
+async function getUsers(request: NextRequest): Promise<NextResponse<object>> {
   try {
-    // Get session and log detailed information
-    const session = await auth();
-    console.log("Session data in API route:", {
-      sessionExists: !!session,
-      userId: session?.user?.id,
-      email: session?.user?.email,
-      roles: session?.user?.roles,
-      allUserData: session?.user,
-      rawSession: session,
-    });
-
-    // Check if user has admin role
-    if (!session?.user?.roles?.includes("admin")) {
-      // [REMOVED] // [REMOVED] console.log("Access denied: User does not have admin role in any system");
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
-    }
+    // Authentication and authorization is handled by withFirebaseAuth wrapper
 
     // Get pagination parameters from query string
     const { searchParams } = new URL(request.url);
@@ -105,23 +88,9 @@ async function getUsers(request: NextRequest) {
  * CREATE/INVITE a user for Google OAuth authentication
  * Since we only use Google OAuth, this endpoint manages user invitations and roles
  */
-async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
+async function inviteUser(request: NextRequest): Promise<NextResponse<object>> {
   try {
-    // Verify the user is authenticated and has admin privileges
-    const session = await auth();
-    console.log("Session for inviteUser:", {
-      sessionExists: !!session,
-      userId: session?.user?.id,
-      email: session?.user?.email,
-      roles: session?.user?.roles,
-    });
-
-    if (!session?.user?.roles?.includes("admin")) {
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
-    }
+    // Authentication and authorization is handled by withFirebaseAuth wrapper
 
     const data = await request.json();
 
@@ -138,8 +107,6 @@ async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
         { status: 400 }
       );
     }
-
-    // [REMOVED] // [REMOVED] console.log(`Processing user invitation for email: ${data.email}`);
 
     // Check if user already exists in Firebase Auth
     try {
@@ -175,8 +142,6 @@ async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
 
       await adminDb.collection("users").doc(existingUser.uid).update(userData);
 
-      // [REMOVED] // [REMOVED] console.log(`Updated existing user: ${existingUser.uid}`);
-
       return NextResponse.json({
         ...userData,
         message: "User updated successfully",
@@ -199,42 +164,37 @@ async function inviteUser(request: NextRequest): Promise<NextResponse<any>> {
           creativeRoles,
           status,
           accountType: data.accountType || "personal",
+          photoURL: null,
+          image: null,
           bio: data.bio || null,
-          invitedAt: now,
           createdAt: now,
           updatedAt: now,
-          invitedBy: session.user.email,
+          invitedBy: "admin", // Since auth is handled by wrapper, we know it's an admin
         };
 
-        // Use email as document ID for invited users (will be replaced with UID when they sign in)
-        const docId = `invited_${data.email.replace(/[.@]/g, "_")}`;
-        await adminDb
-          .collection("invited_users")
-          .doc(docId)
-          .set(invitedUserData);
-
-        // [REMOVED] // [REMOVED] console.log(`Created invitation for user: ${data.email}`);
+        // Use email as document ID for invited users (will be replaced when they sign up)
+        const docId = data.email.replace(/[.#$[\]]/g, "_");
+        await adminDb.collection("users").doc(docId).set(invitedUserData);
 
         return NextResponse.json({
           ...invitedUserData,
-          id: docId,
-          message:
-            "User invitation created. They will be added to the system when they sign in with Google.",
+          uid: docId,
+          message: "User invitation created successfully",
           type: "invited",
         });
+      } else {
+        throw error;
       }
-
-      throw error; // Re-throw other errors
     }
   } catch (error: any) {
-    console.error("Error processing user invitation:", error);
-
+    console.error("Error creating/inviting user:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to process user invitation" },
+      { error: error.message || "Failed to create/invite user" },
       { status: 500 }
     );
   }
 }
 
-// Export the handlers directly, we'll use NextAuth session for authentication
-export { getUsers as GET, inviteUser as POST };
+// Export the wrapped functions
+export const GET = withFirebaseAuth(getUsers, ["admin"]);
+export const POST = withFirebaseAuth(inviteUser, ["admin"]);

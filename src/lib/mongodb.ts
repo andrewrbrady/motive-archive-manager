@@ -4,9 +4,11 @@ import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
 // Check if we're in a build environment and should skip database connections
 const isBuildTime =
-  process.env.NODE_ENV === "production" &&
-  !process.env.VERCEL &&
-  !process.env.DATABASE_URL;
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  (process.env.NODE_ENV === "production" &&
+    !process.env.VERCEL &&
+    !process.env.DATABASE_URL &&
+    !process.env.MONGODB_URI);
 const isStaticGeneration = process.env.NEXT_PHASE === "phase-production-build";
 
 if (!process.env.MONGODB_URI) {
@@ -58,9 +60,9 @@ if (isVercel) {
   options.waitQueueTimeoutMS = 5000;
   options.heartbeatFrequencyMS = 15000;
   options.family = 4;
-  console.log(
-    "Detected Vercel environment, using optimized MongoDB connection settings"
-  );
+  // console.log(
+  //   "Detected Vercel environment, using optimized MongoDB connection settings"
+  // );
 }
 
 // Add development environment specific settings
@@ -77,26 +79,26 @@ if (process.env.NODE_ENV === "development") {
   options.maxIdleTimeMS = 120000;
   // Add heartbeat to keep connections alive
   options.heartbeatFrequencyMS = 30000;
-  console.log(
-    "Development environment detected, using development-specific MongoDB settings"
-  );
+  // console.log(
+  //   "Development environment detected, using development-specific MongoDB settings"
+  // );
 }
 
-// Log MongoDB configuration (omit URI for security)
-console.log("MongoDB Configuration:", {
-  maxPoolSize: options.maxPoolSize,
-  minPoolSize: options.minPoolSize,
-  maxIdleTimeMS: options.maxIdleTimeMS,
-  connectTimeoutMS: options.connectTimeoutMS,
-  socketTimeoutMS: options.socketTimeoutMS,
-  serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
-  waitQueueTimeoutMS: options.waitQueueTimeoutMS,
-  retryWrites: options.retryWrites,
-  retryReads: options.retryReads,
-  heartbeatFrequencyMS: options.heartbeatFrequencyMS,
-  family: options.family,
-  isVercel,
-});
+// Log MongoDB configuration (omit URI for security) - commented out for cleaner logs
+// console.log("MongoDB Configuration:", {
+//   maxPoolSize: options.maxPoolSize,
+//   minPoolSize: options.minPoolSize,
+//   maxIdleTimeMS: options.maxIdleTimeMS,
+//   connectTimeoutMS: options.connectTimeoutMS,
+//   socketTimeoutMS: options.socketTimeoutMS,
+//   serverSelectionTimeoutMS: options.serverSelectionTimeoutMS,
+//   waitQueueTimeoutMS: options.waitQueueTimeoutMS,
+//   retryWrites: options.retryWrites,
+//   retryReads: options.retryReads,
+//   heartbeatFrequencyMS: options.heartbeatFrequencyMS,
+//   family: options.family,
+//   isVercel,
+// });
 
 // Get database name from environment or use default
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -114,7 +116,7 @@ export async function getDatabase(): Promise<Db> {
     // Test the connection with a simple operation with retry logic
     try {
       await db.admin().ping();
-      console.log("MongoDB connection verified with ping");
+      // console.log("MongoDB connection verified with ping");
     } catch (pingError) {
       console.log("Ping failed, attempting to reconnect...");
 
@@ -127,7 +129,7 @@ export async function getDatabase(): Promise<Db> {
 
       // Test the fresh connection
       await freshDb.admin().ping();
-      console.log("Fresh MongoDB connection established and verified");
+      // console.log("Fresh MongoDB connection established and verified");
 
       return freshDb;
     }
@@ -150,7 +152,7 @@ export async function getDatabase(): Promise<Db> {
 
       // Verify the connection works
       await db.admin().ping();
-      console.log("Fresh connection verified with ping");
+      // console.log("Fresh connection verified with ping");
 
       return db;
     } catch (retryError) {
@@ -206,9 +208,9 @@ function shouldForceNewConnection(): boolean {
   // If more than CONNECTION_TTL has passed since our last connection,
   // we should force a new one to avoid using a stale connection
   if (timeSinceLastConnection > CONNECTION_TTL) {
-    console.log(
-      `Last connection was ${timeSinceLastConnection}ms ago. Forcing new connection.`
-    );
+    // console.log(
+    //   `Last connection was ${timeSinceLastConnection}ms ago. Forcing new connection.`
+    // );
     return true;
   }
   return false;
@@ -235,10 +237,10 @@ export async function dbConnect() {
     await mongoose.connect(process.env.MONGODB_URI, {
       dbName: process.env.MONGODB_DB || "motive_archive",
     });
-    console.log(
-      "MongoDB - Successfully connected to database:",
-      process.env.MONGODB_DB || "motive_archive"
-    );
+    // console.log(
+    //   "MongoDB - Successfully connected to database:",
+    //   process.env.MONGODB_DB || "motive_archive"
+    // );
   } catch (error) {
     console.error("MongoDB - Connection error:", {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -255,7 +257,7 @@ let clientPromise: Promise<MongoClient> | null = null;
 // Create a cached MongoDB connection
 function initializeConnection() {
   if (isBuildTime || isStaticGeneration) {
-    console.log("Skipping MongoDB initialization during build time");
+    // console.log("Skipping MongoDB initialization during build time");
     return;
   }
 
@@ -276,13 +278,13 @@ function createMongoClient(): Promise<MongoClient> {
   }
 
   // [REMOVED] // [REMOVED] console.log("Creating new MongoDB client connection to database:", DB_NAME);
-  console.log("MongoDB connection options:", {
-    maxPoolSize: options.maxPoolSize,
-    minPoolSize: options.minPoolSize,
-    maxIdleTimeMS: options.maxIdleTimeMS,
-    isVercel: process.env.VERCEL === "1",
-    environment: process.env.NODE_ENV,
-  });
+  // console.log("MongoDB connection options:", {
+  //   maxPoolSize: options.maxPoolSize,
+  //   minPoolSize: options.minPoolSize,
+  //   maxIdleTimeMS: options.maxIdleTimeMS,
+  //   isVercel: process.env.VERCEL === "1",
+  //   environment: process.env.NODE_ENV,
+  // });
 
   const clientOptions = {
     ...options,
@@ -312,10 +314,10 @@ function createMongoClient(): Promise<MongoClient> {
         .connect()
         .then((connectedClient) => {
           global._lastConnectionTime = Date.now();
-          console.log(
-            "MongoDB client connected successfully to database:",
-            DB_NAME
-          );
+          // console.log(
+          //   "MongoDB client connected successfully to database:",
+          //   DB_NAME
+          // );
           resolve(connectedClient);
         })
         .catch((err) => {
@@ -380,8 +382,7 @@ export async function getMongoClient(
 
   // If too many recent attempts, force a new connection
   if (global._connectionAttempts > 7) {
-    // Back to original
-    console.log("Too many connection attempts detected. Resetting connection.");
+    // console.log("Too many connection attempts detected. Resetting connection.");
     global._mongoClientPromise = null;
     clientPromise = null;
     client = null;
@@ -394,14 +395,14 @@ export async function getMongoClient(
   try {
     // If we should force a new connection, clear the cached promise
     if (shouldForceNewConnection() || !clientPromise) {
-      console.log("Creating fresh MongoDB connection");
+      // console.log("Creating fresh MongoDB connection");
       global._mongoClientPromise = createMongoClient();
       clientPromise = global._mongoClientPromise;
     }
 
     // Ensure there's a valid clientPromise
     if (!clientPromise) {
-      console.log("No valid client promise, creating new one");
+      // console.log("No valid client promise, creating new one");
       clientPromise = createMongoClient();
     }
 
@@ -411,7 +412,7 @@ export async function getMongoClient(
     // Test the connection with a ping - but don't fail on ping errors
     try {
       await connectedClient.db("admin").command({ ping: 1 });
-      console.log("MongoDB connection verified with ping");
+      // console.log("MongoDB connection verified with ping");
     } catch (pingError) {
       console.warn("Ping failed, but continuing with existing connection");
       // Don't throw on ping failure - the connection might still work
@@ -431,9 +432,9 @@ export async function getMongoClient(
         Math.pow(2, global._connectionAttempts) * baseDelay,
         5000 // Back to original
       );
-      console.log(
-        `Retrying connection in ${retryDelay}ms... (attempt ${global._connectionAttempts}/${maxRetries})`
-      );
+      // console.log(
+      //   `Retrying connection in ${retryDelay}ms... (attempt ${global._connectionAttempts}/${maxRetries})`
+      // );
 
       await new Promise((resolve) => setTimeout(resolve, retryDelay));
 
@@ -485,12 +486,12 @@ export async function connectToDatabase() {
 
     // Log connection success with timing
     console.timeEnd("mongodb-connect");
-    console.log(
-      "Connected to database:",
-      db.databaseName,
-      "with pool size:",
-      options.maxPoolSize
-    );
+    // console.log(
+    //   "Connected to database:",
+    //   db.databaseName,
+    //   "with pool size:",
+    //   options.maxPoolSize
+    // );
 
     // Run a simple ping to verify connection is responsive
     await db.command({ ping: 1 });

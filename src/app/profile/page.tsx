@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,7 @@ function ProfileContent() {
           <CardHeader className="text-center">
             <Avatar className="h-24 w-24 mx-auto">
               <AvatarImage
-                src={session.user.profileImage || session.user.image || ""}
+                src={session.user.image || ""}
                 alt={session.user.name || "User"}
               />
               <AvatarFallback className="text-xl">
@@ -103,19 +103,9 @@ function ProfileContent() {
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">
-                  Account Type
+                  User ID
                 </dt>
-                <dd className="mt-1 capitalize">
-                  {session.user.accountType || "Personal"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">
-                  Bio
-                </dt>
-                <dd className="mt-1">
-                  {session.user.bio || "No bio provided"}
-                </dd>
+                <dd className="mt-1 font-mono text-sm">{session.user.id}</dd>
               </div>
             </dl>
           </CardContent>

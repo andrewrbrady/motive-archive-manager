@@ -156,7 +156,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
     // Reset form values when prompt prop changes
     useEffect(() => {
       if (prompt) {
-        reset({
+        const resetData = {
           name: prompt.name || "",
           aiModel: prompt.aiModel || "claude-3-5-sonnet-20241022",
           platform: prompt.platform || platformSettings[0]?.key || "",
@@ -165,7 +165,8 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
           length: prompt.length || lengthSettings[0]?.key || "",
           prompt: prompt.prompt || "",
           isDefault: prompt.isDefault ?? false,
-        });
+        };
+        reset(resetData);
       }
     }, [prompt, reset, platformSettings, lengthSettings]);
 

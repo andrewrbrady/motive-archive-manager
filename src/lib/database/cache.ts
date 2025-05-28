@@ -208,7 +208,19 @@ export const cacheUtils = {
   async warmupCache(): Promise<void> {
     console.log("🔥 Warming up cache...");
 
+    // Skip cache warmup during build time
+    if (
+      typeof window === "undefined" &&
+      (process.env.NEXT_PHASE === "phase-production-build" ||
+        !process.env.NEXTAUTH_URL)
+    ) {
+      console.log("⏭️ Skipping cache warmup during build time");
+      return;
+    }
+
     try {
+      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+
       // Warm up system data (rarely changes)
       await Promise.all([
         // System prompts
@@ -216,8 +228,21 @@ export const cacheUtils = {
           caches.system,
           cacheKeys.systemPrompts(),
           async () => {
-            const response = await fetch("/api/system-prompts/list");
-            return response.json();
+            try {
+              const response = await fetch(
+                `${baseUrl}/api/system-prompts/list`
+              );
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+              return response.json();
+            } catch (error) {
+              console.warn(
+                "Failed to fetch system prompts for cache warmup:",
+                error
+              );
+              return [];
+            }
           }
         ),
 
@@ -226,8 +251,19 @@ export const cacheUtils = {
           caches.system,
           cacheKeys.lengthSettings(),
           async () => {
-            const response = await fetch("/api/length-settings");
-            return response.json();
+            try {
+              const response = await fetch(`${baseUrl}/api/length-settings`);
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+              return response.json();
+            } catch (error) {
+              console.warn(
+                "Failed to fetch length settings for cache warmup:",
+                error
+              );
+              return [];
+            }
           }
         ),
       ]);

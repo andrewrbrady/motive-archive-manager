@@ -223,13 +223,13 @@ export function CarImageGalleryV2({
   }, [isMobile]);
 
   // Get current page and image from URL or default values
-  const currentPage = Number(searchParams.get("page")) || 1;
-  const currentImageId = searchParams.get("image");
+  const currentPage = Number(searchParams?.get("page")) || 1;
+  const currentImageId = searchParams?.get("image");
 
   // Function to update URL with new page number and image ID
   const updateUrlState = useCallback(
     (newPage: number, imageId: string) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParams?.toString() || "");
       params.set("page", newPage.toString());
       params.set("image", imageId);
       router.push(`?${params.toString()}`, { scroll: false });

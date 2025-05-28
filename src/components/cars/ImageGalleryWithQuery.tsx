@@ -139,6 +139,17 @@ export function ImageGalleryWithQuery({
     };
   }, []);
 
+  // Sync currentPage state with URL page parameter
+  useEffect(() => {
+    const urlPage = searchParams?.get("page");
+    const pageFromUrl = urlPage ? parseInt(urlPage) - 1 : 0;
+
+    // Only update if the URL page is different from current state
+    if (pageFromUrl !== currentPage && pageFromUrl >= 0) {
+      setCurrentPage(pageFromUrl);
+    }
+  }, [searchParams, currentPage]);
+
   const handleImageError = useCallback(
     (imageId: string) => {
       if (!isMountedRef.current) return;

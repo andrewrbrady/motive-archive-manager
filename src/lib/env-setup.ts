@@ -36,14 +36,14 @@ if (!process.env.NEXTAUTH_URL) {
   process.env.NEXTAUTH_URL = baseUrl;
 }
 
-console.log("Environment Configuration:", {
-  NODE_ENV: process.env.NODE_ENV,
-  VERCEL_ENV: process.env.VERCEL_ENV,
-  VERCEL_URL: process.env.VERCEL_URL,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-  computed_baseUrl: baseUrl,
-  oauth_callback_url: `${baseUrl}/api/auth/callback/google`,
-});
+// console.log("Environment Configuration:", {
+//   NODE_ENV: process.env.NODE_ENV,
+//   VERCEL_ENV: process.env.VERCEL_ENV,
+//   VERCEL_URL: process.env.VERCEL_URL,
+//   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+//   computed_baseUrl: baseUrl,
+//   oauth_callback_url: `${baseUrl}/api/auth/callback/google`,
+// });
 
 // Type-safe environment variables
 export const env = {

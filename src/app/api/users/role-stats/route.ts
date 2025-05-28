@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { auth } from "@/auth";
+import { withFirebaseAuth } from "@/lib/firebase-auth-middleware";
 
-// Cache role statistics for 30 minutes since they don't change frequently
-export const revalidate = 1800;
+// Make this route dynamic since it uses auth() which requires headers
+export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+async function getRoleStats(
+  request: NextRequest
+): Promise<NextResponse<object>> {
   try {
-    // Check authentication and authorization
-    const session = await auth();
-    if (!session?.user || !session.user.roles.includes("admin")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    // Authentication and authorization is handled by withFirebaseAuth wrapper
 
     // Query Firestore to get all users
     const usersSnapshot = await adminDb.collection("users").get();
@@ -63,3 +61,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = withFirebaseAuth(getRoleStats, ["admin"]);

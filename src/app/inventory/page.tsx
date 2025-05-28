@@ -1,5 +1,5 @@
 // app/inventory/page.tsx
-import React from "react";
+import React, { Suspense } from "react";
 import { fetchInventory } from "@/lib/fetchInventory";
 import { fetchDealers } from "@/lib/fetchDealers";
 import { fetchMakes } from "@/lib/fetchMakes";
@@ -15,6 +15,9 @@ import FiltersSection from "@/components/inventory/FiltersSection";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import MarketTabs from "@/components/market/MarketTabs";
+
+// Make this page dynamic to avoid useSearchParams issues during build
+export const dynamic = "force-dynamic";
 
 // Update the InventoryPageProps interface to include tab
 interface ExtendedInventoryPageProps extends InventoryPageProps {
@@ -65,28 +68,32 @@ export default async function InventoryPage({
     <div className="flex flex-col space-y-6">
       {!isMarketPage && (
         <PageTitle title="Vehicle Inventory" count={total}>
-          <ViewModeSelector currentView={view} />
+          <Suspense fallback={<div>Loading view selector...</div>}>
+            <ViewModeSelector currentView={view} />
+          </Suspense>
         </PageTitle>
       )}
 
-      <FiltersSection
-        currentFilters={{
-          make: filters.make || "",
-          model: filters.model || "",
-          dealer: filters.dealer || "",
-          minPrice: filters.minPrice || "",
-          maxPrice: filters.maxPrice || "",
-          minMileage: filters.minMileage || "",
-          maxMileage: filters.maxMileage || "",
-          minYear: filters.minYear || "",
-          maxYear: filters.maxYear || "",
-          transmission: filters.transmission || "",
-          color: "",
-          interior_color: "",
-        }}
-        _dealers={dealers}
-        makes={makes}
-      />
+      <Suspense fallback={<div>Loading filters...</div>}>
+        <FiltersSection
+          currentFilters={{
+            make: filters.make || "",
+            model: filters.model || "",
+            dealer: filters.dealer || "",
+            minPrice: filters.minPrice || "",
+            maxPrice: filters.maxPrice || "",
+            minMileage: filters.minMileage || "",
+            maxMileage: filters.maxMileage || "",
+            minYear: filters.minYear || "",
+            maxYear: filters.maxYear || "",
+            transmission: filters.transmission || "",
+            color: "",
+            interior_color: "",
+          }}
+          _dealers={dealers}
+          makes={makes}
+        />
+      </Suspense>
 
       {results.length > 0 ? (
         <div className="space-y-8">
@@ -104,11 +111,13 @@ export default async function InventoryPage({
 
           {total > 12 && (
             <div className="flex justify-center mt-8">
-              <Pagination
-                currentPage={page}
-                totalPages={Math.ceil(total / 12)}
-                pageSize={12}
-              />
+              <Suspense fallback={<div>Loading pagination...</div>}>
+                <Pagination
+                  currentPage={page}
+                  totalPages={Math.ceil(total / 12)}
+                  pageSize={12}
+                />
+              </Suspense>
             </div>
           )}
         </div>

@@ -110,7 +110,7 @@ function normalizePromptData(data: any): ICaptionPrompt {
 
 // Convert ICaptionPrompt to PromptTemplate for the modal
 function convertToPromptTemplate(prompt: ICaptionPrompt): PromptTemplate {
-  return {
+  const converted = {
     _id: prompt._id,
     name: prompt.name,
     prompt: prompt.prompt,
@@ -124,6 +124,7 @@ function convertToPromptTemplate(prompt: ICaptionPrompt): PromptTemplate {
       temperature: prompt.modelParams?.temperature,
     },
   };
+  return converted;
 }
 
 const CaptionPromptsContent: React.FC = () => {
@@ -155,9 +156,11 @@ const CaptionPromptsContent: React.FC = () => {
         throw new Error(errorData.error || "Failed to fetch prompts");
       }
       const dataFromApi: any[] = await response.json();
-      setPrompts(dataFromApi.map((item) => normalizePromptData(item)));
+      const normalizedPrompts = dataFromApi.map((item) =>
+        normalizePromptData(item)
+      );
+      setPrompts(normalizedPrompts);
     } catch (err) {
-      console.error(err);
       const errorMessage =
         err instanceof Error ? err.message : "An unknown error occurred";
       setError(errorMessage);
@@ -206,7 +209,7 @@ const CaptionPromptsContent: React.FC = () => {
     };
 
     if (editingPrompt) {
-      // Update existing prompt
+      // Update existing prompt in the list
       setPrompts((prev) =>
         prev.map((p) => (p._id === savedPrompt._id ? updatedPrompt : p))
       );
@@ -215,8 +218,22 @@ const CaptionPromptsContent: React.FC = () => {
       setPrompts((prev) => [...prev, updatedPrompt]);
     }
 
+    // Close the modal immediately to prevent flash
+    setIsModalOpen(false);
+    setEditingPrompt(null);
+
+    // Show success message
+    toast.success(
+      editingPrompt
+        ? "Prompt updated successfully!"
+        : "Prompt created successfully!"
+    );
+
     // Refresh the list to get the latest data from server
-    fetchPrompts();
+    // Use a microtask to ensure this happens after the modal closes
+    Promise.resolve().then(() => {
+      fetchPrompts();
+    });
   };
 
   const handleSetDefault = async (promptId: string) => {
@@ -244,7 +261,6 @@ const CaptionPromptsContent: React.FC = () => {
       toast.success("Default prompt updated successfully!");
       fetchPrompts();
     } catch (err) {
-      console.error(err);
       setPrompts(originalPrompts);
       toast.error("Error setting default prompt", {
         description:
@@ -280,7 +296,6 @@ const CaptionPromptsContent: React.FC = () => {
       fetchPrompts();
       handleCloseDeleteConfirm();
     } catch (err) {
-      console.error(err);
       toast.error("Error deleting prompt", {
         description:
           err instanceof Error ? err.message : "An unknown error occurred",

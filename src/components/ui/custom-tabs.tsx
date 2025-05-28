@@ -59,6 +59,7 @@ const getTabIcon = (tabValue: string) => {
     deliverables: Package,
     events: CalendarDays,
     calendar: Calendar,
+    production: Settings,
   };
 
   return iconMap[tabValue] || FileIcon;
@@ -91,33 +92,26 @@ export function CustomTabs({
 }: CustomTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabParam = searchParams?.get(paramName);
   const isMobile = useIsMobile();
 
-  // Simplified refs - only track URL updates to prevent loops
-  const urlUpdateTimeoutRef = useRef<NodeJS.Timeout>();
-  const lastUrlUpdateRef = useRef<string>("");
+  // Get current tab from URL or use default
+  const urlTab = searchParams?.get(paramName) || null;
+  const validTab = items.find((item) => item.value === urlTab);
+  const currentTab = validTab ? urlTab! : defaultValue || items[0]?.value;
 
-  // Use the URL parameter if available, otherwise use the defaultValue or the first tab
-  const initialTab = tabParam || defaultValue || items[0]?.value;
-  const [activeTab, setActiveTab] = useState(initialTab);
+  // Use a ref to prevent unnecessary re-renders and race conditions
+  const isUpdatingUrl = useRef(false);
 
-  // Simplified URL update function with instant navigation
-  const updateUrl = useCallback(
+  // Simplified tab change handler
+  const handleTabChange = useCallback(
     (value: string) => {
-      // Skip if we just updated to this value
-      if (lastUrlUpdateRef.current === value) return;
+      // Prevent multiple rapid clicks
+      if (isUpdatingUrl.current) return;
 
-      // Clear any pending URL updates
-      if (urlUpdateTimeoutRef.current) {
-        clearTimeout(urlUpdateTimeoutRef.current);
-      }
+      isUpdatingUrl.current = true;
 
-      // Immediate URL update for instant feedback
       try {
-        lastUrlUpdateRef.current = value;
-
-        // Create a new URLSearchParams object from the current search params
+        // Create new URL params
         const params = new URLSearchParams(searchParams?.toString() || "");
 
         // Check for template parameter when switching to non-template tabs
@@ -136,69 +130,41 @@ export function CustomTabs({
         const context = `tab:${value}`;
         const cleanedParams = cleanupUrlParameters(params, context);
 
-        // Use immediate navigation without debouncing
+        // Navigate immediately
         router.replace(`${basePath}?${cleanedParams.toString()}`, {
           scroll: false,
         });
       } catch (error) {
         console.error("Error updating URL:", error);
+      } finally {
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          isUpdatingUrl.current = false;
+        }, 100);
       }
     },
     [searchParams, paramName, basePath, router]
   );
 
-  // Immediate tab change handler for instant UI response
-  const handleTabChange = useCallback(
-    (value: string) => {
-      // Immediately update component state for instant UI feedback
-      setActiveTab(value);
-
-      // Update URL immediately without debouncing
-      updateUrl(value);
-    },
-    [updateUrl]
-  );
-
-  // Sync with URL parameters but only when URL actually changes
-  useEffect(() => {
-    if (
-      tabParam &&
-      tabParam !== activeTab &&
-      tabParam !== lastUrlUpdateRef.current
-    ) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam, activeTab]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (urlUpdateTimeoutRef.current) {
-        clearTimeout(urlUpdateTimeoutRef.current);
-      }
-    };
-  }, []);
-
   // Get the current tab label for the dropdown
   const currentTabLabel =
-    items.find((item) => item.value === activeTab)?.label || items[0]?.label;
+    items.find((item) => item.value === currentTab)?.label || items[0]?.label;
 
   return (
     <Tabs
-      defaultValue={initialTab}
-      value={activeTab}
+      value={currentTab}
       onValueChange={handleTabChange}
       className={`w-full ${className}`}
     >
       {/* Mobile Dropdown */}
       {isMobile ? (
         <div className="mb-8">
-          <Select value={activeTab} onValueChange={handleTabChange}>
+          <Select value={currentTab} onValueChange={handleTabChange}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a tab">
                 <div className="flex items-center gap-2">
                   {(() => {
-                    const IconComponent = getTabIcon(activeTab);
+                    const IconComponent = getTabIcon(currentTab);
                     return <IconComponent className="h-4 w-4" />;
                   })()}
                   {currentTabLabel}

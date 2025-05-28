@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
 const defaultLengthSettings = [
@@ -33,14 +32,9 @@ const defaultLengthSettings = [
   },
 ];
 
-// GET - Fetch length settings for caption generators
-export async function GET() {
+// GET - Fetch length settings for caption generators (public endpoint)
+export async function GET(request: NextRequest): Promise<NextResponse<object>> {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { db } = await connectToDatabase();
     const settings = await db
       .collection("lengthSettings")

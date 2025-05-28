@@ -1,7 +1,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { AuthGuard } from "@/components/auth/AuthGuard";
-import { CarImageGallery } from "@/components/cars/CarImageGallery";
+import { CarTabs } from "@/components/cars/CarTabs";
 import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId, MongoClient } from "mongodb";
 import { CarHeader } from "@/components/cars/CarHeader";
@@ -13,9 +13,8 @@ interface CarPageProps {
 }
 
 async function getCar(id: string) {
-  let mongoClient: MongoClient | null = null;
   try {
-    mongoClient = await getMongoClient();
+    const mongoClient = await getMongoClient();
     const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
     const carsCollection = db.collection("cars");
 
@@ -102,16 +101,8 @@ async function getCar(id: string) {
   } catch (error) {
     console.error("Error fetching car:", error);
     return null;
-  } finally {
-    // Ensure connection is always closed
-    if (mongoClient) {
-      try {
-        await mongoClient.close();
-      } catch (closeError) {
-        console.error("Error closing MongoDB connection:", closeError);
-      }
-    }
   }
+  // DO NOT close the connection - getMongoClient() returns a shared connection
 }
 
 export default async function CarPage({ params }: CarPageProps) {
@@ -129,7 +120,7 @@ export default async function CarPage({ params }: CarPageProps) {
           <CarHeader car={car} />
 
           <div className="mt-8">
-            <CarImageGallery carId={id} showFilters={true} vehicleInfo={car} />
+            <CarTabs carId={id} vehicleInfo={car} />
           </div>
         </div>
       </div>

@@ -33,32 +33,40 @@ export async function verifyFirebaseToken(
   token: string
 ): Promise<TokenData | null> {
   try {
-    // Check if token exists in Firestore API tokens collection
-    const tokensSnapshot = await adminDb
-      .collection("api_tokens")
-      .where("token", "==", token)
-      .where("expiresAt", ">", new Date())
-      .limit(1)
-      .get();
-
-    if (!tokensSnapshot.empty) {
-      const tokenDoc = tokensSnapshot.docs[0];
-      // Update last used
-      await tokenDoc.ref.update({ lastUsed: new Date() });
-
+    // First, try to verify as Firebase Auth token (most common case)
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(token);
       return {
-        userId: tokenDoc.data().userId,
-        userEmail: tokenDoc.data().userEmail,
-        tokenType: "api_token",
+        ...decodedToken,
+        tokenType: "firebase_auth",
       };
-    }
+    } catch (firebaseError) {
+      // If Firebase Auth verification fails, check if it's an API token
+      // Only check API tokens if the token is reasonably short (not a JWT)
+      if (token.length < 500) {
+        const tokensSnapshot = await adminDb
+          .collection("api_tokens")
+          .where("token", "==", token)
+          .where("expiresAt", ">", new Date())
+          .limit(1)
+          .get();
 
-    // If not found in API tokens, verify as Firebase Auth token
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    return {
-      ...decodedToken,
-      tokenType: "firebase_auth",
-    };
+        if (!tokensSnapshot.empty) {
+          const tokenDoc = tokensSnapshot.docs[0];
+          // Update last used
+          await tokenDoc.ref.update({ lastUsed: new Date() });
+
+          return {
+            userId: tokenDoc.data().userId,
+            userEmail: tokenDoc.data().userEmail,
+            tokenType: "api_token",
+          };
+        }
+      }
+
+      // If both Firebase Auth and API token verification fail, throw the original error
+      throw firebaseError;
+    }
   } catch (error) {
     console.error("Error verifying Firebase token:", error);
     return null;

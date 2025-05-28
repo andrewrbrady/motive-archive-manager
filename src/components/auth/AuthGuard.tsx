@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LoadingSpinner } from "@/components/ui/loading";
@@ -19,6 +19,7 @@ export function AuthGuard({
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
+    // Only redirect if we're definitely unauthenticated (not loading)
     if (status === "unauthenticated" && !isRedirecting) {
       console.log(
         "AuthGuard: User is unauthenticated, redirecting to:",
@@ -27,8 +28,14 @@ export function AuthGuard({
       setIsRedirecting(true);
       router.push(redirectTo);
     }
+
+    // Reset redirecting state if user becomes authenticated
+    if (status === "authenticated" && isRedirecting) {
+      setIsRedirecting(false);
+    }
   }, [status, router, redirectTo, isRedirecting]);
 
+  // Show loading while checking auth status or redirecting
   if (status === "loading" || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -37,10 +44,12 @@ export function AuthGuard({
     );
   }
 
+  // If unauthenticated, show nothing (redirect is happening)
   if (status === "unauthenticated") {
     return null;
   }
 
+  // User is authenticated, show children
   return <>{children}</>;
 }
 
@@ -63,28 +72,20 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
   const isAdminBypass = session?.user?.id === "G46fdpqaufe7bmhluKAhakVM44e2";
 
   useEffect(() => {
-    console.log("AdminGuard: Status check", {
-      status,
-      isAuthenticated,
-      isAdmin,
-      isAdminBypass,
-      userRoles: session?.user?.roles,
-      userId: session?.user?.id,
-    });
+    // Don't make any decisions while still loading
+    if (status === "loading") {
+      return;
+    }
 
     if (status === "unauthenticated" && !isRedirecting) {
-      // [REMOVED] // [REMOVED] console.log("AdminGuard: User is unauthenticated, redirecting to signin");
       setIsRedirecting(true);
       router.push("/auth/signin");
     } else if (
-      isAuthenticated &&
+      status === "authenticated" &&
       !isAdmin &&
       !isAdminBypass &&
       !isRedirecting
     ) {
-      console.log(
-        "AdminGuard: User is authenticated but not admin, showing unauthorized"
-      );
       setShowUnauthorized(true);
       // Don't redirect immediately, show unauthorized message first
       setTimeout(() => {
@@ -94,15 +95,7 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
         }
       }, 3000); // Show message for 3 seconds before redirecting
     }
-  }, [
-    status,
-    isAuthenticated,
-    isAdmin,
-    isAdminBypass,
-    router,
-    session,
-    isRedirecting,
-  ]);
+  }, [status, isAdmin, isAdminBypass, router, isRedirecting]); // Removed session from dependencies to prevent unnecessary re-runs
 
   if (isLoading || isRedirecting) {
     return (
@@ -112,29 +105,31 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
     );
   }
 
-  if (showUnauthorized || (isAuthenticated && !isAdmin && !isAdminBypass)) {
+  if (status === "unauthenticated") {
+    return null;
+  }
+
+  if (showUnauthorized && fallbackComponent) {
+    return <>{fallbackComponent}</>;
+  }
+
+  if (isAuthenticated && !isAdmin && !isAdminBypass) {
     return (
-      fallbackComponent || (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-            <p className="text-gray-600">
-              You don't have permission to access this page.
-            </p>
-            <p className="text-sm text-gray-500">
-              Redirecting you to the home page...
-            </p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <p className="text-muted-foreground mb-4">
+            You don't have permission to access this page.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Redirecting to unauthorized page...
+          </p>
         </div>
-      )
+      </div>
     );
   }
 
-  if (isAuthenticated && (isAdmin || isAdminBypass)) {
-    return <>{children}</>;
-  }
-
-  return null;
+  return <>{children}</>;
 }
 
 export default AuthGuard;

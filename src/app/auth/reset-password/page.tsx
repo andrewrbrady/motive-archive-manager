@@ -1,9 +1,14 @@
+import { Suspense } from "react";
 import ResetPasswordForm from "@/components/ResetPasswordForm";
 
 export const metadata = {
   title: "Reset Password - Motive Archive Manager",
   description: "Reset your password to access your account",
 };
+
+function ResetPasswordContent() {
+  return <ResetPasswordForm />;
+}
 
 export default function ResetPasswordPage() {
   return (
@@ -12,7 +17,9 @@ export default function ResetPasswordPage() {
         <h1 className="text-2xl font-bold text-center mb-8">
           Motive Archive Manager
         </h1>
-        <ResetPasswordForm />
+        <Suspense fallback={<div>Loading...</div>}>
+          <ResetPasswordContent />
+        </Suspense>
       </div>
     </div>
   );

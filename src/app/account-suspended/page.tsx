@@ -1,47 +1,39 @@
 "use client";
 
-import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AccountSuspendedPage() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-red-600">Account Suspended</h1>
-          <div className="mt-2 text-gray-600">
-            <p className="mb-4">
-              Your account has been suspended. This may be due to:
-            </p>
-            <ul className="list-disc text-left pl-8 mb-6">
-              <li>Violation of our terms of service</li>
-              <li>Suspicious activity detected on your account</li>
-              <li>Administrative action</li>
-            </ul>
-            <p>
-              If you believe this is an error, please contact our support team
-              for assistance.
-            </p>
-          </div>
-        </div>
+  const { signOut } = useFirebaseAuth();
 
-        <div className="flex flex-col space-y-3">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => signOut({ callbackUrl: "/" })}
-          >
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold text-destructive">
+            Account Suspended
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">
+            Your account has been suspended. Please contact an administrator for
+            assistance.
+          </p>
+
+          <Button onClick={handleSignOut} variant="outline" className="w-full">
             Sign Out
           </Button>
-          <Link
-            href="/contact"
-            className="text-sm text-center text-blue-600 hover:underline"
-          >
-            Contact Support
-          </Link>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

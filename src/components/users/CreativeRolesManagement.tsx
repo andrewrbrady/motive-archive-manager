@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserPlus, Edit, Trash, Users } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 const CREATIVE_ROLES = [
   "video_editor",
@@ -45,19 +46,43 @@ interface CreativeRoleStats {
 }
 
 export default function CreativeRolesManagement() {
+  const { user } = useFirebaseAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [roleStats, setRoleStats] = useState<CreativeRoleStats[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
 
+  // Helper function to get auth headers
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!user) return {};
+    try {
+      const token = await user.getIdToken();
+      return {
+        Authorization: `Bearer ${token}`,
+      };
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return {};
+    }
+  };
+
   useEffect(() => {
-    fetchRoleStats();
-  }, []);
+    if (user) {
+      fetchRoleStats();
+    }
+  }, [user]);
 
   const fetchRoleStats = async () => {
+    if (!user) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/users/role-stats");
+      const headers = await getAuthHeaders();
+      if (Object.keys(headers).length === 0) {
+        throw new Error("No authentication token available");
+      }
+
+      const response = await fetch("/api/users/role-stats", { headers });
       if (!response.ok) {
         throw new Error("Failed to fetch role statistics");
       }
@@ -94,9 +119,15 @@ export default function CreativeRolesManagement() {
     const formattedRole = newRoleName.toLowerCase().trim().replace(/\s+/g, "_");
 
     try {
+      const headers = await getAuthHeaders();
+      if (Object.keys(headers).length === 0) {
+        throw new Error("No authentication token available");
+      }
+
       const response = await fetch("/api/users/creative-roles", {
         method: "POST",
         headers: {
+          ...headers,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ role: formattedRole }),

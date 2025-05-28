@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useSession } from "next-auth/react";
+import React, { useState, useEffect } from "react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

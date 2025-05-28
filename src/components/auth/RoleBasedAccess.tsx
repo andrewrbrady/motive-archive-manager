@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 
 type RoleBasedAccessProps = {
   /**

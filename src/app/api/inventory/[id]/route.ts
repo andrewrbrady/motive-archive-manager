@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-export const dynamic = "force-dynamic";
-
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+
+// Cache inventory items for 1 hour since they don't change frequently
+export const revalidate = 3600;
 
 export async function GET(request: Request) {
   try {

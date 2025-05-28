@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -208,7 +208,7 @@ function DashboardInner() {
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8 md:h-10 md:w-10">
                 <AvatarImage
-                  src={session.user.profileImage || session.user.image || ""}
+                  src={session.user.image || ""}
                   alt={session.user.name || "User"}
                 />
                 <AvatarFallback className="text-xs">

@@ -5,12 +5,12 @@ import { getApps, initializeApp, cert, getApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
-// Log environment variables status
-console.log("Firebase Admin Environment Variables Status:", {
-  projectId: !!process.env.FIREBASE_PROJECT_ID,
-  clientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
-  privateKeyLength: process.env.FIREBASE_PRIVATE_KEY?.length || 0,
-});
+// Log environment variables status - commented out for cleaner logs
+// console.log("Firebase Admin Environment Variables Status:", {
+//   projectId: !!process.env.FIREBASE_PROJECT_ID,
+//   clientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+//   privateKeyLength: process.env.FIREBASE_PRIVATE_KEY?.length || 0,
+// });
 
 if (
   !process.env.FIREBASE_PROJECT_ID ||

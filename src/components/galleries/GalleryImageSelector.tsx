@@ -148,13 +148,13 @@ export function GalleryImageSelector({
   const [carSearchQuery, setCarSearchQuery] = useState("");
 
   // Get current filter values from URL
-  const currentSearch = searchParams.get("search") || undefined;
-  const currentAngle = searchParams.get("angle") || undefined;
-  const currentMovement = searchParams.get("movement") || undefined;
-  const currentTod = searchParams.get("tod") || undefined;
-  const currentView = searchParams.get("view") || undefined;
-  const currentCarId = searchParams.get("carId") || undefined;
-  const currentPage = parseInt(searchParams.get("page") || "1");
+  const currentSearch = searchParams?.get("search") || undefined;
+  const currentAngle = searchParams?.get("angle") || undefined;
+  const currentMovement = searchParams?.get("movement") || undefined;
+  const currentTod = searchParams?.get("tod") || undefined;
+  const currentView = searchParams?.get("view") || undefined;
+  const currentCarId = searchParams?.get("carId") || undefined;
+  const currentPage = parseInt(searchParams?.get("page") || "1");
 
   // Filter cars based on search query
   const filteredCars = React.useMemo(() => {
@@ -220,7 +220,9 @@ export function GalleryImageSelector({
     (key: string, value: string | null) => {
       // [REMOVED] // [REMOVED] console.log("handleFilterChange called with:", { key, value });
       // Create new URLSearchParams with current values
-      const newSearchParams = new URLSearchParams(searchParams.toString());
+      const newSearchParams = new URLSearchParams(
+        searchParams?.toString() || ""
+      );
 
       // Update the filter value
       if (value === null) {

@@ -1,13 +1,16 @@
-import { useState } from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { useSession } from "next-auth/react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface UserRolesProps {
   userId: string;

@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+// This route needs to be dynamic because it processes query parameters
 export const dynamic = "force-dynamic";
+
+// Cache auction data for 30 minutes since it doesn't change frequently
+export const revalidate = 1800;
 
 interface AuctionQuery {
   platformId?: ObjectId;

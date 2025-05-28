@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -69,42 +69,61 @@ export function PromptEditModal({
   const [includeClientHandle, setIncludeClientHandle] = useState(false);
   const promptFormRef = useRef<PromptFormRef>(null);
 
+  // Memoize the prompt object to prevent unnecessary re-renders
+  const memoizedPrompt = useMemo(() => {
+    if (isCreating || !selectedPrompt) return undefined;
+
+    return {
+      ...selectedPrompt,
+      platform: currentFormValues?.platform || selectedPrompt.platform,
+      tone: currentFormValues?.tone || selectedPrompt.tone,
+      style: currentFormValues?.style || selectedPrompt.style,
+      prompt: currentFormValues?.context || selectedPrompt.prompt,
+      length: selectedPrompt.length,
+      aiModel: model,
+      llmProvider: provider,
+      modelParams: {
+        temperature: temperature,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isDefault: false,
+      includeClientHandle: false,
+    } as any;
+  }, [
+    isCreating,
+    selectedPrompt,
+    currentFormValues,
+    model,
+    provider,
+    temperature,
+  ]);
+
   const handleSubmit = async (formData: PromptFormData) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const method = isCreating ? "POST" : "PATCH";
-      const url = "/api/caption-prompts";
-
-      // Use the length value as-is from the form - no validation needed
-      // since the dropdown only shows valid options from the database
-      const payload: Record<string, any> = {
+      const promptData = {
         ...formData,
-        length: formData.length, // Use the actual selected length value
         aiModel: model,
         llmProvider: provider,
         modelParams: {
-          temperature: temperature || undefined,
+          temperature: temperature,
         },
       };
 
-      // For creating new prompts, ensure we don't include _id field
-      if (isCreating) {
-        // Remove any _id field that might be present in formData
-        delete payload._id;
-        delete payload.id;
-      } else if (selectedPrompt) {
-        // For updates, include the ID in the request body
-        payload.id = selectedPrompt._id;
-      }
+      const url = isCreating ? "/api/caption-prompts" : "/api/caption-prompts";
+      const method = isCreating ? "POST" : "PATCH";
+
+      const body = isCreating
+        ? promptData
+        : { id: selectedPrompt?._id, ...promptData };
 
       const response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -112,34 +131,27 @@ export function PromptEditModal({
         throw new Error(errorData.error || "Failed to save prompt");
       }
 
-      const result = await response.json();
+      const savedPrompt = await response.json();
 
-      // Don't update form values here - let the prompt selection logic handle it
-      // The onPromptSaved callback will trigger the prompt selection which will
-      // properly update the form values with the actual saved prompt data
+      const promptTemplate: PromptTemplate = {
+        _id: savedPrompt._id || selectedPrompt?._id || "",
+        name: promptData.name,
+        prompt: promptData.prompt,
+        aiModel: promptData.aiModel,
+        llmProvider: promptData.llmProvider,
+        platform: promptData.platform,
+        tone: promptData.tone,
+        style: promptData.style,
+        length: promptData.length,
+        modelParams: promptData.modelParams,
+      };
 
-      onPromptSaved(result);
-      onClose();
-
-      toast({
-        title: "Success",
-        description: isCreating
-          ? "Prompt created successfully"
-          : "Prompt updated successfully",
-      });
+      onPromptSaved(promptTemplate);
     } catch (err) {
+      console.error("PromptEditModal handleSubmit error:", err);
       setError(
-        err instanceof Error
-          ? err.message
-          : "An unexpected error occurred while saving the prompt."
+        err instanceof Error ? err.message : "An unknown error occurred"
       );
-
-      toast({
-        title: "Error",
-        description:
-          err instanceof Error ? err.message : "Failed to save prompt",
-        variant: "destructive",
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -185,32 +197,7 @@ export function PromptEditModal({
                   ? "new-prompt-form"
                   : selectedPrompt?._id || "edit-prompt-form"
               }
-              prompt={
-                isCreating
-                  ? undefined
-                  : selectedPrompt
-                    ? ({
-                        ...selectedPrompt,
-                        platform:
-                          currentFormValues?.platform ||
-                          selectedPrompt.platform,
-                        tone: currentFormValues?.tone || selectedPrompt.tone,
-                        style: currentFormValues?.style || selectedPrompt.style,
-                        prompt:
-                          currentFormValues?.context || selectedPrompt.prompt,
-                        length: selectedPrompt.length,
-                        aiModel: model,
-                        llmProvider: provider,
-                        modelParams: {
-                          temperature: temperature,
-                        },
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        isDefault: false,
-                        includeClientHandle: false,
-                      } as any)
-                    : undefined
-              }
+              prompt={memoizedPrompt}
               isSubmitting={isSubmitting}
               externalAiModel={model}
               onCancel={onClose}

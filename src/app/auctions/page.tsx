@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { fetchAuctions, type AuctionFilters } from "@/lib/fetchAuctions";
 import { fetchMakes } from "@/lib/fetchMakes";
 import { fetchPlatforms } from "@/lib/fetchPlatforms";
@@ -8,6 +8,9 @@ import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
 import { AuctionsViewWrapper } from "@/components/auctions/AuctionsViewWrapper";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+
+// Make this page dynamic to avoid useSearchParams issues during build
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: {
@@ -26,6 +29,26 @@ interface PageProps {
     pageSize?: string;
     tab?: string; // Add tab parameter for market page integration
   };
+}
+
+function AuctionsFilters({
+  platforms,
+  makes,
+  currentFilters,
+}: {
+  platforms: any[];
+  makes: any[];
+  currentFilters: any;
+}) {
+  return (
+    <Suspense fallback={<div>Loading filters...</div>}>
+      <FiltersSection
+        platforms={platforms}
+        makes={makes}
+        currentFilters={currentFilters}
+      />
+    </Suspense>
+  );
 }
 
 export default async function AuctionsPage({ searchParams }: PageProps) {
@@ -97,12 +120,14 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
         {!isMarketPage && (
           <PageTitle title="Auctions" count={total}>
             <div className="flex items-center gap-4">
-              <ViewModeSelector currentView={view} />
+              <Suspense fallback={<div>Loading view selector...</div>}>
+                <ViewModeSelector currentView={view} />
+              </Suspense>
             </div>
           </PageTitle>
         )}
 
-        <FiltersSection
+        <AuctionsFilters
           platforms={platforms}
           makes={makes}
           currentFilters={{
@@ -116,6 +141,19 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
         />
 
         <AuctionsViewWrapper auctions={auctions} view={view} />
+
+        {/* Pagination */}
+        {total > pageSize && (
+          <div className="flex justify-center mt-8">
+            <Suspense fallback={<div>Loading pagination...</div>}>
+              <Pagination
+                currentPage={page}
+                totalPages={Math.ceil(total / pageSize)}
+                pageSize={pageSize}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
     </AuthGuard>
   );
