@@ -8,20 +8,30 @@ import {
   ProjectListResponse,
   Project as IProject,
 } from "@/types/project";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
 import { ProjectTemplate } from "@/models/ProjectTemplate";
 import { convertProjectForFrontend } from "@/utils/objectId";
 
-export async function POST(request: NextRequest) {
+async function createProject(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const db = await getDatabase();
     const data: CreateProjectRequest = await request.json();
@@ -104,7 +114,7 @@ export async function POST(request: NextRequest) {
         galleryIds: [],
         deliverableIds: [],
         eventIds: [],
-        ownerId: session.user.id,
+        ownerId: userId,
         templateId: data.templateId,
         timeline: {
           startDate: new Date(data.timeline.startDate),
@@ -114,7 +124,7 @@ export async function POST(request: NextRequest) {
         },
         members: [
           {
-            userId: session.user.id,
+            userId: userId,
             role: "owner",
             permissions: [
               "read",
@@ -206,18 +216,21 @@ export async function POST(request: NextRequest) {
       galleryIds: [],
       deliverableIds: [],
       eventIds: [],
-      ownerId: session.user.id,
+      ownerId: userId,
       timeline: {
         startDate: new Date(data.timeline.startDate),
-        endDate: data.timeline.endDate
-          ? new Date(data.timeline.endDate)
-          : undefined,
+        endDate:
+          data.timeline.endDate ||
+          new Date(
+            new Date(data.timeline.startDate).getTime() +
+              (data.timeline.estimatedDuration || 30) * 24 * 60 * 60 * 1000
+          ),
         milestones: milestones,
-        estimatedDuration: data.timeline.estimatedDuration,
+        estimatedDuration: data.timeline.estimatedDuration || 30,
       },
       members: [
         {
-          userId: session.user.id,
+          userId: userId,
           role: "owner",
           permissions: [
             "read",
@@ -261,15 +274,6 @@ export async function POST(request: NextRequest) {
       .collection("projects")
       .findOne({ _id: result.insertedId });
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Created project:", {
-        id: project?._id,
-        title: project?.title,
-        type: project?.type,
-        status: project?.status,
-      });
-    }
-
     return NextResponse.json(
       {
         project: convertProjectForFrontend(project),
@@ -278,32 +282,36 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating project:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to create project", details: errorMessage },
+      { error: "Failed to create project" },
       { status: 500 }
     );
   }
 }
 
-export async function GET(request: NextRequest) {
+async function getProjects(request: NextRequest) {
   try {
     console.log("Projects API: GET request received");
 
-    const session = await auth();
-    console.log("Projects API: Session check", {
-      hasSession: !!session,
-      userId: session?.user?.id,
-    });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
 
-    if (!session?.user?.id) {
+    if (!tokenData) {
       console.log("Projects API: No authentication, returning 401");
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    console.log("Projects API: Session check", {
+      hasSession: true,
+      userId: userId,
+    });
 
     const db = await getDatabase();
     console.log("Projects API: Database connection established");
@@ -335,10 +343,7 @@ export async function GET(request: NextRequest) {
 
     // Build query
     const query: any = {
-      $or: [
-        { ownerId: session.user.id },
-        { "members.userId": session.user.id },
-      ],
+      $or: [{ ownerId: userId }, { "members.userId": userId }],
     };
 
     // Add search
@@ -385,7 +390,7 @@ export async function GET(request: NextRequest) {
         members:
           p.members?.map((m: any) => ({ userId: m.userId, role: m.role })) ||
           [],
-        currentUserId: session.user.id,
+        currentUserId: userId,
       })),
     });
 
@@ -509,3 +514,7 @@ function getDefaultPermissions(role: string): string[] {
 
   return defaultPermissions[role] || ["read"];
 }
+
+// Export the wrapped functions
+export const GET = withFirebaseAuth<any>(getProjects);
+export const POST = withFirebaseAuth<any>(createProject);

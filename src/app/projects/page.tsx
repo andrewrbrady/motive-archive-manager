@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSession } from "@/hooks/useFirebaseAuth";
+import { useState, useEffect, useRef } from "react";
+import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import {
   Project,
@@ -37,6 +37,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
+  const { user } = useFirebaseAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,8 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const fetchingRef = useRef(false);
+  const initialLoadRef = useRef(false);
 
   // State for tracking image loading for each project
   const [imageStates, setImageStates] = useState<
@@ -57,32 +60,27 @@ export default function ProjectsPage() {
     >
   >({});
 
-  useEffect(() => {
-    console.log("ProjectsPage: useEffect triggered", {
-      status,
-      sessionExists: !!session,
-      userId: session?.user?.id,
-    });
-
-    if (status === "loading") {
-      console.log("ProjectsPage: Session still loading...");
-      return;
-    }
-
-    if (!session) {
-      console.log("ProjectsPage: No session, redirecting to signin");
-      router.push("/auth/signin");
-      return;
-    }
-
-    console.log("ProjectsPage: Session valid, fetching projects");
-    fetchProjects();
-  }, [session, status, search, statusFilter, typeFilter]);
-
   const fetchProjects = async () => {
+    if (fetchingRef.current) {
+      console.log("ProjectsPage: Already fetching, skipping...");
+      return;
+    }
+
     try {
+      fetchingRef.current = true;
       console.log("ProjectsPage: Starting to fetch projects...");
       setLoading(true);
+
+      if (!user) {
+        console.log("ProjectsPage: No user available in fetchProjects");
+        throw new Error("No authenticated user found");
+      }
+
+      console.log("ProjectsPage: Getting Firebase ID token...");
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+      console.log("ProjectsPage: Got Firebase ID token successfully");
+
       const params = new URLSearchParams();
 
       if (search) params.append("search", search);
@@ -95,7 +93,11 @@ export default function ProjectsPage() {
       const url = `/api/projects?${params.toString()}`;
       console.log("ProjectsPage: Fetching from URL:", url);
 
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       console.log("ProjectsPage: Response status:", response.status);
 
       if (!response.ok) {
@@ -135,6 +137,7 @@ export default function ProjectsPage() {
       });
 
       setImageStates(newImageStates);
+      console.log("ProjectsPage: Successfully loaded projects and set state");
 
       // ✅ REMOVED: No more setTimeout + individual fetch calls
       // This was causing 10-50 simultaneous API requests
@@ -142,9 +145,61 @@ export default function ProjectsPage() {
       console.error("ProjectsPage: Error fetching projects:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
+      console.log("ProjectsPage: Setting loading to false");
       setLoading(false);
+      fetchingRef.current = false;
     }
   };
+
+  // Initial authentication and load effect
+  useEffect(() => {
+    console.log("ProjectsPage: Auth useEffect triggered", {
+      status,
+      sessionExists: !!session,
+      userExists: !!user,
+      userId: session?.user?.id,
+      initialLoadDone: initialLoadRef.current,
+    });
+
+    if (status === "loading") {
+      console.log("ProjectsPage: Session still loading...");
+      return;
+    }
+
+    if (!session) {
+      console.log("ProjectsPage: No session, redirecting to signin");
+      router.push("/auth/signin");
+      return;
+    }
+
+    if (!user) {
+      console.log(
+        "ProjectsPage: Session exists but no Firebase user yet, waiting..."
+      );
+      return;
+    }
+
+    if (!initialLoadRef.current) {
+      console.log(
+        "ProjectsPage: Initial load - session and user valid, fetching projects"
+      );
+      initialLoadRef.current = true;
+      fetchProjects();
+    }
+  }, [session, status, user]);
+
+  // Search and filter effect
+  useEffect(() => {
+    if (
+      initialLoadRef.current &&
+      session &&
+      user &&
+      status === "authenticated"
+    ) {
+      console.log("ProjectsPage: Search/filter changed, refetching projects");
+      fetchProjects();
+    }
+  }, [search, statusFilter, typeFilter]);
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
@@ -176,7 +231,7 @@ export default function ProjectsPage() {
     }
   };
 
-  if (status === "loading" || loading) {
+  if (status === "loading" || loading || (session && !user)) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">
