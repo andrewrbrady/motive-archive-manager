@@ -15,6 +15,7 @@ import {
 import { ObjectId } from "mongodb";
 import { ProjectTemplate } from "@/models/ProjectTemplate";
 import { convertProjectForFrontend } from "@/utils/objectId";
+import { getFormattedImageUrl } from "@/lib/cloudflare";
 
 async function createProject(request: NextRequest) {
   try {
@@ -425,6 +426,18 @@ async function getProjects(request: NextRequest) {
       firstProjectTitle: projects[0]?.title || "No projects",
     });
 
+    // Debug: Log primary image IDs from projects
+    console.log(
+      "Projects API: Primary image IDs in projects:",
+      projects.map((p) => ({
+        id: p._id,
+        title: p.title,
+        primaryImageId: p.primaryImageId,
+        primaryImageIdString: p.primaryImageId?.toString(),
+        hasPrimaryImageId: !!p.primaryImageId,
+      }))
+    );
+
     // ✅ Fetch primary image URLs if requested
     let projectsWithImages = projects;
     if (includeImages) {
@@ -436,6 +449,11 @@ async function getProjects(request: NextRequest) {
         .filter(Boolean)
         .map((id) => new ObjectId(id));
 
+      console.log(
+        "Projects API: Image IDs to fetch:",
+        imageIds.map((id) => id.toString())
+      );
+
       if (imageIds.length > 0) {
         // Batch fetch all images
         const images = await db
@@ -445,19 +463,50 @@ async function getProjects(request: NextRequest) {
           })
           .toArray();
 
+        console.log(
+          "Projects API: Found images:",
+          images.map((img) => ({
+            id: img._id.toString(),
+            url: img.url,
+            filename: img.filename,
+          }))
+        );
+
         // Create a map of imageId -> imageUrl
         const imageUrlMap = new Map();
         images.forEach((img) => {
-          imageUrlMap.set(img._id.toString(), img.url);
+          // Format the image URL with the proper variant for display in project cards
+          const formattedUrl = getFormattedImageUrl(img.url, "public");
+          imageUrlMap.set(img._id.toString(), formattedUrl);
         });
+
+        console.log(
+          "Projects API: Image URL map:",
+          Array.from(imageUrlMap.entries())
+        );
 
         // Add image URLs to projects
         projectsWithImages = projects.map((project) => ({
           ...project,
           primaryImageUrl: project.primaryImageId
-            ? imageUrlMap.get(project.primaryImageId)
+            ? imageUrlMap.get(project.primaryImageId.toString())
             : null,
         }));
+
+        console.log(
+          "Projects API: Projects with images:",
+          projectsWithImages.map((p) => ({
+            id: p._id,
+            title: p.title,
+            primaryImageId: p.primaryImageId,
+            primaryImageIdString: p.primaryImageId?.toString(),
+            primaryImageUrl: p.primaryImageUrl,
+            lookupKey: p.primaryImageId?.toString(),
+            foundInMap: p.primaryImageId
+              ? imageUrlMap.has(p.primaryImageId.toString())
+              : false,
+          }))
+        );
 
         console.log("Projects API: Added image URLs", {
           imagesFound: images.length,
@@ -465,6 +514,8 @@ async function getProjects(request: NextRequest) {
             (p) => p.primaryImageUrl
           ).length,
         });
+      } else {
+        console.log("Projects API: No image IDs to fetch");
       }
     }
 

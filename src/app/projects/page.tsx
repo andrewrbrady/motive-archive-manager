@@ -116,6 +116,19 @@ export default function ProjectsPage() {
         limit: data.limit,
       });
 
+      // Debug: Log detailed project data to see primary image info
+      console.log(
+        "ProjectsPage: Project details:",
+        data.projects.map((p) => ({
+          id: p._id,
+          title: p.title,
+          primaryImageId: p.primaryImageId,
+          primaryImageUrl: p.primaryImageUrl,
+          hasPrimaryImageId: !!p.primaryImageId,
+          hasPrimaryImageUrl: !!p.primaryImageUrl,
+        }))
+      );
+
       setProjects(data.projects);
 
       // ✅ Initialize image states with data from the API response
