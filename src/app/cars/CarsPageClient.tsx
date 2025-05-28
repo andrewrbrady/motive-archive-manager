@@ -223,11 +223,12 @@ export default function CarsPageClient({
           {useNewGridSelector ? (
             <CarGridSelector
               selectionMode="none"
-              cars={cars}
+              cars={undefined}
               loading={false}
               showFilters={true}
-              showPagination={false} // We'll handle pagination separately for now
-              useUrlFilters={true} // Enable URL-based filtering
+              showPagination={true}
+              pageSize={pageSize}
+              useUrlFilters={true}
               className="space-y-6"
               gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             />
@@ -255,8 +256,8 @@ export default function CarsPageClient({
             </>
           )}
 
-          {/* Bottom Pagination */}
-          {totalPages > 1 && (
+          {/* Bottom Pagination - only show if not using CarGridSelector's pagination */}
+          {!useNewGridSelector && totalPages > 1 && (
             <div className="flex justify-center mt-8">
               <Pagination
                 currentPage={currentPage}

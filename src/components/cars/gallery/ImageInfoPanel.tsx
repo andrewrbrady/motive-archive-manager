@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,12 +11,22 @@ import { X, Copy, Download, RefreshCw, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { ExtendedImageType, getUrlVariations } from "@/types/gallery";
+import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface ImageInfoPanelProps {
   currentImage: ExtendedImageType;
   onClose: () => void;
-  onReanalyze: (imageId: string) => void;
+  onReanalyze: (imageId: string, promptId?: string, modelId?: string) => void;
   onSetPrimary?: (imageId: string) => void;
+}
+
+interface ImageAnalysisPrompt {
+  _id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isDefault: boolean;
 }
 
 export function ImageInfoPanel({
@@ -26,10 +36,77 @@ export function ImageInfoPanel({
   onSetPrimary,
 }: ImageInfoPanelProps) {
   const { toast } = useToast();
+  const { user } = useFirebaseAuth();
   const [selectedUrlOption, setSelectedUrlOption] =
     useState<string>("Original");
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [isSettingPrimary, setIsSettingPrimary] = useState(false);
+  const [showReanalysisOptions, setShowReanalysisOptions] = useState(false);
+  const [selectedPromptId, setSelectedPromptId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>(
+    IMAGE_ANALYSIS_CONFIG.availableModels.find((m) => m.isDefault)?.id ||
+      "gpt-4o-mini"
+  );
+  const [availablePrompts, setAvailablePrompts] = useState<
+    ImageAnalysisPrompt[]
+  >([]);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
+
+  // Helper function to get auth headers
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!user) return {};
+    try {
+      const token = await user.getIdToken();
+      return {
+        Authorization: `Bearer ${token}`,
+      };
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return {};
+    }
+  };
+
+  // Load available prompts when reanalysis options are shown
+  useEffect(() => {
+    const loadPrompts = async () => {
+      if (!showReanalysisOptions || !user) return;
+
+      setIsLoadingPrompts(true);
+      try {
+        const headers = await getAuthHeaders();
+        if (Object.keys(headers).length === 0) {
+          console.error("No authentication token available");
+          return;
+        }
+
+        const response = await fetch(
+          "/api/admin/image-analysis-prompts/active",
+          { headers }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setAvailablePrompts(data || []);
+
+          // Set default prompt if available
+          const defaultPrompt = data?.find(
+            (p: ImageAnalysisPrompt) => p.isDefault
+          );
+          if (defaultPrompt) {
+            setSelectedPromptId(defaultPrompt._id);
+          }
+        } else {
+          console.error("Failed to fetch prompts:", response.status);
+        }
+      } catch (error) {
+        console.error("Failed to load prompts:", error);
+      } finally {
+        setIsLoadingPrompts(false);
+      }
+    };
+
+    loadPrompts();
+  }, [showReanalysisOptions, user]);
 
   const urlVariations = getUrlVariations(currentImage.url);
   const urlOptions = [
@@ -90,7 +167,12 @@ export function ImageInfoPanel({
   const handleReanalyze = async () => {
     setIsReanalyzing(true);
     try {
-      await onReanalyze(currentImage.id || currentImage._id);
+      await onReanalyze(
+        currentImage.id || currentImage._id,
+        selectedPromptId || undefined,
+        selectedModelId || undefined
+      );
+      setShowReanalysisOptions(false);
     } finally {
       setIsReanalyzing(false);
     }
@@ -124,13 +206,15 @@ export function ImageInfoPanel({
           <h3 className="text-sm font-semibold">Image Information</h3>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleReanalyze}
+              onClick={() => setShowReanalysisOptions(!showReanalysisOptions)}
               disabled={isReanalyzing}
               className={cn(
                 "p-1 rounded transition-colors",
                 isReanalyzing
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
-                  : "hover:bg-muted"
+                  : showReanalysisOptions
+                    ? "bg-primary/20 text-primary"
+                    : "hover:bg-muted"
               )}
               title="Re-analyze image metadata with enhanced validation"
             >
@@ -147,6 +231,92 @@ export function ImageInfoPanel({
             </button>
           </div>
         </div>
+
+        {/* Reanalysis Options */}
+        {showReanalysisOptions && (
+          <div className="space-y-3 mb-4 p-3 bg-muted/50 rounded-lg">
+            <h4 className="text-sm font-medium">Reanalysis Options</h4>
+
+            {/* Prompt Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium">Analysis Prompt</label>
+              <Select
+                value={selectedPromptId}
+                onValueChange={setSelectedPromptId}
+                disabled={isLoadingPrompts}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue
+                    placeholder={
+                      isLoadingPrompts
+                        ? "Loading prompts..."
+                        : "Select analysis prompt"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availablePrompts.map((prompt) => (
+                    <SelectItem key={prompt._id} value={prompt._id}>
+                      <div className="flex flex-col">
+                        <span className="text-sm">{prompt.name}</span>
+                        {prompt.description && (
+                          <span className="text-xs text-muted-foreground">
+                            {prompt.description}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Model Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium">AI Model</label>
+              <Select
+                value={selectedModelId}
+                onValueChange={setSelectedModelId}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {IMAGE_ANALYSIS_CONFIG.availableModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex flex-col">
+                        <span className="text-sm">{model.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {model.description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Reanalyze Button */}
+            <Button
+              onClick={handleReanalyze}
+              disabled={isReanalyzing || isLoadingPrompts}
+              size="sm"
+              className="w-full"
+            >
+              {isReanalyzing ? (
+                <>
+                  <RefreshCw className="w-3 h-3 animate-spin mr-2" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-2" />
+                  Reanalyze Image
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         <div className="space-y-3 text-sm">
           {/* Primary Image Button */}

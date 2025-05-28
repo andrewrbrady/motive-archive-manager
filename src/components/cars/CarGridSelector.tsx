@@ -25,7 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/ui/loading";
 import CarCard from "./CarCard";
-import { useDebounce } from "use-debounce";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface CarGridSelectorProps {
@@ -116,7 +116,7 @@ export function CarGridSelector({
   const [makes, setMakes] = useState<string[]>([]);
 
   // Debounce search query with 500ms delay
-  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
 
   // Update filters when debounced search query changes
   useEffect(() => {
@@ -309,6 +309,17 @@ export function CarGridSelector({
     onCarsSelect?.(newSelection);
   };
 
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+
+    // Update URL if using URL filters
+    if (useUrlFilters) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", newPage.toString());
+      router.push(`/cars?${params.toString()}`);
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
   const hasActiveFilters = Object.values(filters).some((value) => value !== "");
   const isCarSelected = (carId: string) => selectedCarIds.includes(carId);
@@ -484,7 +495,7 @@ export function CarGridSelector({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage(1)}
+            onClick={() => handlePageChange(1)}
             disabled={currentPage === 1}
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -492,7 +503,7 @@ export function CarGridSelector({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -506,7 +517,7 @@ export function CarGridSelector({
             variant="outline"
             size="sm"
             onClick={() =>
-              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+              handlePageChange(Math.min(totalPages, currentPage + 1))
             }
             disabled={currentPage === totalPages}
           >
@@ -515,7 +526,7 @@ export function CarGridSelector({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage(totalPages)}
+            onClick={() => handlePageChange(totalPages)}
             disabled={currentPage === totalPages}
           >
             <ChevronsRight className="h-4 w-4" />

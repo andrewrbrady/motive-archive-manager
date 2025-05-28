@@ -6,7 +6,7 @@ export const maxDuration = 90;
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageId, carId } = await request.json();
+    const { imageId, carId, promptId, modelId } = await request.json();
 
     if (!imageId) {
       return NextResponse.json(
@@ -51,6 +51,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`Re-analyzing image: ${image.cloudflareId}`);
     console.log("Current metadata:", JSON.stringify(image.metadata, null, 2));
+    console.log("Using prompt ID:", promptId || "default");
+    console.log("Using model ID:", modelId || "default");
+
+    // Prepare request body for analysis
+    const analysisRequestBody: any = {
+      imageUrl: image.url,
+      vehicleInfo,
+    };
+
+    // Add custom prompt and model if provided
+    if (promptId) {
+      analysisRequestBody.promptId = promptId;
+    }
+    if (modelId) {
+      analysisRequestBody.modelId = modelId;
+    }
 
     // Call the enhanced analysis endpoint
     const analysisResponse = await fetch(
@@ -60,10 +76,7 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          imageUrl: image.url,
-          vehicleInfo,
-        }),
+        body: JSON.stringify(analysisRequestBody),
       }
     );
 
@@ -89,7 +102,9 @@ export async function POST(request: NextRequest) {
       description: analysisResult.analysis?.description || "",
       aiAnalysis: analysisResult.analysis,
       reanalyzedAt: new Date().toISOString(),
-      analysisVersion: "enhanced-validation-v1",
+      analysisVersion: "enhanced-validation-v2",
+      promptId: promptId || null,
+      modelId: modelId || null,
     };
 
     // Update the MongoDB document

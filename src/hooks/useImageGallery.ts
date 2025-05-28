@@ -282,26 +282,37 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   }, [selectedImages, carId, toast, mutate]);
 
   const reanalyzeImage = useCallback(
-    async (imageId: string) => {
+    async (imageId: string, promptId?: string, modelId?: string) => {
       if (isReanalyzing) return;
 
       setIsReanalyzing(true);
       try {
+        const promptText = promptId ? " with custom prompt" : "";
+        const modelText = modelId ? ` using ${modelId}` : "";
+
         toast({
           title: "Re-analyzing Image",
-          description:
-            "Using enhanced validation to improve metadata accuracy...",
+          description: `Using enhanced validation${promptText}${modelText} to improve metadata accuracy...`,
         });
+
+        const requestBody: any = {
+          imageId,
+          carId,
+        };
+
+        if (promptId) {
+          requestBody.promptId = promptId;
+        }
+        if (modelId) {
+          requestBody.modelId = modelId;
+        }
 
         const response = await fetch("/api/openai/reanalyze-image", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            imageId,
-            carId,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
