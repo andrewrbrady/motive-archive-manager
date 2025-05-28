@@ -31,13 +31,26 @@ RUN npm ci --only=production
 # Copy source files
 COPY canvas-service/ ./
 COPY extend_canvas.cpp ./
+COPY matte_generator.cpp ./
+COPY image_cropper.cpp ./
 
 # Compile the canvas extension binary (non-static to use system libraries)
 RUN g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp \
     $(pkg-config --cflags --libs opencv4)
 
-# Make binary executable
-RUN chmod +x extend_canvas
+# Compile the matte generator binary
+RUN g++ -std=c++17 -O2 -Wall -o matte_generator matte_generator.cpp \
+    $(pkg-config --cflags --libs opencv4)
+
+# Compile the image cropper binary
+RUN g++ -std=c++17 -O2 -Wall -o image_cropper image_cropper.cpp \
+    $(pkg-config --cflags --libs opencv4)
+
+# Make binaries executable
+RUN chmod +x extend_canvas matte_generator image_cropper
+
+# Create temp directories
+RUN mkdir -p /tmp/canvas-extension /tmp/image-matte /tmp/image-crop
 
 # Start the server
 CMD ["node", "server.js"] 

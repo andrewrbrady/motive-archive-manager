@@ -239,14 +239,18 @@ export function ImageCropModal({
   );
 
   // Get processing image URL (higher resolution)
-  const getProcessingImageUrl = useCallback((baseUrl: string) => {
-    if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+  const getProcessingImageUrl = useCallback(
+    (baseUrl: string) => {
+      if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
 
-    const urlParts = baseUrl.split("/");
-    // Request high resolution for processing: width=5000, quality=100
-    urlParts[urlParts.length - 1] = "w=5000,q=100";
-    return urlParts.join("/");
-  }, []);
+      const urlParts = baseUrl.split("/");
+      // Use the same width as preview to ensure consistent dimensions
+      // This prevents coordinate scaling issues between preview and processing
+      urlParts[urlParts.length - 1] = `w=${cloudflareWidth},q=100`;
+      return urlParts.join("/");
+    },
+    [cloudflareWidth]
+  );
 
   // Get preview image URL (medium resolution for caching)
   const getPreviewImageUrl = useCallback((baseUrl: string) => {
@@ -696,6 +700,16 @@ export function ImageCropModal({
     try {
       const processingImageUrl = getProcessingImageUrl(image.url || "");
 
+      console.log("🚀 Making crop API call with:", {
+        processingImageUrl: processingImageUrl.substring(0, 100) + "...",
+        cropArea,
+        outputWidth: parseInt(outputWidth),
+        outputHeight: parseInt(outputHeight),
+        scale,
+        processingMethod,
+        originalDimensions,
+      });
+
       const response = await fetch("/api/images/crop-image", {
         method: "POST",
         headers: {
@@ -710,6 +724,7 @@ export function ImageCropModal({
           outputWidth: parseInt(outputWidth),
           outputHeight: parseInt(outputHeight),
           scale: scale,
+          processingMethod: processingMethod, // Add processing method
           uploadToCloudflare: false, // Don't upload yet, just process
           originalFilename: image?.filename,
           originalCarId: image?.carId,
@@ -725,8 +740,12 @@ export function ImageCropModal({
       const result = await response.json();
 
       if (result.success) {
-        // Convert base64 to blob URL for preview
-        if (result.imageData) {
+        // Handle both local API (imageData) and cloud service (processedImageUrl) responses
+        if (result.processedImageUrl) {
+          // Cloud service returns a data URL directly
+          setProcessedImageUrl(result.processedImageUrl);
+        } else if (result.imageData) {
+          // Local API returns base64 string, convert to blob URL for preview
           const byteCharacters = atob(result.imageData);
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
@@ -738,25 +757,39 @@ export function ImageCropModal({
           setProcessedImageUrl(blobUrl);
         }
 
-        setRemoteServiceUsed(false);
+        setRemoteServiceUsed(result.remoteServiceUsed || false);
         setProcessingStatus("Processing completed successfully!");
 
         toast({
           title: "Success",
-          description: "Image cropped successfully",
+          description: `Image cropped successfully using ${
+            result.remoteServiceUsed ? "Cloud Run service" : "local binary"
+          }`,
         });
       } else {
         throw new Error(result.error || "Processing failed");
       }
     } catch (error) {
       console.error("Processing error:", error);
-      setError(
-        error instanceof Error ? error.message : "Unknown error occurred"
-      );
+
+      // Parse error response to get both error and suggestion
+      let errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      let suggestion = "";
+
+      // Check if this is a cloud processing failure with suggestion
+      if (errorMessage.includes("crop-image endpoint may not be available")) {
+        suggestion =
+          "Try switching to 'Local Processing' in the settings below.";
+      }
+
+      setError(errorMessage);
+
       toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Processing failed",
+        title: "Processing Failed",
+        description: suggestion
+          ? `${errorMessage}\n\n💡 ${suggestion}`
+          : errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -795,6 +828,7 @@ export function ImageCropModal({
           outputWidth: parseInt(outputWidth) * multiplier,
           outputHeight: parseInt(outputHeight) * multiplier,
           scale: scale * multiplier,
+          processingMethod: processingMethod, // Add processing method
           uploadToCloudflare: false, // Don't upload yet, just process
           originalFilename: image?.filename,
           originalCarId: image?.carId,
@@ -810,8 +844,12 @@ export function ImageCropModal({
       const result = await response.json();
 
       if (result.success) {
-        // Convert base64 to blob URL for preview
-        if (result.imageData) {
+        // Handle both local API (imageData) and cloud service (processedImageUrl) responses
+        if (result.processedImageUrl) {
+          // Cloud service returns a data URL directly
+          setHighResImageUrl(result.processedImageUrl);
+        } else if (result.imageData) {
+          // Local API returns base64 string, convert to blob URL for preview
           const byteCharacters = atob(result.imageData);
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
@@ -836,13 +874,25 @@ export function ImageCropModal({
       }
     } catch (error) {
       console.error("High-res processing error:", error);
-      setError(
-        error instanceof Error ? error.message : "Unknown error occurred"
-      );
+
+      // Parse error response to get both error and suggestion
+      let errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      let suggestion = "";
+
+      // Check if this is a cloud processing failure with suggestion
+      if (errorMessage.includes("crop-image endpoint may not be available")) {
+        suggestion =
+          "Try switching to 'Local Processing' in the settings below.";
+      }
+
+      setError(errorMessage);
+
       toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "High-res processing failed",
+        title: "High-Resolution Processing Failed",
+        description: suggestion
+          ? `${errorMessage}\n\n💡 ${suggestion}`
+          : errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -887,6 +937,7 @@ export function ImageCropModal({
           outputWidth: parseInt(outputWidth) * multiplier,
           outputHeight: parseInt(outputHeight) * multiplier,
           scale: scale * multiplier,
+          processingMethod: processingMethod, // Add processing method
           uploadToCloudflare: true, // Upload this time
           originalFilename: image?.filename,
           originalCarId: image?.carId,
@@ -916,12 +967,25 @@ export function ImageCropModal({
       }
     } catch (error) {
       console.error("Upload error:", error);
-      setError(
-        error instanceof Error ? error.message : "Unknown error occurred"
-      );
+
+      // Parse error response to get both error and suggestion
+      let errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      let suggestion = "";
+
+      // Check if this is a cloud processing failure with suggestion
+      if (errorMessage.includes("crop-image endpoint may not be available")) {
+        suggestion =
+          "Try switching to 'Local Processing' in the settings below.";
+      }
+
+      setError(errorMessage);
+
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Upload failed",
+        title: "Upload Failed",
+        description: suggestion
+          ? `${errorMessage}\n\n💡 ${suggestion}`
+          : errorMessage,
         variant: "destructive",
       });
     } finally {

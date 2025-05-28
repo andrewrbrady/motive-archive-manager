@@ -1,3 +1,4 @@
+// Canvas Extension and Matte Service v2.4 - with coordinate scaling fix for crop-image endpoint
 const express = require("express");
 const { exec } = require("child_process");
 const { promisify } = require("util");
@@ -329,12 +330,265 @@ app.post("/create-matte", async (req, res) => {
   }
 });
 
+// Image crop endpoint
+app.post("/crop-image", async (req, res) => {
+  const {
+    imageUrl,
+    cropX = 0,
+    cropY = 0,
+    cropWidth,
+    cropHeight,
+    outputWidth = 1080,
+    outputHeight = 1920,
+    scale = 1.0,
+    previewImageDimensions,
+  } = req.body;
+
+  // Validate input parameters
+  if (!imageUrl) {
+    return res.status(400).json({
+      error: "Missing required parameter: imageUrl",
+    });
+  }
+
+  if (outputWidth < 100 || outputWidth > 5000) {
+    return res.status(400).json({
+      error: "Output width must be between 100 and 5000 pixels",
+    });
+  }
+
+  if (outputHeight < 100 || outputHeight > 5000) {
+    return res.status(400).json({
+      error: "Output height must be between 100 and 5000 pixels",
+    });
+  }
+
+  if (scale <= 0 || scale > 10) {
+    return res.status(400).json({
+      error: "Scale factor must be between 0 and 10",
+    });
+  }
+
+  if (cropX < 0 || cropY < 0) {
+    return res.status(400).json({
+      error: "Crop coordinates must be non-negative",
+    });
+  }
+
+  const tempDir = "/tmp/image-crop";
+  const sessionId = uuidv4();
+  const inputPath = path.join(tempDir, `input_${sessionId}.jpg`);
+  const outputPath = path.join(tempDir, `output_${sessionId}.jpg`);
+
+  try {
+    // Ensure temp directory exists
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // Download the image
+    console.log(`Downloading image from: ${imageUrl}`);
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image: ${imageResponse.statusText}`);
+    }
+
+    const imageBuffer = await imageResponse.arrayBuffer();
+    await fs.writeFile(inputPath, Buffer.from(imageBuffer));
+
+    // Get actual image dimensions using ImageMagick identify command
+    let actualWidth, actualHeight;
+    try {
+      const { stdout } = await execAsync(
+        `identify -format "%w %h" "${inputPath}"`
+      );
+      const dimensions = stdout.trim().split(" ");
+      actualWidth = parseInt(dimensions[0]);
+      actualHeight = parseInt(dimensions[1]);
+      console.log(`Actual image dimensions: ${actualWidth}x${actualHeight}`);
+    } catch (identifyError) {
+      console.error("Failed to get image dimensions:", identifyError);
+      throw new Error("Failed to read image dimensions");
+    }
+
+    // Calculate scaling factor if we have preview dimensions
+    let scaledCropX = cropX;
+    let scaledCropY = cropY;
+    let scaledCropWidth = cropWidth;
+    let scaledCropHeight = cropHeight;
+
+    if (previewImageDimensions) {
+      const scaleFactorX = actualWidth / previewImageDimensions.width;
+      const scaleFactorY = actualHeight / previewImageDimensions.height;
+
+      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`);
+
+      scaledCropX = Math.round(cropX * scaleFactorX);
+      scaledCropY = Math.round(cropY * scaleFactorY);
+      scaledCropWidth = Math.round(cropWidth * scaleFactorX);
+      scaledCropHeight = Math.round(cropHeight * scaleFactorY);
+
+      console.log(
+        `Original crop: ${cropX},${cropY} ${cropWidth}x${cropHeight}`
+      );
+      console.log(
+        `Scaled crop: ${scaledCropX},${scaledCropY} ${scaledCropWidth}x${scaledCropHeight}`
+      );
+    }
+
+    // Validate scaled crop area against actual image dimensions
+    if (
+      scaledCropX < 0 ||
+      scaledCropY < 0 ||
+      scaledCropX + scaledCropWidth > actualWidth ||
+      scaledCropY + scaledCropHeight > actualHeight
+    ) {
+      console.error("Scaled crop area validation failed:", {
+        actualDimensions: { actualWidth, actualHeight },
+        scaledCrop: {
+          scaledCropX,
+          scaledCropY,
+          scaledCropWidth,
+          scaledCropHeight,
+        },
+        exceedsRight: scaledCropX + scaledCropWidth > actualWidth,
+        exceedsBottom: scaledCropY + scaledCropHeight > actualHeight,
+      });
+
+      return res.status(400).json({
+        error: `Crop area exceeds image boundaries. Image: ${actualWidth}×${actualHeight}, Crop: ${scaledCropX},${scaledCropY} ${scaledCropWidth}×${scaledCropHeight}`,
+      });
+    }
+
+    // Check if image_cropper executable exists
+    const executablePath = path.join("/app", "image_cropper");
+    try {
+      await fs.access(executablePath);
+    } catch {
+      throw new Error("Image cropper binary not found");
+    }
+
+    // Build command arguments using scaled coordinates
+    const args = [
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--crop-x",
+      scaledCropX.toString(),
+      "--crop-y",
+      scaledCropY.toString(),
+      "--output-width",
+      outputWidth.toString(),
+      "--output-height",
+      outputHeight.toString(),
+      "--scale",
+      scale.toString(),
+    ];
+
+    // Add scaled crop dimensions if specified
+    if (scaledCropWidth && scaledCropWidth > 0) {
+      args.push("--crop-width", scaledCropWidth.toString());
+    }
+    if (scaledCropHeight && scaledCropHeight > 0) {
+      args.push("--crop-height", scaledCropHeight.toString());
+    }
+
+    // Execute the C++ program
+    const command = `${executablePath} ${args.join(" ")}`;
+    console.log("Executing command:", command);
+
+    try {
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: 30000, // 30 second timeout
+      });
+
+      if (stderr) {
+        console.warn("Image cropper stderr:", stderr);
+      }
+
+      console.log("Image cropper stdout:", stdout);
+    } catch (execError) {
+      console.error("Image cropper execution error:", execError);
+      throw new Error(`Image cropping failed: ${execError.message}`);
+    }
+
+    // Check if output file was created
+    try {
+      await fs.access(outputPath);
+    } catch {
+      throw new Error("Output image was not generated");
+    }
+
+    // Read the processed image
+    const processedImageBuffer = await fs.readFile(outputPath);
+
+    // Convert to base64
+    const base64Image = processedImageBuffer.toString("base64");
+    const dataUrl = `data:image/jpeg;base64,${base64Image}`;
+
+    // Clean up temporary files
+    await Promise.all([
+      fs.unlink(inputPath).catch(() => {}),
+      fs.unlink(outputPath).catch(() => {}),
+    ]);
+
+    console.log(`Successfully cropped image: ${imageUrl}`);
+
+    res.json({
+      success: true,
+      processedImageUrl: dataUrl,
+      imageData: base64Image, // Also include raw base64 for compatibility
+      message: "Image cropped successfully with C++ OpenCV",
+      imageSize: processedImageBuffer.length,
+      actualImageDimensions: { width: actualWidth, height: actualHeight },
+      scaledCropCoordinates: {
+        x: scaledCropX,
+        y: scaledCropY,
+        width: scaledCropWidth,
+        height: scaledCropHeight,
+      },
+      metadata: {
+        originalUrl: imageUrl,
+        originalCrop: { cropX, cropY, cropWidth, cropHeight },
+        scaledCrop: {
+          scaledCropX,
+          scaledCropY,
+          scaledCropWidth,
+          scaledCropHeight,
+        },
+        outputWidth,
+        outputHeight,
+        scale,
+        processedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Image crop error:", error);
+
+    // Clean up temporary files on error
+    await Promise.all([
+      fs.unlink(inputPath).catch(() => {}),
+      fs.unlink(outputPath).catch(() => {}),
+    ]);
+
+    if (error.message.includes("timeout")) {
+      return res.status(408).json({
+        error: "Processing timeout. The image may be too large or complex.",
+      });
+    }
+
+    res.status(500).json({
+      error: error.message || "An unexpected error occurred",
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Canvas Extension and Matte Service running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Canvas extension: POST http://localhost:${PORT}/extend-canvas`);
   console.log(`Image matte: POST http://localhost:${PORT}/create-matte`);
+  console.log(`Image crop: POST http://localhost:${PORT}/crop-image`);
 });
 
 // Graceful shutdown
@@ -347,3 +601,4 @@ process.on("SIGINT", () => {
   console.log("Received SIGINT, shutting down gracefully");
   process.exit(0);
 });
+// v2.5 - Fixed coordinate scaling by using consistent image dimensions

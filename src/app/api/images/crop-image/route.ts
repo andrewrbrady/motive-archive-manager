@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       scale: body.scale,
       processingMethod: body.processingMethod,
       uploadToCloudflare: body.uploadToCloudflare,
+      previewImageDimensions: body.previewImageDimensions,
     });
 
     const {
@@ -158,12 +159,43 @@ export async function POST(request: NextRequest) {
             };
 
             // Handle Cloudflare upload if requested
-            if (uploadToCloudflare && remoteResult.imageData) {
+            if (
+              uploadToCloudflare &&
+              (remoteResult.imageData || remoteResult.processedImageUrl)
+            ) {
               try {
-                // Convert base64 to buffer for upload
-                const imageBuffer = Buffer.from(
-                  remoteResult.imageData,
-                  "base64"
+                console.log("☁️ Cloud service upload - available data:", {
+                  hasImageData: !!remoteResult.imageData,
+                  hasProcessedImageUrl: !!remoteResult.processedImageUrl,
+                  processedImageUrlType: typeof remoteResult.processedImageUrl,
+                });
+
+                let imageBuffer;
+
+                if (remoteResult.imageData) {
+                  // Convert base64 to buffer for upload
+                  console.log("📦 Converting imageData (base64) to buffer...");
+                  imageBuffer = Buffer.from(remoteResult.imageData, "base64");
+                } else if (
+                  remoteResult.processedImageUrl &&
+                  remoteResult.processedImageUrl.startsWith("data:image/")
+                ) {
+                  // Extract base64 from data URL
+                  console.log(
+                    "📦 Converting processedImageUrl (data URL) to buffer..."
+                  );
+                  const base64Data =
+                    remoteResult.processedImageUrl.split(",")[1];
+                  imageBuffer = Buffer.from(base64Data, "base64");
+                } else {
+                  throw new Error(
+                    "No valid image data found in cloud service response"
+                  );
+                }
+
+                console.log(
+                  "✅ Image buffer created, size:",
+                  imageBuffer.length
                 );
 
                 const formData = new FormData();
@@ -201,6 +233,13 @@ export async function POST(request: NextRequest) {
                   })
                 );
 
+                console.log("📤 Calling upload API with:", {
+                  filename,
+                  fileSize: imageBuffer.length,
+                  carId: originalCarId,
+                  hasMetadata: true,
+                });
+
                 const uploadResponse = await fetch(
                   `${request.nextUrl.origin}/api/images/upload`,
                   {
@@ -209,24 +248,37 @@ export async function POST(request: NextRequest) {
                   }
                 );
 
+                console.log(
+                  "📥 Upload response status:",
+                  uploadResponse.status
+                );
+                console.log(
+                  "📥 Upload response headers:",
+                  Object.fromEntries(uploadResponse.headers.entries())
+                );
+
                 if (uploadResponse.ok) {
                   const uploadResult = await uploadResponse.json();
+                  console.log("✅ Upload result:", uploadResult);
                   result.cloudflareUpload = uploadResult;
+                  console.log("✅ Cloudflare upload successful");
                 } else {
+                  const errorText = await uploadResponse.text();
                   console.error(
-                    "Failed to upload to Cloudflare:",
-                    uploadResponse.status
+                    "❌ Failed to upload to Cloudflare:",
+                    uploadResponse.status,
+                    errorText
                   );
                   result.cloudflareUpload = {
                     success: false,
-                    error: "Upload failed",
+                    error: `Upload failed: ${uploadResponse.status} - ${errorText}`,
                   };
                 }
               } catch (uploadError) {
-                console.error("Error uploading to Cloudflare:", uploadError);
+                console.error("❌ Error uploading to Cloudflare:", uploadError);
                 result.cloudflareUpload = {
                   success: false,
-                  error: "Upload error",
+                  error: `Upload error: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`,
                 };
               }
             } else if (!uploadToCloudflare) {
@@ -471,6 +523,13 @@ export async function POST(request: NextRequest) {
             })
           );
 
+          console.log("📤 Calling upload API with:", {
+            filename,
+            fileSize: processedImageBuffer.length,
+            carId: originalCarId,
+            hasMetadata: true,
+          });
+
           const uploadResponse = await fetch(
             `${request.nextUrl.origin}/api/images/upload`,
             {
@@ -479,23 +538,31 @@ export async function POST(request: NextRequest) {
             }
           );
 
+          console.log("📥 Upload response status:", uploadResponse.status);
+
           if (uploadResponse.ok) {
             const uploadResult = await uploadResponse.json();
+            console.log("✅ Upload result:", uploadResult);
             result.cloudflareUpload = uploadResult;
             console.log("✅ Cloudflare upload successful");
           } else {
+            const errorText = await uploadResponse.text();
             console.error(
               "❌ Failed to upload to Cloudflare:",
-              uploadResponse.status
+              uploadResponse.status,
+              errorText
             );
             result.cloudflareUpload = {
               success: false,
-              error: "Upload failed",
+              error: `Upload failed: ${uploadResponse.status} - ${errorText}`,
             };
           }
         } catch (uploadError) {
           console.error("❌ Error uploading to Cloudflare:", uploadError);
-          result.cloudflareUpload = { success: false, error: "Upload error" };
+          result.cloudflareUpload = {
+            success: false,
+            error: `Upload error: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`,
+          };
         }
       } else {
         // Return the image as base64 for preview

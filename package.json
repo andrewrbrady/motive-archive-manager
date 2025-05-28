@@ -179,11 +179,11 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@babel/plugin-transform-runtime": "^7.26.10",
     "@jest/globals": "^29.7.0",
     "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/bcrypt": "^5.0.2",
+    "@types/body-parser": "^1.19.5",
     "@types/eslint": "^9.6.1",
     "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.14",
@@ -193,7 +193,6 @@
     "@types/react-dom": "^18",
     "@types/react-syntax-highlighter": "^15.5.13",
     "autoprefixer": "^10.4.20",
-    "babel-loader": "^10.0.0",
     "chalk": "^4.1.2",
     "dotenv": "^16.5.0",
     "eslint": "^8",
