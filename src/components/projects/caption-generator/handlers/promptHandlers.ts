@@ -143,9 +143,15 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
         const method = isCreating ? "POST" : "PATCH";
 
         // For updates, include the ID in the request body
-        const payload = isCreating
-          ? promptData
-          : { ...promptData, id: selectedPrompt?._id };
+        // For creates, ensure we don't include any _id field
+        let payload;
+        if (isCreating) {
+          // Create a clean payload without any _id fields
+          const { _id, id, ...cleanData } = promptData;
+          payload = cleanData;
+        } else {
+          payload = { ...promptData, id: selectedPrompt?._id };
+        }
 
         const response = await fetch(url, {
           method,

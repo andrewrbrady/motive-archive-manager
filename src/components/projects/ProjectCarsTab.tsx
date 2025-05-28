@@ -30,6 +30,7 @@ import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { CarGridSelector } from "../cars/CarGridSelector";
 
 interface Car {
   _id: string;
@@ -257,11 +258,9 @@ export function ProjectCarsTab({
 }: ProjectCarsTabProps) {
   const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
   const [projectCars, setProjectCars] = useState<Car[]>([]);
-  const [availableCars, setAvailableCars] = useState<Car[]>([]);
   const [loadingProjectCars, setLoadingProjectCars] = useState(false);
-  const [loadingAvailableCars, setLoadingAvailableCars] = useState(false);
   const [isLinkingCar, setIsLinkingCar] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
 
   // Fetch project cars on mount and when project changes
   useEffect(() => {
@@ -293,68 +292,50 @@ export function ProjectCarsTab({
     }
   };
 
-  const fetchAvailableCars = async () => {
-    try {
-      setLoadingAvailableCars(true);
-      const response = await fetch(
-        "/api/cars?fields=_id,make,model,year,color,vin,status,createdAt"
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch available cars");
-      }
-
-      const data = await response.json();
-
-      // Filter out cars that are already linked to this project
-      const currentCarIds = project?.carIds || [];
-      const availableCarsList = (data.cars || []).filter(
-        (car: Car) => !currentCarIds.includes(car._id)
-      );
-
-      setAvailableCars(availableCarsList);
-    } catch (error) {
-      console.error("Error fetching available cars:", error);
+  const handleLinkCars = async () => {
+    if (selectedCarIds.length === 0) {
       toast({
-        title: "Error",
-        description: "Failed to load available cars",
+        title: "No cars selected",
+        description: "Please select at least one car to link",
         variant: "destructive",
       });
-    } finally {
-      setLoadingAvailableCars(false);
+      return;
     }
-  };
 
-  const handleLinkCar = async (carId: string) => {
     try {
       setIsLinkingCar(true);
-      const response = await fetch(`/api/projects/${project._id}/cars`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ carId }),
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to link car");
+      // Link cars one by one (could be optimized with a batch endpoint)
+      for (const carId of selectedCarIds) {
+        const response = await fetch(`/api/projects/${project._id}/cars`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ carId }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to link car ${carId}`);
+        }
       }
 
       // Refresh project data and cars
       await onProjectUpdate();
       await fetchProjectCars();
-      await fetchAvailableCars();
+      setSelectedCarIds([]);
+      setIsLinkCarOpen(false);
 
       toast({
         title: "Success",
-        description: "Car linked to project successfully",
+        description: `${selectedCarIds.length} car${selectedCarIds.length !== 1 ? "s" : ""} linked to project successfully`,
       });
     } catch (error) {
       toast({
         title: "Error",
         description:
-          error instanceof Error ? error.message : "Failed to link car",
+          error instanceof Error ? error.message : "Failed to link cars",
         variant: "destructive",
       });
     } finally {
@@ -394,35 +375,8 @@ export function ProjectCarsTab({
     }
   };
 
-  // Filter available cars based on search term
-  const filteredAvailableCars = availableCars.filter((car) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      car.make?.toLowerCase().includes(searchLower) ||
-      car.model?.toLowerCase().includes(searchLower) ||
-      car.year?.toString().includes(searchLower) ||
-      car.color?.toLowerCase().includes(searchLower) ||
-      car.vin?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  const formatCarName = (car: Car) => {
-    const parts = [car.year, car.make, car.model].filter(Boolean);
-    return parts.join(" ");
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "available":
-        return "bg-green-100 text-green-800";
-      case "sold":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  // Get currently linked car IDs to exclude from selection
+  const linkedCarIds = project?.carIds || [];
 
   return (
     <Card>
@@ -433,103 +387,61 @@ export function ProjectCarsTab({
             open={isLinkCarOpen}
             onOpenChange={(open) => {
               setIsLinkCarOpen(open);
-              if (open) {
-                fetchAvailableCars();
-              } else {
-                setSearchTerm("");
+              if (!open) {
+                setSelectedCarIds([]);
               }
             }}
           >
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                Link Car
+                Link Cars
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader>
-                <DialogTitle>Link Car to Project</DialogTitle>
+                <DialogTitle>Link Cars to Project</DialogTitle>
                 <DialogDescription>
-                  Select an existing car to link to this project.
+                  Select cars to link to this project. Use the filters to find
+                  specific cars.
                 </DialogDescription>
               </DialogHeader>
 
-              {/* Search */}
-              <div className="flex items-center gap-2 py-4">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search cars by make, model, year, color, or VIN..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1"
+              <div className="flex-1 overflow-y-auto">
+                <CarGridSelector
+                  selectionMode="multiple"
+                  selectedCarIds={selectedCarIds}
+                  onCarsSelect={setSelectedCarIds}
+                  excludeCarIds={linkedCarIds}
+                  showFilters={true}
+                  showPagination={true}
+                  pageSize={12}
+                  gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
                 />
               </div>
 
-              <div className="flex-1 overflow-y-auto">
-                {loadingAvailableCars ? (
-                  <div className="flex items-center justify-center h-32">
-                    <div className="text-sm text-muted-foreground">
-                      Loading cars...
-                    </div>
-                  </div>
-                ) : filteredAvailableCars.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Car className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium mb-2">
-                      {searchTerm ? "No cars found" : "No available cars"}
-                    </p>
-                    <p className="text-sm">
-                      {searchTerm
-                        ? "Try adjusting your search terms"
-                        : "All cars are already linked to this project"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredAvailableCars.map((car) => (
-                      <div
-                        key={car._id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/20 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="text-2xl">🚗</div>
-                          <div className="flex-1">
-                            <div className="font-medium">
-                              {formatCarName(car)}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {car.color && <span>{car.color}</span>}
-                              {car.vin && (
-                                <span>
-                                  {car.color ? " • " : ""}VIN: {car.vin}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleLinkCar(car._id)}
-                            disabled={isLinkingCar}
-                          >
-                            {isLinkingCar ? "Linking..." : "Link"}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
+              <DialogFooter className="flex-shrink-0">
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setSearchTerm("");
+                    setSelectedCarIds([]);
                     setIsLinkCarOpen(false);
                   }}
                 >
-                  Close
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleLinkCars}
+                  disabled={isLinkingCar || selectedCarIds.length === 0}
+                >
+                  {isLinkingCar ? (
+                    <>
+                      <LoadingSpinner size="sm" className="mr-2" />
+                      Linking...
+                    </>
+                  ) : (
+                    `Link ${selectedCarIds.length} Car${selectedCarIds.length !== 1 ? "s" : ""}`
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -539,9 +451,7 @@ export function ProjectCarsTab({
       <CardContent className="pt-4">
         {loadingProjectCars ? (
           <div className="flex items-center justify-center h-32">
-            <div className="text-sm text-muted-foreground">
-              Loading project cars...
-            </div>
+            <LoadingSpinner size="lg" />
           </div>
         ) : projectCars.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">

@@ -74,12 +74,19 @@ export default function NewDeliverableForm({
         // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Raw API response:", data);
         // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
 
-        if (Array.isArray(data)) {
-          const activeUsers = data.filter(
+        // Handle the correct API response structure: { users: [...], total: number }
+        if (data.users && Array.isArray(data.users)) {
+          const activeUsers = data.users.filter(
             (user: FirestoreUser) => user.status === "active"
           );
           // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Active users:", activeUsers.length);
           // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
+          setUsers(activeUsers);
+        } else if (Array.isArray(data)) {
+          // Fallback for legacy API responses that return array directly
+          const activeUsers = data.filter(
+            (user: FirestoreUser) => user.status === "active"
+          );
           setUsers(activeUsers);
         } else {
           console.error("Unexpected API response structure:", data);

@@ -28,19 +28,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(prompts[0]);
     }
     if (defaultOnly && platform && prompts.length === 0) {
-      // No specific default found for this platform, maybe return a general default or 404?
-      // For now, let's try to find any default prompt if platform specific isn't there.
+      // No specific default found for this platform, try to find any default prompt
       const anyDefault = await CaptionPrompt.findOne({ isDefault: true }).sort({
         updatedAt: -1,
       });
       if (anyDefault) return NextResponse.json(anyDefault);
-      return NextResponse.json(
-        {
-          error:
-            "No default prompt found for this platform, and no general default available.",
-        },
-        { status: 404 }
-      );
+
+      // Instead of returning a 404 error, return null to indicate no default prompt exists
+      // This prevents the 500 error in the browser and allows the frontend to handle it gracefully
+      return NextResponse.json(null);
     }
 
     return NextResponse.json(prompts);

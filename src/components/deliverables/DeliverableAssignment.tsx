@@ -66,11 +66,21 @@ export default function DeliverableAssignment({
       // Log the raw response to see what we're getting
       console.log(
         "API response received, count:",
-        Array.isArray(data) ? data.length : "not an array"
+        data.users
+          ? data.users.length
+          : Array.isArray(data)
+            ? data.length
+            : "not an array"
       );
 
-      // The API returns an array directly, not an object with a users property
-      if (!Array.isArray(data)) {
+      // Handle the correct API response structure: { users: [...], total: number }
+      let usersArray;
+      if (data.users && Array.isArray(data.users)) {
+        usersArray = data.users;
+      } else if (Array.isArray(data)) {
+        // Fallback for legacy API responses that return array directly
+        usersArray = data;
+      } else {
         console.error("Unexpected API response structure:", data);
         toast.error("Invalid user data format received");
         return;
@@ -78,7 +88,7 @@ export default function DeliverableAssignment({
 
       // Allow all active users to be assigned to deliverables
       // No additional filtering by role - ensures maximum flexibility
-      const eligibleUsers = data.filter(
+      const eligibleUsers = usersArray.filter(
         (user: FirestoreUser) => user.status === "active"
       );
 

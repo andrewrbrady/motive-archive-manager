@@ -101,10 +101,23 @@ function DirectUserSelector({
         throw new Error(`Failed to fetch users: ${response.status}`);
 
       const data = await response.json();
-      // [REMOVED] // [REMOVED] console.log(`Fetched ${data.length} users`);
+
+      // Handle the correct API response structure: { users: [...], total: number }
+      let usersArray;
+      if (data.users && Array.isArray(data.users)) {
+        usersArray = data.users;
+      } else if (Array.isArray(data)) {
+        // Fallback for legacy API responses that return array directly
+        usersArray = data;
+      } else {
+        console.error("Unexpected API response structure:", data);
+        throw new Error("Invalid response format");
+      }
+
+      // [REMOVED] // [REMOVED] console.log(`Fetched ${usersArray.length} users`);
 
       // Filter out OAuth IDs (long numeric strings)
-      const filteredUsers = data
+      const filteredUsers = usersArray
         .filter((user: any) => user.uid && !/^\d{21,}$/.test(user.uid))
         .map((user: any) => ({
           uid: user.uid,

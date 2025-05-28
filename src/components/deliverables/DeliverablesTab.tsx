@@ -149,30 +149,41 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Raw API response:", data);
         console.log(
           "Fetched users in DeliverablesTab:",
-          Array.isArray(data) ? data.length : "not an array"
+          data.users
+            ? data.users.length
+            : Array.isArray(data)
+              ? data.length
+              : "not an array"
         );
 
-        // API returns an array directly, not an object with users property
-        // Store all users
-        if (Array.isArray(data)) {
-          const activeUsers = data.filter(
-            (user: User) => user.status === "active"
-          );
-          // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Active users:", activeUsers.length);
-          // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Sample user:", activeUsers[0]);
-          setAllUsers(activeUsers);
-
-          // For backward compatibility, still set the editors list
-          // But we'll use allUsers where we need all active users
-          const editors = activeUsers.filter((user: User) =>
-            user.creativeRoles.includes("video_editor")
-          );
-          // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Editors:", editors.length);
-          setUsers(editors);
+        // Handle the correct API response structure: { users: [...], total: number }
+        let usersArray;
+        if (data.users && Array.isArray(data.users)) {
+          usersArray = data.users;
+        } else if (Array.isArray(data)) {
+          // Fallback for legacy API responses that return array directly
+          usersArray = data;
         } else {
           console.error("Unexpected API response structure:", data);
           toast.error("Failed to load users properly");
+          return;
         }
+
+        // Store all users
+        const activeUsers = usersArray.filter(
+          (user: User) => user.status === "active"
+        );
+        // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Active users:", activeUsers.length);
+        // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Sample user:", activeUsers[0]);
+        setAllUsers(activeUsers);
+
+        // For backward compatibility, still set the editors list
+        // But we'll use allUsers where we need all active users
+        const editors = activeUsers.filter((user: User) =>
+          user.creativeRoles.includes("video_editor")
+        );
+        // [REMOVED] // [REMOVED] console.log("DeliverablesTab: Editors:", editors.length);
+        setUsers(editors);
       } catch (error) {
         console.error("Error fetching users:", error);
         toast.error("Failed to fetch users");

@@ -13,6 +13,7 @@ import { PageTitle } from "@/components/ui/PageTitle";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Make } from "@/lib/fetchMakes";
+import { CarGridSelector } from "@/components/cars/CarGridSelector";
 
 // Interface for client data with string IDs instead of ObjectIds
 export interface ClientWithStringId {
@@ -96,6 +97,9 @@ export default function CarsPageClient({
     ...filters,
   }).toString();
 
+  // For the new grid selector, we'll use it in grid mode and fall back to the old view wrapper for list mode
+  const useNewGridSelector = view === "grid";
+
   return (
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
@@ -115,7 +119,7 @@ export default function CarsPageClient({
               </div>
 
               <div className="flex items-center gap-3 flex-shrink-0">
-                {totalPages > 1 && (
+                {totalPages > 1 && !useNewGridSelector && (
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
@@ -138,25 +142,41 @@ export default function CarsPageClient({
             </div>
           </PageTitle>
 
-          <CarFiltersSection
-            currentFilters={{
-              make: filters.make || "",
-              minYear: filters.minYear || "",
-              maxYear: filters.maxYear || "",
-              clientId: filters.clientId || "",
-              search: filters.search || "",
-            }}
-            makes={makes.map((make) => make.name)}
-            clients={clients}
-          />
+          {/* Use new grid selector for grid view, old filters for list view */}
+          {useNewGridSelector ? (
+            <CarGridSelector
+              selectionMode="none"
+              cars={cars}
+              loading={false}
+              showFilters={true}
+              showPagination={false} // We'll handle pagination separately for now
+              useUrlFilters={true} // Enable URL-based filtering
+              className="space-y-6"
+              gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            />
+          ) : (
+            <>
+              <CarFiltersSection
+                currentFilters={{
+                  make: filters.make || "",
+                  minYear: filters.minYear || "",
+                  maxYear: filters.maxYear || "",
+                  clientId: filters.clientId || "",
+                  search: filters.search || "",
+                }}
+                makes={makes.map((make) => make.name)}
+                clients={clients}
+              />
 
-          <CarsViewWrapper
-            cars={cars}
-            viewMode="grid" // Force grid view on mobile, original view on desktop
-            currentSearchParams={currentSearchParams}
-            forceGridOnMobile={true}
-            actualViewMode={view}
-          />
+              <CarsViewWrapper
+                cars={cars}
+                viewMode="grid" // Force grid view on mobile, original view on desktop
+                currentSearchParams={currentSearchParams}
+                forceGridOnMobile={true}
+                actualViewMode={view}
+              />
+            </>
+          )}
 
           {/* Bottom Pagination */}
           {totalPages > 1 && (

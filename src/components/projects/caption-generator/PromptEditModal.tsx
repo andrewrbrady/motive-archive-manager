@@ -89,7 +89,13 @@ export function PromptEditModal({
         },
       };
 
-      if (!isCreating && selectedPrompt) {
+      // For creating new prompts, ensure we don't include _id field
+      if (isCreating) {
+        // Remove any _id field that might be present in formData
+        delete payload._id;
+        delete payload.id;
+      } else if (selectedPrompt) {
+        // For updates, include the ID in the request body
         payload.id = selectedPrompt._id;
       }
 
