@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
 
 interface ImageCropModalProps {
   isOpen: boolean;
@@ -1133,12 +1134,13 @@ export function ImageCropModal({
                 process.env.NODE_ENV === "development" &&
                 livePreviewUrl ? (
                   <div className="space-y-2">
-                    <Image
+                    <CloudflareImage
                       src={livePreviewUrl}
                       alt="Live preview"
                       width={400}
                       height={400}
                       className="w-full h-auto max-h-64 object-contain rounded border"
+                      variant="medium"
                     />
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-muted-foreground">
@@ -1656,12 +1658,13 @@ export function ImageCropModal({
                 <div className="space-y-2">
                   <Label>Processed Image</Label>
                   <div className="border rounded-lg p-2 bg-muted/50">
-                    <Image
+                    <CloudflareImage
                       src={processedImageUrl}
                       alt="Processed image"
                       width={200}
                       height={200}
                       className="w-full h-auto max-h-48 object-contain rounded"
+                      variant="medium"
                     />
                     {processedDimensions && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -1677,12 +1680,13 @@ export function ImageCropModal({
                 <div className="space-y-2">
                   <Label>High-Resolution Image</Label>
                   <div className="border rounded-lg p-2 bg-muted/50">
-                    <Image
+                    <CloudflareImage
                       src={highResImageUrl}
                       alt="High-res processed image"
                       width={200}
                       height={200}
                       className="w-full h-auto max-h-48 object-contain rounded"
+                      variant="large"
                     />
                     {highResDimensions && (
                       <p className="text-xs text-muted-foreground mt-1">

@@ -17,12 +17,12 @@ export function cloudflareImageLoader({
     // Extract the image ID from Cloudflare Images URL
     const imageId = extractCloudflareImageId(src);
     if (imageId) {
-      const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH;
-      if (!accountHash) {
-        console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH not configured");
+      const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+      if (!accountId) {
+        console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID not configured");
         return src; // Fallback to original URL
       }
-      return `https://imagedelivery.net/${accountHash}/${imageId}/w=${width},q=${quality}`;
+      return `https://imagedelivery.net/${accountId}/${imageId}/w=${width},q=${quality}`;
     }
   }
 
@@ -66,13 +66,13 @@ export function getCloudflareImageUrl(
   imageId: string,
   variant: keyof typeof CLOUDFLARE_VARIANTS = "medium"
 ): string {
-  const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH;
-  if (!accountHash) {
-    console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH not configured");
+  const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+  if (!accountId) {
+    console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID not configured");
     return imageId; // Fallback to original
   }
 
-  return `https://imagedelivery.net/${accountHash}/${imageId}/${CLOUDFLARE_VARIANTS[variant]}`;
+  return `https://imagedelivery.net/${accountId}/${imageId}/${CLOUDFLARE_VARIANTS[variant]}`;
 }
 
 // Helper function to check if a URL is a Cloudflare Images URL
@@ -84,13 +84,13 @@ export function isCloudflareImageUrl(url: string): boolean {
 
 // Helper function to get the base Cloudflare Images URL without variants
 export function getCloudflareImageBaseUrl(imageId: string): string {
-  const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH;
-  if (!accountHash) {
-    console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH not configured");
+  const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+  if (!accountId) {
+    console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID not configured");
     return imageId;
   }
 
-  return `https://imagedelivery.net/${accountHash}/${imageId}`;
+  return `https://imagedelivery.net/${accountId}/${imageId}`;
 }
 
 // Helper function to create responsive srcSet for Cloudflare Images
@@ -99,16 +99,16 @@ export function createCloudflareImageSrcSet(
   sizes: number[] = [400, 600, 800, 1200],
   quality: number = 90
 ): string {
-  const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH;
-  if (!accountHash) {
-    console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_HASH not configured");
+  const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
+  if (!accountId) {
+    console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID not configured");
     return "";
   }
 
   return sizes
     .map(
       (size) =>
-        `https://imagedelivery.net/${accountHash}/${imageId}/w=${size},q=${quality} ${size}w`
+        `https://imagedelivery.net/${accountId}/${imageId}/w=${size},q=${quality} ${size}w`
     )
     .join(", ");
 }

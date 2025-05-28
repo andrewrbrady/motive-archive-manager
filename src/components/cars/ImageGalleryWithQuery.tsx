@@ -1,3 +1,5 @@
+"use client";
+
 import React, {
   useState,
   useRef,
@@ -55,6 +57,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
 
 interface FilterState {
   angle?: string;
@@ -1010,8 +1013,8 @@ export function ImageGalleryWithQuery({
                   bottom: 0,
                 }}
               >
-                <Image
-                  src={getFormattedImageUrl(currentImage.url)}
+                <CloudflareImage
+                  src={currentImage.url}
                   alt={
                     currentImage.metadata?.description ||
                     `Image ${mainIndex + 1}`
@@ -1026,6 +1029,7 @@ export function ImageGalleryWithQuery({
                   )}
                   sizes="66vw"
                   priority
+                  variant="large"
                   onLoad={() => handleImageLoad(currentImage.id)}
                   onError={() => handleImageError(currentImage.id)}
                 />
@@ -1122,8 +1126,8 @@ export function ImageGalleryWithQuery({
                         {/* Image */}
                         {image.url && (
                           <div className="relative w-full h-full">
-                            <Image
-                              src={getFormattedImageUrl(image.url)}
+                            <CloudflareImage
+                              src={image.url}
                               alt={image.metadata?.description || `Thumbnail`}
                               fill
                               className={cn(
@@ -1137,6 +1141,7 @@ export function ImageGalleryWithQuery({
                                 }
                               )}
                               sizes="(max-width: 768px) 100px, 120px"
+                              variant="gallery"
                               onLoad={() => handleImageLoad(image.id)}
                               onError={() => handleImageError(image.id)}
                             />

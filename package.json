@@ -51,7 +51,8 @@
     "migrate:oauth-users": "node src/scripts/migrate-oauth-users.mjs",
     "cleanup-users": "tsx src/scripts/cleanup-mongodb-refs.ts",
     "migrate:string-to-objectids": "node scripts/migrate-string-ids-to-objectids.js",
-    "migrate:string-to-objectids:dry-run": "node scripts/migrate-string-ids-to-objectids.js --dry-run"
+    "migrate:string-to-objectids:dry-run": "node scripts/migrate-string-ids-to-objectids.js --dry-run",
+    "migrate:cloudflare-images": "tsx scripts/migrate-to-cloudflare-images.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.36.3",
