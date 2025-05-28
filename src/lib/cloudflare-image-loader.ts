@@ -31,6 +31,9 @@ export function cloudflareImageLoader({
   return src;
 }
 
+// Default export required by Next.js for custom image loaders
+export default cloudflareImageLoader;
+
 function extractCloudflareImageId(url: string): string | null {
   // Extract image ID from various Cloudflare Images URL formats
   const patterns = [
