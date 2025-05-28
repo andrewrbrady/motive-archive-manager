@@ -1,10 +1,10 @@
 import Image, { ImageProps } from "next/image";
 import {
   cloudflareImageLoader,
-  getCloudflareImageUrl,
   CLOUDFLARE_VARIANTS,
   isCloudflareImageUrl,
 } from "@/lib/cloudflare-image-loader";
+import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -27,10 +27,9 @@ export function CloudflareImage({
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Handle Cloudflare Images URLs
-  const optimizedSrc = isCloudflareImageUrl(src)
-    ? src
-    : getCloudflareImageUrl(src, variant);
+  // Use the existing getFormattedImageUrl function with the appropriate variant
+  const cloudflareVariant = CLOUDFLARE_VARIANTS[variant];
+  const optimizedSrc = getFormattedImageUrl(src, cloudflareVariant);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setImageError(true);

@@ -9,25 +9,17 @@ export function cloudflareImageLoader({
   width,
   quality = 85,
 }: CloudflareImageLoaderProps): string {
-  // If it's already a Cloudflare Images URL, use it directly with transformations
+  // For Cloudflare Images URLs, we should NOT transform them further
+  // since they already use named variants like "public", "thumbnail", etc.
   if (
     src.includes("imagedelivery.net") ||
     src.includes("cloudflareimages.com")
   ) {
-    // Extract the image ID from Cloudflare Images URL
-    const imageId = extractCloudflareImageId(src);
-    if (imageId) {
-      const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
-      if (!accountId) {
-        console.warn("NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID not configured");
-        return src; // Fallback to original URL
-      }
-      return `https://imagedelivery.net/${accountId}/${imageId}/w=${width},q=${quality}`;
-    }
+    // Return the URL as-is since it's already optimized by Cloudflare
+    return src;
   }
 
-  // For external URLs or non-Cloudflare URLs, return as-is
-  // In production, you might want to upload these to Cloudflare Images first
+  // For non-Cloudflare URLs, return as-is (Next.js will handle them)
   return src;
 }
 
@@ -53,16 +45,17 @@ function extractCloudflareImageId(url: string): string | null {
   return null;
 }
 
-// Predefined variants for common use cases
+// Predefined variants that match your existing system
 export const CLOUDFLARE_VARIANTS = {
-  thumbnail: "w=200,h=150,fit=cover,q=85",
-  medium: "w=600,h=400,fit=cover,q=90",
-  large: "w=1200,h=800,fit=cover,q=95",
-  hero: "w=1920,h=1080,fit=cover,q=95",
+  thumbnail: "thumbnail",
+  medium: "medium",
+  large: "large",
+  hero: "public", // Use "public" for hero images (original quality)
   // Additional variants for specific use cases
-  square: "w=400,h=400,fit=cover,q=90",
-  wide: "w=800,h=450,fit=cover,q=90",
-  gallery: "w=300,h=200,fit=cover,q=85",
+  square: "thumbnail", // Map to existing thumbnail variant
+  wide: "medium", // Map to existing medium variant
+  gallery: "thumbnail", // Map to existing thumbnail variant
+  public: "public", // Original image
 } as const;
 
 export function getCloudflareImageUrl(
@@ -75,7 +68,8 @@ export function getCloudflareImageUrl(
     return imageId; // Fallback to original
   }
 
-  return `https://imagedelivery.net/${accountId}/${imageId}/${CLOUDFLARE_VARIANTS[variant]}`;
+  const cloudflareVariant = CLOUDFLARE_VARIANTS[variant];
+  return `https://imagedelivery.net/${accountId}/${imageId}/${cloudflareVariant}`;
 }
 
 // Helper function to check if a URL is a Cloudflare Images URL
@@ -97,10 +91,14 @@ export function getCloudflareImageBaseUrl(imageId: string): string {
 }
 
 // Helper function to create responsive srcSet for Cloudflare Images
+// This uses your existing named variants instead of flexible variants
 export function createCloudflareImageSrcSet(
   imageId: string,
-  sizes: number[] = [400, 600, 800, 1200],
-  quality: number = 90
+  variants: (keyof typeof CLOUDFLARE_VARIANTS)[] = [
+    "thumbnail",
+    "medium",
+    "large",
+  ]
 ): string {
   const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
   if (!accountId) {
@@ -108,10 +106,23 @@ export function createCloudflareImageSrcSet(
     return "";
   }
 
-  return sizes
-    .map(
-      (size) =>
-        `https://imagedelivery.net/${accountId}/${imageId}/w=${size},q=${quality} ${size}w`
-    )
+  // Map variants to approximate widths for srcset
+  const variantWidths = {
+    thumbnail: 200,
+    medium: 600,
+    large: 1200,
+    hero: 1920,
+    square: 200,
+    wide: 800,
+    gallery: 300,
+    public: 1920,
+  };
+
+  return variants
+    .map((variant) => {
+      const cloudflareVariant = CLOUDFLARE_VARIANTS[variant];
+      const width = variantWidths[variant];
+      return `https://imagedelivery.net/${accountId}/${imageId}/${cloudflareVariant} ${width}w`;
+    })
     .join(", ");
 }

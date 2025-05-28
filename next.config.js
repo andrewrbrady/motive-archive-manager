@@ -19,7 +19,7 @@ const nextConfig = {
     return `build-${Date.now()}`;
   },
   images: {
-    // Use custom Cloudflare loader to bypass Vercel's image optimization
+    // Use custom Cloudflare loader to handle Cloudflare Images URLs
     loader: "custom",
     loaderFile: "./src/lib/cloudflare-image-loader.ts",
 
@@ -38,18 +38,18 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "**", // Keep for backward compatibility, but prefer specific domains
+        hostname: "**", // Keep for backward compatibility
       },
     ],
 
-    // Define responsive breakpoints optimized for Cloudflare Images
+    // Standard device sizes for responsive images
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
 
-    // Disable formats that Cloudflare Images handles automatically
+    // Let Cloudflare handle format optimization
     formats: ["image/webp"],
 
-    // Minimize quality since Cloudflare Images will handle optimization
+    // Standard cache TTL
     minimumCacheTTL: 60,
   },
   // Add webpack configuration for Node.js modules
