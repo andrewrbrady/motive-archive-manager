@@ -422,8 +422,11 @@ export default function CarsPageClient({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Any Make</SelectItem>
-                    {makes.map((make) => (
-                      <SelectItem key={make._id} value={make.name}>
+                    {makes.map((make, index) => (
+                      <SelectItem
+                        key={make._id?.toString() || `make-${index}`}
+                        value={make.name}
+                      >
                         {make.name}
                       </SelectItem>
                     ))}

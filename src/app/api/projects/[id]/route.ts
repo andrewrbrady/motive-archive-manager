@@ -7,8 +7,8 @@ import {
   Project as IProject,
 } from "@/types/project";
 import {
-  withFirebaseAuth,
   verifyFirebaseToken,
+  getUserIdFromToken,
 } from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
 import { convertProjectForFrontend } from "@/utils/objectId";
@@ -25,113 +25,174 @@ async function getProject(
     // Get the token from the authorization header
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.split("Bearer ")[1];
-    const tokenData = await verifyFirebaseToken(token);
 
-    if (!tokenData) {
-      console.log("❌ Authentication failed");
+    if (!token) {
+      console.log("❌ getProject: No authorization token provided");
       return NextResponse.json(
-        { error: "Authentication required" },
+        {
+          error: "Authentication required",
+          details: "No authorization token provided",
+          code: "MISSING_TOKEN",
+        },
         { status: 401 }
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    const tokenData = await verifyFirebaseToken(token);
 
-    console.log("🔐 Authentication check:", {
-      hasSession: true,
-      userId: userId,
+    if (!tokenData) {
+      console.log("❌ getProject: Token verification failed");
+      return NextResponse.json(
+        {
+          error: "Authentication failed",
+          details: "Invalid or expired token",
+          code: "INVALID_TOKEN",
+        },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
+    console.log("🔐 getProject: Authentication successful", {
+      userId,
+      tokenType: tokenData.tokenType,
     });
 
     const { id: projectId } = await params;
-    console.log("📋 Project ID from params:", projectId);
+    console.log("📋 getProject: Project ID from params:", projectId);
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
-      console.log("❌ Invalid project ID format");
+      console.log("❌ getProject: Invalid project ID format");
       return NextResponse.json(
-        { error: "Invalid project ID" },
+        {
+          error: "Invalid request",
+          details: "Invalid project ID format",
+          code: "INVALID_PROJECT_ID",
+        },
         { status: 400 }
       );
     }
 
-    console.log("🔗 Connecting to database...");
+    console.log("🔗 getProject: Connecting to database...");
     await connectToDatabase();
-    console.log("✅ Database connected successfully");
+    console.log("✅ getProject: Database connected successfully");
 
-    console.log("🔍 Searching for project using Mongoose model...");
+    console.log("🔍 getProject: Searching for project...");
     const project = await Project.findOne({
       _id: projectId,
       $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
-      console.log("❌ Project not found or access denied");
+      console.log("❌ getProject: Project not found or access denied", {
+        projectId,
+        userId,
+      });
       return NextResponse.json(
-        { error: "Project not found or access denied" },
+        {
+          error: "Project not found",
+          details: "Project not found or you don't have access to it",
+          code: "PROJECT_NOT_FOUND",
+        },
         { status: 404 }
       );
     }
 
-    console.log("✅ Project found via Mongoose:", {
+    console.log("✅ getProject: Project found", {
       projectId: project._id,
       projectTitle: project.title,
       hasDeliverables: !!project.deliverables,
       deliverablesCount: project.deliverables?.length || 0,
-      deliverables: project.deliverables || [],
-      projectKeys: Object.keys(project.toObject()),
     });
 
     const response: ProjectResponse = {
       project: convertProjectForFrontend(project.toObject()) as IProject,
     };
 
-    console.log(
-      "📤 Sending response with deliverables count:",
-      response.project.deliverables?.length || 0
-    );
+    console.log("📤 getProject: Sending successful response");
     return NextResponse.json(response);
-  } catch (error) {
-    console.error("💥 Error fetching project:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+  } catch (error: any) {
+    console.error("💥 getProject: Error fetching project:", {
+      error: error.message,
+      stack: error.stack,
+    });
+
     return NextResponse.json(
-      { error: "Failed to fetch project", details: errorMessage },
+      {
+        error: "Internal server error",
+        details: "Failed to fetch project",
+        code: "INTERNAL_ERROR",
+      },
       { status: 500 }
     );
   }
 }
 
-export const GET = withFirebaseAuth<any>(getProject);
+// Use manual authentication instead of wrapper to avoid TypeScript issues
+export const GET = getProject;
 
 async function updateProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("🔄 PUT /api/projects/[id] - Starting project update");
+
   try {
     // Get the token from the authorization header
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.split("Bearer ")[1];
-    const tokenData = await verifyFirebaseToken(token);
 
-    if (!tokenData) {
+    if (!token) {
+      console.log("❌ updateProject: No authorization token provided");
       return NextResponse.json(
-        { error: "Authentication required" },
+        {
+          error: "Authentication required",
+          details: "No authorization token provided",
+          code: "MISSING_TOKEN",
+        },
         { status: 401 }
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      console.log("❌ updateProject: Token verification failed");
+      return NextResponse.json(
+        {
+          error: "Authentication failed",
+          details: "Invalid or expired token",
+          code: "INVALID_TOKEN",
+        },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
+    console.log("🔐 updateProject: Authentication successful", {
+      userId,
+      tokenType: tokenData.tokenType,
+    });
 
     await connectToDatabase();
     const { id: projectId } = await params;
     const data: UpdateProjectRequest = await request.json();
 
+    console.log("📋 updateProject: Processing update", {
+      projectId,
+      fieldsToUpdate: Object.keys(data),
+    });
+
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
+      console.log("❌ updateProject: Invalid project ID format");
       return NextResponse.json(
-        { error: "Invalid project ID" },
+        {
+          error: "Invalid request",
+          details: "Invalid project ID format",
+          code: "INVALID_PROJECT_ID",
+        },
         { status: 400 }
       );
     }
@@ -160,21 +221,24 @@ async function updateProject(
     });
 
     if (!existingProject) {
+      console.log(
+        "❌ updateProject: Project not found or insufficient permissions",
+        {
+          projectId,
+          userId,
+        }
+      );
       return NextResponse.json(
-        { error: "Project not found or insufficient permissions" },
-        { status: 404 }
+        {
+          error: "Access denied",
+          details: "Project not found or insufficient permissions",
+          code: "INSUFFICIENT_PERMISSIONS",
+        },
+        { status: 403 }
       );
     }
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log("Updating project:", {
-        id: projectId,
-        hasTitle: !!data.title,
-        hasStatus: !!data.status,
-        hasProgress: !!data.progress,
-        fieldsCount: Object.keys(data).length,
-      });
-    }
+    console.log("✅ updateProject: Permission check passed");
 
     // Build update object
     const updateData: any = {
@@ -200,143 +264,200 @@ async function updateProject(
             (data as any).primaryImageId
           );
         } else {
+          console.log("❌ updateProject: Invalid primaryImageId format");
           return NextResponse.json(
-            { error: "Invalid primaryImageId format" },
+            {
+              error: "Invalid request",
+              details: "Invalid primaryImageId format",
+              code: "INVALID_IMAGE_ID",
+            },
             { status: 400 }
           );
         }
       } else {
-        // If empty string or null, remove the field
         updateData.primaryImageId = null;
       }
     }
 
-    // Update timeline if provided
+    // Handle timeline updates
     if (data.timeline) {
-      const timelineUpdate: any = {};
-      if (data.timeline.startDate)
-        timelineUpdate["timeline.startDate"] = new Date(
-          data.timeline.startDate
-        );
-      if (data.timeline.endDate)
-        timelineUpdate["timeline.endDate"] = new Date(data.timeline.endDate);
-      if (data.timeline.estimatedDuration)
-        timelineUpdate["timeline.estimatedDuration"] =
-          data.timeline.estimatedDuration;
-      Object.assign(updateData, timelineUpdate);
+      updateData.timeline = {
+        startDate: data.timeline.startDate
+          ? new Date(data.timeline.startDate)
+          : existingProject.timeline?.startDate,
+        endDate: data.timeline.endDate
+          ? new Date(data.timeline.endDate)
+          : existingProject.timeline?.endDate,
+        milestones: existingProject.timeline?.milestones || [],
+        estimatedDuration:
+          data.timeline.estimatedDuration ||
+          existingProject.timeline?.estimatedDuration,
+      };
     }
 
-    // Update progress if provided
-    if (data.progress) {
-      updateData["progress.percentage"] = data.progress.percentage;
-      updateData["progress.completedTasks"] = data.progress.completedTasks;
-      updateData["progress.totalTasks"] = data.progress.totalTasks;
-      updateData["progress.lastUpdated"] = new Date();
-    }
-
-    // Update budget if provided
+    // Handle budget updates
     if (data.budget) {
-      updateData["budget.total"] = data.budget.total;
-      updateData["budget.currency"] = data.budget.currency;
-      updateData["budget.remaining"] = data.budget.total; // Will be recalculated
+      updateData.budget = {
+        total: data.budget.total ?? existingProject.budget?.total,
+        spent: existingProject.budget?.spent || 0,
+        remaining:
+          (data.budget.total ?? (existingProject.budget?.total || 0)) -
+          (existingProject.budget?.spent || 0),
+        currency:
+          data.budget.currency || existingProject.budget?.currency || "USD",
+        expenses: existingProject.budget?.expenses || [],
+      };
     }
 
-    // Set completion/archive dates based on status
-    if (data.status === "completed" && !existingProject.completedAt) {
-      updateData.completedAt = new Date();
-    }
-    if (data.status === "archived" && !existingProject.archivedAt) {
-      updateData.archivedAt = new Date();
-    }
-
+    console.log("🔄 updateProject: Applying updates to database");
     const updatedProject = await Project.findByIdAndUpdate(
       projectId,
-      { $set: updateData },
+      updateData,
       { new: true }
     );
 
     if (!updatedProject) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      console.log("❌ updateProject: Failed to update project");
+      return NextResponse.json(
+        {
+          error: "Update failed",
+          details: "Failed to update project",
+          code: "UPDATE_FAILED",
+        },
+        { status: 500 }
+      );
     }
 
+    console.log("✅ updateProject: Project updated successfully");
     const response: ProjectResponse = {
       project: convertProjectForFrontend(updatedProject.toObject()) as IProject,
     };
 
     return NextResponse.json(response);
-  } catch (error) {
-    console.error("Error updating project:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+  } catch (error: any) {
+    console.error("💥 updateProject: Error updating project:", {
+      error: error.message,
+      stack: error.stack,
+    });
+
     return NextResponse.json(
-      { error: "Failed to update project", details: errorMessage },
+      {
+        error: "Internal server error",
+        details: "Failed to update project",
+        code: "INTERNAL_ERROR",
+      },
       { status: 500 }
     );
   }
 }
 
-export const PUT = withFirebaseAuth<any>(updateProject);
+// Use manual authentication instead of wrapper to avoid TypeScript issues
+export const PUT = updateProject;
 
 async function deleteProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("🗑️ DELETE /api/projects/[id] - Starting project deletion");
+
   try {
     // Get the token from the authorization header
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.split("Bearer ")[1];
-    const tokenData = await verifyFirebaseToken(token);
 
-    if (!tokenData) {
+    if (!token) {
+      console.log("❌ deleteProject: No authorization token provided");
       return NextResponse.json(
-        { error: "Authentication required" },
+        {
+          error: "Authentication required",
+          details: "No authorization token provided",
+          code: "MISSING_TOKEN",
+        },
         { status: 401 }
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      console.log("❌ deleteProject: Token verification failed");
+      return NextResponse.json(
+        {
+          error: "Authentication failed",
+          details: "Invalid or expired token",
+          code: "INVALID_TOKEN",
+        },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
+    console.log("🔐 deleteProject: Authentication successful", {
+      userId,
+      tokenType: tokenData.tokenType,
+    });
 
     await connectToDatabase();
     const { id: projectId } = await params;
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
+      console.log("❌ deleteProject: Invalid project ID format");
       return NextResponse.json(
-        { error: "Invalid project ID" },
+        {
+          error: "Invalid request",
+          details: "Invalid project ID format",
+          code: "INVALID_PROJECT_ID",
+        },
         { status: 400 }
       );
     }
 
-    // Check if user has permission to delete this project (only owner)
-    const existingProject = await Project.findOne({
+    // Check if user is the owner (only owners can delete projects)
+    const project = await Project.findOne({
       _id: projectId,
       ownerId: userId,
     });
 
-    if (!existingProject) {
+    if (!project) {
+      console.log("❌ deleteProject: Project not found or not owner", {
+        projectId,
+        userId,
+      });
       return NextResponse.json(
-        { error: "Project not found or insufficient permissions" },
-        { status: 404 }
+        {
+          error: "Access denied",
+          details: "Project not found or you're not the owner",
+          code: "NOT_OWNER",
+        },
+        { status: 403 }
       );
     }
 
-    const result = await Project.findByIdAndDelete(projectId);
+    console.log("🗑️ deleteProject: Deleting project from database");
+    await Project.findByIdAndDelete(projectId);
 
-    if (!result) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
+    console.log("✅ deleteProject: Project deleted successfully");
+    return NextResponse.json({
+      success: true,
+      message: "Project deleted successfully",
+    });
+  } catch (error: any) {
+    console.error("💥 deleteProject: Error deleting project:", {
+      error: error.message,
+      stack: error.stack,
+    });
 
-    return NextResponse.json({ message: "Project deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting project:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to delete project", details: errorMessage },
+      {
+        error: "Internal server error",
+        details: "Failed to delete project",
+        code: "INTERNAL_ERROR",
+      },
       { status: 500 }
     );
   }
 }
 
-export const DELETE = withFirebaseAuth<any>(deleteProject);
+// Use manual authentication instead of wrapper to avoid TypeScript issues
+export const DELETE = deleteProject;

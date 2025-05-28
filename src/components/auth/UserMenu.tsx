@@ -32,7 +32,7 @@ export function UserMenu() {
   };
 
   // User is not authenticated
-  if (!session) {
+  if (!session?.user) {
     return (
       <div className="flex items-center gap-4">
         <Link href="/auth/signin">
@@ -42,10 +42,13 @@ export function UserMenu() {
     );
   }
 
+  // Since we've already checked that session.user exists, we can safely use it
+  const user = session.user;
+
   // Get user initials for avatar fallback
   const getInitials = () => {
-    if (!session.user?.name) return "U";
-    return session.user.name
+    if (!user?.name) return "U";
+    return user.name
       .split(" ")
       .map((n) => n[0])
       .join("")
@@ -59,10 +62,7 @@ export function UserMenu() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage
-              src={session.user.image || ""}
-              alt={session.user.name || "User"}
-            />
+            <AvatarImage src={user.image || ""} alt={user.name || "User"} />
             <AvatarFallback>{getInitials()}</AvatarFallback>
           </Avatar>
         </Button>
@@ -70,11 +70,9 @@ export function UserMenu() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">
-              {session.user.name}
-            </p>
+            <p className="text-sm font-medium leading-none">{user.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {session.user.email}
+              {user.email}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -83,7 +81,7 @@ export function UserMenu() {
           <DropdownMenuItem asChild>
             <Link href="/profile">Profile</Link>
           </DropdownMenuItem>
-          {session.user.roles?.includes("admin") && (
+          {user.roles?.includes("admin") && (
             <DropdownMenuItem asChild>
               <Link href="/admin">Admin</Link>
             </DropdownMenuItem>

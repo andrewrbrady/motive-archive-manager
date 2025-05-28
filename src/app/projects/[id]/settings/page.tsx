@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/button";

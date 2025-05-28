@@ -14,7 +14,6 @@ const CalendarTab = lazy(() => import("./CalendarTab"));
 const InspectionTab = lazy(() => import("./InspectionTab"));
 const Specifications = lazy(() => import("./Specifications"));
 const CarGalleries = lazy(() => import("./CarGalleries"));
-const ArticleGenerator = lazy(() => import("./ArticleGenerator"));
 const CarCopywriter = lazy(() =>
   import("./CarCopywriter").then((m) => ({ default: m.CarCopywriter }))
 );
@@ -200,15 +199,6 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       value: "documentation",
       label: "Documentation",
       content: <DocumentationFiles carId={carId} />,
-    },
-    {
-      value: "article",
-      label: "Article",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <ArticleGenerator carId={carId} />
-        </Suspense>
-      ),
     },
     {
       value: "deliverables",

@@ -55,7 +55,6 @@ const getTabIcon = (tabValue: string) => {
     captions: Share2,
     inspections: ClipboardCheck,
     documentation: FileIcon,
-    article: Newspaper,
     deliverables: Package,
     events: CalendarDays,
     calendar: Calendar,

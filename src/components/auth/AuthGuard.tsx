@@ -60,41 +60,117 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showUnauthorized, setShowUnauthorized] = useState(false);
+  const [unauthorizedTimeoutId, setUnauthorizedTimeoutId] =
+    useState<NodeJS.Timeout | null>(null);
 
   const isLoading = status === "loading";
   const isAuthenticated = status === "authenticated";
   const isAdmin = session?.user?.roles?.includes("admin");
 
-  // Temporary bypass for specific admin user
-  const isAdminBypass = session?.user?.id === "G46fdpqaufe7bmhluKAhakVM44e2";
+  // Temporary bypass for specific admin users
+  const adminBypassIds = [
+    "G46fdpqaufe7bmhluKAhakVM44e2", // Original admin
+    "B1hNo4GocJh9rPVAhMUhtvO6PGZ2", // Current user
+  ];
+  const isAdminBypass =
+    session?.user?.id && adminBypassIds.includes(session.user.id);
+
+  // CRITICAL FIX: Check if we're in a loading state where user is authenticated but session data isn't loaded yet
+  const isSessionDataLoading = isAuthenticated && !session?.user;
+
+  // Debug logging
+  useEffect(() => {
+    if (session?.user) {
+      console.log("AdminGuard: Session data:", {
+        userId: session.user.id,
+        email: session.user.email,
+        roles: session.user.roles,
+        isAdmin,
+        isAdminBypass,
+        status,
+        isSessionDataLoading,
+      });
+    } else if (isAuthenticated) {
+      console.log(
+        "AdminGuard: Authenticated but no session data yet (loading user data)"
+      );
+    }
+  }, [session, isAdmin, isAdminBypass, status, isSessionDataLoading]);
+
+  // CRITICAL FIX: Clear timeout and reset unauthorized state when admin access is detected
+  useEffect(() => {
+    if (isAdmin || isAdminBypass) {
+      if (unauthorizedTimeoutId) {
+        console.log(
+          "AdminGuard: Admin access detected, clearing unauthorized timeout"
+        );
+        clearTimeout(unauthorizedTimeoutId);
+        setUnauthorizedTimeoutId(null);
+      }
+      setShowUnauthorized(false);
+    }
+  }, [isAdmin, isAdminBypass, unauthorizedTimeoutId]);
 
   useEffect(() => {
-    // Don't make any decisions while still loading
-    if (status === "loading") {
+    // Clear any existing timeout when dependencies change
+    if (unauthorizedTimeoutId) {
+      clearTimeout(unauthorizedTimeoutId);
+      setUnauthorizedTimeoutId(null);
+    }
+
+    // CRITICAL FIX: Don't make any decisions while still loading OR while session data is loading
+    if (status === "loading" || isSessionDataLoading) {
       return;
     }
 
     if (status === "unauthenticated" && !isRedirecting) {
+      console.log("AdminGuard: User unauthenticated, redirecting to signin");
       setIsRedirecting(true);
       router.push("/auth/signin");
     } else if (
       status === "authenticated" &&
+      session?.user && // CRITICAL FIX: Ensure we have session data before making admin decisions
       !isAdmin &&
       !isAdminBypass &&
       !isRedirecting
     ) {
+      console.log(
+        "AdminGuard: User authenticated but not admin, showing unauthorized"
+      );
       setShowUnauthorized(true);
       // Don't redirect immediately, show unauthorized message first
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (!isRedirecting) {
+          console.log("AdminGuard: Redirecting to unauthorized page");
           setIsRedirecting(true);
           router.push("/unauthorized");
         }
       }, 3000); // Show message for 3 seconds before redirecting
+      setUnauthorizedTimeoutId(timeoutId);
+    } else if (status === "authenticated" && (isAdmin || isAdminBypass)) {
+      console.log("AdminGuard: User has admin access, showing content");
     }
-  }, [status, isAdmin, isAdminBypass, router, isRedirecting]); // Removed session from dependencies to prevent unnecessary re-runs
+  }, [
+    status,
+    isAdmin,
+    isAdminBypass,
+    router,
+    isRedirecting,
+    session?.user,
+    isSessionDataLoading,
+  ]);
 
-  if (isLoading || isRedirecting) {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (unauthorizedTimeoutId) {
+        clearTimeout(unauthorizedTimeoutId);
+      }
+    };
+  }, [unauthorizedTimeoutId]);
+
+  // CRITICAL FIX: Show loading while authentication is being determined OR while session data is loading
+  if (isLoading || isRedirecting || isSessionDataLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -110,7 +186,8 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
     return <>{fallbackComponent}</>;
   }
 
-  if (isAuthenticated && !isAdmin && !isAdminBypass) {
+  // CRITICAL FIX: Only show unauthorized if we have session data and user is definitely not admin
+  if (isAuthenticated && session?.user && !isAdmin && !isAdminBypass) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

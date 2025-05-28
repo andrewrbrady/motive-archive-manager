@@ -66,15 +66,16 @@ export default function ProjectsPage() {
       return;
     }
 
+    // Only fetch if we have a user and session
+    if (!user || !session?.user?.id) {
+      console.log("ProjectsPage: No user or session, skipping fetch");
+      return;
+    }
+
     try {
       fetchingRef.current = true;
       console.log("ProjectsPage: Starting to fetch projects...");
       setLoading(true);
-
-      if (!user) {
-        console.log("ProjectsPage: No user available in fetchProjects");
-        throw new Error("No authenticated user found");
-      }
 
       console.log("ProjectsPage: Getting Firebase ID token...");
       // Get the Firebase ID token
@@ -116,99 +117,49 @@ export default function ProjectsPage() {
         limit: data.limit,
       });
 
-      // Debug: Log detailed project data to see primary image info
-      console.log(
-        "ProjectsPage: Project details:",
-        data.projects.map((p) => ({
-          id: p._id,
-          title: p.title,
-          primaryImageId: p.primaryImageId,
-          primaryImageUrl: p.primaryImageUrl,
-          hasPrimaryImageId: !!p.primaryImageId,
-          hasPrimaryImageUrl: !!p.primaryImageUrl,
-        }))
-      );
-
       setProjects(data.projects);
 
-      // ✅ Initialize image states with data from the API response
-      const newImageStates: Record<
-        string,
-        {
-          loading: boolean;
-          url: string | null;
-          error: boolean;
-        }
-      > = {};
-
+      // Initialize image states for projects that have primary images
+      const newImageStates: typeof imageStates = {};
       data.projects.forEach((project) => {
-        newImageStates[project._id!] = {
-          loading: false,
-          url: project.primaryImageUrl || null, // ✅ Use pre-loaded image URL
-          error: false,
-        };
+        if (project.primaryImageUrl) {
+          newImageStates[project._id!] = {
+            loading: false,
+            url: project.primaryImageUrl,
+            error: false,
+          };
+        } else {
+          newImageStates[project._id!] = {
+            loading: false,
+            url: null,
+            error: false,
+          };
+        }
       });
-
       setImageStates(newImageStates);
-      console.log("ProjectsPage: Successfully loaded projects and set state");
 
-      // ✅ REMOVED: No more setTimeout + individual fetch calls
-      // This was causing 10-50 simultaneous API requests
-    } catch (err) {
-      console.error("ProjectsPage: Error fetching projects:", err);
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(null);
+    } catch (error) {
+      console.error("ProjectsPage: Error fetching projects:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
     } finally {
-      console.log("ProjectsPage: Setting loading to false");
       setLoading(false);
       fetchingRef.current = false;
     }
   };
 
-  // Initial authentication and load effect
+  // Simplified effect - just fetch when we have user and session
   useEffect(() => {
-    console.log("ProjectsPage: Auth useEffect triggered", {
-      status,
-      sessionExists: !!session,
-      userExists: !!user,
-      userId: session?.user?.id,
-      initialLoadDone: initialLoadRef.current,
-    });
-
-    if (status === "loading") {
-      console.log("ProjectsPage: Session still loading...");
-      return;
-    }
-
-    if (!session) {
-      console.log("ProjectsPage: No session, redirecting to signin");
-      router.push("/auth/signin");
-      return;
-    }
-
-    if (!user) {
-      console.log(
-        "ProjectsPage: Session exists but no Firebase user yet, waiting..."
-      );
-      return;
-    }
-
-    if (!initialLoadRef.current) {
-      console.log(
-        "ProjectsPage: Initial load - session and user valid, fetching projects"
-      );
+    if (user && session?.user?.id && !initialLoadRef.current) {
+      console.log("ProjectsPage: Initial load - fetching projects");
       initialLoadRef.current = true;
       fetchProjects();
     }
-  }, [session, status, user]);
+  }, [user, session?.user?.id]);
 
   // Search and filter effect
   useEffect(() => {
-    if (
-      initialLoadRef.current &&
-      session &&
-      user &&
-      status === "authenticated"
-    ) {
+    if (initialLoadRef.current && user && session?.user?.id) {
       console.log("ProjectsPage: Search/filter changed, refetching projects");
       fetchProjects();
     }
@@ -244,7 +195,8 @@ export default function ProjectsPage() {
     }
   };
 
-  if (status === "loading" || loading || (session && !user)) {
+  // Show loading while authentication is being handled by AuthGuard
+  if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">
@@ -362,96 +314,64 @@ export default function ProjectsPage() {
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          onError={() => {
+                            setImageStates((prev) => ({
+                              ...prev,
+                              [project._id!]: {
+                                ...prev[project._id!],
+                                error: true,
+                                url: null,
+                              },
+                            }));
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <ImageIcon className="h-8 w-8" />
-                            <span className="text-sm font-medium">
-                              No Image
-                            </span>
-                          </div>
+                          <ImageIcon className="h-12 w-12 text-muted-foreground" />
                         </div>
                       )}
                     </div>
 
-                    <CardHeader>
-                      <div className="flex justify-between items-start mb-2">
-                        <CardTitle className="text-lg line-clamp-2">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-lg line-clamp-1">
                           {project.title}
                         </CardTitle>
-                      </div>
-                      <div className="flex gap-2 mb-2">
-                        <Badge className={getStatusColor(project.status)}>
+                        <Badge
+                          className={`ml-2 ${getStatusColor(project.status)}`}
+                        >
                           {project.status.replace("_", " ")}
                         </Badge>
-                        <Badge variant="outline">
-                          {getTypeLabel(project.type)}
-                        </Badge>
                       </div>
-                      <CardDescription className="line-clamp-3">
+                      <CardDescription className="line-clamp-2">
                         {project.description}
                       </CardDescription>
                     </CardHeader>
 
-                    <CardContent>
-                      <div className="space-y-3">
-                        {/* Progress */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all"
-                              style={{
-                                width: `${project.progress.percentage}%`,
-                              }}
-                            />
+                    <CardContent className="pt-0">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>
+                              {project.timeline?.startDate
+                                ? format(
+                                    new Date(project.timeline.startDate),
+                                    "MMM d"
+                                  )
+                                : "No date"}
+                            </span>
                           </div>
-                          <span className="text-sm text-gray-600">
-                            {project.progress.percentage}%
+                          <div className="flex items-center gap-1">
+                            <Users className="h-4 w-4" />
+                            <span>{project.members?.length || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-medium">
+                            {getTypeLabel(project.type)}
                           </span>
                         </div>
-
-                        {/* Stats */}
-                        <div className="flex justify-between text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(
-                              new Date(project.timeline.startDate),
-                              "MMM d"
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {project.members.length}
-                          </div>
-                          {project.budget && (
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              {project.budget.currency}{" "}
-                              {project.budget.total.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Tags */}
-                        {project.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {project.tags.slice(0, 3).map((tag, index) => (
-                              <Badge
-                                key={index}
-                                variant="secondary"
-                                className="text-xs"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
-                            {project.tags.length > 3 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{project.tags.length - 3}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </CardContent>
                   </Card>

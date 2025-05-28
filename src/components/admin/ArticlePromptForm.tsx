@@ -11,97 +11,96 @@ import type { ProviderId } from "@/lib/llmProviders";
 import { getAllModels, llmProviders, findModelById } from "@/lib/llmProviders";
 import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { ModelSelector } from "@/components/ModelSelector";
 
-// Assuming ArticlePrompt interface is defined in ArticleGenerator.tsx or a shared types file
-// For now, let's define a simplified version here for clarity, ensure it matches the one in ArticleGenerator
-interface ArticlePromptForForm {
+// Article prompt interface for managing article generation templates
+// Used by copywriting tools and other article generation features
+interface ArticlePrompt {
   _id?: string;
   name: string;
   prompt: string;
-  aiModel: ModelType;
-  llmProvider: ProviderId;
+  aiModel: string;
+  llmProvider: string;
   modelParams?: {
     temperature?: number;
   };
-  isDefault?: boolean; // Add if managing default status here
+  isDefault?: boolean;
 }
 
 export interface ArticlePromptFormData {
   name: string;
   prompt: string;
-  aiModel: ModelType;
-  llmProvider: ProviderId;
-  modelParams: {
-    temperature: number;
-  };
-  isDefault?: boolean;
-  // other fields as needed
+  aiModel: string;
+  llmProvider: string;
+  temperature: number;
+  isDefault: boolean;
 }
 
 interface ArticlePromptFormProps {
-  prompt?: ArticlePromptForForm; // For editing
-  isSubmitting: boolean;
+  initialData?: ArticlePrompt;
   onSubmit: (data: ArticlePromptFormData) => Promise<void>;
   onCancel: () => void;
-  // To allow ArticleGenerator to manage these states if preferred, and pass them down
-  initialModel?: ModelType;
-  initialProvider?: ProviderId;
-  initialTemperature?: number;
-  renderModelSelector?: () => React.ReactNode;
+  isSubmitting?: boolean;
+  // Form state management - can be handled by parent components
+  // for better integration with existing state management patterns
 }
 
 const ArticlePromptForm: React.FC<ArticlePromptFormProps> = ({
-  prompt,
-  isSubmitting,
+  initialData,
   onSubmit,
   onCancel,
-  initialModel = "claude-3-5-sonnet-20241022",
-  initialProvider = "anthropic",
-  initialTemperature = 0.7,
-  renderModelSelector,
+  isSubmitting,
 }) => {
-  const [name, setName] = useState(prompt?.name || "");
-  const [promptText, setPromptText] = useState(prompt?.prompt || "");
+  const [name, setName] = useState(initialData?.name || "");
+  const [promptText, setPromptText] = useState(initialData?.prompt || "");
   const [currentAiModel, setCurrentAiModel] = useState<ModelType>(
-    prompt?.aiModel || initialModel
+    (initialData?.aiModel as ModelType) || "claude-3-5-sonnet-20241022"
   );
   const [currentProvider, setCurrentProvider] = useState<ProviderId>(
-    prompt?.llmProvider || initialProvider
+    (initialData?.llmProvider as ProviderId) || "anthropic"
   );
   const [currentTemperature, setCurrentTemperature] = useState<number>(
-    prompt?.modelParams?.temperature !== undefined
-      ? prompt.modelParams.temperature
-      : initialTemperature
+    initialData?.modelParams?.temperature !== undefined
+      ? initialData.modelParams.temperature
+      : 0.7
   );
   const [isDefault, setIsDefault] = useState<boolean>(
-    prompt?.isDefault || false
+    initialData?.isDefault || false
   );
 
   const allModels = getAllModels();
   const modelsByCurrentProvider = llmProviders[currentProvider]?.models || [];
 
   useEffect(() => {
-    if (prompt) {
-      setName(prompt.name);
-      setPromptText(prompt.prompt);
-      setCurrentAiModel(prompt.aiModel);
-      setCurrentProvider(prompt.llmProvider);
+    if (initialData) {
+      setName(initialData.name);
+      setPromptText(initialData.prompt);
+      setCurrentAiModel(initialData.aiModel as ModelType);
+      setCurrentProvider(initialData.llmProvider as ProviderId);
       setCurrentTemperature(
-        prompt.modelParams?.temperature !== undefined
-          ? prompt.modelParams.temperature
-          : initialTemperature
+        initialData.modelParams?.temperature !== undefined
+          ? initialData.modelParams.temperature
+          : 0.7
       );
-      setIsDefault(prompt.isDefault || false);
+      setIsDefault(initialData.isDefault || false);
     } else {
       // Reset to defaults for new prompt form
       setName("");
       setPromptText("");
-      setCurrentAiModel(initialModel);
-      setCurrentProvider(initialProvider);
-      setCurrentTemperature(initialTemperature);
+      setCurrentAiModel("claude-3-5-sonnet-20241022");
+      setCurrentProvider("anthropic");
+      setCurrentTemperature(0.7);
       setIsDefault(false);
     }
-  }, [prompt, initialModel, initialProvider, initialTemperature]);
+  }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,9 +114,7 @@ const ArticlePromptForm: React.FC<ArticlePromptFormProps> = ({
       prompt: promptText,
       aiModel: currentAiModel,
       llmProvider: currentProvider,
-      modelParams: {
-        temperature: currentTemperature,
-      },
+      temperature: currentTemperature,
       isDefault,
     });
   };
@@ -272,11 +269,6 @@ const ArticlePromptForm: React.FC<ArticlePromptFormProps> = ({
         </div>
       </div>
 
-      {/* Model selector is conditionally rendered if the prop is provided */}
-      {renderModelSelector && (
-        <div className="mt-6">{renderModelSelector()}</div>
-      )}
-
       <DialogFooter className="pt-4">
         {" "}
         {/* Ensure this is styled if not usingshadcn Dialog directly */}
@@ -295,7 +287,7 @@ const ArticlePromptForm: React.FC<ArticlePromptFormProps> = ({
           {isSubmitting ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : null}
-          {prompt?._id ? "Save Changes" : "Create Prompt"}
+          {initialData?._id ? "Save Changes" : "Create Prompt"}
         </Button>
       </DialogFooter>
     </form>

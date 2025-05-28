@@ -25,13 +25,16 @@ function ProfileContent() {
 
   // Function to get user initials for the avatar fallback
   const getInitials = () => {
-    if (!session.user.name) return "U";
+    if (!session?.user?.name) return "U";
     return session.user.name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase();
   };
+
+  // Since we've already checked that session.user exists, we can safely use it
+  const user = session.user;
 
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-4xl pt-24">
@@ -41,29 +44,24 @@ function ProfileContent() {
         <Card className="md:col-span-1">
           <CardHeader className="text-center">
             <Avatar className="h-24 w-24 mx-auto">
-              <AvatarImage
-                src={session.user.image || ""}
-                alt={session.user.name || "User"}
-              />
+              <AvatarImage src={user.image || ""} alt={user.name || "User"} />
               <AvatarFallback className="text-xl">
                 {getInitials()}
               </AvatarFallback>
             </Avatar>
-            <CardTitle className="mt-4">{session.user.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {session.user.email}
-            </p>
+            <CardTitle className="mt-4">{user.name}</CardTitle>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2 justify-center mb-4">
-              {session.user.roles?.map((role) => (
+              {user.roles?.map((role) => (
                 <Badge key={role} variant="secondary" className="capitalize">
                   {role}
                 </Badge>
               ))}
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
-              {session.user.creativeRoles?.map((role) => (
+              {user.creativeRoles?.map((role) => (
                 <Badge key={role} variant="outline" className="capitalize">
                   {role}
                 </Badge>
@@ -72,12 +70,10 @@ function ProfileContent() {
             <div className="mt-4 pt-4 border-t text-center">
               <p className="text-sm font-medium">Account Status</p>
               <Badge
-                variant={
-                  session.user.status === "active" ? "default" : "destructive"
-                }
+                variant={user.status === "active" ? "default" : "destructive"}
                 className="mt-1"
               >
-                {session.user.status || "active"}
+                {user.status || "active"}
               </Badge>
             </div>
           </CardContent>
@@ -93,19 +89,19 @@ function ProfileContent() {
                 <dt className="text-sm font-medium text-muted-foreground">
                   Name
                 </dt>
-                <dd className="mt-1">{session.user.name || "Not provided"}</dd>
+                <dd className="mt-1">{user.name || "Not provided"}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">
                   Email
                 </dt>
-                <dd className="mt-1">{session.user.email}</dd>
+                <dd className="mt-1">{user.email}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">
                   User ID
                 </dt>
-                <dd className="mt-1 font-mono text-sm">{session.user.id}</dd>
+                <dd className="mt-1 font-mono text-sm">{user.id}</dd>
               </div>
             </dl>
           </CardContent>
