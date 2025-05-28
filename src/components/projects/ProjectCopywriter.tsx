@@ -26,6 +26,7 @@ import type {
   Platform,
 } from "./caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface ProjectCopywriterProps {
   project: Project;
@@ -36,6 +37,8 @@ export function ProjectCopywriter({
   project,
   onProjectUpdate,
 }: ProjectCopywriterProps) {
+  const { user } = useFirebaseAuth();
+
   // Client handle state
   const [clientHandle, setClientHandle] = useState<string | null>(null);
 
@@ -54,7 +57,10 @@ export function ProjectCopywriter({
   });
 
   // Use project data hook - must be called before any early returns
-  const projectDataHook = useProjectData({ projectId: project._id || "" });
+  const projectDataHook = useProjectData({
+    projectId: project._id || "",
+    user,
+  });
 
   // Derive length from selected prompt template (using promptHandlers state)
   const derivedLength = promptHandlers.selectedPrompt

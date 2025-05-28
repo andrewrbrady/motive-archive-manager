@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, use, lazy, Suspense } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect, use, lazy, Suspense, useRef } from "react";
+import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import { Project, ProjectStatus } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
@@ -39,11 +39,13 @@ interface ProjectDetailPageProps {
 
 export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { data: session, status } = useSession();
+  const { user } = useFirebaseAuth();
   const router = useRouter();
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialLoadRef = useRef(false);
 
   // Get tab from URL searchParams, default to "overview"
   const [activeTab, setActiveTab] = useState("overview");
@@ -141,24 +143,67 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     window.history.pushState({}, "", url.toString());
   };
 
+  // Initial authentication and load effect
   useEffect(() => {
-    if (status === "loading") return;
+    console.log("ProjectDetailPage: Auth useEffect triggered", {
+      status,
+      sessionExists: !!session,
+      userExists: !!user,
+      userId: session?.user?.id,
+      initialLoadDone: initialLoadRef.current,
+    });
+
+    if (status === "loading") {
+      console.log("ProjectDetailPage: Session still loading...");
+      return;
+    }
+
     if (!session) {
+      console.log("ProjectDetailPage: No session, redirecting to signin");
       router.push("/auth/signin");
       return;
     }
-    fetchProject();
-  }, [session, status, resolvedParams.id]);
+
+    if (!user) {
+      console.log(
+        "ProjectDetailPage: Session exists but no Firebase user yet, waiting..."
+      );
+      return;
+    }
+
+    if (!initialLoadRef.current) {
+      console.log(
+        "ProjectDetailPage: Initial load - session and user valid, fetching project"
+      );
+      initialLoadRef.current = true;
+      fetchProject();
+    }
+  }, [session, status, user, resolvedParams.id]);
 
   const fetchProject = async () => {
     console.log("🔄 Fetching project data...");
     try {
       setLoading(true);
+
+      if (!user) {
+        console.log("ProjectDetailPage: No user available in fetchProject");
+        throw new Error("No authenticated user found");
+      }
+
+      console.log("ProjectDetailPage: Getting Firebase ID token...");
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+      console.log("ProjectDetailPage: Got Firebase ID token successfully");
+
       console.log(
         "🌐 Making request to:",
         `/api/projects/${resolvedParams.id}`
       );
-      const response = await fetch(`/api/projects/${resolvedParams.id}`);
+      const response = await fetch(`/api/projects/${resolvedParams.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       console.log("📥 Project fetch response:", {
         status: response.status,
@@ -246,10 +291,17 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     if (!project) return;
 
     try {
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
       const response = await fetch(`/api/projects/${project._id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -276,7 +328,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     router.push("/projects");
   };
 
-  if (status === "loading" || loading) {
+  if (status === "loading" || loading || (session && !user)) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">

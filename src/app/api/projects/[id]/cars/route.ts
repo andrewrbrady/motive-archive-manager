@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 
 interface ProjectCarsRouteParams {
   params: Promise<{ id: string }>;
 }
 
 // GET - Fetch cars linked to project
-export async function GET(
+async function getProjectCars(
   request: NextRequest,
   { params }: ProjectCarsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -32,10 +45,7 @@ export async function GET(
     // Get project and verify user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: session.user.id },
-        { "members.userId": session.user.id },
-      ],
+      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -90,15 +100,25 @@ export async function GET(
 }
 
 // POST - Link car to project
-export async function POST(
+async function linkCarToProject(
   request: NextRequest,
   { params }: ProjectCarsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -121,9 +141,9 @@ export async function POST(
     const project = await db.collection("projects").findOne({
       _id: projectId,
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
-          "members.userId": session.user.id,
+          "members.userId": userId,
           "members.role": { $in: ["owner", "manager"] },
         },
       ],
@@ -180,15 +200,25 @@ export async function POST(
 }
 
 // DELETE - Unlink car from project
-export async function DELETE(
+async function unlinkCarFromProject(
   request: NextRequest,
   { params }: ProjectCarsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -207,14 +237,15 @@ export async function DELETE(
 
     const db = await getDatabase();
     const projectId = new ObjectId(id);
+    const carObjectId = new ObjectId(carId);
 
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
-          "members.userId": session.user.id,
+          "members.userId": userId,
           "members.role": { $in: ["owner", "manager"] },
         },
       ],
@@ -227,22 +258,17 @@ export async function DELETE(
       );
     }
 
-    // Remove car from project (handle both ObjectId and string formats)
+    // Remove car from project
     await db.collection("projects").updateOne(
       { _id: projectId },
       {
-        $pull: {
-          carIds: {
-            $in: [carId, new ObjectId(carId)],
-          },
-        } as any,
+        $pull: { carIds: carObjectId } as any,
         $set: { updatedAt: new Date() },
       }
     );
 
     return NextResponse.json({
       message: "Car unlinked from project successfully",
-      carId: carId,
     });
   } catch (error) {
     console.error("Error unlinking car from project:", error);
@@ -252,3 +278,8 @@ export async function DELETE(
     );
   }
 }
+
+// Export the wrapped functions
+export const GET = withFirebaseAuth<any>(getProjectCars);
+export const POST = withFirebaseAuth<any>(linkCarToProject);
+export const DELETE = withFirebaseAuth<any>(unlinkCarFromProject);

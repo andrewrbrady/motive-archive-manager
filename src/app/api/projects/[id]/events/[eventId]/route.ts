@@ -2,22 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { EventModel } from "@/models/Event";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 
 export const dynamic = "force-dynamic";
 
-export async function PUT(
+async function updateProjectEvent(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; eventId: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id: projectId, eventId } = await params;
 
@@ -34,11 +44,11 @@ export async function PUT(
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
           members: {
             $elemMatch: {
-              userId: session.user.id,
+              userId: userId,
               permissions: { $in: ["write", "manage_timeline"] },
             },
           },
@@ -146,18 +156,25 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function deleteProjectEvent(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; eventId: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id: projectId, eventId } = await params;
 
@@ -174,11 +191,11 @@ export async function DELETE(
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
           members: {
             $elemMatch: {
-              userId: session.user.id,
+              userId: userId,
               permissions: { $in: ["write", "manage_timeline"] },
             },
           },
@@ -202,7 +219,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Remove the event ID from the project's eventIds array
+    // Remove the event from the project's eventIds array
     await db
       .collection("projects")
       .updateOne(
@@ -224,12 +241,16 @@ export async function DELETE(
 }
 
 export async function OPTIONS(request: Request) {
-  return new NextResponse(null, {
-    status: 204,
+  return new Response(null, {
+    status: 200,
     headers: {
+      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Origin": "*",
     },
   });
 }
+
+// Export the wrapped functions
+export const PUT = withFirebaseAuth<any>(updateProjectEvent);
+export const DELETE = withFirebaseAuth<any>(deleteProjectEvent);

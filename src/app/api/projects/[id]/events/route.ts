@@ -3,22 +3,32 @@ import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { Event, DbEvent } from "@/types/event";
 import { EventModel } from "@/models/Event";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
+async function getProjectEvents(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id: projectId } = await params;
 
@@ -34,10 +44,7 @@ export async function GET(
     // Check if user has access to this project
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
-      $or: [
-        { ownerId: session.user.id },
-        { "members.userId": session.user.id },
-      ],
+      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -110,18 +117,25 @@ export async function GET(
   }
 }
 
-export async function POST(
+async function createProjectEvent(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id: projectId } = await params;
 
@@ -138,11 +152,11 @@ export async function POST(
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
           members: {
             $elemMatch: {
-              userId: session.user.id,
+              userId: userId,
               permissions: { $in: ["write", "manage_timeline"] },
             },
           },
@@ -203,7 +217,7 @@ export async function POST(
       location_id: locationId,
       primary_image_id: primaryImageId,
       image_ids: imageIds.length > 0 ? imageIds : undefined,
-      created_by: session.user.id, // Track who created the event
+      created_by: userId, // Track who created the event
     };
 
     const newEventId = await eventModel.create(eventData);
@@ -236,3 +250,7 @@ export async function POST(
     );
   }
 }
+
+// Export the wrapped functions
+export const GET = withFirebaseAuth<any>(getProjectEvents);
+export const POST = withFirebaseAuth<any>(createProjectEvent);

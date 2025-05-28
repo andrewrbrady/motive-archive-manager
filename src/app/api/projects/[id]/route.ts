@@ -6,32 +6,42 @@ import {
   ProjectResponse,
   Project as IProject,
 } from "@/types/project";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
 import { convertProjectForFrontend } from "@/utils/objectId";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
+async function getProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   console.log("🔍 GET /api/projects/[id] - Starting project fetch");
 
   try {
-    const session = await auth();
-    console.log("🔐 Authentication check:", {
-      hasSession: !!session,
-      userId: session?.user?.id,
-    });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
 
-    if (!session?.user?.id) {
+    if (!tokenData) {
       console.log("❌ Authentication failed");
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+
+    console.log("🔐 Authentication check:", {
+      hasSession: true,
+      userId: userId,
+    });
 
     const { id: projectId } = await params;
     console.log("📋 Project ID from params:", projectId);
@@ -52,10 +62,7 @@ export async function GET(
     console.log("🔍 Searching for project using Mongoose model...");
     const project = await Project.findOne({
       _id: projectId,
-      $or: [
-        { ownerId: session.user.id },
-        { "members.userId": session.user.id },
-      ],
+      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -95,18 +102,27 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export const GET = withFirebaseAuth<any>(getProject);
+
+async function updateProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     await connectToDatabase();
     const { id: projectId } = await params;
@@ -124,11 +140,11 @@ export async function PUT(
     const existingProject = await Project.findOne({
       _id: projectId,
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
           members: {
             $elemMatch: {
-              userId: session.user.id,
+              userId: userId,
               permissions: {
                 $in: [
                   "write",
@@ -259,18 +275,27 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+export const PUT = withFirebaseAuth<any>(updateProject);
+
+async function deleteProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     await connectToDatabase();
     const { id: projectId } = await params;
@@ -286,7 +311,7 @@ export async function DELETE(
     // Check if user has permission to delete this project (only owner)
     const existingProject = await Project.findOne({
       _id: projectId,
-      ownerId: session.user.id,
+      ownerId: userId,
     });
 
     if (!existingProject) {
@@ -313,3 +338,5 @@ export async function DELETE(
     );
   }
 }
+
+export const DELETE = withFirebaseAuth<any>(deleteProject);

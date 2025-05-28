@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 
 interface ProjectCaptionsRouteParams {
   params: Promise<{ id: string }>;
 }
 
 // GET - Fetch captions for project
-export async function GET(
+async function getProjectCaptions(
   request: NextRequest,
   { params }: ProjectCaptionsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -36,9 +49,9 @@ export async function GET(
     }
 
     const isMember = project.members?.some(
-      (member: any) => member.userId === session.user.id
+      (member: any) => member.userId === userId
     );
-    if (!isMember && project.ownerId !== session.user.id) {
+    if (!isMember && project.ownerId !== userId) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -60,15 +73,25 @@ export async function GET(
 }
 
 // POST - Create new caption for project
-export async function POST(
+async function createProjectCaption(
   request: NextRequest,
   { params }: ProjectCaptionsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -98,14 +121,14 @@ export async function POST(
     }
 
     const isMember = project.members?.some(
-      (member: any) => member.userId === session.user.id
+      (member: any) => member.userId === userId
     );
-    const isOwner = project.ownerId === session.user.id;
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner ||
       (isMember &&
         ["owner", "manager"].includes(
-          project.members.find((m: any) => m.userId === session.user.id)?.role
+          project.members.find((m: any) => m.userId === userId)?.role
         ));
 
     if (!canManage) {
@@ -124,7 +147,7 @@ export async function POST(
       platform,
       context: context || "",
       caption,
-      createdBy: session.user.id,
+      createdBy: userId,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -145,15 +168,25 @@ export async function POST(
 }
 
 // PATCH - Update existing caption
-export async function PATCH(
+async function updateProjectCaption(
   request: NextRequest,
   { params }: ProjectCaptionsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     const url = new URL(request.url);
@@ -187,14 +220,14 @@ export async function PATCH(
     }
 
     const isMember = project.members?.some(
-      (member: any) => member.userId === session.user.id
+      (member: any) => member.userId === userId
     );
-    const isOwner = project.ownerId === session.user.id;
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner ||
       (isMember &&
         ["owner", "manager"].includes(
-          project.members.find((m: any) => m.userId === session.user.id)?.role
+          project.members.find((m: any) => m.userId === userId)?.role
         ));
 
     if (!canManage) {
@@ -205,21 +238,21 @@ export async function PATCH(
     }
 
     // Update caption
-    const updateData: any = {
-      caption,
-      updatedAt: new Date(),
-    };
+    const updateResult = await db.collection("project_captions").updateOne(
+      { _id: captionObjectId, projectId: id },
+      {
+        $set: {
+          platform,
+          context: context || "",
+          caption,
+          carIds: carIds || [],
+          eventIds: eventIds || [],
+          updatedAt: new Date(),
+        },
+      }
+    );
 
-    if (platform) updateData.platform = platform;
-    if (context !== undefined) updateData.context = context;
-    if (carIds) updateData.carIds = carIds;
-    if (eventIds) updateData.eventIds = eventIds;
-
-    const result = await db
-      .collection("project_captions")
-      .updateOne({ _id: captionObjectId, projectId: id }, { $set: updateData });
-
-    if (result.matchedCount === 0) {
+    if (updateResult.matchedCount === 0) {
       return NextResponse.json({ error: "Caption not found" }, { status: 404 });
     }
 
@@ -235,16 +268,26 @@ export async function PATCH(
   }
 }
 
-// DELETE - Remove caption from project
-export async function DELETE(
+// DELETE - Delete caption
+async function deleteProjectCaption(
   request: NextRequest,
   { params }: ProjectCaptionsRouteParams
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     const { id } = await params;
     const url = new URL(request.url);
@@ -268,14 +311,14 @@ export async function DELETE(
     }
 
     const isMember = project.members?.some(
-      (member: any) => member.userId === session.user.id
+      (member: any) => member.userId === userId
     );
-    const isOwner = project.ownerId === session.user.id;
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner ||
       (isMember &&
         ["owner", "manager"].includes(
-          project.members.find((m: any) => m.userId === session.user.id)?.role
+          project.members.find((m: any) => m.userId === userId)?.role
         ));
 
     if (!canManage) {
@@ -286,11 +329,11 @@ export async function DELETE(
     }
 
     // Delete caption
-    const result = await db
+    const deleteResult = await db
       .collection("project_captions")
       .deleteOne({ _id: captionObjectId, projectId: id });
 
-    if (result.deletedCount === 0) {
+    if (deleteResult.deletedCount === 0) {
       return NextResponse.json({ error: "Caption not found" }, { status: 404 });
     }
 
@@ -305,3 +348,9 @@ export async function DELETE(
     );
   }
 }
+
+// Export the wrapped functions
+export const GET = withFirebaseAuth<any>(getProjectCaptions);
+export const POST = withFirebaseAuth<any>(createProjectCaption);
+export const PATCH = withFirebaseAuth<any>(updateProjectCaption);
+export const DELETE = withFirebaseAuth<any>(deleteProjectCaption);

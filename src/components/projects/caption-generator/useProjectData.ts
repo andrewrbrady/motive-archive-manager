@@ -13,12 +13,14 @@ import {
   Template,
 } from "./types";
 import type { BaTCarDetails } from "@/types/car-page";
+import type { User } from "firebase/auth";
 
 interface UseProjectDataProps {
   projectId: string;
+  user?: User | null;
 }
 
-export function useProjectData({ projectId }: UseProjectDataProps) {
+export function useProjectData({ projectId, user }: UseProjectDataProps) {
   // Car-related state
   const [projectCars, setProjectCars] = useState<ProjectCar[]>([]);
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
@@ -83,7 +85,20 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
   const fetchProjectCars = async () => {
     try {
       setLoadingCars(true);
-      const response = await fetch(`/api/projects/${projectId}/cars`);
+
+      if (!user) {
+        console.log("useProjectData: No user available for fetchProjectCars");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${projectId}/cars`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch project cars");
@@ -131,7 +146,20 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
   const fetchProjectEvents = async () => {
     try {
       setLoadingEvents(true);
-      const response = await fetch(`/api/projects/${projectId}/events`);
+
+      if (!user) {
+        console.log("useProjectData: No user available for fetchProjectEvents");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${projectId}/events`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch project events");
@@ -236,7 +264,21 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
 
   const fetchProjectCaptions = async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/captions`);
+      if (!user) {
+        console.log(
+          "useProjectData: No user available for fetchProjectCaptions"
+        );
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${projectId}/captions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch project captions");
       }
@@ -249,12 +291,12 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
 
   // Fetch project data when projectId changes
   useEffect(() => {
-    if (projectId) {
+    if (projectId && user) {
       fetchProjectCars();
       fetchProjectEvents();
       fetchProjectCaptions();
     }
-  }, [projectId]);
+  }, [projectId, user]);
 
   // Fetch system prompts when component mounts
   useEffect(() => {

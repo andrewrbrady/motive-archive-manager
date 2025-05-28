@@ -28,6 +28,7 @@ import type {
 import type { ProviderId } from "@/lib/llmProviders";
 import type { BaTCarDetails } from "@/types/car-page";
 import type { Event } from "@/types/event";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface CarCopywriterProps {
   carId: string;
@@ -43,6 +44,8 @@ interface CarSavedCaption {
 }
 
 export function CarCopywriter({ carId }: CarCopywriterProps) {
+  const { user } = useFirebaseAuth();
+
   // Car-specific state
   const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
   const [loadingCar, setLoadingCar] = useState(true);
@@ -409,7 +412,19 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
-      const response = await fetch("/api/system-prompts/list");
+      if (!user) {
+        console.log("CarCopywriter: No user available for fetchSystemPrompts");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch("/api/system-prompts/list", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch system prompts");
 
       const data = await response.json();
@@ -432,7 +447,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     } finally {
       setLoadingSystemPrompts(false);
     }
-  }, []);
+  }, [user]);
 
   // Fetch length settings
   const fetchLengthSettings = useCallback(async () => {

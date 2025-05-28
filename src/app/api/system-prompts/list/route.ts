@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  withFirebaseAuth,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 
 // GET - Fetch system prompts for selection (non-admin endpoint)
-export async function GET(request: NextRequest) {
+async function getSystemPromptsList(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get the token from the authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -51,3 +61,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+// Export the wrapped function
+export const GET = withFirebaseAuth<any>(getSystemPromptsList);

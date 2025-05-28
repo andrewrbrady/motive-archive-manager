@@ -78,6 +78,7 @@ import ListView from "@/components/events/ListView";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "@/components/events/EventTypeSelector";
 import { LoadingContainer } from "@/components/ui/loading";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface ProjectEventsTabProps {
   projectId: string;
@@ -119,6 +120,7 @@ const getEventTypeIcon = (type: EventType) => {
 };
 
 export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
+  const { user } = useFirebaseAuth();
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState("grid"); // Start with grid view for projects
@@ -131,7 +133,20 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/projects/${projectId}/events`);
+
+      if (!user) {
+        console.log("ProjectEventsTab: No user available in fetchEvents");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${projectId}/events`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -190,10 +205,17 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
 
   const handleCreateEvent = async (eventData: Partial<Event>) => {
     try {
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
       const response = await fetch(`/api/projects/${projectId}/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(eventData),
       });
@@ -213,10 +235,17 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
 
   const handleAttachEvent = async (eventId: string) => {
     try {
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
       const response = await fetch(`/api/projects/${projectId}/events/attach`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ eventId }),
       });
@@ -236,10 +265,17 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
 
   const handleDetachEvent = async (eventId: string) => {
     try {
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
       const response = await fetch(`/api/projects/${projectId}/events/detach`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ eventId }),
       });
@@ -261,6 +297,12 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
     updates: Partial<Event>
   ) => {
     try {
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.map((event) =>
@@ -274,6 +316,7 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(updates),
         }
@@ -295,6 +338,12 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.filter((event) => event.id !== eventId)
@@ -304,6 +353,9 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
         `/api/projects/${projectId}/events/${eventId}`,
         {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
