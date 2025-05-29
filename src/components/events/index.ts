@@ -5,7 +5,6 @@ export { default as EventsTab } from "./EventsTab";
 export { default as ListView } from "./ListView";
 export { default as EventForm } from "./EventForm";
 export { default as EventBatchTemplates } from "./EventBatchTemplates";
-export { default as EventsCalendar } from "./EventsCalendar";
 export { default as EventTemplateGantt } from "./EventTemplateGantt";
 export { default as EventBatchManager } from "./EventBatchManager";
 export { default as CreateEventButton } from "./CreateEventButton";

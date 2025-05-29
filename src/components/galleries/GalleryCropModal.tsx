@@ -41,10 +41,17 @@ import {
   Check,
   X,
   Upload,
+  Maximize2,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CropArea {
   x: number;
@@ -126,6 +133,7 @@ export function GalleryCropModal({
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
+  const [lastProcessingTime, setLastProcessingTime] = useState(0);
 
   // Canvas refs for interactive cropping
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -161,14 +169,16 @@ export function GalleryCropModal({
   // Save live preview preference and handle toggle
   const handleLivePreviewToggle = (enabled: boolean) => {
     setLivePreviewEnabled(enabled);
-    localStorage.setItem("galleryCropLivePreview", enabled.toString());
+    if (enabled && shouldTriggerLivePreview()) {
+      debouncedGeneratePreview();
+    }
+  };
 
-    if (!enabled) {
-      setLivePreviewUrl(null);
-      setPreviewProcessingTime(null);
-      if (previewTimeoutRef.current) {
-        clearTimeout(previewTimeoutRef.current);
-      }
+  const handlePreset = (width: number, height: number) => {
+    setOutputWidth(width.toString());
+    setOutputHeight(height.toString());
+    if (shouldTriggerLivePreview()) {
+      debouncedGeneratePreview();
     }
   };
 
@@ -866,22 +876,50 @@ export function GalleryCropModal({
   const handleReplaceImage = async (multiplier: 1 | 2) => {
     if (!image || !processedImageUrl) return;
 
-    // Prevent double-clicks and concurrent executions
-    if (isReplacing1x || isReplacing2x) return;
+    // Add time-based lock to prevent rapid successive calls
+    const now = Date.now();
+    if (now - lastProcessingTime < 2000) {
+      console.log(
+        `🚫 handleReplaceImage(${multiplier}) blocked - too soon after last processing`
+      );
+      return;
+    }
+
+    // Prevent double-clicks and concurrent executions with more robust checking
+    if (isReplacing1x || isReplacing2x || isReplacing) {
+      console.log(
+        `🚫 handleReplaceImage(${multiplier}) blocked - already processing:`,
+        {
+          isReplacing1x,
+          isReplacing2x,
+          isReplacing,
+        }
+      );
+      return;
+    }
+
+    console.log(`🎯 handleReplaceImage(${multiplier}) starting...`);
+    setLastProcessingTime(now);
 
     try {
+      // Set the specific multiplier state first
       if (multiplier === 1) {
         setIsReplacing1x(true);
+        console.log("🔒 Locked 1x processing");
       } else {
         setIsReplacing2x(true);
+        console.log("🔒 Locked 2x processing");
       }
 
+      // Set general replacing state
       setIsReplacing(true);
       setProcessingStatus(
         multiplier === 1
           ? "Saving standard resolution image..."
           : "Saving high-resolution image..."
       );
+
+      console.log(`📤 Making API call with multiplier: ${multiplier}`);
 
       // Use the selected multiplier for the processing
       const processingImageUrl = getProcessingImageUrl(image.url || "");
@@ -902,7 +940,7 @@ export function GalleryCropModal({
           outputHeight: parseInt(outputHeight) * multiplier,
           scale: scale * multiplier,
           processingMethod,
-          uploadToCloudflare: true, // This is key - we need to upload to Cloudflare
+          uploadToCloudflare: true,
           originalFilename: image?.filename,
           originalCarId: image?.carId,
           previewImageDimensions: originalDimensions,
@@ -915,6 +953,7 @@ export function GalleryCropModal({
       }
 
       const processingResult = await processingResponse.json();
+      console.log(`✅ Processing result for ${multiplier}x:`, processingResult);
 
       if (
         !processingResult.success ||
@@ -925,21 +964,22 @@ export function GalleryCropModal({
 
       setProcessingStatus("Updating gallery...");
 
-      // Now replace the image in the gallery using the uploaded image data
-      const parameters = {
-        imageUrl: processingImageUrl,
-        cropX: Math.round(cropArea.x),
-        cropY: Math.round(cropArea.y),
-        cropWidth: Math.round(cropArea.width),
-        cropHeight: Math.round(cropArea.height),
-        outputWidth: parseInt(outputWidth) * multiplier,
-        outputHeight: parseInt(outputHeight) * multiplier,
-        scale: scale * multiplier,
-        processingMethod,
-      };
+      // Get the processed image ID from the upload result
+      const processedImageId =
+        processingResult.cloudflareUpload?.images?.[0]?.id;
 
+      if (!processedImageId) {
+        throw new Error("Failed to get processed image ID from upload result");
+      }
+
+      console.log(
+        `📝 Using already-processed image ID for ${multiplier}x:`,
+        processedImageId
+      );
+
+      // Now update the gallery to use the already-processed image
       const response = await fetch(
-        `/api/galleries/${galleryId}/replace-image`,
+        `/api/galleries/${galleryId}/replace-image-direct`,
         {
           method: "POST",
           headers: {
@@ -947,8 +987,7 @@ export function GalleryCropModal({
           },
           body: JSON.stringify({
             originalImageId: image._id,
-            processingType: "crop" as const,
-            parameters,
+            processedImageId: processedImageId,
           }),
         }
       );
@@ -959,6 +998,7 @@ export function GalleryCropModal({
       }
 
       const result = await response.json();
+      console.log(`✅ Gallery replacement result for ${multiplier}x:`, result);
 
       // Verify the new image is available before updating UI
       if (result && result.processedImage && result.processedImage.url) {
@@ -992,6 +1032,8 @@ export function GalleryCropModal({
         }
       }
 
+      console.log(`🎉 Successfully completed ${multiplier}x processing`);
+
       toast({
         title: "Success",
         description:
@@ -1000,7 +1042,7 @@ export function GalleryCropModal({
             : "Image saved to gallery successfully",
       });
     } catch (error) {
-      console.error("Gallery image save error:", error);
+      console.error(`❌ Gallery image save error for ${multiplier}x:`, error);
       toast({
         title: "Error",
         description:
@@ -1008,6 +1050,7 @@ export function GalleryCropModal({
         variant: "destructive",
       });
     } finally {
+      console.log(`🔓 Unlocking states for ${multiplier}x processing`);
       setIsReplacing(false);
       setIsReplacing1x(false);
       setIsReplacing2x(false);
@@ -1041,17 +1084,13 @@ export function GalleryCropModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[85vw] max-h-[70vh] overflow-y-auto">
-        <div className="relative">
-          <DialogHeader>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Crop className="h-5 w-5" />
               Image Crop Tool
             </DialogTitle>
-            <DialogDescription>
-              Crop and scale your image for social media formats. Drag the crop
-              area on the preview to adjust.
-            </DialogDescription>
           </DialogHeader>
 
           {/* Absolutely positioned crop validation checkmark */}
@@ -1062,12 +1101,12 @@ export function GalleryCropModal({
               </div>
             )}
 
-          <div className="space-y-4 mt-4">
+          <div className="flex-1 min-h-0 space-y-4 overflow-y-auto p-1">
             {/* Main Grid: Preview (Left) and Crop Controls (Right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Left Column: Live Preview */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+              {/* Left Column: Live Preview - Make it fill available height */}
+              <div className="space-y-2 flex flex-col">
+                <div className="flex items-center justify-between flex-shrink-0">
                   <Label>Live Preview</Label>
                   {processingMethod === "local" &&
                     process.env.NODE_ENV === "development" && (
@@ -1094,291 +1133,284 @@ export function GalleryCropModal({
                     )}
                 </div>
 
-                <div className="border rounded-lg p-2 bg-muted/50 relative">
+                <div className="border rounded-lg p-2 bg-muted/50 relative flex-1 min-h-0">
                   {livePreviewEnabled &&
                   processingMethod === "local" &&
                   process.env.NODE_ENV === "development" &&
                   livePreviewUrl ? (
-                    <div className="space-y-2">
-                      {/* Fill available height instead of fixed aspect ratio */}
-                      <div className="relative w-full h-[40vh]">
-                        <CloudflareImage
-                          src={livePreviewUrl}
-                          alt="Live preview"
-                          width={800}
-                          height={1000}
-                          className="absolute inset-0 w-full h-full object-contain rounded border"
-                          variant="medium"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
+                    <div className="space-y-2 h-full flex flex-col">
+                      <CloudflareImage
+                        src={livePreviewUrl}
+                        alt="Live preview"
+                        width={600}
+                        height={600}
+                        className="w-full h-full object-contain rounded"
+                        variant="public"
+                      />
+                      {previewProcessingTime && (
                         <p className="text-xs text-muted-foreground">
-                          Live Preview (800px wide)
+                          Generated in {previewProcessingTime}ms
+                          {remoteServiceUsed && " (remote)"}
                         </p>
-                        {previewProcessingTime && (
-                          <p className="text-xs text-muted-foreground">
-                            {previewProcessingTime}ms
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="relative w-full h-[40vh] flex items-center justify-center text-muted-foreground">
-                      <div className="text-center space-y-2">
-                        <Eye className="h-8 w-8 mx-auto opacity-50" />
-                        <p className="text-sm">
-                          {process.env.NODE_ENV !== "development"
-                            ? "Live preview available in development mode only"
-                            : processingMethod !== "local"
-                              ? "Live preview only available with local processing"
-                              : livePreviewEnabled
-                                ? "Adjust crop area to see live preview"
-                                : "Enable live preview to see real-time results"}
-                        </p>
-                      </div>
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">
+                        {processingMethod === "local" &&
+                        process.env.NODE_ENV === "development"
+                          ? "Enable live preview to see real-time crop results"
+                          : "Preview will appear after processing"}
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Right Column: Crop Canvas + All Controls */}
-              <div className="space-y-3">
-                {/* Crop Canvas */}
-                <div>
-                  <Label>Image Preview & Crop Area</Label>
-                  <div className="border rounded-lg p-2 bg-muted/50 mt-1">
+              {/* Right Column: Crop Controls */}
+              <div className="space-y-4 flex flex-col">
+                {/* Interactive Crop Canvas */}
+                <div className="space-y-2 flex-shrink-0">
+                  <Label>Interactive Crop</Label>
+                  <div className="border rounded-lg p-2 bg-muted/50">
                     {currentImageUrl ? (
-                      <canvas
-                        ref={canvasRef}
-                        className="border rounded cursor-move max-w-full"
-                        onMouseDown={handleCanvasMouseDown}
-                        onMouseMove={handleCanvasMouseMove}
-                        onMouseUp={handleCanvasMouseUp}
-                        onMouseLeave={handleCanvasMouseUp}
-                      />
+                      <div className="relative">
+                        <canvas
+                          ref={canvasRef}
+                          className="max-w-full h-48 border rounded cursor-crosshair"
+                          onMouseDown={handleCanvasMouseDown}
+                          onMouseMove={handleCanvasMouseMove}
+                          onMouseUp={handleCanvasMouseUp}
+                        />
+                      </div>
                     ) : (
-                      <div className="h-48 flex items-center justify-center text-muted-foreground">
-                        No image selected
+                      <div className="w-full h-48 border rounded flex items-center justify-center bg-muted">
+                        <p className="text-sm text-muted-foreground">
+                          Loading image...
+                        </p>
                       </div>
                     )}
                   </div>
-                  {originalDimensions && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Drag to move the crop area. Original:{" "}
-                      {originalDimensions.width}×{originalDimensions.height}
-                    </p>
-                  )}
                 </div>
 
-                {/* Output Dimensions - at the top in two columns */}
-                <div className="space-y-2">
-                  <Label>Output Dimensions</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="outputWidth" className="text-xs">
-                        Width
-                      </Label>
-                      <Input
-                        id="outputWidth"
-                        type="number"
-                        value={outputWidth}
-                        onChange={(e) => {
-                          setOutputWidth(e.target.value);
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
-                        }}
-                        min="1"
-                        max="8000"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="outputHeight" className="text-xs">
-                        Height
-                      </Label>
-                      <Input
-                        id="outputHeight"
-                        type="number"
-                        value={outputHeight}
-                        onChange={(e) => {
-                          setOutputHeight(e.target.value);
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
-                        }}
-                        min="1"
-                        max="8000"
-                      />
-                    </div>
-                  </div>
+                {/* Output Dimensions with Icons */}
+                <div className="space-y-2 flex-shrink-0">
+                  <div className="grid grid-cols-2 gap-4">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-1 text-xs">
+                              <Maximize2 className="h-3 w-3" />
+                              Width
+                            </Label>
+                            <Input
+                              type="number"
+                              value={outputWidth}
+                              onChange={(e) => {
+                                setOutputWidth(e.target.value);
+                                if (shouldTriggerLivePreview()) {
+                                  debouncedGeneratePreview();
+                                }
+                              }}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Final output width in pixels</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
-                  {/* Quick presets */}
-                  <div className="flex gap-1 flex-wrap">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-1 text-xs">
+                              <Maximize2 className="h-3 w-3" />
+                              Height
+                            </Label>
+                            <Input
+                              type="number"
+                              value={outputHeight}
+                              onChange={(e) => {
+                                setOutputHeight(e.target.value);
+                                if (shouldTriggerLivePreview()) {
+                                  debouncedGeneratePreview();
+                                }
+                              }}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Final output height in pixels</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+
+                {/* Preset Buttons */}
+                <div className="space-y-2 flex-shrink-0">
+                  <Label className="text-xs">Presets</Label>
+                  <div className="grid grid-cols-2 gap-1">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs px-2 py-1 h-auto"
-                      onClick={() => {
-                        setOutputWidth("1080");
-                        setOutputHeight("1920");
-                      }}
+                      onClick={() => handlePreset(1080, 1920)}
+                      className="h-7 text-xs px-2"
                     >
                       9:16
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs px-2 py-1 h-auto"
-                      onClick={() => {
-                        setOutputWidth("1080");
-                        setOutputHeight("1080");
-                      }}
+                      onClick={() => handlePreset(1080, 1080)}
+                      className="h-7 text-xs px-2"
                     >
                       1:1
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs px-2 py-1 h-auto"
-                      onClick={() => {
-                        setOutputWidth("1080");
-                        setOutputHeight("1350");
-                      }}
+                      onClick={() => handlePreset(1080, 1350)}
+                      className="h-7 text-xs px-2"
                     >
                       4:5
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs px-2 py-1 h-auto"
-                      onClick={() => {
-                        setOutputWidth("1920");
-                        setOutputHeight("1080");
-                      }}
+                      onClick={() => handlePreset(1920, 1080)}
+                      className="h-7 text-xs px-2"
                     >
                       16:9
                     </Button>
                   </div>
                 </div>
 
-                {/* Crop Area Controls */}
-                <div className="space-y-2">
-                  <Label>Crop Area (pixels)</Label>
+                {/* Crop Area with Icons */}
+                <div className="space-y-2 flex-shrink-0">
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="cropX" className="text-xs">
-                        X Position
-                      </Label>
-                      <Input
-                        id="cropX"
-                        type="number"
-                        value={cropArea.x}
-                        onChange={(e) => {
-                          const newX = parseInt(e.target.value) || 0;
-                          if (
-                            originalDimensions &&
-                            newX + cropArea.width <= originalDimensions.width
-                          ) {
-                            setCropArea((prev) => ({
-                              ...prev,
-                              x: Math.max(0, newX),
-                            }));
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
-                          }
-                        }}
-                        min="0"
-                        max={originalDimensions?.width || 0}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="cropY" className="text-xs">
-                        Y Position
-                      </Label>
-                      <Input
-                        id="cropY"
-                        type="number"
-                        value={cropArea.y}
-                        onChange={(e) => {
-                          const newY = parseInt(e.target.value) || 0;
-                          if (
-                            originalDimensions &&
-                            newY + cropArea.height <= originalDimensions.height
-                          ) {
-                            setCropArea((prev) => ({
-                              ...prev,
-                              y: Math.max(0, newY),
-                            }));
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
-                          }
-                        }}
-                        min="0"
-                        max={originalDimensions?.height || 0}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="cropWidth" className="text-xs">
-                        Width
-                      </Label>
-                      <Input
-                        id="cropWidth"
-                        type="number"
-                        value={cropArea.width}
-                        onChange={(e) => {
-                          const newWidth = parseInt(e.target.value) || 0;
-                          if (
-                            originalDimensions &&
-                            cropArea.x + newWidth <= originalDimensions.width
-                          ) {
-                            setCropArea((prev) => ({
-                              ...prev,
-                              width: Math.max(1, newWidth),
-                            }));
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
-                          }
-                        }}
-                        min="1"
-                        max={originalDimensions?.width || 0}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="cropHeight" className="text-xs">
-                        Height
-                      </Label>
-                      <Input
-                        id="cropHeight"
-                        type="number"
-                        value={cropArea.height}
-                        onChange={(e) => {
-                          const newHeight = parseInt(e.target.value) || 0;
-                          if (
-                            originalDimensions &&
-                            cropArea.y + newHeight <= originalDimensions.height
-                          ) {
-                            setCropArea((prev) => ({
-                              ...prev,
-                              height: Math.max(1, newHeight),
-                            }));
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
-                          }
-                        }}
-                        min="1"
-                        max={originalDimensions?.height || 0}
-                      />
-                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-1 text-xs">
+                              <Settings className="h-3 w-3" />X
+                            </Label>
+                            <Input
+                              type="number"
+                              value={Math.round(cropArea.x)}
+                              onChange={(e) =>
+                                setCropArea((prev) => ({
+                                  ...prev,
+                                  x: parseInt(e.target.value) || 0,
+                                }))
+                              }
+                              min={0}
+                              max={originalDimensions?.width || 0}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Crop area X position</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-1 text-xs">
+                              <Settings className="h-3 w-3" />Y
+                            </Label>
+                            <Input
+                              type="number"
+                              value={Math.round(cropArea.y)}
+                              onChange={(e) =>
+                                setCropArea((prev) => ({
+                                  ...prev,
+                                  y: parseInt(e.target.value) || 0,
+                                }))
+                              }
+                              min={0}
+                              max={originalDimensions?.height || 0}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Crop area Y position</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-1 text-xs">
+                              <Settings className="h-3 w-3" />W
+                            </Label>
+                            <Input
+                              type="number"
+                              value={Math.round(cropArea.width)}
+                              onChange={(e) =>
+                                setCropArea((prev) => ({
+                                  ...prev,
+                                  width: parseInt(e.target.value) || 0,
+                                }))
+                              }
+                              min={0}
+                              max={originalDimensions?.width || 0}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Crop area width</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="space-y-1">
+                            <Label className="flex items-center gap-1 text-xs">
+                              <Settings className="h-3 w-3" />H
+                            </Label>
+                            <Input
+                              type="number"
+                              value={Math.round(cropArea.height)}
+                              onChange={(e) =>
+                                setCropArea((prev) => ({
+                                  ...prev,
+                                  height: parseInt(e.target.value) || 0,
+                                }))
+                              }
+                              min={0}
+                              max={originalDimensions?.height || 0}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Crop area height</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
 
                 {/* Scale Control */}
-                <div className="space-y-1">
-                  <Label>Scale: {scale.toFixed(1)}x</Label>
+                <div className="space-y-2 flex-shrink-0">
+                  <Label className="text-xs">Scale: {scale.toFixed(1)}x</Label>
                   <Slider
                     value={[scale]}
                     onValueChange={(value) => {
@@ -1399,13 +1431,13 @@ export function GalleryCropModal({
                 </div>
 
                 {/* Processing Method */}
-                <div className="space-y-1">
-                  <Label>Processing Method</Label>
+                <div className="space-y-2 flex-shrink-0">
+                  <Label className="text-xs">Processing Method</Label>
                   <Select
                     value={processingMethod}
                     onValueChange={handleProcessingMethodChange}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1425,15 +1457,9 @@ export function GalleryCropModal({
                   </Select>
                 </div>
 
-                {/* Status Messages */}
-                {processingStatus && (
-                  <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">{processingStatus}</p>
-                  </div>
-                )}
-
+                {/* Error Messages */}
                 {error && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="p-2 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
                     <p className="text-sm text-red-800">{error}</p>
                   </div>
                 )}
@@ -1445,15 +1471,15 @@ export function GalleryCropModal({
                     processingMethod === "local" &&
                     process.env.NODE_ENV === "development"
                   ) && (
-                    <div className="space-y-1">
-                      <Label>Processed Image</Label>
+                    <div className="space-y-1 flex-shrink-0">
+                      <Label className="text-xs">Processed Image</Label>
                       <div className="border rounded-lg p-2 bg-muted/50">
                         <CloudflareImage
                           src={processedImageUrl}
                           alt="Processed image"
                           width={300}
                           height={300}
-                          className="w-full h-auto max-h-48 object-contain rounded"
+                          className="w-full h-auto max-h-32 object-contain rounded"
                           variant="medium"
                         />
                         {processedDimensions && (
@@ -1469,108 +1495,119 @@ export function GalleryCropModal({
             </div>
           </div>
 
-          <DialogFooter className="flex flex-wrap gap-2">
-            <div className="flex gap-2 flex-wrap">
-              {/* Process Button */}
-              <Button
-                onClick={handleProcess}
-                disabled={
-                  isProcessing ||
-                  !image ||
-                  !originalDimensions ||
-                  !validateCropArea(cropArea, originalDimensions)
-                }
-                className="bg-black hover:bg-gray-800 text-white"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Crop className="mr-2 h-4 w-4" />
-                    Crop Image (Preview)
-                  </>
-                )}
-              </Button>
-
-              {/* Download Button */}
-              {processedImageUrl && (
+          {/* Sticky Footer with Buttons */}
+          <DialogFooter className="flex-shrink-0 border-t bg-background p-4 mt-4">
+            <div className="flex flex-wrap gap-2 w-full justify-between items-center">
+              <div className="flex gap-2 flex-wrap items-center">
+                {/* Process Button */}
                 <Button
-                  variant="outline"
-                  onClick={() => {
-                    const imageUrl = processedImageUrl;
-                    if (imageUrl) {
-                      const link = document.createElement("a");
-                      link.href = imageUrl;
-                      link.download = `cropped_${image?.filename || "image"}.jpg`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }
-                  }}
+                  onClick={handleProcess}
+                  disabled={
+                    isProcessing ||
+                    !image ||
+                    !originalDimensions ||
+                    !validateCropArea(cropArea, originalDimensions)
+                  }
+                  className="bg-black hover:bg-gray-800 text-white"
                 >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Crop className="mr-2 h-4 w-4" />
+                      Crop Image (Preview)
+                    </>
+                  )}
                 </Button>
-              )}
 
-              {/* Save Button with Resolution Options */}
-              {processedImageUrl && (
-                <div className="flex gap-1">
+                {/* Download Button */}
+                {processedImageUrl && (
                   <Button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleReplaceImage(1);
-                    }}
-                    disabled={isReplacing1x || isReplacing2x}
-                    className="border-gray-300 hover:bg-gray-50"
                     variant="outline"
-                  >
-                    {isReplacing1x ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-4 w-4" />
-                        1x (Save)
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleReplaceImage(2);
+                    onClick={() => {
+                      const imageUrl = processedImageUrl;
+                      if (imageUrl) {
+                        const link = document.createElement("a");
+                        link.href = imageUrl;
+                        link.download = `cropped_${image?.filename || "image"}.jpg`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }
                     }}
-                    disabled={isReplacing1x || isReplacing2x}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    variant="default"
                   >
-                    {isReplacing2x ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-4 w-4" />
-                        2x (Save)
-                      </>
-                    )}
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
                   </Button>
-                </div>
-              )}
-            </div>
+                )}
 
-            <Button variant="outline" onClick={handleClose}>
-              <X className="mr-2 h-4 w-4" />
-              Close
-            </Button>
+                {/* Save Button with Resolution Options */}
+                {processedImageUrl && (
+                  <div className="flex gap-1">
+                    <Button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleReplaceImage(1);
+                      }}
+                      disabled={isReplacing1x || isReplacing2x}
+                      className="border-gray-300 hover:bg-gray-50"
+                      variant="outline"
+                    >
+                      {isReplacing1x ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          1x (Save)
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleReplaceImage(2);
+                      }}
+                      disabled={isReplacing1x || isReplacing2x}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      variant="default"
+                    >
+                      {isReplacing2x ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          2x (Save)
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Processing Status - Small text next to buttons */}
+                {processingStatus && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {processingStatus}
+                  </div>
+                )}
+              </div>
+
+              <Button variant="outline" onClick={handleClose}>
+                <X className="mr-2 h-4 w-4" />
+                Close
+              </Button>
+            </div>
           </DialogFooter>
         </div>
       </DialogContent>
