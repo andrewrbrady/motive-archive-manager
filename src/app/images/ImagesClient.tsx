@@ -471,28 +471,38 @@ export default function ImagesClient() {
                         <CommandItem
                           value="all"
                           onSelect={() => handleCarChange("all")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
                         >
                           <Check
                             className={cn(
-                              "mr-2 h-4 w-4",
+                              "mr-2 h-4 w-4 pointer-events-none",
                               carId === "all" ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          All Cars
+                          <span className="pointer-events-none">All Cars</span>
                         </CommandItem>
                         {sortedCars.map((car) => (
                           <CommandItem
                             key={car._id}
                             value={`${car.year} ${car.make} ${car.model}`}
                             onSelect={() => handleCarChange(car._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-4 w-4 pointer-events-none",
                                 carId === car._id ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            {car.year} {car.make} {car.model}
+                            <span className="pointer-events-none">
+                              {car.year} {car.make} {car.model}
+                            </span>
                           </CommandItem>
                         ))}
                       </CommandGroup>

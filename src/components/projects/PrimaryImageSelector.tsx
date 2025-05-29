@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useImages } from "@/hooks/use-images";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -150,6 +150,7 @@ export function PrimaryImageSelector({
   const [isOpen, setIsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [selectedAngle, setSelectedAngle] = useState<string>("all");
   const [selectedView, setSelectedView] = useState<string>("all");
   const [selectedMovement, setSelectedMovement] = useState<string>("all");
@@ -157,6 +158,8 @@ export function PrimaryImageSelector({
   const [selectedCarId, setSelectedCarId] = useState<string>("all");
   const [carSearchOpen, setCarSearchOpen] = useState(false);
   const [carSearchQuery, setCarSearchQuery] = useState("");
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch all cars by setting a high limit
   const { data: carsData } = useCars({ limit: 1000, sortDirection: "desc" });
@@ -193,7 +196,7 @@ export function PrimaryImageSelector({
     return car ? `${car.year} ${car.make} ${car.model}` : "All Cars";
   }, [selectedCarId, carsData?.cars]);
 
-  const { data, isLoading, error } = useImages({
+  const useImagesParams = {
     limit: IMAGES_PER_PAGE,
     carId: selectedCarId === "all" ? undefined : selectedCarId,
     angle: selectedAngle === "all" ? undefined : selectedAngle,
@@ -202,7 +205,9 @@ export function PrimaryImageSelector({
     view: selectedView === "all" ? undefined : selectedView,
     page: currentPage,
     search: searchQuery || undefined,
-  });
+  };
+
+  const { data, isLoading, error } = useImages(useImagesParams);
 
   // Handle search with debounce
   const [debouncedSetSearch] = useDebounce((value: string) => {
@@ -210,13 +215,12 @@ export function PrimaryImageSelector({
     setCurrentPage(1); // Reset to first page on search
   }, 500);
 
-  // Handle search input
-  const handleSearchInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      debouncedSetSearch(e.target.value);
-    },
-    [debouncedSetSearch]
-  );
+  // Handle search input change
+  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    debouncedSetSearch(value);
+  };
 
   // Handle filter changes
   const handleFilterChange = useCallback((key: string, value: string) => {
@@ -261,6 +265,7 @@ export function PrimaryImageSelector({
     if (open) {
       setCurrentPage(1);
       setSearchQuery("");
+      setSearchInput("");
       setSelectedAngle("all");
       setSelectedView("all");
       setSelectedMovement("all");
@@ -288,7 +293,7 @@ export function PrimaryImageSelector({
             {selectedImageId ? "Change Primary Image" : "Select Primary Image"}
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Select Primary Image</DialogTitle>
             <DialogDescription>
@@ -296,7 +301,7 @@ export function PrimaryImageSelector({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+          <div className="flex-1 flex flex-col space-y-4 min-h-0">
             {/* Filters */}
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap gap-2 items-center">
@@ -322,7 +327,7 @@ export function PrimaryImageSelector({
                           onValueChange={setCarSearchQuery}
                         />
                         <CommandEmpty>No cars found.</CommandEmpty>
-                        <CommandGroup className="max-h-[200px] overflow-auto">
+                        <CommandGroup className="max-h-64 overflow-auto">
                           <CommandItem
                             key="all"
                             value="all"
@@ -331,38 +336,46 @@ export function PrimaryImageSelector({
                               setCarSearchOpen(false);
                               setCarSearchQuery("");
                             }}
-                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4 flex-shrink-0",
+                                "mr-2 h-4 w-4 pointer-events-none",
                                 selectedCarId === "all"
                                   ? "opacity-100"
                                   : "opacity-0"
                               )}
                             />
-                            <span>All Cars</span>
+                            <span className="pointer-events-none">
+                              All Cars
+                            </span>
                           </CommandItem>
                           {sortedCars.map((car) => (
                             <CommandItem
                               key={car._id}
-                              value={car._id}
+                              value={`${car.year} ${car.make} ${car.model}`}
                               onSelect={() => {
                                 handleFilterChange("carId", car._id);
                                 setCarSearchOpen(false);
                                 setCarSearchQuery("");
                               }}
-                              className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
                             >
                               <Check
                                 className={cn(
-                                  "mr-2 h-4 w-4 flex-shrink-0",
+                                  "mr-2 h-4 w-4 pointer-events-none",
                                   selectedCarId === car._id
                                     ? "opacity-100"
                                     : "opacity-0"
                                 )}
                               />
-                              <span>
+                              <span className="pointer-events-none">
                                 {car.year} {car.make} {car.model}
                               </span>
                             </CommandItem>
@@ -375,6 +388,7 @@ export function PrimaryImageSelector({
 
                 <Input
                   placeholder="Search images..."
+                  value={searchInput}
                   onChange={handleSearchInput}
                   className="w-full md:w-[250px]"
                 />
