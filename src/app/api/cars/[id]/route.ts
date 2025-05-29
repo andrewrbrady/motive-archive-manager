@@ -645,19 +645,23 @@ export async function PATCH(request: Request) {
 
       // Handle client field specifically
       if (key === "client") {
-        if (!value) {
+        if (!value || value === "") {
           acc[key] = null;
         } else {
           try {
-            // Validate the client ID format
-            if (!ObjectId.isValid(value.toString())) {
-              throw new Error(`Invalid client ID format: ${value}`);
+            // Check if the value is a valid ObjectId format
+            if (ObjectId.isValid(value.toString())) {
+              // Store client ID as ObjectId for consistency
+              acc[key] = new ObjectId(value.toString());
+            } else {
+              // For non-ObjectId client values (like legacy string identifiers),
+              // store as string and let the application handle the lookup
+              acc[key] = value.toString();
             }
-            // Store client ID as ObjectId for consistency
-            acc[key] = new ObjectId(value.toString());
           } catch (error) {
-            console.error("Error converting client ID:", error);
-            throw new Error(`Invalid client ID format: ${value}`);
+            console.error("Error processing client ID:", error);
+            // If there's any error, store as string
+            acc[key] = value.toString();
           }
         }
         return acc;

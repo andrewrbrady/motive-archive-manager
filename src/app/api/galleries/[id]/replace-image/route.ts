@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 
 interface ReplaceImageRequest {
   originalImageId: string;
-  processingType: "canvas-extension" | "image-matte";
+  processingType: "canvas-extension" | "image-matte" | "crop";
   parameters: any;
 }
 
@@ -84,6 +84,23 @@ export async function POST(request: NextRequest) {
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
       };
+    } else if (processingType === "crop") {
+      processingEndpoint = "/api/images/crop-image";
+
+      processingParams = {
+        imageUrl: parameters.imageUrl,
+        cropX: parameters.cropX,
+        cropY: parameters.cropY,
+        cropWidth: parameters.cropWidth,
+        cropHeight: parameters.cropHeight,
+        outputWidth: parameters.outputWidth,
+        outputHeight: parameters.outputHeight,
+        scale: parameters.scale,
+        processingMethod: parameters.processingMethod,
+        uploadToCloudflare: true,
+        originalFilename: originalImage.filename,
+        originalCarId: originalImage.carId,
+      };
     } else {
       processingEndpoint = "/api/images/create-matte";
 
@@ -130,12 +147,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the new image data
-    const newImageId = processingResult.cloudflareUpload.mongoId;
+    const newImageId = processingResult.cloudflareUpload.images?.[0]?.id;
+
+    if (!newImageId) {
+      console.error(
+        "No image ID found in upload result:",
+        processingResult.cloudflareUpload
+      );
+      return NextResponse.json(
+        { error: "Failed to get processed image ID from upload result" },
+        { status: 500 }
+      );
+    }
+
     const newImage = await imagesCollection.findOne({
       _id: new ObjectId(newImageId),
     });
 
     if (!newImage) {
+      console.error("Image not found in database with ID:", newImageId);
       return NextResponse.json(
         { error: "Failed to retrieve processed image" },
         { status: 500 }

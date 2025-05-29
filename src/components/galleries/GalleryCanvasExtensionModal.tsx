@@ -18,7 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Settings, Cloud, Monitor, Check, X } from "lucide-react";
+import {
+  Loader2,
+  Settings,
+  Cloud,
+  Monitor,
+  Check,
+  X,
+  Download,
+  Eye,
+} from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
@@ -41,6 +50,11 @@ interface ProcessedImageData {
   carId: string;
 }
 
+interface ImageDimensions {
+  width: number;
+  height: number;
+}
+
 export function GalleryCanvasExtensionModal({
   isOpen,
   onClose,
@@ -55,13 +69,22 @@ export function GalleryCanvasExtensionModal({
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
   const [processingMethod, setProcessingMethod] =
     useState<ProcessingMethod>("cloud");
-  const [originalDimensions, setOriginalDimensions] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
+  const [originalDimensions, setOriginalDimensions] =
+    useState<ImageDimensions | null>(null);
   const [processedImage, setProcessedImage] =
     useState<ProcessedImageData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Add high-resolution state variables
+  const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
+  const [highResMultiplier, setHighResMultiplier] = useState<number | null>(
+    null
+  );
+  const [highResImageUrl, setHighResImageUrl] = useState<string | null>(null);
+  const [processedDimensions, setProcessedDimensions] =
+    useState<ImageDimensions | null>(null);
+  const [highResDimensions, setHighResDimensions] =
+    useState<ImageDimensions | null>(null);
 
   const {
     previewProcessImage,
@@ -127,6 +150,38 @@ export function GalleryCanvasExtensionModal({
     }
   }, [enhancedImageUrl]);
 
+  // Load processed image dimensions when processed image changes
+  useEffect(() => {
+    if (processedImage?.url) {
+      const img = new window.Image();
+      img.onload = () => {
+        setProcessedDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = processedImage.url;
+    } else {
+      setProcessedDimensions(null);
+    }
+  }, [processedImage?.url]);
+
+  // Load high-res image dimensions when high-res image changes
+  useEffect(() => {
+    if (highResImageUrl) {
+      const img = new window.Image();
+      img.onload = () => {
+        setHighResDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = highResImageUrl;
+    } else {
+      setHighResDimensions(null);
+    }
+  }, [highResImageUrl]);
+
   const handlePreview = async () => {
     if (!image || !enhancedImageUrl) return;
 
@@ -183,6 +238,94 @@ export function GalleryCanvasExtensionModal({
     }
   };
 
+  const handleHighResProcess = async (multiplier: 2 | 4) => {
+    if (!image || !processedDimensions) return;
+
+    setIsProcessingHighRes(true);
+    setHighResMultiplier(multiplier);
+    setHighResImageUrl(null);
+    setHighResDimensions(null);
+
+    try {
+      // Calculate the high-resolution target dimensions
+      // Scale BOTH width and height to maintain aspect ratio
+      const targetWidth = processedDimensions.width * multiplier;
+      const targetHeight = processedDimensions.height * multiplier;
+
+      // Get the high-resolution source image from Cloudflare
+      // Use the multiplied width to get a proportionally larger source image
+      const highResCloudflareWidth = parseInt(cloudflareWidth) * multiplier;
+      const highResSourceUrl = getEnhancedImageUrl(
+        image.url,
+        highResCloudflareWidth.toString(),
+        cloudflareQuality
+      );
+
+      const response = await fetch("/api/images/extend-canvas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
+          desiredHeight: targetHeight,
+          paddingPct: parseFloat(paddingPct),
+          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+          uploadToCloudflare: false,
+          originalFilename: image.filename,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to process high-resolution image");
+      }
+
+      const result = await response.json();
+      setHighResImageUrl(result.processedImageUrl);
+
+      toast({
+        title: "Success",
+        description: `${multiplier}x high-resolution image processed successfully (${targetWidth}×${targetHeight})`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to process ${multiplier}x high-resolution image`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingHighRes(false);
+    }
+  };
+
+  const handleHighResDownload = () => {
+    if (highResImageUrl && highResMultiplier) {
+      // Convert data URL to blob for better download handling
+      fetch(highResImageUrl)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `extended_${highResMultiplier}x_${image?.filename || "image"}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        })
+        .catch((error) => {
+          console.error("Blob creation failed:", error);
+          // Fallback to direct download
+          const link = document.createElement("a");
+          link.href = highResImageUrl;
+          link.download = `extended_${highResMultiplier}x_${image?.filename || "image"}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+    }
+  };
+
   const handleDiscardPreview = () => {
     setProcessedImage(null);
     setShowPreview(false);
@@ -196,6 +339,12 @@ export function GalleryCanvasExtensionModal({
     setCloudflareQuality("100");
     setProcessedImage(null);
     setShowPreview(false);
+    // Reset high-resolution state variables
+    setIsProcessingHighRes(false);
+    setHighResMultiplier(null);
+    setHighResImageUrl(null);
+    setProcessedDimensions(null);
+    setHighResDimensions(null);
     onClose();
   };
 
@@ -444,6 +593,60 @@ export function GalleryCanvasExtensionModal({
               </div>
             )}
 
+            {/* High-Resolution Processing Section */}
+            {showPreview && processedImage && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={() => handleHighResProcess(2)}
+                    disabled={isProcessingHighRes}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    {isProcessingHighRes && highResMultiplier === 2 ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        2x...
+                      </>
+                    ) : (
+                      "Generate 2x"
+                    )}
+                  </Button>
+
+                  <Button
+                    onClick={() => handleHighResProcess(4)}
+                    disabled={isProcessingHighRes}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    {isProcessingHighRes && highResMultiplier === 4 ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        4x...
+                      </>
+                    ) : (
+                      "Generate 4x"
+                    )}
+                  </Button>
+                </div>
+
+                {/* High-res download button */}
+                {highResImageUrl && (
+                  <Button
+                    onClick={handleHighResDownload}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                  >
+                    <Download className="mr-1 h-3 w-3" />
+                    Download {highResMultiplier}x High-Res
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Debug info */}
             {process.env.NODE_ENV === "development" && (
               <div className="text-xs text-muted-foreground mt-2">
@@ -490,41 +693,48 @@ export function GalleryCanvasExtensionModal({
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Processed Image</Label>
-                {processedImage && (
+                <Label className="text-sm font-medium">
+                  {highResImageUrl
+                    ? `High-Res Image (${highResMultiplier}x)`
+                    : "Processed Image"}
+                </Label>
+                {(highResDimensions || processedDimensions) && (
                   <span className="text-xs text-muted-foreground">
-                    Preview Ready
+                    {highResDimensions
+                      ? `${highResDimensions.width} × ${highResDimensions.height}`
+                      : processedDimensions
+                        ? `${processedDimensions.width} × ${processedDimensions.height}`
+                        : ""}
                   </span>
                 )}
               </div>
               <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                {processedImage ? (
+                {highResImageUrl || processedImage ? (
                   <div className="relative max-w-full max-h-[400px]">
                     <Image
-                      src={processedImage.url}
-                      alt={processedImage.filename || "Processed image"}
+                      src={(highResImageUrl || processedImage?.url)!}
+                      alt={
+                        highResImageUrl
+                          ? "High-resolution processed image"
+                          : processedImage?.filename || "Processed image"
+                      }
                       width={0}
                       height={0}
                       sizes="100vw"
                       className="w-auto h-auto max-w-full max-h-[400px] object-contain"
                       style={{ width: "auto", height: "auto" }}
-                      key={processedImage.url}
+                      key={highResImageUrl || processedImage?.url}
                     />
+                    {highResImageUrl && (
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+                        {highResMultiplier}x High-Res
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-[300px] text-muted-foreground">
                     <div className="text-center">
-                      <div className="h-8 w-8 mx-auto mb-2 opacity-50">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                          <circle cx="12" cy="13" r="3" />
-                        </svg>
-                      </div>
+                      <Eye className="h-8 w-8 mx-auto mb-2" />
                       <p className="text-sm">
                         Processed image will appear here
                       </p>
@@ -532,6 +742,23 @@ export function GalleryCanvasExtensionModal({
                   </div>
                 )}
               </div>
+
+              {/* Toggle between processed and high-res images */}
+              {processedImage && highResImageUrl && (
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setHighResImageUrl(null);
+                      setHighResDimensions(null);
+                    }}
+                    className="flex-1 text-xs"
+                  >
+                    Show Original Preview
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>

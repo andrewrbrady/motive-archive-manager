@@ -10,6 +10,7 @@ import {
   Palette,
   CheckSquare,
   Square,
+  Crop,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -17,6 +18,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { GalleryCanvasExtensionModal } from "./GalleryCanvasExtensionModal";
 import { GalleryImageMatteModal } from "./GalleryImageMatteModal";
+import { GalleryCropModal } from "./GalleryCropModal";
 import { ImageData } from "@/app/images/columns";
 
 interface SortableGalleryItemProps {
@@ -53,6 +55,7 @@ export function SortableGalleryItem({
   const [isCopied, setIsCopied] = useState(false);
   const [isCanvasExtensionOpen, setIsCanvasExtensionOpen] = useState(false);
   const [isImageMatteOpen, setIsImageMatteOpen] = useState(false);
+  const [isCropOpen, setIsCropOpen] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{
     width: number;
     height: number;
@@ -119,6 +122,10 @@ export function SortableGalleryItem({
 
   const handleImageMatte = () => {
     setIsImageMatteOpen(true);
+  };
+
+  const handleCrop = () => {
+    setIsCropOpen(true);
   };
 
   const handleImageClick = () => {
@@ -220,23 +227,37 @@ export function SortableGalleryItem({
             </div>
           )}
 
-          {/* Processing buttons for horizontal images - hide in batch mode */}
-          {!isBatchMode && isHorizontal && (
+          {/* Processing buttons - show for all images in non-batch mode */}
+          {!isBatchMode && (
             <div className="absolute top-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              {/* Crop button for all images */}
               <button
-                onClick={handleCanvasExtension}
-                className="p-1.5 bg-blue-500/80 rounded-full hover:bg-blue-500 shadow-sm hover:shadow-md transition-all duration-200"
-                title="Extend Canvas"
+                onClick={handleCrop}
+                className="p-1.5 bg-green-500/80 rounded-full hover:bg-green-500 shadow-sm hover:shadow-md transition-all duration-200"
+                title="Crop Image"
               >
-                <Expand className="h-4 w-4 text-white" />
+                <Crop className="h-4 w-4 text-white" />
               </button>
-              <button
-                onClick={handleImageMatte}
-                className="p-1.5 bg-purple-500/80 rounded-full hover:bg-purple-500 shadow-sm hover:shadow-md transition-all duration-200"
-                title="Create Matte"
-              >
-                <Palette className="h-4 w-4 text-white" />
-              </button>
+
+              {/* Canvas extension and matte buttons for horizontal images */}
+              {isHorizontal && (
+                <>
+                  <button
+                    onClick={handleCanvasExtension}
+                    className="p-1.5 bg-blue-500/80 rounded-full hover:bg-blue-500 shadow-sm hover:shadow-md transition-all duration-200"
+                    title="Extend Canvas"
+                  >
+                    <Expand className="h-4 w-4 text-white" />
+                  </button>
+                  <button
+                    onClick={handleImageMatte}
+                    className="p-1.5 bg-purple-500/80 rounded-full hover:bg-purple-500 shadow-sm hover:shadow-md transition-all duration-200"
+                    title="Create Matte"
+                  >
+                    <Palette className="h-4 w-4 text-white" />
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -295,6 +316,17 @@ export function SortableGalleryItem({
           image={imageData}
           galleryId={galleryId}
           onImageReplaced={onImageProcessed}
+        />
+      )}
+
+      {/* Crop Modal */}
+      {galleryId && (
+        <GalleryCropModal
+          isOpen={isCropOpen}
+          onClose={() => setIsCropOpen(false)}
+          image={imageData}
+          galleryId={galleryId}
+          onImageProcessed={onImageProcessed}
         />
       )}
     </>

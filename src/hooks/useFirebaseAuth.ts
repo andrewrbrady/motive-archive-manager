@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
@@ -53,7 +53,7 @@ export function useFirebaseAuth() {
     hasValidToken: false,
   });
 
-  const [tokenValidationAttempts, setTokenValidationAttempts] = useState(0);
+  const tokenValidationAttemptsRef = useRef(0);
   const MAX_TOKEN_VALIDATION_ATTEMPTS = 3;
 
   // Validate token with retry logic
@@ -61,21 +61,38 @@ export function useFirebaseAuth() {
     if (!user) return false;
 
     try {
-      const token = await user.getIdToken(true); // Force refresh
+      const token = await user.getIdToken(false); // Don't force refresh initially
+      if (!token) return false;
 
-      // Test the token with a simple API call
+      // Validate with the API
       const response = await fetch("/api/auth/validate", {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      const isValid = response.ok;
-
-      return isValid;
+      return response.ok;
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Token validation error:", error);
-      return false;
+
+      // If validation endpoint fails, fall back to basic Firebase token check
+      // This helps handle network issues or temporary API problems
+      try {
+        console.log(
+          "🔄 useFirebaseAuth: Validation endpoint failed, trying basic token check..."
+        );
+        const token = await user.getIdToken(false);
+        // If we can get a token and user is authenticated, assume it's valid
+        // This is a fallback to prevent auth failures due to API issues
+        return !!token;
+      } catch (tokenError) {
+        console.error(
+          "💥 useFirebaseAuth: Basic token check also failed:",
+          tokenError
+        );
+        return false;
+      }
     }
   }, []);
 
@@ -90,7 +107,7 @@ export function useFirebaseAuth() {
           isAuthenticated: false,
           hasValidToken: false,
         });
-        setTokenValidationAttempts(0);
+        tokenValidationAttemptsRef.current = 0;
         return;
       }
 
@@ -102,38 +119,30 @@ export function useFirebaseAuth() {
         isAuthenticated: true,
       }));
 
-      // Validate token
-      const hasValidToken = await validateToken(user);
+      // Validate token with a single attempt (no recursive retries)
+      let isValid = await validateToken(user);
 
-      if (
-        !hasValidToken &&
-        tokenValidationAttempts < MAX_TOKEN_VALIDATION_ATTEMPTS
-      ) {
-        setTokenValidationAttempts((prev) => prev + 1);
-
-        // Retry after a short delay
-        setTimeout(
-          () => {
-            handleAuthStateChange(user);
-          },
-          1000 * (tokenValidationAttempts + 1)
-        ); // Exponential backoff
-        return;
+      // If validation fails, try once with a fresh token
+      if (!isValid && tokenValidationAttemptsRef.current < 1) {
+        tokenValidationAttemptsRef.current++;
+        try {
+          console.log("🔄 useFirebaseAuth: Attempting token refresh...");
+          await user.getIdToken(true); // Force refresh
+          isValid = await validateToken(user);
+        } catch (error) {
+          console.error("💥 useFirebaseAuth: Token refresh failed:", error);
+        }
       }
 
       setAuthState({
         user,
         loading: false,
-        error: hasValidToken ? null : "Authentication token is invalid",
-        isAuthenticated: !!user,
-        hasValidToken,
+        error: null,
+        isAuthenticated: true,
+        hasValidToken: isValid,
       });
-
-      if (hasValidToken) {
-        setTokenValidationAttempts(0);
-      }
     },
-    [validateToken, tokenValidationAttempts]
+    [validateToken]
   );
 
   useEffect(() => {
@@ -192,12 +201,13 @@ export function useFirebaseAuth() {
     }
 
     try {
-      const token = await authState.user.getIdToken(true);
+      // Try to get the current token first
+      let token = await authState.user.getIdToken(false);
 
-      // Validate the token
-      const isValid = await validateToken(authState.user);
-      if (!isValid) {
-        return null;
+      // If we don't have a valid token state, try refreshing
+      if (!authState.hasValidToken) {
+        console.log("🔄 getValidToken: Refreshing token...");
+        token = await authState.user.getIdToken(true); // Force refresh
       }
 
       return token;
@@ -205,7 +215,7 @@ export function useFirebaseAuth() {
       console.error("💥 useFirebaseAuth: Error getting token:", error);
       return null;
     }
-  }, [authState.user, validateToken]);
+  }, [authState.user, authState.hasValidToken]);
 
   // Method to sign in with Google
   const signInWithGoogle = useCallback(async () => {
@@ -247,6 +257,9 @@ export function useSession(): SessionState {
     status: "loading",
     error: null,
   });
+
+  const hasLoadedSession = useRef(false);
+  const currentUserId = useRef<string | null>(null);
 
   // Fetch user roles from Firestore using authenticated request
   const fetchUserRoles = useCallback(
@@ -291,29 +304,37 @@ export function useSession(): SessionState {
         status: "unauthenticated",
         error: error,
       });
+      hasLoadedSession.current = false;
+      currentUserId.current = null;
       return;
     }
 
-    // Convert Firebase user to session format and fetch roles
-    const loadUserSession = async () => {
-      const roles = await fetchUserRoles(user.uid);
+    // Only load session if we haven't loaded it for this user yet
+    if (!hasLoadedSession.current || currentUserId.current !== user.uid) {
+      currentUserId.current = user.uid;
+      hasLoadedSession.current = true;
 
-      setSessionState({
-        data: {
-          user: {
-            id: user.uid,
-            name: user.displayName,
-            email: user.email,
-            image: user.photoURL,
-            roles: roles,
+      // Convert Firebase user to session format and fetch roles
+      const loadUserSession = async () => {
+        const roles = await fetchUserRoles(user.uid);
+
+        setSessionState({
+          data: {
+            user: {
+              id: user.uid,
+              name: user.displayName,
+              email: user.email,
+              image: user.photoURL,
+              roles: roles,
+            },
           },
-        },
-        status: "authenticated",
-        error: null,
-      });
-    };
+          status: "authenticated",
+          error: null,
+        });
+      };
 
-    loadUserSession();
+      loadUserSession();
+    }
   }, [user, loading, isAuthenticated, error, fetchUserRoles]);
 
   return sessionState;
@@ -321,12 +342,30 @@ export function useSession(): SessionState {
 
 // Utility hook for making authenticated API calls
 export function useAuthenticatedFetch() {
-  const { getValidToken, isAuthenticated, hasValidToken } = useFirebaseAuth();
+  const { getValidToken, isAuthenticated, hasValidToken, refreshAuth } =
+    useFirebaseAuth();
 
   const authenticatedFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      if (!isAuthenticated || !hasValidToken) {
+      // First check if we're authenticated at all
+      if (!isAuthenticated) {
         throw new Error("Not authenticated");
+      }
+
+      // If we don't have a valid token, try to refresh first
+      if (!hasValidToken) {
+        console.log(
+          "🔄 authenticatedFetch: Token not valid, attempting refresh..."
+        );
+        try {
+          const refreshSuccess = await refreshAuth();
+          if (!refreshSuccess) {
+            throw new Error("Failed to refresh authentication token");
+          }
+        } catch (refreshError) {
+          console.error("💥 authenticatedFetch: Refresh failed:", refreshError);
+          throw new Error("Not authenticated");
+        }
       }
 
       const token = await getValidToken();
@@ -344,13 +383,44 @@ export function useAuthenticatedFetch() {
         headers,
       });
 
+      // If we get a 401, try to refresh token once and retry the request
       if (response.status === 401) {
+        console.log(
+          "🔄 authenticatedFetch: Got 401, attempting token refresh and retry..."
+        );
+        try {
+          const refreshSuccess = await refreshAuth();
+          if (refreshSuccess) {
+            const newToken = await getValidToken();
+            if (newToken) {
+              // Retry the request with the new token
+              const retryHeaders = {
+                ...options.headers,
+                Authorization: `Bearer ${newToken}`,
+              };
+
+              const retryResponse = await fetch(url, {
+                ...options,
+                headers: retryHeaders,
+              });
+
+              if (retryResponse.status === 401) {
+                throw new Error("Authentication token expired");
+              }
+
+              return retryResponse;
+            }
+          }
+        } catch (retryError) {
+          console.error("💥 authenticatedFetch: Retry failed:", retryError);
+        }
+
         throw new Error("Authentication token expired");
       }
 
       return response;
     },
-    [getValidToken, isAuthenticated, hasValidToken]
+    [getValidToken, isAuthenticated, hasValidToken, refreshAuth]
   );
 
   return { authenticatedFetch, isAuthenticated, hasValidToken };

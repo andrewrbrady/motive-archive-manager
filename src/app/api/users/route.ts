@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
-import { connectToDatabase } from "@/lib/mongodb";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { logger } from "@/lib/logging";
 import { getUsers } from "@/lib/users/cache";
@@ -26,17 +25,27 @@ export async function GET(request: NextRequest) {
   try {
     console.log("🔒 GET /api/users: Authentication successful, fetching users");
 
-    // Get users from Firestore
-    const usersSnapshot = await adminDb.collection("users").get();
-    const users = usersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    // Use cached users function which handles filtering and proper data structure
+    const firestoreUsers = await getUsers();
+
+    // Transform to match EventForm's User interface expectations
+    const users = firestoreUsers.map((user) => ({
+      _id: user.uid, // EventForm expects _id
+      id: user.uid,
+      uid: user.uid,
+      name: user.name,
+      email: user.email,
+      roles: user.roles || [],
+      creativeRoles: user.creativeRoles || [],
+      status: user.status,
+      photoURL: user.photoURL,
+      image: user.image,
     }));
 
     console.log("✅ GET /api/users: Successfully fetched users", {
       count: users.length,
     });
-    return NextResponse.json({ users });
+    return NextResponse.json(users);
   } catch (error) {
     console.error("💥 GET /api/users: Error fetching users:", error);
     return NextResponse.json(

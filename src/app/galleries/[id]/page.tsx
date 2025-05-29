@@ -302,12 +302,70 @@ export default function GalleryPage() {
     setIsDownloading(false);
   };
 
-  const handleImageProcessed = (originalImageId: string, newImageData: any) => {
-    // Refresh the gallery data to show the updated image
-    mutate();
+  const handleImageProcessed = async (
+    originalImageId: string,
+    newImageData: any
+  ) => {
+    if (!gallery) return;
+
+    console.log("🔄 handleImageProcessed called:", {
+      originalImageId,
+      newImageData,
+      currentGallery: gallery,
+    });
+
+    // Update the local gallery state by creating a new gallery object
+    const updatedGallery = {
+      ...gallery,
+      // Update the images array by replacing the original image with the processed one
+      images: gallery.images?.map((image: any) => {
+        if (image._id === originalImageId) {
+          console.log("✅ Found image to replace:", image);
+          console.log("📝 Replacing with:", newImageData);
+          // Replace with the complete new image data and add cache-busting
+          return {
+            ...image, // Keep any existing fields as fallback
+            ...newImageData, // Override with new processed image data
+            url: `${newImageData.url}?v=${newImageData._id}`, // Add cache-busting to force refresh
+          };
+        }
+        return image;
+      }),
+      // Update imageIds array if the ID changed
+      imageIds: gallery.imageIds.map((id: string) => {
+        const newId = id === originalImageId ? newImageData._id : id;
+        if (id === originalImageId) {
+          console.log(`📋 Updated imageId: ${id} → ${newId}`);
+        }
+        return newId;
+      }),
+      // Update orderedImages array if it exists
+      orderedImages: gallery.orderedImages?.map((item: any) => {
+        if (item.id === originalImageId) {
+          console.log(
+            `📋 Updated orderedImage: ${item.id} → ${newImageData._id}`
+          );
+          return { ...item, id: newImageData._id };
+        }
+        return item;
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    console.log("🎯 Final updated gallery:", updatedGallery);
+
+    // Update the SWR cache with the new data immediately
+    await mutate(updatedGallery);
+
+    // After a short delay, revalidate to ensure we have the latest data
+    setTimeout(() => {
+      console.log("🔄 Revalidating gallery data...");
+      mutate();
+    }, 1000);
+
     toast({
       title: "Success",
-      description: "Image processed and replaced in gallery successfully",
+      description: "Image processed and saved to gallery successfully",
     });
   };
 

@@ -95,6 +95,22 @@ export default function GalleriesClient() {
     limit: pageSize,
   });
 
+  // Debug logging - let's see what's actually happening
+  useEffect(() => {
+    console.log("🐛 GalleriesClient State:", {
+      isLoading,
+      error: error?.message,
+      hasData: !!data,
+      dataKeys: data ? Object.keys(data) : null,
+      galleriesArray: data?.galleries,
+      galleriesLength: data?.galleries?.length,
+      galleriesType: typeof data?.galleries,
+      firstGallery: data?.galleries?.[0],
+      pagination: data?.pagination,
+      renderCondition: data?.galleries && data.galleries.length > 0,
+    });
+  }, [data, isLoading, error]);
+
   const [newGallery, setNewGallery] = useState({
     name: "",
     description: "",

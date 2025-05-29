@@ -21,7 +21,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Images, MoreHorizontal, Search, Eye } from "lucide-react";
+import {
+  Plus,
+  Images,
+  MoreHorizontal,
+  Search,
+  Eye,
+  ExternalLink,
+  Unlink,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
@@ -31,6 +39,7 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { useAPI } from "@/lib/fetcher";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface Gallery {
   _id: string;
@@ -160,6 +169,7 @@ export function ProjectGalleriesTab({
   onProjectUpdate,
 }: ProjectGalleriesTabProps) {
   const api = useAPI();
+  const { isAuthenticated, hasValidToken, user } = useFirebaseAuth();
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -174,11 +184,34 @@ export function ProjectGalleriesTab({
       setGalleries(data.galleries || []);
     } catch (error) {
       console.error("Error fetching project galleries:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch project galleries",
-        variant: "destructive",
-      });
+
+      // Check if it's an authentication error
+      if (
+        error instanceof Error &&
+        error.message.includes("Not authenticated")
+      ) {
+        toast({
+          title: "Authentication Error",
+          description:
+            "Please refresh the page and try again. You may need to sign in again.",
+          variant: "destructive",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Refresh Page
+            </Button>
+          ),
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch project galleries",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -197,11 +230,33 @@ export function ProjectGalleriesTab({
       setAvailableGalleries(unlinkedGalleries);
     } catch (error) {
       console.error("Error fetching available galleries:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch available galleries",
-        variant: "destructive",
-      });
+
+      // Check if it's an authentication error
+      if (
+        error instanceof Error &&
+        error.message.includes("Not authenticated")
+      ) {
+        toast({
+          title: "Authentication Error",
+          description: "Please refresh the page to continue linking galleries.",
+          variant: "destructive",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Refresh Page
+            </Button>
+          ),
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch available galleries",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -292,6 +347,31 @@ export function ProjectGalleriesTab({
 
   return (
     <div className="space-y-6">
+      {/* Debug Section - Development Only */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h4 className="text-sm font-medium text-yellow-800 mb-2">
+            Debug: Authentication Status
+          </h4>
+          <div className="text-xs text-yellow-700 space-y-1">
+            <div>Authenticated: {isAuthenticated ? "✅ Yes" : "❌ No"}</div>
+            <div>Valid Token: {hasValidToken ? "✅ Yes" : "❌ No"}</div>
+            <div>User ID: {user?.uid || "None"}</div>
+            <div>User Email: {user?.email || "None"}</div>
+            {(!isAuthenticated || !hasValidToken) && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.location.reload()}
+                className="mt-2"
+              >
+                Refresh Page
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
