@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,9 +9,26 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  Wand2,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { PromptTemplate } from "@/components/projects/caption-generator/types";
+import JsonGenerationModal from "./JsonGenerationModal";
 
 interface JsonUploadPasteModalProps {
   isOpen: boolean;
@@ -21,6 +38,12 @@ interface JsonUploadPasteModalProps {
   description?: string;
   expectedType: string; // "events", "deliverables", or "cars"
   isSubmitting?: boolean;
+  carData?: {
+    make?: string;
+    model?: string;
+    year?: number;
+    [key: string]: any;
+  };
 }
 
 export default function JsonUploadPasteModal({
@@ -31,6 +54,7 @@ export default function JsonUploadPasteModal({
   description,
   expectedType,
   isSubmitting = false,
+  carData,
 }: JsonUploadPasteModalProps) {
   const [jsonText, setJsonText] = useState("");
   const [validationResult, setValidationResult] = useState<{
@@ -40,6 +64,7 @@ export default function JsonUploadPasteModal({
     count?: number;
   }>({ isValid: false });
   const [uploadMethod, setUploadMethod] = useState<"paste" | "upload">("paste");
+  const [showAiModal, setShowAiModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateJsonData = useCallback(
@@ -204,6 +229,13 @@ export default function JsonUploadPasteModal({
     fileInputRef.current?.click();
   };
 
+  const handleAiGenerated = (generatedJson: string) => {
+    setJsonText(generatedJson);
+    handleTextChange(generatedJson);
+    setUploadMethod("paste");
+    setShowAiModal(false);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -236,6 +268,16 @@ export default function JsonUploadPasteModal({
               <Upload className="w-4 h-4 mr-2" />
               Upload JSON File
             </Button>
+            {expectedType === "cars" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAiModal(true)}
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Generate with AI
+              </Button>
+            )}
           </div>
 
           <input
@@ -387,6 +429,14 @@ export default function JsonUploadPasteModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* AI Generation Modal */}
+      <JsonGenerationModal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        onGenerated={handleAiGenerated}
+        carData={carData}
+      />
     </Dialog>
   );
 }

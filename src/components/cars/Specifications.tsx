@@ -1260,6 +1260,15 @@ const Specifications = ({
         description="Upload a JSON file or paste a JSON object to update car specifications. Data will be merged with existing specifications."
         expectedType="cars"
         isSubmitting={isSubmittingJson}
+        carData={{
+          make: car.make,
+          model: car.model,
+          year: car.year,
+          color: car.color,
+          vin: car.vin,
+          condition: car.condition,
+          description: car.description,
+        }}
       />
     </div>
   );

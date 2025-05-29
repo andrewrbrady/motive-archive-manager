@@ -118,6 +118,12 @@ export default function NewCarPage() {
               description="Upload a JSON file or paste a JSON object to populate the car form with existing data."
               expectedType="cars"
               isSubmitting={isSubmittingJson}
+              carData={
+                {
+                  // Pass any existing form data for AI context
+                  // This could be enhanced to get actual form values
+                }
+              }
             />
           </div>
         </main>
