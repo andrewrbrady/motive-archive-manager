@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "./EventTypeSelector";
 import EditEventDialog from "./EditEventDialog";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 export interface ListViewProps {
   events: Event[];
@@ -85,6 +86,7 @@ export default function ListView({
   onEventUpdated,
   isEditMode: parentEditMode,
 }: ListViewProps) {
+  const { user } = useFirebaseAuth();
   const [localEditMode, setLocalEditMode] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
@@ -103,11 +105,26 @@ export default function ListView({
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch("/api/users");
+        if (!user) {
+          console.log("ListView: No user available for fetchUsers");
+          setUsers([]);
+          setUsersLoading(false);
+          return;
+        }
+
+        // Get the Firebase ID token
+        const token = await user.getIdToken();
+
+        const response = await fetch("/api/projects/users", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
         if (!response.ok) throw new Error("Failed to fetch users");
         const data = await response.json();
 
-        // Handle different possible response structures
+        // Handle the response structure from /api/projects/users
         let usersArray = [];
         if (Array.isArray(data)) {
           usersArray = data;
@@ -121,7 +138,18 @@ export default function ListView({
           usersArray = [];
         }
 
-        setUsers(usersArray.filter((user: User) => user.status === "active"));
+        // Transform the data to match the expected User interface
+        const transformedUsers = usersArray.map((user: any) => ({
+          _id: user.uid || user._id,
+          name: user.name,
+          email: user.email,
+          roles: user.roles || [],
+          creativeRoles: user.creativeRoles || [],
+          status: user.status || "active",
+          firebaseUid: user.uid,
+        }));
+
+        setUsers(transformedUsers);
       } catch (error) {
         console.error("Error fetching users:", error);
         toast.error("Failed to fetch users");
@@ -132,7 +160,7 @@ export default function ListView({
     };
 
     fetchUsers();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (events.length > 0) {

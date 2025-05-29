@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { CAPTION_GUIDELINES } from "@/constants/caption-examples";
 import { generateText } from "@/lib/llmService";
 import { findModelById } from "@/lib/llmProviders";
+import { connectToDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 interface MessageContent {
   type: "text";
@@ -343,67 +345,93 @@ ${template === "dealer" ? "- Do not include the dealer reference - it will be ad
     // Build system prompt that works across providers
     // Fetch the selected system prompt from database
     let systemPrompt = "";
+    console.log(
+      "🔍 Starting system prompt fetch. systemPromptId:",
+      systemPromptId
+    );
+
     try {
       if (systemPromptId) {
-        // Fetch specific system prompt by ID
-        const systemPromptResponse = await fetch(
-          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/${systemPromptId}`,
-          {
-            headers: {
-              Cookie: request.headers.get("cookie") || "",
-            },
-          }
+        // Fetch specific system prompt by ID directly from database
+        console.log(
+          "🔍 Fetching specific system prompt by ID:",
+          systemPromptId
         );
-        if (systemPromptResponse.ok) {
-          const systemPromptData = await systemPromptResponse.json();
-          systemPrompt = systemPromptData.prompt;
+        try {
+          const { db } = await connectToDatabase();
+          console.log("🔍 Database connected successfully");
+
+          const systemPromptData = await db
+            .collection("systemPrompts")
+            .findOne({ _id: new ObjectId(systemPromptId) });
+
+          console.log("🔍 System prompt data fetched:", {
+            found: !!systemPromptData,
+            hasPromptField: systemPromptData
+              ? "prompt" in systemPromptData
+              : false,
+            promptLength: systemPromptData?.prompt?.length || 0,
+            allFields: systemPromptData ? Object.keys(systemPromptData) : [],
+          });
+
+          if (systemPromptData) {
+            systemPrompt = systemPromptData.prompt;
+            console.log(
+              "🔍 System prompt extracted, length:",
+              systemPrompt?.length || 0
+            );
+          }
+        } catch (error) {
+          console.error("Error fetching specific system prompt:", error);
         }
       }
 
-      // Fallback to active system prompt if no specific prompt selected or fetch failed
+      // Fallback to active system prompt if no specific prompt selected or found
       if (!systemPrompt) {
-        const systemPromptResponse = await fetch(
-          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active`
+        console.log(
+          "🔍 No specific prompt found, fetching active system prompt"
         );
-        if (systemPromptResponse.ok) {
-          const systemPromptData = await systemPromptResponse.json();
-          systemPrompt = systemPromptData.prompt;
+        try {
+          const { db } = await connectToDatabase();
+          const systemPromptData = await db
+            .collection("systemPrompts")
+            .findOne({ isActive: true });
+
+          console.log("🔍 Active system prompt data fetched:", {
+            found: !!systemPromptData,
+            hasPromptField: systemPromptData
+              ? "prompt" in systemPromptData
+              : false,
+            promptLength: systemPromptData?.prompt?.length || 0,
+            allFields: systemPromptData ? Object.keys(systemPromptData) : [],
+          });
+
+          if (systemPromptData) {
+            systemPrompt = systemPromptData.prompt;
+            console.log(
+              "🔍 Active system prompt extracted, length:",
+              systemPrompt?.length || 0
+            );
+          } else {
+            throw new Error("No active system prompt found");
+          }
+        } catch (error) {
+          console.error("Error fetching active system prompt:", error);
+          throw new Error("No system prompt found");
         }
       }
     } catch (error) {
       console.error("Error fetching system prompt:", error);
-      // Fallback to default system prompt
-      systemPrompt = `You are a professional automotive content creator who specializes in writing engaging ${platform} captions. Follow these guidelines:
-
-${guidelines.map((g) => `- ${g}`).join("\n")}
-
-Length Guideline: ${
-        lengthGuidelines[length as keyof typeof lengthGuidelines] ||
-        lengthGuidelines.standard
-      }
-Tone Guideline: ${
-        toneGuidelines[tone as keyof typeof toneGuidelines] ||
-        toneGuidelines.professional
-      }
-Style Guideline: ${
-        styleGuidelines[style as keyof typeof styleGuidelines] ||
-        styleGuidelines.descriptive
-      }
-
-${context ? `USER'S SPECIFIC INSTRUCTIONS: ${context}` : ""}
-
-The first line of every caption must follow this format:
-[YEAR] [MAKE] [MODEL] ⚡️ | [DESCRIPTIVE TITLE IN ALL CAPS]
-Example: 1967 Ferrari 275 GTB/4 ⚡️ | PININFARINA PERFECTION
-
-${
-  clientInfo && clientInfo.includeInCaption && clientInfo.handle
-    ? `IMPORTANT: You MUST include the client/dealer handle ${clientInfo.handle} in the caption.`
-    : ""
-}
-
-Important: End the caption with relevant hashtags on a new line.`;
+      return NextResponse.json(
+        { error: "Failed to fetch system prompt configuration" },
+        { status: 500 }
+      );
     }
+
+    console.log(
+      "🔍 Final system prompt before appending guidelines, length:",
+      systemPrompt?.length || 0
+    );
 
     // Append platform-specific guidelines and formatting to the system prompt
     systemPrompt += `

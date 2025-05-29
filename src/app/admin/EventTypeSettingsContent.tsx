@@ -23,6 +23,7 @@ import {
   eventTypeCategories,
 } from "@/types/eventType";
 import { IconPicker, getIconComponent } from "@/components/ui/IconPicker";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 // Available color classes
 const availableColors = [
@@ -57,14 +58,19 @@ const EventTypeSettingsContent: React.FC = () => {
     category: "other",
   });
 
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
+
   useEffect(() => {
-    fetchEventTypeSettings();
-  }, []);
+    if (isAuthenticated && hasValidToken) {
+      fetchEventTypeSettings();
+    }
+  }, [isAuthenticated, hasValidToken]);
 
   const fetchEventTypeSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/event-type-settings");
+      const response = await authenticatedFetch("/api/event-type-settings");
       if (!response.ok) throw new Error("Failed to fetch event type settings");
       const data = await response.json();
       setEventTypeSettings(data);
@@ -109,7 +115,7 @@ const EventTypeSettingsContent: React.FC = () => {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const response = await fetch("/api/event-type-settings", {
+      const response = await authenticatedFetch("/api/event-type-settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

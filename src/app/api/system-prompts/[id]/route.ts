@@ -10,8 +10,8 @@ export async function GET(
 ) {
   console.log("🔒 GET /api/system-prompts/[id]: Starting request");
 
-  // Check authentication and admin role
-  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  // Check authentication (no admin role required - system prompts are needed for caption generation)
+  const authResult = await verifyAuthMiddleware(request, []);
   if (authResult) {
     console.log("❌ GET /api/system-prompts/[id]: Authentication failed");
     return authResult;
@@ -24,6 +24,9 @@ export async function GET(
       return NextResponse.json({ error: "Invalid prompt ID" }, { status: 400 });
     }
 
+    console.log(
+      "🔒 GET /api/system-prompts/[id]: Authentication successful, fetching prompt"
+    );
     const { db } = await connectToDatabase();
     const systemPrompt = await db
       .collection("systemPrompts")

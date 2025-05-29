@@ -9,14 +9,15 @@ import { Car } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import type { CarFormData } from "@/components/cars/CarEntryForm";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText } from "lucide-react";
+import { FileJson } from "lucide-react";
 import { toast } from "sonner";
+import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 
 export default function NewCarPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploadingJson, setIsUploadingJson] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showJsonUpload, setShowJsonUpload] = useState(false);
+  const [isSubmittingJson, setIsSubmittingJson] = useState(false);
   const carFormRef = useRef<CarEntryFormRef>(null);
 
   const handleSubmit = async (formData: Partial<CarFormData>) => {
@@ -38,65 +39,37 @@ export default function NewCarPage() {
       router.push(`/cars/${data._id}`);
     } catch (error) {
       console.error("Error creating car:", error);
-      alert("Failed to create car. Please try again.");
+      toast.error("Failed to create car. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleJsonUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "application/json" && !file.name.endsWith(".json")) {
-      toast.error("Please select a valid JSON file");
-      return;
-    }
-
+  const handleJsonSubmit = async (jsonData: any[]) => {
     try {
-      setIsUploadingJson(true);
-      const fileContent = await file.text();
-      const jsonData = JSON.parse(fileContent);
+      setIsSubmittingJson(true);
 
-      // Validate that it has at least make and model
-      if (!jsonData.make || !jsonData.model) {
-        toast.error(
-          "JSON file must contain at least 'make' and 'model' fields"
-        );
-        return;
-      }
+      // The modal guarantees jsonData is an array with exactly one car object for cars
+      const carData = jsonData[0];
 
       // Populate the form with the JSON data
       if (carFormRef.current) {
-        carFormRef.current.populateForm(jsonData);
+        carFormRef.current.populateForm(carData);
         toast.success(
-          `Form populated with data for ${jsonData.make} ${jsonData.model}`
+          `Form populated with data for ${carData.make} ${carData.model}`
         );
       } else {
-        toast.error("Form not ready. Please try again.");
+        throw new Error("Form not ready. Please try again.");
       }
     } catch (error) {
-      console.error("Error processing JSON file:", error);
-      if (error instanceof SyntaxError) {
-        toast.error("Invalid JSON format. Please check your file.");
-      } else {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to process JSON file"
-        );
-      }
+      console.error("Error processing JSON:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to process JSON data"
+      );
+      throw error; // Re-throw to prevent modal from closing
     } finally {
-      setIsUploadingJson(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      setIsSubmittingJson(false);
     }
-  };
-
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
   };
 
   return (
@@ -108,41 +81,24 @@ export default function NewCarPage() {
               <PageTitle title="Add New Car" />
               <div className="flex gap-4">
                 <Button
-                  onClick={triggerFileUpload}
-                  disabled={isUploadingJson}
+                  onClick={() => setShowJsonUpload(true)}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
-                  {isUploadingJson ? (
-                    <>
-                      <Upload className="h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4" />
-                      Upload JSON
-                    </>
-                  )}
+                  <FileJson className="h-4 w-4" />
+                  Import JSON
                 </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={handleJsonUpload}
-                  className="hidden"
-                />
               </div>
             </div>
 
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="text-sm font-medium text-blue-900 mb-2">
-                JSON Upload Instructions
+                JSON Import Instructions
               </h3>
               <p className="text-sm text-blue-700">
-                Upload a JSON file to automatically populate the form fields
-                with car data. The JSON must contain at least{" "}
-                <code className="bg-blue-100 px-1 rounded">make</code> and{" "}
+                Upload a JSON file or paste a JSON object to automatically
+                populate the form fields with car data. The JSON must contain at
+                least <code className="bg-blue-100 px-1 rounded">make</code> and{" "}
                 <code className="bg-blue-100 px-1 rounded">model</code> fields.
                 You can review and edit the populated data before submitting.
               </p>
@@ -152,6 +108,16 @@ export default function NewCarPage() {
               ref={carFormRef}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
+            />
+
+            <JsonUploadPasteModal
+              isOpen={showJsonUpload}
+              onClose={() => setShowJsonUpload(false)}
+              onSubmit={handleJsonSubmit}
+              title="Import Car Data from JSON"
+              description="Upload a JSON file or paste a JSON object to populate the car form with existing data."
+              expectedType="cars"
+              isSubmitting={isSubmittingJson}
             />
           </div>
         </main>

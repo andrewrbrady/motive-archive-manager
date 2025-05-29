@@ -15,6 +15,7 @@ import {
 import { Save, RotateCcw, Plus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { IconPicker, getIconComponent } from "@/components/ui/IconPicker";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 interface PlatformSetting {
   key: string;
@@ -83,14 +84,19 @@ const PlatformSettingsContent: React.FC = () => {
     icon: "",
   });
 
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
+
   useEffect(() => {
-    fetchPlatformSettings();
-  }, []);
+    if (isAuthenticated && hasValidToken) {
+      fetchPlatformSettings();
+    }
+  }, [isAuthenticated, hasValidToken]);
 
   const fetchPlatformSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/admin/platform-settings");
+      const response = await authenticatedFetch("/api/admin/platform-settings");
       if (response.ok) {
         const data = await response.json();
         setPlatformSettings(data.length > 0 ? data : defaultPlatformSettings);
@@ -122,13 +128,16 @@ const PlatformSettingsContent: React.FC = () => {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const response = await fetch("/api/admin/platform-settings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(platformSettings),
-      });
+      const response = await authenticatedFetch(
+        "/api/admin/platform-settings",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(platformSettings),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();

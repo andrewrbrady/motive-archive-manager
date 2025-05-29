@@ -24,7 +24,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
 import { toast } from "sonner";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 interface ImageAnalysisPrompt {
@@ -40,7 +39,6 @@ interface ImageAnalysisPrompt {
 }
 
 const ImageAnalysisPromptsContent: React.FC = () => {
-  const { user } = useFirebaseAuth();
   const [prompts, setPrompts] = useState<ImageAnalysisPrompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,35 +58,16 @@ const ImageAnalysisPromptsContent: React.FC = () => {
     category: "general",
   });
 
-  // Helper function to get auth headers
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    if (!user) return {};
-    try {
-      const token = await user.getIdToken();
-      return {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return {};
-    }
-  };
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
 
   // Fetch prompts
   const fetchPrompts = async () => {
-    if (!user) return; // Wait for user to be available
-
     try {
       setIsLoading(true);
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch("/api/admin/image-analysis-prompts", {
-        headers,
-      });
+      const response = await authenticatedFetch(
+        "/api/admin/image-analysis-prompts"
+      );
       if (!response.ok) throw new Error("Failed to fetch prompts");
       const data = await response.json();
       setPrompts(data);
@@ -101,10 +80,10 @@ const ImageAnalysisPromptsContent: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user) {
+    if (isAuthenticated && hasValidToken) {
       fetchPrompts();
     }
-  }, [user]);
+  }, [isAuthenticated, hasValidToken]);
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,14 +99,11 @@ const ImageAnalysisPromptsContent: React.FC = () => {
 
       const method = editingPrompt ? "PUT" : "POST";
 
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method,
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(formData),
       });
 
@@ -161,16 +137,10 @@ const ImageAnalysisPromptsContent: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `/api/admin/image-analysis-prompts/${prompt._id}`,
         {
           method: "DELETE",
-          headers,
         }
       );
 
@@ -199,16 +169,13 @@ const ImageAnalysisPromptsContent: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `/api/admin/image-analysis-prompts/${prompt._id}`,
         {
           method: "PUT",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             ...prompt,
             isDefault: !prompt.isDefault,
@@ -221,13 +188,11 @@ const ImageAnalysisPromptsContent: React.FC = () => {
         throw new Error(errorData.error || "Failed to update prompt");
       }
 
-      toast.success("Prompt updated successfully");
+      toast.success("Default status updated successfully");
       await fetchPrompts();
     } catch (error) {
-      console.error("Error updating prompt:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update prompt"
-      );
+      console.error("Error updating default status:", error);
+      toast.error("Failed to update default status");
     } finally {
       setIsSubmitting(false);
     }
@@ -240,16 +205,13 @@ const ImageAnalysisPromptsContent: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `/api/admin/image-analysis-prompts/${prompt._id}`,
         {
           method: "PUT",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             ...prompt,
             isActive: !prompt.isActive,
@@ -262,13 +224,11 @@ const ImageAnalysisPromptsContent: React.FC = () => {
         throw new Error(errorData.error || "Failed to update prompt");
       }
 
-      toast.success("Prompt updated successfully");
+      toast.success("Active status updated successfully");
       await fetchPrompts();
     } catch (error) {
-      console.error("Error updating prompt:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update prompt"
-      );
+      console.error("Error updating active status:", error);
+      toast.error("Failed to update active status");
     } finally {
       setIsSubmitting(false);
     }

@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { defaultEventTypeSettings, EventTypeSetting } from "@/types/eventType";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  console.log("🔒 GET /api/event-type-settings: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/event-type-settings: Authentication failed");
+    return authResult;
+  }
+
   try {
+    console.log(
+      "🔒 GET /api/event-type-settings: Authentication successful, fetching settings"
+    );
     const db = await getDatabase();
     const collection = db.collection("eventTypeSettings");
 
@@ -14,12 +27,24 @@ export async function GET() {
 
     if (!settings || !settings.settings) {
       // Return default settings if none exist
+      console.log(
+        "✅ GET /api/event-type-settings: Returning default settings"
+      );
       return NextResponse.json(defaultEventTypeSettings);
     }
 
+    console.log(
+      "✅ GET /api/event-type-settings: Successfully fetched settings",
+      {
+        count: settings.settings.length,
+      }
+    );
     return NextResponse.json(settings.settings);
   } catch (error) {
-    console.error("Error fetching event type settings:", error);
+    console.error(
+      "💥 GET /api/event-type-settings: Error fetching event type settings:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to fetch event type settings" },
       { status: 500 }
@@ -28,6 +53,15 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/event-type-settings: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ POST /api/event-type-settings: Authentication failed");
+    return authResult;
+  }
+
   try {
     const settings: EventTypeSetting[] = await request.json();
 
@@ -73,9 +107,15 @@ export async function POST(request: NextRequest) {
       { upsert: true }
     );
 
+    console.log(
+      "✅ POST /api/event-type-settings: Successfully saved settings"
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error saving event type settings:", error);
+    console.error(
+      "💥 POST /api/event-type-settings: Error saving event type settings:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to save event type settings" },
       { status: 500 }

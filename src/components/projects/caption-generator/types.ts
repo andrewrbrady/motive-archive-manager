@@ -53,7 +53,7 @@ export interface SystemPrompt {
   description: string;
   isActive: boolean;
   type: string;
-  content: string;
+  prompt: string;
 }
 
 export interface PromptTemplate {

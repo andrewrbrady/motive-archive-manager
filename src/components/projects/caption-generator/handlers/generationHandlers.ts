@@ -276,7 +276,7 @@ export function useGenerationHandlers() {
 }
 
 // Hook for saving captions
-export function useCaptionSaver() {
+export function useCaptionSaver(user?: any) {
   const [isSaving, setIsSaving] = useState(false);
 
   const saveCaption = useCallback(
@@ -284,18 +284,26 @@ export function useCaptionSaver() {
       projectId: string,
       caption: string,
       platform: string,
-      context: string,
-      carIds: string[],
-      eventIds: string[]
+      context?: string,
+      carIds: string[] = [],
+      eventIds: string[] = []
     ): Promise<boolean> => {
       if (!caption) return false;
 
       setIsSaving(true);
       try {
+        if (!user) {
+          throw new Error("No authenticated user found");
+        }
+
+        // Get the Firebase ID token
+        const token = await user.getIdToken();
+
         const response = await fetch(`/api/projects/${projectId}/captions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             caption,
@@ -330,7 +338,7 @@ export function useCaptionSaver() {
         setIsSaving(false);
       }
     },
-    []
+    [user]
   );
 
   return {
@@ -340,7 +348,7 @@ export function useCaptionSaver() {
 }
 
 // Hook for managing saved captions
-export function useSavedCaptions() {
+export function useSavedCaptions(user?: any) {
   const [savedCaptions, setSavedCaptions] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
@@ -381,12 +389,20 @@ export function useSavedCaptions() {
   const handleSaveEdit = useCallback(
     async (projectId: string, captionId: string) => {
       try {
+        if (!user) {
+          throw new Error("No authenticated user found");
+        }
+
+        // Get the Firebase ID token
+        const token = await user.getIdToken();
+
         const response = await fetch(
           `/api/projects/${projectId}/captions?id=${captionId}`,
           {
             method: "PATCH",
             headers: {
               "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               caption: editingText,
@@ -426,16 +442,26 @@ export function useSavedCaptions() {
         return false;
       }
     },
-    [editingText]
+    [editingText, user]
   );
 
   const handleDeleteCaption = useCallback(
     async (projectId: string, captionId: string) => {
       try {
+        if (!user) {
+          throw new Error("No authenticated user found");
+        }
+
+        // Get the Firebase ID token
+        const token = await user.getIdToken();
+
         const response = await fetch(
           `/api/projects/${projectId}/captions?id=${captionId}`,
           {
             method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           }
         );
 
@@ -464,7 +490,7 @@ export function useSavedCaptions() {
         return false;
       }
     },
-    []
+    [user]
   );
 
   const handleEditTextChange = useCallback((text: string) => {

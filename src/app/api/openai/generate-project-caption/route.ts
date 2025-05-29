@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "@/lib/llmService";
 import { findModelById } from "@/lib/llmProviders";
+import { connectToDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 interface MessageContent {
   type: "text";
@@ -197,59 +199,78 @@ export async function POST(request: NextRequest) {
 
     // Fetch the selected system prompt from database with timeout
     let systemPrompt = "";
+    console.log(
+      "🔍 Starting system prompt fetch. systemPromptId:",
+      systemPromptId
+    );
+
     try {
       if (systemPromptId) {
-        // Create timeout promise for system prompt fetch
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("System prompt fetch timeout")),
-            10000
-          )
+        // Fetch specific system prompt by ID directly from database
+        console.log(
+          "🔍 Fetching specific system prompt by ID:",
+          systemPromptId
         );
+        try {
+          const { db } = await connectToDatabase();
+          console.log("🔍 Database connected successfully");
 
-        // Fetch specific system prompt by ID
-        const systemPromptPromise = fetch(
-          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/${systemPromptId}`,
-          {
-            headers: {
-              Cookie: request.headers.get("cookie") || "",
-            },
+          const systemPromptData = await db
+            .collection("systemPrompts")
+            .findOne({ _id: new ObjectId(systemPromptId) });
+
+          console.log("🔍 System prompt data fetched:", {
+            found: !!systemPromptData,
+            hasPromptField: systemPromptData
+              ? "prompt" in systemPromptData
+              : false,
+            promptLength: systemPromptData?.prompt?.length || 0,
+            allFields: systemPromptData ? Object.keys(systemPromptData) : [],
+          });
+
+          if (systemPromptData) {
+            systemPrompt = systemPromptData.prompt;
+            console.log(
+              "🔍 System prompt extracted, length:",
+              systemPrompt?.length || 0
+            );
           }
-        );
-
-        const systemPromptResponse = (await Promise.race([
-          systemPromptPromise,
-          timeoutPromise,
-        ])) as Response;
-
-        if (systemPromptResponse.ok) {
-          const systemPromptData = await systemPromptResponse.json();
-          systemPrompt = systemPromptData.prompt;
+        } catch (error) {
+          console.error("Error fetching specific system prompt:", error);
         }
       }
 
       // Fallback to active system prompt if no specific prompt selected or found
       if (!systemPrompt) {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Active system prompt fetch timeout")),
-            10000
-          )
+        console.log(
+          "🔍 No specific prompt found, fetching active system prompt"
         );
+        try {
+          const { db } = await connectToDatabase();
+          const systemPromptData = await db
+            .collection("systemPrompts")
+            .findOne({ isActive: true });
 
-        const systemPromptPromise = fetch(
-          `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/system-prompts/active`
-        );
+          console.log("🔍 Active system prompt data fetched:", {
+            found: !!systemPromptData,
+            hasPromptField: systemPromptData
+              ? "prompt" in systemPromptData
+              : false,
+            promptLength: systemPromptData?.prompt?.length || 0,
+            allFields: systemPromptData ? Object.keys(systemPromptData) : [],
+          });
 
-        const systemPromptResponse = (await Promise.race([
-          systemPromptPromise,
-          timeoutPromise,
-        ])) as Response;
-
-        if (systemPromptResponse.ok) {
-          const systemPromptData = await systemPromptResponse.json();
-          systemPrompt = systemPromptData.prompt;
-        } else {
+          if (systemPromptData) {
+            systemPrompt = systemPromptData.prompt;
+            console.log(
+              "🔍 Active system prompt extracted, length:",
+              systemPrompt?.length || 0
+            );
+          } else {
+            throw new Error("No active system prompt found");
+          }
+        } catch (error) {
+          console.error("Error fetching active system prompt:", error);
           throw new Error("No system prompt found");
         }
       }
@@ -260,6 +281,11 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    console.log(
+      "🔍 Final system prompt before building prompt, length:",
+      systemPrompt?.length || 0
+    );
 
     // Check elapsed time before proceeding to LLM generation
     const elapsedTime = Date.now() - startTime;

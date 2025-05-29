@@ -139,7 +139,8 @@ const LengthSettingsContent: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save length settings");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save length settings");
       }
 
       setHasChanges(false);
@@ -151,7 +152,10 @@ const LengthSettingsContent: React.FC = () => {
       console.error("Error saving length settings:", error);
       toast({
         title: "Error",
-        description: "Failed to save length settings",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to save length settings",
         variant: "destructive",
       });
     } finally {

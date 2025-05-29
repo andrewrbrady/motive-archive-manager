@@ -6,9 +6,9 @@ import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { Client } from "@/types/contact";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { SpecificationsEnrichment } from "./SpecificationsEnrichment";
-import { JsonUploadModal } from "./JsonUploadModal";
+import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 
 // Define the car data structure as we receive it from the API
 interface CarData {
@@ -322,6 +322,7 @@ const Specifications = ({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedId, setLastSavedId] = useState(car._id);
   const [isJsonUploadModalOpen, setIsJsonUploadModalOpen] = useState(false);
+  const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
   // Update localSpecs when car changes or edit mode is toggled
   useEffect(() => {
@@ -362,12 +363,14 @@ const Specifications = ({
     onInputChange?.(parent, value, field);
   };
 
-  const handleJsonUpload = (jsonData: any, mode: "merge" | "replace") => {
-    if (mode === "replace") {
-      // Replace all specifications with JSON data
-      setLocalSpecs(jsonData);
-    } else {
-      // Merge JSON data with existing specifications
+  const handleJsonSubmit = async (jsonData: any[]) => {
+    try {
+      setIsSubmittingJson(true);
+
+      // For specifications, we expect a single car object
+      const carData = jsonData[0];
+
+      // Merge the JSON data with existing specifications
       const mergeDeep = (target: any, source: any): any => {
         const result = { ...target };
 
@@ -386,9 +389,18 @@ const Specifications = ({
         return result;
       };
 
-      setLocalSpecs(mergeDeep(localSpecs, jsonData));
+      setLocalSpecs(mergeDeep(localSpecs, carData));
+
+      toast.success("Specifications updated with JSON data");
+    } catch (error) {
+      console.error("Error processing JSON:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to process JSON data"
+      );
+      throw error; // Re-throw to prevent modal from closing
+    } finally {
+      setIsSubmittingJson(false);
     }
-    setIsJsonUploadModalOpen(false);
   };
 
   const handleSave = async () => {
@@ -497,7 +509,7 @@ const Specifications = ({
                 onClick={() => setIsJsonUploadModalOpen(true)}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Upload JSON
+                Import JSON
               </Button>
               <Button
                 variant="default"
@@ -1240,11 +1252,14 @@ const Specifications = ({
       </div>
 
       {/* JSON Upload Modal */}
-      <JsonUploadModal
+      <JsonUploadPasteModal
         isOpen={isJsonUploadModalOpen}
         onClose={() => setIsJsonUploadModalOpen(false)}
-        onApplyJson={handleJsonUpload}
-        currentData={localSpecs}
+        onSubmit={handleJsonSubmit}
+        title="Update Specifications from JSON"
+        description="Upload a JSON file or paste a JSON object to update car specifications. Data will be merged with existing specifications."
+        expectedType="cars"
+        isSubmitting={isSubmittingJson}
       />
     </div>
   );

@@ -6,10 +6,7 @@ interface LengthSetting {
   key: string;
   name: string;
   description: string;
-  defaultValue: number;
-  minValue: number;
-  maxValue: number;
-  unit: string;
+  instructions: string;
 }
 
 // GET - Fetch length settings for admin management
@@ -73,25 +70,13 @@ export async function POST(request: NextRequest) {
         !setting.key ||
         !setting.name ||
         !setting.description ||
-        setting.defaultValue === undefined ||
-        setting.minValue === undefined ||
-        setting.maxValue === undefined ||
-        !setting.unit
+        !setting.instructions
       ) {
         return NextResponse.json(
-          { error: "All fields are required for each length setting" },
-          { status: 400 }
-        );
-      }
-
-      // Validate numeric values
-      if (
-        setting.defaultValue < setting.minValue ||
-        setting.defaultValue > setting.maxValue ||
-        setting.minValue >= setting.maxValue
-      ) {
-        return NextResponse.json(
-          { error: "Invalid numeric values for length setting" },
+          {
+            error:
+              "All fields (key, name, description, instructions) are required for each length setting",
+          },
           { status: 400 }
         );
       }

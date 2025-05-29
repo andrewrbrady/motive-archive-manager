@@ -74,10 +74,10 @@ export function ProjectCopywriter({
     useGenerationHandlers();
 
   // Content saving - must be called before any early returns
-  const { saveCaption } = useCaptionSaver();
+  const { saveCaption } = useCaptionSaver(user);
 
   // Saved content management - must be called before any early returns
-  const savedCaptionsHook = useSavedCaptions();
+  const savedCaptionsHook = useSavedCaptions(user);
 
   // Helper function to update form values from prompt values
   const updateFormFromPromptValues = useCallback(

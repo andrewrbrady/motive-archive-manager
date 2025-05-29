@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { CarGridSelector } from "../cars/CarGridSelector";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface Car {
   _id: string;
@@ -256,23 +257,30 @@ export function ProjectCarsTab({
   project,
   onProjectUpdate,
 }: ProjectCarsTabProps) {
-  const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
+  const { user } = useFirebaseAuth();
   const [projectCars, setProjectCars] = useState<Car[]>([]);
   const [loadingProjectCars, setLoadingProjectCars] = useState(false);
-  const [isLinkingCar, setIsLinkingCar] = useState(false);
+  const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
+  const [isLinkingCar, setIsLinkingCar] = useState(false);
 
-  // Fetch project cars on mount and when project changes
-  useEffect(() => {
-    if (project) {
-      fetchProjectCars();
-    }
-  }, [project]);
-
-  const fetchProjectCars = async () => {
+  const fetchProjectCars = useCallback(async () => {
     try {
       setLoadingProjectCars(true);
-      const response = await fetch(`/api/projects/${project._id}/cars`);
+
+      if (!user) {
+        console.log("ProjectCarsTab: No user available for fetchProjectCars");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${project._id}/cars`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch project cars");
@@ -290,7 +298,14 @@ export function ProjectCarsTab({
     } finally {
       setLoadingProjectCars(false);
     }
-  };
+  }, [user, project._id]);
+
+  // Fetch project cars on component mount and when project changes
+  useEffect(() => {
+    if (user && project._id) {
+      fetchProjectCars();
+    }
+  }, [fetchProjectCars, user, project._id]);
 
   const handleLinkCars = async () => {
     if (selectedCarIds.length === 0) {
@@ -305,12 +320,21 @@ export function ProjectCarsTab({
     try {
       setIsLinkingCar(true);
 
+      if (!user) {
+        console.log("ProjectCarsTab: No user available for handleLinkCars");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
       // Link cars one by one (could be optimized with a batch endpoint)
       for (const carId of selectedCarIds) {
         const response = await fetch(`/api/projects/${project._id}/cars`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ carId }),
         });
@@ -345,10 +369,21 @@ export function ProjectCarsTab({
 
   const handleUnlinkCar = async (carId: string) => {
     try {
+      if (!user) {
+        console.log("ProjectCarsTab: No user available for handleUnlinkCar");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
       const response = await fetch(
         `/api/projects/${project._id}/cars?carId=${carId}`,
         {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 

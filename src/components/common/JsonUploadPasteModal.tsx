@@ -19,7 +19,7 @@ interface JsonUploadPasteModalProps {
   onSubmit: (data: any[]) => Promise<void>;
   title: string;
   description?: string;
-  expectedType: string; // "events" or "deliverables"
+  expectedType: string; // "events", "deliverables", or "cars"
   isSubmitting?: boolean;
 }
 
@@ -47,6 +47,46 @@ export default function JsonUploadPasteModal({
       data: any
     ): { isValid: boolean; error?: string; data?: any[]; count?: number } => {
       try {
+        // For cars, we can accept either a single object or an array with one object
+        if (expectedType === "cars") {
+          let carData: any[];
+
+          if (Array.isArray(data)) {
+            if (data.length === 0) {
+              return { isValid: false, error: "Array cannot be empty" };
+            }
+            if (data.length > 1) {
+              return {
+                isValid: false,
+                error:
+                  "Only one car object is allowed. Please provide a single car object or an array with one car.",
+              };
+            }
+            carData = data;
+          } else if (typeof data === "object" && data !== null) {
+            // Single object - wrap it in an array for consistent handling
+            carData = [data];
+          } else {
+            return {
+              isValid: false,
+              error:
+                "JSON must be a car object or an array with one car object",
+            };
+          }
+
+          // Validate the car object
+          const car = carData[0];
+          if (!car.make || !car.model) {
+            return {
+              isValid: false,
+              error: "Car object missing required fields: make, model",
+            };
+          }
+
+          return { isValid: true, data: carData, count: 1 };
+        }
+
+        // For events and deliverables, we expect arrays
         if (!Array.isArray(data)) {
           return { isValid: false, error: "JSON must be an array of items" };
         }
@@ -211,7 +251,11 @@ export default function JsonUploadPasteModal({
             <Label htmlFor="json-input">JSON Data</Label>
             <Textarea
               id="json-input"
-              placeholder={`Paste your ${expectedType} JSON array here...`}
+              placeholder={
+                expectedType === "cars"
+                  ? `Paste your car JSON object here...`
+                  : `Paste your ${expectedType} JSON array here...`
+              }
               value={jsonText}
               onChange={(e) => handleTextChange(e.target.value)}
               className="min-h-[200px] font-mono text-sm"
@@ -235,8 +279,10 @@ export default function JsonUploadPasteModal({
                       <div className="text-green-800">
                         <p className="font-medium">Valid JSON</p>
                         <p className="text-sm">
-                          Ready to create {validationResult.count}{" "}
-                          {expectedType}
+                          Ready to{" "}
+                          {expectedType === "cars"
+                            ? "populate form with car data"
+                            : `create ${validationResult.count} ${expectedType}`}
                         </p>
                       </div>
                     ) : (
@@ -258,8 +304,9 @@ export default function JsonUploadPasteModal({
                 Expected format for {expectedType}:
               </p>
               <pre className="text-xs text-blue-700 overflow-x-auto">
-                {expectedType === "events"
-                  ? `[
+                {(() => {
+                  if (expectedType === "events") {
+                    return `[
   {
     "type": "PRODUCTION",
     "title": "Video Shoot",
@@ -268,8 +315,9 @@ export default function JsonUploadPasteModal({
     "end": "2024-01-15T17:00:00.000Z",
     "isAllDay": false
   }
-]`
-                  : `[
+]`;
+                  } else if (expectedType === "deliverables") {
+                    return `[
   {
     "title": "Instagram Reel",
     "platform": "Instagram Reels",
@@ -281,7 +329,37 @@ export default function JsonUploadPasteModal({
     "editor": "John Doe",
     "status": "not_started"
   }
-]`}
+]`;
+                  } else {
+                    return `{
+  "make": "Toyota",
+  "model": "Camry",
+  "year": 2020,
+  "color": "Silver",
+  "mileage": {
+    "value": 50000,
+    "unit": "miles"
+  },
+  "vin": "1HGBH41JXMN109186",
+  "status": "available",
+  "condition": "excellent",
+  "price": {
+    "listPrice": 25000,
+    "priceHistory": []
+  },
+  "engine": {
+    "type": "4-cylinder",
+    "displacement": {
+      "value": 2.5,
+      "unit": "L"
+    }
+  },
+  "transmission": {
+    "type": "automatic"
+  }
+}`;
+                  }
+                })()}
               </pre>
             </CardContent>
           </Card>
@@ -300,8 +378,12 @@ export default function JsonUploadPasteModal({
             disabled={!validationResult.isValid || isSubmitting}
           >
             {isSubmitting
-              ? "Creating..."
-              : `Create ${validationResult.count || 0} ${expectedType}`}
+              ? expectedType === "cars"
+                ? "Populating..."
+                : "Creating..."
+              : expectedType === "cars"
+                ? "Populate Form"
+                : `Create ${validationResult.count || 0} ${expectedType}`}
           </Button>
         </DialogFooter>
       </DialogContent>

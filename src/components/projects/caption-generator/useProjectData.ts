@@ -203,7 +203,19 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
-      const response = await fetch("/api/system-prompts/list");
+      if (!user) {
+        console.log("useProjectData: No user available for fetchSystemPrompts");
+        throw new Error("No authenticated user found");
+      }
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch("/api/system-prompts/list", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch system prompts");
@@ -300,8 +312,10 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
 
   // Fetch system prompts when component mounts
   useEffect(() => {
-    fetchSystemPrompts();
-  }, []);
+    if (user) {
+      fetchSystemPrompts();
+    }
+  }, [user]);
 
   // Fetch length settings when component mounts
   useEffect(() => {
@@ -433,6 +447,13 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
     }
 
     let llmText = "";
+
+    // Add system prompt context first
+    llmText += `SYSTEM PROMPT: ${systemPrompt.name}\n`;
+    llmText += `${systemPrompt.prompt || "System prompt content is undefined"}\n\n`;
+
+    llmText += "CONTEXT:\n";
+    llmText += "INSTRUCTIONS FOR THE LANGUAGE MODEL\n\n";
 
     // User context - this is what gets sent as the user prompt
     llmText += "USER PROMPT (what gets sent to LLM):\n\n";

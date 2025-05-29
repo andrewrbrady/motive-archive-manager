@@ -49,6 +49,7 @@ async function getSystemPromptsList(request: NextRequest) {
         type: 1,
         length: 1,
         isActive: 1,
+        prompt: 1,
       })
       .toArray();
 
