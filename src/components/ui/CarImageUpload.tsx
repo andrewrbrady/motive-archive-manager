@@ -451,7 +451,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       {pendingFiles.length > 0 && progress.length === 0 && !isUploading && (
         <div className="mt-4 w-full">
           <div className="mb-2 font-medium">Files to upload:</div>
-          <ul className="w-full max-w-[350px] overflow-hidden mb-4 divide-y divide-border rounded border border-border bg-background">
+          <ul className="w-full max-w-[350px] overflow-hidden mb-4 divide-y divide-border rounded border border-border bg-background max-h-48 overflow-y-auto">
             {pendingFiles.map((file, i) => (
               <li
                 key={i}
@@ -484,7 +484,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
           <div className="mb-2 font-medium">
             Uploading {progress.length} file{progress.length > 1 ? "s" : ""}...
           </div>
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
             {progress.map((fileProgress, i) => (
               <div key={i} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">

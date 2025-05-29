@@ -48,7 +48,7 @@ export function UploadDialog({
               Upload Images
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Upload Images</DialogTitle>
               <DialogDescription>
@@ -56,7 +56,7 @@ export function UploadDialog({
                 to {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="flex-1 overflow-y-auto py-4">
               <CarImageUpload
                 carId={carId}
                 vehicleInfo={vehicleInfo}
@@ -64,7 +64,7 @@ export function UploadDialog({
                 onError={handleUploadError}
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
@@ -85,7 +85,7 @@ export function UploadDialog({
             Upload Images
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Upload Images</DialogTitle>
             <DialogDescription>
@@ -93,7 +93,7 @@ export function UploadDialog({
               {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto py-4">
             <CarImageUpload
               carId={carId}
               vehicleInfo={vehicleInfo}
@@ -101,7 +101,7 @@ export function UploadDialog({
               onError={handleUploadError}
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -114,7 +114,7 @@ export function UploadDialog({
   // Regular dialog (controlled externally)
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Upload Images</DialogTitle>
           <DialogDescription>
@@ -122,7 +122,7 @@ export function UploadDialog({
             {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
+        <div className="flex-1 overflow-y-auto py-4">
           <CarImageUpload
             carId={carId}
             vehicleInfo={vehicleInfo}
@@ -130,7 +130,7 @@ export function UploadDialog({
             onError={handleUploadError}
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

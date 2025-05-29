@@ -35,6 +35,9 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ICaptionPrompt } from "@/models/CaptionPrompt";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { PromptEditModal } from "@/components/projects/caption-generator/PromptEditModal";
+import type { PromptTemplate } from "@/components/projects/caption-generator/types";
+import type { ProviderId } from "@/lib/llmProviders";
 
 interface JsonGenerationModalProps {
   isOpen: boolean;
@@ -90,6 +93,14 @@ export default function JsonGenerationModal({
     null
   );
 
+  // Form state for prompt template values
+  const [formTone, setFormTone] = useState("professional");
+  const [formStyle, setFormStyle] = useState("descriptive");
+  const [formPlatform] = useState("JSON"); // Fixed to JSON
+  const [formModel, setFormModel] = useState("claude-3-5-sonnet-20241022");
+  const [formProvider, setFormProvider] = useState<ProviderId>("anthropic");
+  const [formTemperature, setFormTemperature] = useState(0.7);
+
   // Preview and editing state
   const [generatedJson, setGeneratedJson] = useState<string>("");
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
@@ -102,6 +113,13 @@ export default function JsonGenerationModal({
   // LLM Preview state
   const [showPreview, setShowPreview] = useState(false);
   const [editableLLMText, setEditableLLMText] = useState<string>("");
+
+  // Prompt editing state
+  const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+  const [isCreatingPrompt, setIsCreatingPrompt] = useState(false);
+  const [modalModel, setModalModel] = useState("claude-3-5-sonnet-20241022");
+  const [modalProvider, setModalProvider] = useState<ProviderId>("anthropic");
+  const [modalTemperature, setModalTemperature] = useState(0.7);
 
   // Saved content state
   const [savedJsons, setSavedJsons] = useState<SavedJson[]>([]);
@@ -220,8 +238,38 @@ export default function JsonGenerationModal({
       setAdditionalContext("");
       setShowPreview(false);
       setEditableLLMText("");
+
+      // Reset form state to defaults
+      setFormTone("professional");
+      setFormStyle("descriptive");
+      setFormModel("claude-3-5-sonnet-20241022");
+      setFormProvider("anthropic");
+      setFormTemperature(0.7);
     }
   }, [isOpen, fetchJsonPrompts, fetchSavedJsons, fetchSystemPrompts, user]);
+
+  // Update form state when prompt template changes
+  useEffect(() => {
+    if (selectedPromptId && promptTemplates.length > 0) {
+      const selectedPrompt = promptTemplates.find(
+        (p) => p._id === selectedPromptId
+      );
+      if (selectedPrompt) {
+        setFormTone(selectedPrompt.tone || "professional");
+        setFormStyle(selectedPrompt.style || "descriptive");
+        setFormModel(selectedPrompt.aiModel || "claude-3-5-sonnet-20241022");
+        setFormProvider(
+          (selectedPrompt.llmProvider as ProviderId) || "anthropic"
+        );
+
+        // Only set temperature if it's still at default value to avoid overriding user changes
+        if (formTemperature === 0.7) {
+          setFormTemperature(selectedPrompt.modelParams?.temperature || 0.7);
+          setModalTemperature(selectedPrompt.modelParams?.temperature || 0.7);
+        }
+      }
+    }
+  }, [selectedPromptId, promptTemplates]); // Remove formTemperature from dependencies
 
   // Build context for AI generation
   const buildGenerationContext = useCallback(() => {
@@ -291,13 +339,11 @@ export default function JsonGenerationModal({
     // Add generation settings
     llmText += "GENERATION SETTINGS:\n";
     llmText += `Platform: JSON\n`;
-    if (promptTemplate) {
-      llmText += `Tone: ${promptTemplate.tone || "professional"}\n`;
-      llmText += `Style: ${promptTemplate.style || "descriptive"}\n`;
-      llmText += `Length: ${promptTemplate.length || "standard"}\n`;
-      llmText += `Model: ${promptTemplate.aiModel || "claude-3-5-sonnet-20241022"}\n`;
-      llmText += `Temperature: ${promptTemplate.modelParams?.temperature || 0.7}\n`;
-    }
+    llmText += `Tone: ${formTone}\n`;
+    llmText += `Style: ${formStyle}\n`;
+    llmText += `Length: ${promptTemplate?.length || "standard"}\n`;
+    llmText += `Model: ${formModel}\n`;
+    llmText += `Temperature: ${formTemperature}\n`;
     llmText += "\n";
 
     llmText +=
@@ -311,6 +357,10 @@ export default function JsonGenerationModal({
     promptTemplates,
     buildGenerationContext,
     carData,
+    formTone,
+    formStyle,
+    formModel,
+    formTemperature,
   ]);
 
   // LLM Preview handlers
@@ -327,6 +377,159 @@ export default function JsonGenerationModal({
     const generatedText = buildLLMText();
     setEditableLLMText(generatedText);
   }, [buildLLMText]);
+
+  // Helper function to strip markdown code fences
+  const stripCodeFences = useCallback((text: string): string => {
+    // Remove ```json at the start and ``` at the end
+    return text
+      .replace(/^```(?:json|JSON)?\s*\n?/, "") // Remove opening fence
+      .replace(/\n?\s*```\s*$/, "") // Remove closing fence
+      .trim();
+  }, []);
+
+  // Prompt editing handlers
+  const handleEditPrompt = useCallback(() => {
+    const selectedPrompt = promptTemplates.find(
+      (p) => p._id === selectedPromptId
+    );
+    if (selectedPrompt) {
+      // Update modal state from selected prompt
+      setModalModel(selectedPrompt.aiModel || formModel);
+      setModalProvider(
+        (selectedPrompt.llmProvider as ProviderId) || formProvider
+      );
+      setModalTemperature(
+        selectedPrompt.modelParams?.temperature || formTemperature
+      );
+
+      // Update form state from selected prompt
+      setFormTone(selectedPrompt.tone || "professional");
+      setFormStyle(selectedPrompt.style || "descriptive");
+      setFormModel(selectedPrompt.aiModel || "claude-3-5-sonnet-20241022");
+      setFormProvider(
+        (selectedPrompt.llmProvider as ProviderId) || "anthropic"
+      );
+      setFormTemperature(selectedPrompt.modelParams?.temperature || 0.7);
+
+      setIsCreatingPrompt(false);
+      setIsPromptModalOpen(true);
+    }
+  }, [
+    selectedPromptId,
+    promptTemplates,
+    formModel,
+    formProvider,
+    formTemperature,
+  ]);
+
+  const handleNewPrompt = useCallback(() => {
+    // Reset to defaults for new prompt
+    setModalModel("claude-3-5-sonnet-20241022");
+    setModalProvider("anthropic");
+    setModalTemperature(0.7);
+    setFormTone("professional");
+    setFormStyle("descriptive");
+    setFormModel("claude-3-5-sonnet-20241022");
+    setFormProvider("anthropic");
+    setFormTemperature(0.7);
+    setIsCreatingPrompt(true);
+    setIsPromptModalOpen(true);
+  }, []);
+
+  const handlePromptSaved = useCallback(
+    async (prompt: PromptTemplate) => {
+      try {
+        // Refresh the prompts list to include the new/updated prompt
+        await fetchJsonPrompts();
+
+        // Select the saved prompt
+        setSelectedPromptId(prompt._id);
+
+        // Update form state with saved prompt values
+        setFormTone(prompt.tone || "professional");
+        setFormStyle(prompt.style || "descriptive");
+        setFormModel(prompt.aiModel || "claude-3-5-sonnet-20241022");
+        setFormProvider((prompt.llmProvider as ProviderId) || "anthropic");
+        setFormTemperature(prompt.modelParams?.temperature || 0.7);
+        setModalTemperature(prompt.modelParams?.temperature || 0.7);
+
+        // Close the modal
+        setIsPromptModalOpen(false);
+
+        toast.success(
+          isCreatingPrompt
+            ? "Prompt created successfully!"
+            : "Prompt updated successfully!"
+        );
+      } catch (error) {
+        console.error("Error after prompt save:", error);
+      }
+    },
+    [fetchJsonPrompts, isCreatingPrompt]
+  );
+
+  const updateFormFromPromptValues = useCallback(
+    (values: {
+      context: string;
+      tone: string;
+      style: string;
+      platform: string;
+      model: string;
+      provider: string;
+      temperature: number;
+    }) => {
+      // Update all form state
+      setAdditionalContext(values.context || "");
+      setFormTone(values.tone || "professional");
+      setFormStyle(values.style || "descriptive");
+      setFormModel(values.model || "claude-3-5-sonnet-20241022");
+      setFormProvider((values.provider as ProviderId) || "anthropic");
+      setFormTemperature(values.temperature || 0.7);
+
+      // Also update modal state to keep them in sync
+      setModalModel(values.model || "claude-3-5-sonnet-20241022");
+      setModalProvider((values.provider as ProviderId) || "anthropic");
+      setModalTemperature(values.temperature || 0.7);
+    },
+    []
+  );
+
+  // Enhanced temperature change handler
+  const handleTemperatureChange = useCallback((newTemperature: number) => {
+    setFormTemperature(newTemperature);
+    setModalTemperature(newTemperature);
+  }, []);
+
+  // Enhanced model change handler
+  const handleModelChange = useCallback((newModel: string) => {
+    setFormModel(newModel);
+    setModalModel(newModel);
+  }, []);
+
+  // Enhanced provider change handler
+  const handleProviderChange = useCallback((newProvider: ProviderId) => {
+    setFormProvider(newProvider);
+    setModalProvider(newProvider);
+  }, []);
+
+  // Convert ICaptionPrompt to PromptTemplate format
+  const convertToPromptTemplate = useCallback(
+    (prompt: ICaptionPrompt): PromptTemplate => {
+      return {
+        _id: String(prompt._id),
+        name: prompt.name,
+        prompt: prompt.prompt,
+        aiModel: prompt.aiModel,
+        llmProvider: prompt.llmProvider,
+        platform: prompt.platform,
+        tone: prompt.tone,
+        style: prompt.style,
+        length: prompt.length,
+        modelParams: prompt.modelParams,
+      };
+    },
+    []
+  );
 
   // Generate JSON with AI
   const handleGenerate = async () => {
@@ -390,12 +593,12 @@ export default function JsonGenerationModal({
         clientInfo: null,
         carDetails: combinedCarDetails,
         eventDetails: combinedEventDetails,
-        temperature: selectedPrompt.modelParams?.temperature || 0.7,
-        tone: selectedPrompt.tone || "professional",
-        style: selectedPrompt.style || "descriptive",
+        temperature: formTemperature,
+        tone: formTone,
+        style: formStyle,
         length: selectedPrompt.length || "standard",
         template: selectedPrompt.prompt,
-        aiModel: selectedPrompt.aiModel || "claude-3-5-sonnet-20241022",
+        aiModel: formModel,
         projectId: "", // Empty for individual car
         selectedCarIds: carData ? ["temp-car-id"] : [],
         selectedEventIds: [],
@@ -433,7 +636,8 @@ export default function JsonGenerationModal({
       }
 
       const result = await response.json();
-      setGeneratedJson(result.caption); // The API returns 'caption' field
+      const cleanedJson = stripCodeFences(result.caption); // Strip markdown code fences
+      setGeneratedJson(cleanedJson);
       setViewMode("preview");
       toast.success("JSON generated successfully!");
     } catch (error) {
@@ -492,7 +696,7 @@ export default function JsonGenerationModal({
 
   // Use generated JSON
   const handleUseGenerated = () => {
-    const textToUse = isEditingPreview ? previewEditText : generatedJson;
+    const textToUse = getCurrentPreviewText();
     if (!textToUse.trim()) {
       toast.error("No JSON to use");
       return;
@@ -513,11 +717,22 @@ export default function JsonGenerationModal({
     setSelectedSystemPromptId("");
     setShowPreview(false);
     setEditableLLMText("");
+    setIsPromptModalOpen(false);
+    setIsCreatingPrompt(false);
+
+    // Reset form state
+    setFormTone("professional");
+    setFormStyle("descriptive");
+    setFormModel("claude-3-5-sonnet-20241022");
+    setFormProvider("anthropic");
+    setFormTemperature(0.7);
+
     onClose();
   };
 
   const getCurrentPreviewText = () => {
-    return isEditingPreview ? previewEditText : generatedJson;
+    const text = isEditingPreview ? previewEditText : generatedJson;
+    return stripCodeFences(text);
   };
 
   return (
@@ -553,24 +768,43 @@ export default function JsonGenerationModal({
                     platform "JSON" in the admin panel.
                   </div>
                 ) : (
-                  <Select
-                    value={selectedPromptId}
-                    onValueChange={setSelectedPromptId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a prompt template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {promptTemplates.map((prompt) => (
-                        <SelectItem
-                          key={String(prompt._id)}
-                          value={String(prompt._id)}
-                        >
-                          {prompt.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+                      <Select
+                        value={selectedPromptId}
+                        onValueChange={setSelectedPromptId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a prompt template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {promptTemplates.map((prompt) => (
+                            <SelectItem
+                              key={String(prompt._id)}
+                              value={String(prompt._id)}
+                            >
+                              {prompt.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEditPrompt}
+                        disabled={!selectedPromptId}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleNewPrompt}
+                      >
+                        New
+                      </Button>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -743,9 +977,9 @@ export default function JsonGenerationModal({
           </div>
 
           {/* Right Column - Preview and Saved Content */}
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full max-h-[calc(90vh-160px)]">
             {/* Mode Toggle Buttons */}
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mb-4 flex-shrink-0">
               <Button
                 variant={viewMode === "preview" ? "default" : "outline"}
                 size="sm"
@@ -827,7 +1061,7 @@ export default function JsonGenerationModal({
                           )}
                         </div>
                       </div>
-                      <div className="flex-1 border rounded-lg overflow-hidden">
+                      <div className="flex-1 border rounded-lg overflow-hidden min-h-[400px] max-h-[500px]">
                         {isEditingPreview ? (
                           <Textarea
                             value={previewEditText}
@@ -901,6 +1135,38 @@ export default function JsonGenerationModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal for Editing or Creating Prompts */}
+      <PromptEditModal
+        isOpen={isPromptModalOpen}
+        onClose={() => setIsPromptModalOpen(false)}
+        isCreating={isCreatingPrompt}
+        selectedPrompt={
+          selectedPromptId
+            ? (() => {
+                const prompt = promptTemplates.find(
+                  (p) => p._id === selectedPromptId
+                );
+                return prompt ? convertToPromptTemplate(prompt) : null;
+              })()
+            : null
+        }
+        model={formModel}
+        provider={formProvider}
+        temperature={modalTemperature}
+        clientHandle={null}
+        onPromptSaved={handlePromptSaved}
+        onModelChange={handleModelChange}
+        onProviderChange={handleProviderChange}
+        onTemperatureChange={handleTemperatureChange}
+        onFormValuesUpdate={updateFormFromPromptValues}
+        currentFormValues={{
+          context: additionalContext,
+          platform: formPlatform,
+          tone: formTone,
+          style: formStyle,
+        }}
+      />
     </Dialog>
   );
 }
