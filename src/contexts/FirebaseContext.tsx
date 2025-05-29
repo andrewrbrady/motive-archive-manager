@@ -71,29 +71,12 @@ export const FirebaseProvider = ({ children }: FirebaseProviderProps) => {
 
   const signUp = async (email: string, password: string): Promise<User> => {
     try {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(
-          `Attempting to sign up user with email: ${email.substring(0, 3)}***`
-        );
-      }
-
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log(
-          `User created successfully with UID: ${userCredential.user.uid.substring(0, 8)}***`
-        );
-        console.log(
-          `User email: ${userCredential.user.email?.substring(0, 3)}***`
-        );
-        console.log(
-          `User email verified: ${userCredential.user.emailVerified}`
-        );
-      }
       return userCredential.user;
     } catch (error: any) {
       console.error(`Error signing up user with email: ${email}`);

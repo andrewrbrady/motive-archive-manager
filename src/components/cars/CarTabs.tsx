@@ -169,15 +169,6 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       ),
     },
     {
-      value: "bat",
-      label: "BaT Listing",
-      content: (
-        <div className="p-6 text-center text-muted-foreground">
-          <p>BaT Listing functionality coming soon...</p>
-        </div>
-      ),
-    },
-    {
       value: "captions",
       label: "Copywriter",
       content: (

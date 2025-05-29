@@ -268,10 +268,28 @@ export async function DELETE(
   { params }: ProjectGalleriesRouteParams
 ) {
   try {
-    const session = await verifyAuthMiddleware(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log(
+        "❌ DELETE /api/projects/[id]/galleries: Authentication failed"
+      );
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -299,9 +317,9 @@ export async function DELETE(
     const project = await db.collection("projects").findOne({
       _id: projectId,
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
-          "members.userId": session.user.id,
+          "members.userId": userId,
           "members.role": { $in: ["owner", "manager"] },
         },
       ],

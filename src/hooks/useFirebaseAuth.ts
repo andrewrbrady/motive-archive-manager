@@ -57,30 +57,27 @@ export function useFirebaseAuth() {
   const MAX_TOKEN_VALIDATION_ATTEMPTS = 3;
 
   // Validate token with retry logic
-  const validateToken = useCallback(
-    async (user: User): Promise<boolean> => {
-      if (!user) return false;
+  const validateToken = useCallback(async (user: User): Promise<boolean> => {
+    if (!user) return false;
 
-      try {
-        const token = await user.getIdToken(true); // Force refresh
+    try {
+      const token = await user.getIdToken(true); // Force refresh
 
-        // Test the token with a simple API call
-        const response = await fetch("/api/auth/validate", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      // Test the token with a simple API call
+      const response = await fetch("/api/auth/validate", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        const isValid = response.ok;
+      const isValid = response.ok;
 
-        return isValid;
-      } catch (error: any) {
-        console.error("💥 useFirebaseAuth: Token validation error:", error);
-        return false;
-      }
-    },
-    [tokenValidationAttempts]
-  );
+      return isValid;
+    } catch (error: any) {
+      console.error("💥 useFirebaseAuth: Token validation error:", error);
+      return false;
+    }
+  }, []);
 
   // Enhanced auth state change handler
   const handleAuthStateChange = useCallback(

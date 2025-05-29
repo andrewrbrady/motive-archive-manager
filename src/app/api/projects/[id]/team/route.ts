@@ -13,10 +13,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ GET /api/projects/[id]/team: Authentication failed");
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     await connectToDatabase();
@@ -28,8 +44,8 @@ export async function GET(
 
     // Check if user has access to this project
     const hasAccess =
-      project.ownerId === session.user.id ||
-      project.members.some((member: any) => member.userId === session.user.id);
+      project.ownerId === userId ||
+      project.members.some((member: any) => member.userId === userId);
 
     if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
@@ -53,16 +69,32 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ POST /api/projects/[id]/team: Authentication failed");
+      return authResult;
     }
 
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
+
     const body = await request.json();
-    const { userId, role, permissions, hourlyRate } = body;
+    const { userId: memberUserId, role, permissions, hourlyRate } = body;
     const { id } = await params;
 
-    if (!userId || !role) {
+    if (!memberUserId || !role) {
       return NextResponse.json(
         { error: "User ID and role are required" },
         { status: 400 }
@@ -91,11 +123,10 @@ export async function POST(
 
     // Check if user has permission to add members
     const canAddMembers =
-      project.ownerId === session.user.id ||
+      project.ownerId === userId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
-          ["owner", "manager"].includes(member.role)
+          member.userId === userId && ["owner", "manager"].includes(member.role)
       );
 
     if (!canAddMembers) {
@@ -104,7 +135,7 @@ export async function POST(
 
     // Check if user is already a member
     const existingMember = project.members.find(
-      (member: any) => member.userId === userId
+      (member: any) => member.userId === memberUserId
     );
     if (existingMember) {
       return NextResponse.json(
@@ -115,7 +146,7 @@ export async function POST(
 
     // Create new member
     const newMember = {
-      userId,
+      userId: memberUserId,
       role,
       permissions: permissions || [],
       joinedAt: new Date(),
@@ -156,10 +187,26 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ PUT /api/projects/[id]/team: Authentication failed");
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const currentUserId = getUserIdFromToken(tokenData);
 
     const body = await request.json();
     const { userId, role, permissions, hourlyRate } = body;
@@ -181,10 +228,10 @@ export async function PUT(
 
     // Check if user has permission to update members
     const canUpdateMembers =
-      project.ownerId === session.user.id ||
+      project.ownerId === currentUserId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
+          member.userId === currentUserId &&
           ["owner", "manager"].includes(member.role)
       );
 
@@ -239,10 +286,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ DELETE /api/projects/[id]/team: Authentication failed");
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const currentUserId = getUserIdFromToken(tokenData);
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
@@ -264,10 +327,10 @@ export async function DELETE(
 
     // Check if user has permission to remove members
     const canRemoveMembers =
-      project.ownerId === session.user.id ||
+      project.ownerId === currentUserId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
+          member.userId === currentUserId &&
           ["owner", "manager"].includes(member.role)
       );
 

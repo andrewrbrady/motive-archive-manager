@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Save, X } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 

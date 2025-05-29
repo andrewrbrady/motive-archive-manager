@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
 import { PageTitle } from "@/components/ui/PageTitle";
 
-// Define the allowed values for each field (from CarImageGalleryV2)
+// Define the allowed values for each field used in image metadata filtering
 const allowedValues = {
   angle: [
     "front",

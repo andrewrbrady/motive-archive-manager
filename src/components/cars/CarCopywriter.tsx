@@ -413,8 +413,10 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       setSystemPromptError(null);
 
       if (!user) {
-        console.log("CarCopywriter: No user available for fetchSystemPrompts");
-        throw new Error("No authenticated user found");
+        console.log(
+          "CarCopywriter: No user available for fetchSystemPrompts, skipping..."
+        );
+        return; // Return early instead of throwing error
       }
 
       // Get the Firebase ID token
@@ -498,16 +500,21 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   useEffect(() => {
     fetchCarDetails();
     fetchCarEvents();
-    fetchSystemPrompts();
     fetchLengthSettings();
     fetchSavedCaptions();
   }, [
     fetchCarDetails,
     fetchCarEvents,
-    fetchSystemPrompts,
     fetchLengthSettings,
     fetchSavedCaptions,
   ]);
+
+  // Fetch system prompts only when user is available
+  useEffect(() => {
+    if (user) {
+      fetchSystemPrompts();
+    }
+  }, [user, fetchSystemPrompts]);
 
   // Fetch prompts when component mounts - separate useEffect to avoid dependency issues
   useEffect(() => {

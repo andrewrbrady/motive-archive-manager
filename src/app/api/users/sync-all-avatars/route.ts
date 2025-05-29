@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
+import {
+  verifyAuthMiddleware,
+  verifyFirebaseToken,
+  getUserEmailFromToken,
+} from "@/lib/firebase-auth-middleware";
 import { logger } from "@/lib/logging";
 
 /**
@@ -13,14 +17,56 @@ export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
 
   try {
-    // Get current session and check admin permissions
-    const session = await auth();
-    if (!session?.user?.email) {
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
+    // Get token data and extract user email
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userEmail = getUserEmailFromToken(tokenData);
+    if (!userEmail) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check if user has admin role
-    if (!session.user.roles?.includes("admin")) {
+    let isAdmin = false;
+    if (tokenData.tokenType === "firebase_auth") {
+      // For Firebase tokens, check the roles array
+      isAdmin = tokenData.roles?.includes("admin") || false;
+    } else if (tokenData.tokenType === "api_token") {
+      // For API tokens, fetch user data from Firestore to check roles
+      try {
+        const userDoc = await adminDb
+          .collection("users")
+          .doc(tokenData.userId)
+          .get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          isAdmin = userData?.roles?.includes("admin") || false;
+        }
+      } catch (error) {
+        logger.error({
+          message: "Error fetching user roles",
+          requestId,
+          userId: tokenData.userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 }
@@ -30,7 +76,7 @@ export async function POST(request: NextRequest) {
     logger.info({
       message: "Starting bulk avatar sync",
       requestId,
-      adminEmail: session.user.email,
+      adminEmail: userEmail,
     });
 
     // Get all users from Firestore

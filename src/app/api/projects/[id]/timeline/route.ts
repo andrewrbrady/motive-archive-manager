@@ -13,10 +13,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ GET /api/projects/[id]/timeline: Authentication failed");
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     await connectToDatabase();
@@ -28,8 +44,8 @@ export async function GET(
 
     // Check if user has access to this project
     const hasAccess =
-      project.ownerId === session.user.id ||
-      project.members.some((member: any) => member.userId === session.user.id);
+      project.ownerId === userId ||
+      project.members.some((member: any) => member.userId === userId);
 
     if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
@@ -53,10 +69,26 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ PUT /api/projects/[id]/timeline: Authentication failed");
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const body = await request.json();
     const { milestones, startDate, endDate, estimatedDuration } = body;
@@ -71,11 +103,10 @@ export async function PUT(
 
     // Check if user has permission to edit this project
     const canEdit =
-      project.ownerId === session.user.id ||
+      project.ownerId === userId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
-          ["owner", "manager"].includes(member.role)
+          member.userId === userId && ["owner", "manager"].includes(member.role)
       );
 
     if (!canEdit) {
@@ -121,10 +152,26 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log("❌ POST /api/projects/[id]/timeline: Authentication failed");
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const body = await request.json();
     const { title, description, dueDate, assignedTo, dependencies } = body;
@@ -146,11 +193,10 @@ export async function POST(
 
     // Check if user has permission to edit this project
     const canEdit =
-      project.ownerId === session.user.id ||
+      project.ownerId === userId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
-          ["owner", "manager"].includes(member.role)
+          member.userId === userId && ["owner", "manager"].includes(member.role)
       );
 
     if (!canEdit) {
@@ -201,10 +247,28 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log(
+        "❌ DELETE /api/projects/[id]/timeline: Authentication failed"
+      );
+      return authResult;
     }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     const url = new URL(request.url);
@@ -226,11 +290,10 @@ export async function DELETE(
 
     // Check if user has permission to edit this project
     const canEdit =
-      project.ownerId === session.user.id ||
+      project.ownerId === userId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
-          ["owner", "manager"].includes(member.role)
+          member.userId === userId && ["owner", "manager"].includes(member.role)
       );
 
     if (!canEdit) {

@@ -3,6 +3,7 @@ import {
   verifyAuthMiddleware,
   getUserIdFromToken,
   verifyFirebaseToken,
+  getUserEmailFromToken,
 } from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
@@ -94,20 +95,33 @@ export async function POST(
   );
 
   try {
-    const session = await auth();
-    console.log("🔐 Authentication check:", {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      userEmail: session?.user?.email,
-    });
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log(
+        "❌ POST /api/projects/[id]/deliverables: Authentication failed"
+      );
+      return authResult;
+    }
 
-    if (!session?.user) {
-      console.log("❌ Authentication failed - no session or user");
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
+    console.log("🔐 Authentication check:", {
+      hasToken: !!token,
+      userId: userId,
+      tokenType: tokenData.tokenType,
+    });
 
     const { id } = await params;
     console.log("📋 Project ID from params:", id);
@@ -193,15 +207,13 @@ export async function POST(
     }
 
     // Check permissions (manager or owner can add deliverables)
-    const member = project.members.find(
-      (m: any) => m.userId === session.user.id
-    );
-    const isOwner = project.ownerId === session.user.id;
+    const member = project.members.find((m: any) => m.userId === userId);
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner || (member && ["owner", "manager"].includes(member.role));
 
     console.log("🔐 Permission check:", {
-      userId: session.user.id,
+      userId: userId,
       isOwner,
       memberRole: member?.role || "not a member",
       canManage,
@@ -231,8 +243,10 @@ export async function POST(
       type: type || "Video", // Map to existing deliverable types
       duration: duration || 30,
       aspect_ratio: aspectRatio || "16:9",
-      firebase_uid: assignedTo || session.user.id,
-      editor: assignedTo ? "Assigned User" : session.user.name || "Unknown",
+      firebase_uid: assignedTo || userId,
+      editor: assignedTo
+        ? "Assigned User"
+        : getUserEmailFromToken(tokenData) || "Unknown",
       status: "not_started",
       edit_dates: [],
       edit_deadline: new Date(dueDate),
@@ -308,13 +322,28 @@ export async function PUT(
   console.log("🔄 PUT /api/projects/[id]/deliverables - Updating deliverable");
 
   try {
-    const session = await auth();
-    if (!session?.user) {
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log(
+        "❌ PUT /api/projects/[id]/deliverables: Authentication failed"
+      );
+      return authResult;
+    }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     const body = await request.json();
@@ -345,10 +374,8 @@ export async function PUT(
     }
 
     // Check permissions
-    const member = project.members.find(
-      (m: any) => m.userId === session.user.id
-    );
-    const isOwner = project.ownerId === session.user.id;
+    const member = project.members.find((m: any) => m.userId === userId);
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner || (member && ["owner", "manager"].includes(member.role));
 
@@ -383,7 +410,7 @@ export async function PUT(
       updateData.release_date = new Date(dueDate);
     }
     if (assignedTo !== undefined) {
-      updateData.firebase_uid = assignedTo || session.user.id;
+      updateData.firebase_uid = assignedTo || userId;
     }
 
     console.log("📝 Updating deliverable with data:", updateData);
@@ -428,13 +455,28 @@ export async function DELETE(
   );
 
   try {
-    const session = await auth();
-    if (!session?.user) {
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log(
+        "❌ DELETE /api/projects/[id]/deliverables: Authentication failed"
+      );
+      return authResult;
+    }
+
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     const body = await request.json();
@@ -457,10 +499,8 @@ export async function DELETE(
     }
 
     // Check permissions (manager or owner can remove deliverables)
-    const member = project.members.find(
-      (m: any) => m.userId === session.user.id
-    );
-    const isOwner = project.ownerId === session.user.id;
+    const member = project.members.find((m: any) => m.userId === userId);
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner || (member && ["owner", "manager"].includes(member.role));
 

@@ -85,45 +85,17 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       try {
-        if (process.env.NODE_ENV !== "production") {
-          console.log(
-            `Fetching car labels for IDs: ${uncachedIds.map((id) => id.substring(0, 8) + "***").join(", ")}`
-          );
-        }
-
         const response = await fetch("/api/cars/labels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ carIds: uncachedIds }),
         });
 
-        if (process.env.NODE_ENV !== "production") {
-          console.log(
-            "Car labels API response:",
-            response.status,
-            response.statusText
-          );
-        }
-
         if (!response.ok) {
           throw new Error(`Failed to fetch car labels: ${response.statusText}`);
         }
 
         const data = await response.json();
-        if (process.env.NODE_ENV !== "production") {
-          // [REMOVED] // [REMOVED] console.log("Car labels API response structure:", Object.keys(data));
-          console.log(
-            "Received labels for cars:",
-            Object.keys(data.labels || {}).length
-          );
-          console.log(
-            "Labels data sample:",
-            Object.keys(data.labels || {}).slice(0, 3)
-          );
-          if (data.debug) {
-            // [REMOVED] // [REMOVED] console.log("API debug info:", data.debug);
-          }
-        }
 
         // Handle both response formats: {cars: []} and {data: []}
         const carsArray = Array.isArray(data.cars)

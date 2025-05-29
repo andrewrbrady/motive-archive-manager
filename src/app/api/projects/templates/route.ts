@@ -8,6 +8,7 @@ import {
 import {
   verifyAuthMiddleware,
   getUserIdFromToken,
+  verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
 
@@ -24,13 +25,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const userId = await getUserIdFromToken(request);
-    if (!userId) {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const db = await getDatabase();
     const { searchParams } = new URL(request.url);
@@ -102,13 +109,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const userId = await getUserIdFromToken(request);
-    if (!userId) {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const db = await getDatabase();
     const data = await request.json();

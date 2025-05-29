@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
+import {
+  verifyAuthMiddleware,
+  verifyFirebaseToken,
+  getUserEmailFromToken,
+  getUserIdFromToken,
+} from "@/lib/firebase-auth-middleware";
 import { logger } from "@/lib/logging";
 
 /**
@@ -15,14 +20,33 @@ export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
 
   try {
-    // Get current session
-    const session = await verifyAuthMiddleware();
-    if (!session?.user?.email) {
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
+    // Get token data and extract user info
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userEmail = getUserEmailFromToken(tokenData);
+    const userId = getUserIdFromToken(tokenData);
+
+    if (!userEmail) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get user from Firebase Auth
-    const authUser = await adminAuth.getUserByEmail(session.user.email);
+    const authUser = await adminAuth.getUser(userId);
     if (!authUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
