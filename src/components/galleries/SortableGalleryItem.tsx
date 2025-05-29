@@ -85,6 +85,7 @@ export function SortableGalleryItem({
 
   // Load image dimensions to determine if it's horizontal
   React.useEffect(() => {
+    console.log(`🖼️ Image URL updated for ${image.filename}: ${image.url}`);
     const img = new window.Image();
     img.onload = () => {
       setImageDimensions({
@@ -93,7 +94,7 @@ export function SortableGalleryItem({
       });
     };
     img.src = image.url;
-  }, [image.url]);
+  }, [image.url, image.filename]);
 
   const isHorizontal = imageDimensions
     ? imageDimensions.width > imageDimensions.height
@@ -249,6 +250,7 @@ export function SortableGalleryItem({
                 )}
               >
                 <Image
+                  key={image.url}
                   src={image.url}
                   alt={image.filename || "Gallery image"}
                   fill
@@ -369,6 +371,7 @@ export function SortableGalleryItem({
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden">
           <div className="relative w-full h-[80vh]">
             <Image
+              key={image.url}
               src={image.url}
               alt={image.filename || "Gallery image"}
               fill

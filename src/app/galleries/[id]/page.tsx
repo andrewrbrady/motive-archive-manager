@@ -313,65 +313,80 @@ export default function GalleryPage() {
   ) => {
     if (!gallery) return;
 
-    console.log("🔄 handleImageProcessed called:", {
+    console.log("🔄 handleImageProcessed called with:", {
       originalImageId,
       newImageData,
-      currentGallery: gallery,
+      currentGalleryImages: gallery.images?.length || 0,
     });
 
-    // Update the local gallery state by creating a new gallery object
-    const updatedGallery = {
-      ...gallery,
-      // Update the images array by replacing the original image with the processed one
-      images: gallery.images?.map((image: any) => {
-        if (image._id === originalImageId) {
-          console.log("✅ Found image to replace:", image);
-          console.log("📝 Replacing with:", newImageData);
-          // Replace with the complete new image data and add cache-busting
-          return {
-            ...image, // Keep any existing fields as fallback
-            ...newImageData, // Override with new processed image data
-            url: `${newImageData.url}?v=${newImageData._id}`, // Add cache-busting to force refresh
-          };
-        }
-        return image;
-      }),
-      // Update imageIds array if the ID changed
-      imageIds: gallery.imageIds.map((id: string) => {
-        const newId = id === originalImageId ? newImageData._id : id;
-        if (id === originalImageId) {
-          console.log(`📋 Updated imageId: ${id} → ${newId}`);
-        }
-        return newId;
-      }),
-      // Update orderedImages array if it exists
-      orderedImages: gallery.orderedImages?.map((item: any) => {
-        if (item.id === originalImageId) {
-          console.log(
-            `📋 Updated orderedImage: ${item.id} → ${newImageData._id}`
-          );
-          return { ...item, id: newImageData._id };
-        }
-        return item;
-      }),
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      // Create updated gallery with minimal changes - more efficient than full re-render
+      const updatedGallery = {
+        ...gallery,
+        // Update the images array by replacing the original image with the processed one
+        images: gallery.images?.map((image: any) => {
+          if (image._id === originalImageId) {
+            console.log("✅ Found image to replace:", {
+              oldId: image._id,
+              oldUrl: image.url,
+              newId: newImageData._id,
+              newUrl: newImageData.url,
+            });
+            // Replace with the complete new image data
+            return {
+              ...image, // Keep any existing fields as fallback
+              ...newImageData, // Override with new processed image data
+            };
+          }
+          return image;
+        }),
+        // Update imageIds array if the ID changed
+        imageIds: gallery.imageIds.map((id: string) => {
+          return id === originalImageId ? newImageData._id : id;
+        }),
+        // Update orderedImages array if it exists
+        orderedImages: gallery.orderedImages?.map((item: any) => {
+          if (item.id === originalImageId) {
+            return { ...item, id: newImageData._id };
+          }
+          return item;
+        }),
+        updatedAt: new Date().toISOString(),
+      };
 
-    console.log("🎯 Final updated gallery:", updatedGallery);
+      console.log("🎯 About to mutate with updated gallery:", {
+        originalImagesCount: gallery.images?.length || 0,
+        updatedImagesCount: updatedGallery.images?.length || 0,
+      });
 
-    // Update the SWR cache with the new data immediately
-    await mutate(updatedGallery);
+      // Try both optimistic update and force refresh
+      mutate(updatedGallery); // Optimistic update
 
-    // After a short delay, revalidate to ensure we have the latest data
-    setTimeout(() => {
-      console.log("🔄 Revalidating gallery data...");
+      // Also trigger a revalidation after a short delay to ensure fresh data
+      setTimeout(() => {
+        console.log("🔄 Triggering SWR revalidation...");
+        mutate();
+      }, 100);
+
+      console.log("✅ Gallery state updated successfully");
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Image processed and saved to gallery successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error updating gallery:", error);
+
+      // On error, revalidate to get fresh data
       mutate();
-    }, 1000);
 
-    toast({
-      title: "Success",
-      description: "Image processed and saved to gallery successfully",
-    });
+      toast({
+        title: "Error",
+        description: "Failed to update gallery display. Refreshing...",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {

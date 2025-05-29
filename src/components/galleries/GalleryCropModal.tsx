@@ -267,12 +267,7 @@ export function GalleryCropModal({
 
   // Cache image locally for live preview
   const cacheImageForPreview = useCallback(async () => {
-    if (
-      !image?.url ||
-      processingMethod !== "local" ||
-      process.env.NODE_ENV !== "development"
-    )
-      return;
+    if (!image?.url || processingMethod !== "local") return;
 
     try {
       const previewImageUrl = getPreviewImageUrl(image.url);
@@ -305,8 +300,7 @@ export function GalleryCropModal({
       !livePreviewEnabled ||
       !cachedImagePath ||
       !originalDimensions ||
-      processingMethod !== "local" ||
-      process.env.NODE_ENV !== "development"
+      processingMethod !== "local"
     ) {
       return;
     }
@@ -385,10 +379,7 @@ export function GalleryCropModal({
   // Helper function to check if live preview should trigger
   const shouldTriggerLivePreview = useCallback(() => {
     return (
-      livePreviewEnabled &&
-      cachedImagePath &&
-      processingMethod === "local" &&
-      process.env.NODE_ENV === "development"
+      livePreviewEnabled && cachedImagePath && processingMethod === "local"
     );
   }, [livePreviewEnabled, cachedImagePath, processingMethod]);
 
@@ -1004,53 +995,9 @@ export function GalleryCropModal({
 
       // Verify the new image is available before updating UI
       if (result && result.processedImage && result.processedImage.url) {
-        // Wait for CDN propagation with retry mechanism
-        const waitForImageAvailability = async (
-          imageUrl: string,
-          maxRetries: number = 10,
-          delayMs: number = 1000
-        ) => {
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-              await new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                  console.log(
-                    `✅ Image available on attempt ${attempt}:`,
-                    imageUrl
-                  );
-                  resolve(true);
-                };
-                img.onerror = () => {
-                  reject(new Error(`Image not available (attempt ${attempt})`));
-                };
-                // Add cache-busting parameter
-                img.src = `${imageUrl}?v=${Date.now()}`;
-              });
-
-              // Image loaded successfully
-              return true;
-            } catch (error) {
-              console.log(
-                `⏳ Attempt ${attempt}/${maxRetries}: Image not ready yet, waiting ${delayMs}ms...`
-              );
-
-              if (attempt === maxRetries) {
-                console.warn("⚠️ Max retries reached, but proceeding anyway");
-                return false;
-              }
-
-              // Wait before next attempt
-              await new Promise((resolve) => setTimeout(resolve, delayMs));
-            }
-          }
-          return false;
-        };
-
-        console.log("🔄 Waiting for new image to be available...");
-        setIsWaitingForImage(true);
-        await waitForImageAvailability(result.processedImage.url);
-        setIsWaitingForImage(false);
+        // Immediately update the UI - no need to wait for CDN propagation
+        // The image component will handle loading states naturally
+        console.log("🎯 Immediately updating UI with new image data...");
 
         if (onImageProcessed) {
           console.log("🎯 Calling onImageProcessed and closing modal...");
@@ -1134,35 +1081,33 @@ export function GalleryCropModal({
               <div className="space-y-2 flex flex-col">
                 <div className="flex items-center justify-between flex-shrink-0">
                   <Label>Live Preview</Label>
-                  {processingMethod === "local" &&
-                    process.env.NODE_ENV === "development" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          handleLivePreviewToggle(!livePreviewEnabled)
-                        }
-                        className="h-8 px-3"
-                      >
-                        {livePreviewEnabled ? (
-                          <>
-                            <Pause className="mr-1 h-3 w-3" />
-                            Disable
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-1 h-3 w-3" />
-                            Enable
-                          </>
-                        )}
-                      </Button>
-                    )}
+                  {processingMethod === "local" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleLivePreviewToggle(!livePreviewEnabled)
+                      }
+                      className="h-8 px-3"
+                    >
+                      {livePreviewEnabled ? (
+                        <>
+                          <Pause className="mr-1 h-3 w-3" />
+                          Disable
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-1 h-3 w-3" />
+                          Enable
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
 
                 <div className="border rounded-lg p-2 bg-muted/50 relative flex-1 min-h-0 max-h-[50vh]">
                   {livePreviewEnabled &&
                   processingMethod === "local" &&
-                  process.env.NODE_ENV === "development" &&
                   livePreviewUrl ? (
                     <div className="h-full flex flex-col">
                       <div className="flex-1 flex items-center justify-center min-h-0">
@@ -1185,8 +1130,7 @@ export function GalleryCropModal({
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <p className="text-sm text-muted-foreground">
-                        {processingMethod === "local" &&
-                        process.env.NODE_ENV === "development"
+                        {processingMethod === "local"
                           ? "Enable live preview to see real-time crop results"
                           : "Preview will appear after processing"}
                       </p>
@@ -1494,11 +1438,7 @@ export function GalleryCropModal({
 
                 {/* Processed Image Preview - only show when live preview is not active */}
                 {processedImageUrl &&
-                  !(
-                    livePreviewEnabled &&
-                    processingMethod === "local" &&
-                    process.env.NODE_ENV === "development"
-                  ) && (
+                  !(livePreviewEnabled && processingMethod === "local") && (
                     <div className="space-y-1 flex-shrink-0">
                       <Label className="text-xs">Processed Image</Label>
                       <div className="border rounded-lg p-2 bg-muted/50">

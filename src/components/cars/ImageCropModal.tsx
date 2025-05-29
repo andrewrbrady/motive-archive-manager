@@ -265,12 +265,7 @@ export function ImageCropModal({
 
   // Cache image locally for live preview
   const cacheImageForPreview = useCallback(async () => {
-    if (
-      !image?.url ||
-      processingMethod !== "local" ||
-      process.env.NODE_ENV !== "development"
-    )
-      return;
+    if (!image?.url || processingMethod !== "local") return;
 
     try {
       // Use medium resolution for preview (1500px wide)
@@ -305,8 +300,7 @@ export function ImageCropModal({
       !livePreviewEnabled ||
       !cachedImagePath ||
       !originalDimensions ||
-      processingMethod !== "local" ||
-      process.env.NODE_ENV !== "development"
+      processingMethod !== "local"
     ) {
       return;
     }
@@ -387,10 +381,7 @@ export function ImageCropModal({
   // Helper function to check if live preview should trigger
   const shouldTriggerLivePreview = useCallback(() => {
     return (
-      livePreviewEnabled &&
-      cachedImagePath &&
-      processingMethod === "local" &&
-      process.env.NODE_ENV === "development"
+      livePreviewEnabled && cachedImagePath && processingMethod === "local"
     );
   }, [livePreviewEnabled, cachedImagePath, processingMethod]);
 
@@ -651,12 +642,7 @@ export function ImageCropModal({
 
   // Cache image when modal opens or image changes (for local processing)
   useEffect(() => {
-    if (
-      isOpen &&
-      image &&
-      processingMethod === "local" &&
-      process.env.NODE_ENV === "development"
-    ) {
+    if (isOpen && image && processingMethod === "local") {
       cacheImageForPreview();
     }
   }, [isOpen, image, processingMethod, cacheImageForPreview]);
@@ -1104,35 +1090,33 @@ export function ImageCropModal({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Live Preview</Label>
-                  {processingMethod === "local" &&
-                    process.env.NODE_ENV === "development" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          handleLivePreviewToggle(!livePreviewEnabled)
-                        }
-                        className="h-8 px-3"
-                      >
-                        {livePreviewEnabled ? (
-                          <>
-                            <Pause className="mr-1 h-3 w-3" />
-                            Disable
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-1 h-3 w-3" />
-                            Enable
-                          </>
-                        )}
-                      </Button>
-                    )}
+                  {processingMethod === "local" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleLivePreviewToggle(!livePreviewEnabled)
+                      }
+                      className="h-8 px-3"
+                    >
+                      {livePreviewEnabled ? (
+                        <>
+                          <Pause className="mr-1 h-3 w-3" />
+                          Disable
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-1 h-3 w-3" />
+                          Enable
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
 
                 <div className="border rounded-lg p-4 bg-muted/50 relative">
                   {livePreviewEnabled &&
                   processingMethod === "local" &&
-                  process.env.NODE_ENV === "development" &&
                   livePreviewUrl ? (
                     <div className="space-y-2">
                       <CloudflareImage
@@ -1159,20 +1143,17 @@ export function ImageCropModal({
                       <div className="text-center space-y-2">
                         <Eye className="h-8 w-8 mx-auto opacity-50" />
                         <p className="text-sm">
-                          {process.env.NODE_ENV !== "development"
-                            ? "Live preview available in development mode only"
-                            : processingMethod !== "local"
-                              ? "Live preview available in local processing mode"
-                              : !livePreviewEnabled
-                                ? "Live preview disabled"
-                                : cachedImagePath
-                                  ? "Live preview will appear here"
-                                  : "Caching image for preview..."}
+                          {processingMethod !== "local"
+                            ? "Live preview available in local processing mode"
+                            : !livePreviewEnabled
+                              ? "Live preview disabled"
+                              : cachedImagePath
+                                ? "Live preview will appear here"
+                                : "Caching image for preview..."}
                         </p>
                         {livePreviewEnabled &&
                           cachedImagePath &&
-                          processingMethod === "local" &&
-                          process.env.NODE_ENV === "development" && (
+                          processingMethod === "local" && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -1197,30 +1178,27 @@ export function ImageCropModal({
                   )}
 
                   {/* Generating indicator - absolutely positioned */}
-                  {isGeneratingPreview &&
-                    process.env.NODE_ENV === "development" && (
-                      <div className="absolute bottom-2 right-2">
-                        <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                      </div>
-                    )}
+                  {isGeneratingPreview && (
+                    <div className="absolute bottom-2 right-2">
+                      <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                    </div>
+                  )}
 
-                  {livePreviewEnabled &&
-                    processingMethod === "local" &&
-                    process.env.NODE_ENV === "development" && (
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        {cachedImagePath ? (
-                          <div className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3 text-green-600" />
-                            Image cached for preview
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Caching image for preview...
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  {livePreviewEnabled && processingMethod === "local" && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {cachedImagePath ? (
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3 text-green-600" />
+                          Image cached for preview
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Caching image for preview...
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

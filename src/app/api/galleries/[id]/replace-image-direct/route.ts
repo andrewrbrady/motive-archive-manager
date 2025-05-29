@@ -128,6 +128,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Store original image metadata in the processed image for restore functionality
+    await imagesCollection.updateOne(
+      { _id: new ObjectId(processedImageId) },
+      {
+        $set: {
+          "metadata.originalImage": {
+            _id: originalImage._id.toString(),
+            url: originalImage.url,
+            filename: originalImage.filename,
+            cloudflareId: originalImage.cloudflareId,
+            metadata: originalImage.metadata,
+            createdAt: originalImage.createdAt,
+          },
+          "metadata.replacedAt": new Date().toISOString(),
+          "metadata.processingType": "crop", // Since this is used by crop modal
+        },
+      }
+    );
+
     if (updateResult.modifiedCount === 0) {
       return NextResponse.json(
         { error: "Failed to update gallery" },
