@@ -7,11 +7,15 @@ import DeliverablesHeader from "./deliverables-tab/components/DeliverablesHeader
 import DeliverableCard from "./deliverables-tab/components/DeliverableCard";
 import DeliverablesTable from "./deliverables-tab/components/DeliverablesTable";
 import DeliverableModal from "./deliverables-tab/components/DeliverableModal";
+import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
+import { toast } from "sonner";
 
 export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [selectedDeliverable, setSelectedDeliverable] =
     useState<Deliverable | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showJsonUpload, setShowJsonUpload] = useState(false);
+  const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
   // Get the actual carId string
   const actualCarId = Array.isArray(carId) ? carId[0] : carId;
@@ -43,6 +47,42 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     setIsModalOpen(false);
   };
 
+  const handleJsonSubmit = async (jsonData: any[]) => {
+    try {
+      setIsSubmittingJson(true);
+
+      const response = await fetch(
+        `/api/cars/${actualCarId}/deliverables/batch`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ deliverables: jsonData }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create deliverables");
+      }
+
+      const result = await response.json();
+      toast.success(`Successfully created ${result.count} deliverables`);
+
+      // Refresh the deliverables list
+      fetchDeliverables();
+    } catch (error) {
+      console.error("Error creating deliverables from JSON:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create deliverables"
+      );
+      throw error; // Re-throw to prevent modal from closing
+    } finally {
+      setIsSubmittingJson(false);
+    }
+  };
+
   // Actions object for components
   const actions = {
     onEdit: (deliverable: Deliverable) => {
@@ -60,6 +100,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         carId={actualCarId}
         batchMode={batchMode}
         onRefresh={fetchDeliverables}
+        onShowJsonUpload={() => setShowJsonUpload(true)}
       />
 
       {/* Mobile View - Cards */}
@@ -107,6 +148,17 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         actions={actions}
+      />
+
+      {/* JSON Upload Modal */}
+      <JsonUploadPasteModal
+        isOpen={showJsonUpload}
+        onClose={() => setShowJsonUpload(false)}
+        onSubmit={handleJsonSubmit}
+        title="Batch Create Deliverables from JSON"
+        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects."
+        expectedType="deliverables"
+        isSubmitting={isSubmittingJson}
       />
     </div>
   );

@@ -30,6 +30,7 @@ import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { useAPI } from "@/lib/fetcher";
 
 interface Gallery {
   _id: string;
@@ -158,6 +159,7 @@ export function ProjectGalleriesTab({
   project,
   onProjectUpdate,
 }: ProjectGalleriesTabProps) {
+  const api = useAPI();
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,10 +170,7 @@ export function ProjectGalleriesTab({
   const fetchProjectGalleries = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/projects/${project._id}/galleries`);
-      if (!response.ok) throw new Error("Failed to fetch galleries");
-
-      const data = await response.json();
+      const data = await api.get(`/api/projects/${project._id}/galleries`);
       setGalleries(data.galleries || []);
     } catch (error) {
       console.error("Error fetching project galleries:", error);
@@ -187,10 +186,7 @@ export function ProjectGalleriesTab({
 
   const fetchAvailableGalleries = async () => {
     try {
-      const response = await fetch(`/api/galleries?limit=100`);
-      if (!response.ok) throw new Error("Failed to fetch available galleries");
-
-      const data = await response.json();
+      const data = await api.get(`/api/galleries?limit=100`);
 
       // Filter out galleries that are already linked to this project
       const linkedGalleryIds = new Set(galleries.map((g) => g._id));
@@ -224,18 +220,7 @@ export function ProjectGalleriesTab({
   const handleLinkGallery = async (galleryId: string) => {
     try {
       setIsLinking(true);
-      const response = await fetch(`/api/projects/${project._id}/galleries`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ galleryId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to link gallery");
-      }
+      await api.post(`/api/projects/${project._id}/galleries`, { galleryId });
 
       toast({
         title: "Success",
@@ -261,17 +246,9 @@ export function ProjectGalleriesTab({
 
   const handleUnlinkGallery = async (galleryId: string) => {
     try {
-      const response = await fetch(
-        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`,
-        {
-          method: "DELETE",
-        }
+      await api.delete(
+        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`
       );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to unlink gallery");
-      }
 
       toast({
         title: "Success",

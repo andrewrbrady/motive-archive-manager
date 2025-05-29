@@ -6,8 +6,17 @@ import ListView from "@/components/events/ListView";
 import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
 import CreateEventButton from "@/components/events/CreateEventButton";
+import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, List, Package, Plus, Copy, Pencil } from "lucide-react";
+import {
+  CalendarDays,
+  List,
+  Package,
+  Plus,
+  Copy,
+  Pencil,
+  FileJson,
+} from "lucide-react";
 import { LoadingContainer } from "@/components/ui/loading";
 import {
   Tooltip,
@@ -27,7 +36,9 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const [showBatchManager, setShowBatchManager] = useState(false);
   const [showBatchTemplates, setShowBatchTemplates] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [showJsonUpload, setShowJsonUpload] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
   const fetchEvents = async () => {
     try {
@@ -117,6 +128,39 @@ export default function EventsTab({ carId }: EventsTabProps) {
     }
   };
 
+  const handleJsonSubmit = async (jsonData: any[]) => {
+    try {
+      setIsSubmittingJson(true);
+
+      const response = await fetch(`/api/cars/${carId}/events/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ events: jsonData }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create events");
+      }
+
+      const result = await response.json();
+      toast.success(`Successfully created ${result.count} events`);
+
+      // Refresh the events list
+      fetchEvents();
+    } catch (error) {
+      console.error("Error creating events from JSON:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create events"
+      );
+      throw error; // Re-throw to prevent modal from closing
+    } finally {
+      setIsSubmittingJson(false);
+    }
+  };
+
   if (isLoading) {
     return <LoadingContainer />;
   }
@@ -164,6 +208,19 @@ export default function EventsTab({ carId }: EventsTabProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Edit All</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowJsonUpload(true)}
+              >
+                <FileJson className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Batch Create from JSON</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -232,6 +289,16 @@ export default function EventsTab({ carId }: EventsTabProps) {
         {showCreateEvent && (
           <CreateEventButton carId={carId} onEventCreated={fetchEvents} />
         )}
+
+        <JsonUploadPasteModal
+          isOpen={showJsonUpload}
+          onClose={() => setShowJsonUpload(false)}
+          onSubmit={handleJsonSubmit}
+          title="Batch Create Events from JSON"
+          description="Upload a JSON file or paste JSON data to create multiple events at once. The JSON should be an array of event objects."
+          expectedType="events"
+          isSubmitting={isSubmittingJson}
+        />
       </div>
     </TooltipProvider>
   );

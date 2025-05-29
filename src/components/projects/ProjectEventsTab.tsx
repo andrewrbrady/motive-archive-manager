@@ -38,6 +38,7 @@ import {
   Pencil,
   Copy,
   Grid3X3,
+  FileJson,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -75,6 +76,7 @@ import {
 import EventCard from "@/components/events/EventCard";
 import EditEventDialog from "@/components/events/EditEventDialog";
 import ListView from "@/components/events/ListView";
+import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "@/components/events/EventTypeSelector";
 import { LoadingContainer } from "@/components/ui/loading";
@@ -127,6 +129,8 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [showAttachEvent, setShowAttachEvent] = useState(false);
+  const [showJsonUpload, setShowJsonUpload] = useState(false);
+  const [isSubmittingJson, setIsSubmittingJson] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [showEditEvent, setShowEditEvent] = useState(false);
 
@@ -163,7 +167,11 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
           try {
             let car = null;
             if (event.car_id) {
-              const carResponse = await fetch(`/api/cars/${event.car_id}`);
+              const carResponse = await fetch(`/api/cars/${event.car_id}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
               if (carResponse.ok) {
                 car = await carResponse.json();
               }
@@ -198,10 +206,10 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   useEffect(() => {
-    if (projectId) {
+    if (projectId && user) {
       fetchEvents();
     }
-  }, [projectId]);
+  }, [projectId, user]);
 
   const handleCreateEvent = async (eventData: Partial<Event>) => {
     try {
@@ -378,6 +386,46 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
     setShowEditEvent(true);
   };
 
+  const handleJsonSubmit = async (jsonData: any[]) => {
+    try {
+      setIsSubmittingJson(true);
+
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${projectId}/events/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ events: jsonData }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create events");
+      }
+
+      const result = await response.json();
+      toast.success(`Successfully created ${result.count} events`);
+
+      // Refresh the events list
+      fetchEvents();
+    } catch (error) {
+      console.error("Error creating events from JSON:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create events"
+      );
+      throw error; // Re-throw to prevent modal from closing
+    } finally {
+      setIsSubmittingJson(false);
+    }
+  };
+
   if (isLoading) {
     return <LoadingContainer />;
   }
@@ -437,6 +485,19 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
             </Tooltip>
 
             <div className="border-l pl-2" />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowJsonUpload(true)}
+                >
+                  <FileJson className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Batch Create from JSON</TooltipContent>
+            </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -546,6 +607,7 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
           onOpenChange={setShowAttachEvent}
           onAttach={handleAttachEvent}
           projectId={projectId}
+          user={user}
         />
 
         {/* Edit Event Dialog */}
@@ -554,6 +616,17 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
           open={showEditEvent}
           onOpenChange={setShowEditEvent}
           onUpdate={handleUpdateEvent}
+        />
+
+        {/* JSON Upload Modal */}
+        <JsonUploadPasteModal
+          isOpen={showJsonUpload}
+          onClose={() => setShowJsonUpload(false)}
+          onSubmit={handleJsonSubmit}
+          title="Batch Create Events from JSON"
+          description="Upload a JSON file or paste JSON data to create multiple events at once. The JSON should be an array of event objects."
+          expectedType="events"
+          isSubmitting={isSubmittingJson}
         />
       </div>
     </TooltipProvider>
@@ -815,11 +888,13 @@ function AttachEventDialog({
   onOpenChange,
   onAttach,
   projectId,
+  user,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAttach: (eventId: string) => void;
   projectId: string;
+  user: any;
 }) {
   const [availableEvents, setAvailableEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -849,14 +924,27 @@ function AttachEventDialog({
   };
 
   const fetchAvailableEvents = async () => {
+    if (!user) {
+      console.log("No user available for fetching available events");
+      return;
+    }
+
     try {
       setIsLoading(true);
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
       const queryParams = new URLSearchParams();
       if (filters.type && filters.type !== "all") {
         queryParams.append("type", filters.type);
       }
 
-      const response = await fetch(`/api/events?${queryParams.toString()}`);
+      const response = await fetch(`/api/events?${queryParams.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error("Error fetching events:", errorData);
@@ -868,7 +956,12 @@ function AttachEventDialog({
       let projectEvents = [];
       try {
         const projectEventsResponse = await fetch(
-          `/api/projects/${projectId}/events`
+          `/api/projects/${projectId}/events`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
         if (projectEventsResponse.ok) {
           projectEvents = await projectEventsResponse.json();
@@ -887,7 +980,11 @@ function AttachEventDialog({
           .map(async (event: Event) => {
             try {
               if (event.car_id) {
-                const carResponse = await fetch(`/api/cars/${event.car_id}`);
+                const carResponse = await fetch(`/api/cars/${event.car_id}`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                });
                 if (carResponse.ok) {
                   const car = await carResponse.json();
                   return { ...event, car };
@@ -912,10 +1009,10 @@ function AttachEventDialog({
   };
 
   useEffect(() => {
-    if (open) {
+    if (open && user) {
       fetchAvailableEvents();
     }
-  }, [open, filters, projectId]);
+  }, [open, filters, projectId, user]);
 
   const handleAttachSelected = async () => {
     if (selectedEvents.size === 0) {

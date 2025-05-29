@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { BatchModeState } from "../types";
 import NewDeliverableForm from "../../NewDeliverableForm";
 import BatchDeliverableForm from "../../BatchDeliverableForm";
+import { FileJson } from "lucide-react";
 
 interface DeliverablesHeaderProps {
   title?: string;
@@ -11,6 +12,7 @@ interface DeliverablesHeaderProps {
   showNewDeliverable?: boolean;
   showBatchDeliverable?: boolean;
   onRefresh?: () => void;
+  onShowJsonUpload?: () => void;
   children?: React.ReactNode;
 }
 
@@ -21,6 +23,7 @@ export default function DeliverablesHeader({
   showNewDeliverable = true,
   showBatchDeliverable = true,
   onRefresh,
+  onShowJsonUpload,
   children,
 }: DeliverablesHeaderProps) {
   const {
@@ -57,6 +60,12 @@ export default function DeliverablesHeader({
               <Button variant="outline" onClick={toggleBatchMode}>
                 Batch Delete
               </Button>
+              {onShowJsonUpload && (
+                <Button variant="outline" onClick={onShowJsonUpload}>
+                  <FileJson className="w-4 h-4 mr-2" />
+                  Batch JSON
+                </Button>
+              )}
               {showBatchDeliverable && carId && (
                 <BatchDeliverableForm
                   carId={carId}
@@ -100,6 +109,12 @@ export default function DeliverablesHeader({
               <Button variant="outline" onClick={toggleBatchMode} size="sm">
                 Batch Delete
               </Button>
+              {onShowJsonUpload && (
+                <Button variant="outline" onClick={onShowJsonUpload} size="sm">
+                  <FileJson className="w-4 h-4 mr-1" />
+                  JSON
+                </Button>
+              )}
               {showBatchDeliverable && carId && (
                 <BatchDeliverableForm
                   carId={carId}

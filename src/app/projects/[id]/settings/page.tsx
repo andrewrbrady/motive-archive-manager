@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useSession } from "@/hooks/useFirebaseAuth";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ interface ProjectSettingsPageProps {
 export default function ProjectSettingsPage({
   params,
 }: ProjectSettingsPageProps) {
-  const { data: session, status } = useSession();
+  const { user } = useFirebaseAuth();
   const router = useRouter();
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
@@ -39,22 +39,38 @@ export default function ProjectSettingsPage({
   });
 
   useEffect(() => {
-    if (status === "loading") return;
-    if (!session) {
+    if (!user) {
       router.push("/auth/signin");
       return;
     }
     fetchProject();
-  }, [session, status, resolvedParams.id]);
+  }, [user, resolvedParams.id]);
 
   const fetchProject = async () => {
+    if (!user) {
+      setError("You must be logged in to view project settings");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await fetch(`/api/projects/${resolvedParams.id}`);
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
+      const response = await fetch(`/api/projects/${resolvedParams.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error("Project not found");
+        }
+        if (response.status === 401) {
+          throw new Error("You don't have permission to access this project");
         }
         throw new Error("Failed to fetch project");
       }
@@ -76,14 +92,19 @@ export default function ProjectSettingsPage({
   };
 
   const handleSave = async () => {
-    if (!project) return;
+    if (!project || !user) return;
 
     try {
       setSaving(true);
+
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
       const response = await fetch(`/api/projects/${project._id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: formData.title,
@@ -93,6 +114,9 @@ export default function ProjectSettingsPage({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("You don't have permission to update this project");
+        }
         throw new Error("Failed to update project");
       }
 
@@ -109,7 +133,10 @@ export default function ProjectSettingsPage({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update project settings",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to update project settings",
         variant: "destructive",
       });
     } finally {
@@ -125,7 +152,7 @@ export default function ProjectSettingsPage({
     setFormData({ ...formData, primaryImageId: imageId || "" });
   };
 
-  if (status === "loading" || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">

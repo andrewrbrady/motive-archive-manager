@@ -250,10 +250,20 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   };
 
   const fetchMemberDetails = async (userIds: string[]) => {
+    if (!user) {
+      console.log("No user available for fetching member details");
+      return;
+    }
+
     try {
+      // Get the Firebase ID token
+      const token = await user.getIdToken();
+
       // Use the project-specific users endpoint (no admin required)
       const response = await fetch("/api/projects/users", {
-        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
