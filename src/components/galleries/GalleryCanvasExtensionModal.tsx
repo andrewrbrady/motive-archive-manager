@@ -268,6 +268,9 @@ export function GalleryCanvasExtensionModal({
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
           uploadToCloudflare: false,
           originalFilename: image.filename,
+          requestedWidth: processedDimensions.width,
+          requestedHeight: parseInt(desiredHeight),
+          scaleMultiplier: multiplier,
         }),
       });
 

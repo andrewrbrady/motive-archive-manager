@@ -175,6 +175,9 @@ export function BatchCanvasExtensionModal({
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
           processingMethod,
+          requestedWidth: Math.round((parseInt(desiredHeight) * 16) / 9), // Default aspect ratio
+          requestedHeight: parseInt(desiredHeight),
+          scaleMultiplier: 1,
         };
 
         const result = await previewProcessImage({
@@ -315,6 +318,9 @@ export function BatchCanvasExtensionModal({
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
           processingMethod,
+          requestedWidth: Math.round((parseInt(desiredHeight) * 16) / 9), // Default aspect ratio
+          requestedHeight: parseInt(desiredHeight),
+          scaleMultiplier: 1,
         };
 
         const result = await replaceImageInGallery(
@@ -436,6 +442,9 @@ export function BatchCanvasExtensionModal({
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
           processingMethod,
+          requestedWidth: Math.round((parseInt(desiredHeight) * 16) / 9), // Use original requested dimensions
+          requestedHeight: parseInt(desiredHeight), // Use original requested dimensions
+          scaleMultiplier: multiplier,
         };
 
         const result = await replaceImageInGallery(

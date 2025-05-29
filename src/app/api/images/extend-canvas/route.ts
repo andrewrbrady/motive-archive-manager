@@ -18,6 +18,9 @@ interface ExtendCanvasRequest {
   uploadToCloudflare?: boolean;
   originalFilename?: string;
   originalCarId?: string;
+  requestedWidth?: number;
+  requestedHeight?: number;
+  scaleMultiplier?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +35,9 @@ export async function POST(request: NextRequest) {
       uploadToCloudflare,
       originalFilename,
       originalCarId,
+      requestedWidth,
+      requestedHeight,
+      scaleMultiplier,
     } = body;
 
     // Debug logging
@@ -141,7 +147,20 @@ export async function POST(request: NextRequest) {
                 // Create filename for the processed image
                 const baseFilename = originalFilename || "image";
                 const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
-                const processedFilename = `${nameWithoutExt}_extended_${desiredHeight}px.jpg`;
+
+                // Generate filename based on the new naming convention
+                let processedFilename;
+                if (scaleMultiplier && scaleMultiplier >= 2) {
+                  const reqWidth =
+                    requestedWidth || Math.round((desiredHeight * 16) / 9); // Default aspect ratio
+                  const reqHeight = requestedHeight || desiredHeight;
+                  processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}-${scaleMultiplier}X.jpg`;
+                } else {
+                  const reqWidth =
+                    requestedWidth || Math.round((desiredHeight * 16) / 9);
+                  const reqHeight = requestedHeight || desiredHeight;
+                  processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}.jpg`;
+                }
 
                 // Create a File object from the buffer
                 const processedFile = new File(
@@ -455,7 +474,20 @@ export async function POST(request: NextRequest) {
           // Create filename for the processed image
           const baseFilename = originalFilename || "image";
           const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
-          const processedFilename = `${nameWithoutExt}_extended_${desiredHeight}px.jpg`;
+
+          // Generate filename based on the new naming convention
+          let processedFilename;
+          if (scaleMultiplier && scaleMultiplier >= 2) {
+            const reqWidth =
+              requestedWidth || Math.round((desiredHeight * 16) / 9); // Default aspect ratio
+            const reqHeight = requestedHeight || desiredHeight;
+            processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}-${scaleMultiplier}X.jpg`;
+          } else {
+            const reqWidth =
+              requestedWidth || Math.round((desiredHeight * 16) / 9);
+            const reqHeight = requestedHeight || desiredHeight;
+            processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}.jpg`;
+          }
 
           // Create a File object from the buffer
           const processedFile = new File(

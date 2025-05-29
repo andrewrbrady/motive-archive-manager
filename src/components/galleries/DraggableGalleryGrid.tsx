@@ -33,6 +33,7 @@ import {
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { BatchCanvasExtensionModal } from "./BatchCanvasExtensionModal";
 import { BatchImageMatteModal } from "./BatchImageMatteModal";
+import { Input } from "@/components/ui/input";
 
 interface DraggableGalleryGridProps {
   gallery: Gallery;
@@ -55,6 +56,7 @@ export function DraggableGalleryGrid({
     React.useState(false);
   const [isBatchImageMatteOpen, setIsBatchImageMatteOpen] =
     React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const getOrderedItems = React.useCallback((gallery: Gallery) => {
     if (
@@ -72,6 +74,33 @@ export function DraggableGalleryGrid({
   }, []);
 
   const [items, setItems] = React.useState(() => getOrderedItems(gallery));
+
+  // Filter items based on search query
+  const filteredItems = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return items;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return items.filter((item) => {
+      const image = gallery.images?.find((img: any) => img._id === item.id);
+      if (!image) return false;
+
+      // Search in filename
+      if (image.filename?.toLowerCase().includes(query)) return true;
+
+      // Search in metadata
+      if (image.metadata) {
+        const metadataString = Object.values(image.metadata)
+          .filter((value) => typeof value === "string")
+          .join(" ")
+          .toLowerCase();
+        if (metadataString.includes(query)) return true;
+      }
+
+      return false;
+    });
+  }, [items, searchQuery, gallery.images]);
 
   // Keep track of the last successful order to handle errors
   const lastSuccessfulOrder = React.useRef(items);
@@ -112,6 +141,7 @@ export function DraggableGalleryGrid({
   React.useEffect(() => {
     setIsBatchMode(false);
     setSelectedImageIds(new Set());
+    setSearchQuery("");
   }, [gallery._id]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -177,7 +207,9 @@ export function DraggableGalleryGrid({
   };
 
   const handleSelectAll = () => {
-    const allImageIds = items.map((item) => item.id);
+    const allImageIds = searchQuery
+      ? filteredItems.map((item) => item.id)
+      : items.map((item) => item.id);
     setSelectedImageIds(new Set(allImageIds));
   };
 
@@ -186,7 +218,8 @@ export function DraggableGalleryGrid({
   };
 
   const getSelectedImages = () => {
-    return items
+    const relevantItems = searchQuery ? filteredItems : items;
+    return relevantItems
       .filter((item) => selectedImageIds.has(item.id))
       .map((item) => gallery.images?.find((img: any) => img._id === item.id))
       .filter(Boolean);
@@ -250,6 +283,30 @@ export function DraggableGalleryGrid({
 
   return (
     <div className="space-y-4">
+      {/* Search Input */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search gallery images..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {searchQuery && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSearchQuery("")}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {/* Grid Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 px-2">
           <ZoomOut className="h-4 w-4 text-muted-foreground" />
@@ -266,6 +323,10 @@ export function DraggableGalleryGrid({
         </div>
 
         <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {filteredItems.length} of {items.length} images
+            {searchQuery && ` matching "${searchQuery}"`}
+          </span>
           <Button
             variant={isBatchMode ? "default" : "outline"}
             size="sm"
@@ -286,6 +347,13 @@ export function DraggableGalleryGrid({
         </div>
       </div>
 
+      {/* Show no results message when search returns no results */}
+      {searchQuery && filteredItems.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground">
+          No images found matching "{searchQuery}"
+        </div>
+      )}
+
       {isBatchMode && (
         <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
           <div className="flex items-center gap-4">
@@ -295,7 +363,7 @@ export function DraggableGalleryGrid({
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                Select All
+                Select All{searchQuery ? " Filtered" : ""}
               </Button>
               <Button variant="outline" size="sm" onClick={handleDeselectAll}>
                 Deselect All
@@ -334,7 +402,7 @@ export function DraggableGalleryGrid({
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={items.map((item) => item.id)}
+          items={filteredItems.map((item) => item.id)}
           strategy={rectSortingStrategy}
         >
           <div
@@ -345,7 +413,7 @@ export function DraggableGalleryGrid({
             }}
           >
             {(() => {
-              return items.map((item) => {
+              return filteredItems.map((item) => {
                 const image = gallery.images?.find(
                   (img: any) => img._id === item.id
                 );

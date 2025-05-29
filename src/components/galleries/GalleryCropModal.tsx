@@ -939,6 +939,8 @@ export function GalleryCropModal({
           originalFilename: image?.filename,
           originalCarId: image?.carId,
           previewImageDimensions: originalDimensions,
+          requestedWidth: parseInt(outputWidth),
+          requestedHeight: parseInt(outputHeight),
         }),
       });
 

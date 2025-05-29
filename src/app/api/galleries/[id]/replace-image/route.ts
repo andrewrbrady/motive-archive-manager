@@ -83,6 +83,9 @@ export async function POST(request: NextRequest) {
         uploadToCloudflare: true,
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
+        requestedWidth: parameters.requestedWidth,
+        requestedHeight: parameters.requestedHeight,
+        scaleMultiplier: parameters.scaleMultiplier,
       };
     } else if (processingType === "crop") {
       processingEndpoint = "/api/images/crop-image";
@@ -100,6 +103,8 @@ export async function POST(request: NextRequest) {
         uploadToCloudflare: true,
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
+        requestedWidth: parameters.requestedWidth,
+        requestedHeight: parameters.requestedHeight,
       };
     } else {
       processingEndpoint = "/api/images/create-matte";
@@ -114,6 +119,9 @@ export async function POST(request: NextRequest) {
         uploadToCloudflare: true,
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
+        requestedWidth: parameters.requestedWidth,
+        requestedHeight: parameters.requestedHeight,
+        scaleMultiplier: parameters.scaleMultiplier,
       };
     }
 

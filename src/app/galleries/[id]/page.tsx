@@ -200,111 +200,248 @@ export default function GalleryPage() {
   };
 
   const handleDownloadAllImages = async () => {
-    if (!gallery || !gallery.images || gallery.images.length === 0) {
-      toast({
-        title: "No Images",
-        description: "There are no images in this gallery to download.",
-        variant: "default",
-      });
-      return;
-    }
-
     if (isDownloading) return;
     setIsDownloading(true);
 
-    toast({
-      title: "Preparing Zip File",
-      description: `Fetching and compressing images... This may take a moment.`,
-    });
+    try {
+      // Force refresh the gallery data and wait for it
+      console.log("🔄 Fetching latest gallery data before download...");
+      console.log("📊 Current gallery state:", {
+        imageCount: gallery?.images?.length || 0,
+        imageIds: gallery?.imageIds?.slice(0, 3) || [],
+        firstFewFilenames:
+          gallery?.images?.slice(0, 3).map((img: any) => img.filename) || [],
+      });
 
-    const zip = new JSZip();
-    const imageMap = new Map(
-      gallery.images.map((img: ImageData) => [img._id, img])
-    );
-
-    const orderedImageIds = gallery.orderedImages?.length
-      ? gallery.orderedImages
-          .sort((a, b) => a.order - b.order)
-          .map((item) => item.id)
-      : gallery.imageIds;
-
-    const imagesToProcess = orderedImageIds
-      .map((id) => imageMap.get(id))
-      .filter((img): img is ImageData => !!img);
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (let i = 0; i < imagesToProcess.length; i++) {
-      const image = imagesToProcess[i];
-      // Corrected URL format: append parameters directly to the image.url
-      const downloadUrl = `${image.url}w=3000,q=100`;
-      const filenameInZip =
-        image.filename || `gallery-image-${image._id.slice(-6)}-${i + 1}.jpg`;
-
+      // Make a direct API call to get the absolute latest gallery data
+      let currentGallery;
       try {
-        const response = await fetch(downloadUrl);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch ${filenameInZip}: ${response.statusText}`
-          );
+        const response = await fetch(`/api/galleries/${id}`);
+        if (response.ok) {
+          currentGallery = await response.json();
+          console.log("✅ Fetched fresh gallery data via API:", {
+            imageCount: currentGallery.images?.length || 0,
+            imageIds: currentGallery.imageIds?.slice(0, 3) || [],
+            firstFewFilenames:
+              currentGallery.images
+                ?.slice(0, 3)
+                .map((img: any) => img.filename) || [],
+            timestamp: new Date().toISOString(),
+            debugInfo: currentGallery._debug,
+          });
+
+          // Compare with current state
+          const isDataDifferent =
+            (gallery?.images?.length || 0) !==
+              (currentGallery.images?.length || 0) ||
+            JSON.stringify(gallery?.imageIds?.slice(0, 5)) !==
+              JSON.stringify(currentGallery.imageIds?.slice(0, 5));
+
+          console.log("🔍 Data comparison:", {
+            isDifferent: isDataDifferent,
+            oldCount: gallery?.images?.length || 0,
+            newCount: currentGallery.images?.length || 0,
+          });
+        } else {
+          throw new Error("API call failed");
         }
-        const blob = await response.blob();
-        zip.file(filenameInZip, blob);
-        successCount++;
-      } catch (err) {
-        errorCount++;
-        console.error(`Failed to fetch or add ${filenameInZip} to zip:`, err);
-        toast({
-          title: "Image Error",
-          description: `Skipping ${filenameInZip}. Check console for details.`,
-          variant: "destructive",
-        });
+      } catch (apiError) {
+        console.log("API call failed, falling back to SWR mutate...");
+        await mutate();
+        // Wait a bit for revalidation to complete
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        currentGallery = gallery;
       }
-    }
 
-    if (successCount > 0) {
-      try {
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const zipFilename = `${gallery.name.replace(/\s+/g, "_") || "gallery"}_hq_images.zip`;
-
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(zipBlob);
-        link.download = zipFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href); // Clean up the object URL
-
+      if (
+        !currentGallery ||
+        !currentGallery.images ||
+        currentGallery.images.length === 0
+      ) {
         toast({
-          title: "Download Started",
-          description: `Zipped ${successCount} of ${imagesToProcess.length} images. Download of '${zipFilename}' has started.`,
+          title: "No Images",
+          description: "There are no images in this gallery to download.",
+          variant: "default",
         });
-        if (errorCount > 0) {
+        return;
+      }
+
+      console.log("🔍 Download All Debug Info:", {
+        galleryImages: currentGallery.images?.length || 0,
+        galleryImageIds: currentGallery.imageIds?.length || 0,
+        orderedImages: currentGallery.orderedImages?.length || 0,
+        firstFewImages: currentGallery.images?.slice(0, 3).map((img: any) => ({
+          id: img._id,
+          filename: img.filename,
+          url: img.url?.substring(0, 50) + "...",
+        })),
+      });
+
+      toast({
+        title: "Preparing Zip File",
+        description: `Fetching and compressing ${currentGallery.images.length} images... This may take a moment.`,
+      });
+
+      const zip = new JSZip();
+      const imageMap = new Map(
+        currentGallery.images.map((img: any) => [img._id, img])
+      );
+
+      const orderedImageIds = currentGallery.orderedImages?.length
+        ? currentGallery.orderedImages.map((item: any) => item.id)
+        : currentGallery.imageIds;
+
+      const imagesToProcess = orderedImageIds
+        .map((id: any) => imageMap.get(id))
+        .filter((img: any): img is ImageData => !!img);
+
+      console.log("📦 Images to process:", {
+        orderedImageIds: orderedImageIds?.length || 0,
+        imagesToProcess: imagesToProcess.length,
+        imageMap: imageMap.size,
+      });
+
+      // Log detailed image info to compare with UI
+      console.log("🔍 Detailed image processing order:");
+      imagesToProcess.slice(0, 10).forEach((img: any, index: number) => {
+        console.log(`${index + 1}. ${img.filename} (${img._id})`, {
+          url: img.url,
+          originalOrder: currentGallery.orderedImages?.find(
+            (item: any) => item.id === img._id
+          )?.order,
+        });
+      });
+
+      // Also log the first few from orderedImages for comparison
+      console.log("🎯 Gallery ordered images (first 10):");
+      if (currentGallery.orderedImages?.length) {
+        currentGallery.orderedImages
+          .sort((a: any, b: any) => a.order - b.order)
+          .slice(0, 10)
+          .forEach((item: any, index: number) => {
+            const img: any = imageMap.get(item.id);
+            console.log(
+              `${index + 1}. Order ${item.order}: ${img?.filename || "NOT FOUND"} (${item.id})`
+            );
+          });
+      } else {
+        console.log("No orderedImages found, using imageIds order");
+        currentGallery.imageIds
+          .slice(0, 10)
+          .forEach((id: string, index: number) => {
+            const img: any = imageMap.get(id);
+            console.log(
+              `${index + 1}. ${img?.filename || "NOT FOUND"} (${id})`
+            );
+          });
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 0; i < imagesToProcess.length; i++) {
+        const image = imagesToProcess[i];
+        // Fix the URL construction for Cloudflare Images
+        let downloadUrl: string;
+
+        if (image.url.includes("imagedelivery.net")) {
+          // For Cloudflare Images, request original size at max quality
+          const baseUrl = image.url
+            .split("/public")[0]
+            .split("/w=")[0]
+            .split("/q=")[0];
+          const urlParts = baseUrl.split("/");
+          const accountHash = urlParts[3]; // imagedelivery.net/ACCOUNT_HASH/...
+          const imageId = urlParts[4]; // imagedelivery.net/ACCOUNT_HASH/IMAGE_ID/...
+
+          // Request original size at maximum quality - Cloudflare will serve the highest available
+          downloadUrl = `https://imagedelivery.net/${accountHash}/${imageId}/q=100`;
+        } else {
+          // For other URLs, use as-is
+          downloadUrl = image.url;
+        }
+
+        const filenameInZip =
+          image.filename || `gallery-image-${image._id.slice(-6)}-${i + 1}.jpg`;
+
+        try {
+          console.log(
+            `Downloading image ${i + 1}/${imagesToProcess.length}: ${filenameInZip}`
+          );
+          console.log(`  Original URL: ${image.url}`);
+          console.log(`  Download URL: ${downloadUrl}`);
+
+          const response = await fetch(downloadUrl);
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch ${filenameInZip}: ${response.statusText}`
+            );
+          }
+          const blob = await response.blob();
+          zip.file(filenameInZip, blob);
+          successCount++;
+        } catch (err) {
+          errorCount++;
+          console.error(`Failed to fetch or add ${filenameInZip} to zip:`, err);
           toast({
-            title: "Download Incomplete",
-            description: `${errorCount} image(s) could not be processed. Check console for details.`,
-            variant: "default", // Changed from "warning" as it's not a valid variant
+            title: "Image Error",
+            description: `Skipping ${filenameInZip}. Check console for details.`,
+            variant: "destructive",
           });
         }
-      } catch (zipError) {
-        console.error("Failed to generate or download zip:", zipError);
+      }
+
+      if (successCount > 0) {
+        try {
+          const zipBlob = await zip.generateAsync({ type: "blob" });
+          const zipFilename = `${currentGallery.name.replace(/\s+/g, "_") || "gallery"}_hq_images.zip`;
+
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(zipBlob);
+          link.download = zipFilename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(link.href); // Clean up the object URL
+
+          toast({
+            title: "Download Started",
+            description: `Zipped ${successCount} of ${imagesToProcess.length} images. Download of '${zipFilename}' has started.`,
+          });
+          if (errorCount > 0) {
+            toast({
+              title: "Download Incomplete",
+              description: `${errorCount} image(s) could not be processed. Check console for details.`,
+              variant: "default", // Changed from "warning" as it's not a valid variant
+            });
+          }
+        } catch (zipError) {
+          console.error("Failed to generate or download zip:", zipError);
+          toast({
+            title: "Zip Generation Failed",
+            description: "Could not create the zip file. Check console.",
+            variant: "destructive",
+          });
+        }
+      } else if (imagesToProcess.length > 0) {
         toast({
-          title: "Zip Generation Failed",
-          description: "Could not create the zip file. Check console.",
+          title: "Zip Failed",
+          description: "No images could be added to the zip file.",
           variant: "destructive",
         });
       }
-    } else if (imagesToProcess.length > 0) {
+      // No toast for "No images to download" here, as it's handled at the beginning.
+
+      setIsDownloading(false);
+    } catch (error) {
+      console.error("Error downloading images:", error);
       toast({
-        title: "Zip Failed",
-        description: "No images could be added to the zip file.",
+        title: "Error",
+        description: "Failed to download images. Check console for details.",
         variant: "destructive",
       });
+      setIsDownloading(false);
     }
-    // No toast for "No images to download" here, as it's handled at the beginning.
-
-    setIsDownloading(false);
   };
 
   const handleImageProcessed = async (

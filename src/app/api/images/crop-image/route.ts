@@ -18,6 +18,8 @@ interface CropImageRequest {
     width: number;
     height: number;
   };
+  requestedWidth?: number;
+  requestedHeight?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -75,6 +77,8 @@ export async function POST(request: NextRequest) {
       originalFilename,
       originalCarId,
       previewImageDimensions,
+      requestedWidth,
+      requestedHeight,
     } = body;
 
     if (!imageUrl) {
@@ -199,9 +203,30 @@ export async function POST(request: NextRequest) {
                 );
 
                 const formData = new FormData();
-                const filename = originalFilename
-                  ? `cropped_${originalFilename}`
-                  : `cropped_image_${Date.now()}.jpg`;
+
+                // Generate filename based on the new naming convention
+                let filename;
+                if (originalFilename) {
+                  const nameWithoutExt = originalFilename.replace(
+                    /\.[^/.]+$/,
+                    ""
+                  );
+                  const requestedW =
+                    requestedWidth || Math.round(outputWidth / (scale || 1));
+                  const requestedH =
+                    requestedHeight || Math.round(outputHeight / (scale || 1));
+
+                  // Check if this is a 2x scale (or higher)
+                  const scaleFactor = scale || 1;
+                  if (scaleFactor >= 2) {
+                    const scaleMultiplier = Math.round(scaleFactor);
+                    filename = `${nameWithoutExt}-CROPPED-${requestedW}x${requestedH}-${scaleMultiplier}X.jpg`;
+                  } else {
+                    filename = `${nameWithoutExt}-CROPPED-${requestedW}x${requestedH}.jpg`;
+                  }
+                } else {
+                  filename = `cropped_image_${Date.now()}.jpg`;
+                }
 
                 const file = new File([imageBuffer], filename, {
                   type: "image/jpeg",
@@ -488,9 +513,27 @@ export async function POST(request: NextRequest) {
 
           // Create FormData for the upload
           const formData = new FormData();
-          const filename = originalFilename
-            ? `cropped_${originalFilename}`
-            : `cropped_image_${Date.now()}.jpg`;
+
+          // Generate filename based on the new naming convention
+          let filename;
+          if (originalFilename) {
+            const nameWithoutExt = originalFilename.replace(/\.[^/.]+$/, "");
+            const requestedW =
+              requestedWidth || Math.round(outputWidth / (scale || 1));
+            const requestedH =
+              requestedHeight || Math.round(outputHeight / (scale || 1));
+
+            // Check if this is a 2x scale (or higher)
+            const scaleFactor = scale || 1;
+            if (scaleFactor >= 2) {
+              const scaleMultiplier = Math.round(scaleFactor);
+              filename = `${nameWithoutExt}-CROPPED-${requestedW}x${requestedH}-${scaleMultiplier}X.jpg`;
+            } else {
+              filename = `${nameWithoutExt}-CROPPED-${requestedW}x${requestedH}.jpg`;
+            }
+          } else {
+            filename = `cropped_image_${Date.now()}.jpg`;
+          }
 
           // Create a File object from the buffer
           const file = new File([processedImageBuffer], filename, {

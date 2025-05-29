@@ -174,6 +174,9 @@ export function BatchImageMatteModal({
           paddingPercent: parseFloat(paddingPercent),
           matteColor,
           processingMethod,
+          requestedWidth: parseInt(canvasWidth),
+          requestedHeight: parseInt(canvasHeight),
+          scaleMultiplier: 1,
         };
 
         const result = await previewProcessImage({
@@ -272,6 +275,9 @@ export function BatchImageMatteModal({
           paddingPercent: parseFloat(paddingPercent),
           matteColor,
           processingMethod,
+          requestedWidth: parseInt(canvasWidth),
+          requestedHeight: parseInt(canvasHeight),
+          scaleMultiplier: 1,
         };
 
         const result = await replaceImageInGallery(
