@@ -118,28 +118,33 @@ export default function GalleryPage() {
 
     try {
       // Create optimistically updated gallery data
+      const updatedImageIds = isRemoving
+        ? gallery.imageIds.filter((id) => id !== imageId)
+        : [...gallery.imageIds, imageId];
+
+      const updatedOrderedImages = isRemoving
+        ? (gallery.orderedImages || []).filter((item) => item.id !== imageId)
+        : [
+            ...(gallery.orderedImages ||
+              gallery.imageIds.map((id, index) => ({ id, order: index }))),
+            { id: imageId, order: gallery.imageIds.length },
+          ];
+
       const updatedGallery = {
         ...gallery,
-        imageIds: isRemoving
-          ? gallery.imageIds.filter((id) => id !== imageId)
-          : [...gallery.imageIds, imageId],
+        imageIds: updatedImageIds,
         images: isRemoving
           ? (gallery.images || []).filter((img: any) => img._id !== imageId)
           : [...(gallery.images || []), image],
-        orderedImages: isRemoving
-          ? (gallery.orderedImages || []).filter((item) => item.id !== imageId)
-          : [
-              ...(gallery.orderedImages ||
-                gallery.imageIds.map((id, index) => ({ id, order: index }))),
-              { id: imageId, order: gallery.imageIds.length },
-            ],
+        orderedImages: updatedOrderedImages,
       };
 
-      // Make the API call first
+      // Make the API call with ONLY the necessary updates to prevent data loss
       await updateGallery(id, {
-        ...gallery,
-        imageIds: updatedGallery.imageIds,
-        orderedImages: updatedGallery.orderedImages,
+        name: gallery.name,
+        description: gallery.description,
+        imageIds: updatedImageIds,
+        orderedImages: updatedOrderedImages,
       });
 
       // Then update the local state

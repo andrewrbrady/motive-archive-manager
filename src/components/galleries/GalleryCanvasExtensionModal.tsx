@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -27,6 +28,8 @@ import {
   X,
   Download,
   Eye,
+  ZoomIn,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
@@ -193,8 +196,6 @@ export function GalleryCanvasExtensionModal({
       processingMethod,
     };
 
-    console.log("Canvas extension processing with parameters:", parameters);
-
     const result = await previewProcessImage({
       galleryId,
       imageId: image._id,
@@ -202,15 +203,9 @@ export function GalleryCanvasExtensionModal({
       parameters,
     });
 
-    console.log("Canvas extension preview result:", result);
-
     if (result) {
       setProcessedImage(result.processedImage);
       setShowPreview(true);
-      console.log("Canvas extension preview state set:", {
-        processedImage: result.processedImage,
-        showPreview: true,
-      });
     }
   };
 
@@ -350,7 +345,7 @@ export function GalleryCanvasExtensionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Canvas Extension</DialogTitle>
           <DialogDescription>
@@ -359,309 +354,11 @@ export function GalleryCanvasExtensionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left side - Controls */}
-          <div className="space-y-4">
-            {/* Cloudflare Image Quality Controls */}
-            <div className="p-3 border rounded-lg bg-muted/30">
-              <Label className="text-sm font-medium mb-2 block">
-                Original Image Quality
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="cloudflareWidth" className="text-xs">
-                    Width (px)
-                  </Label>
-                  <Input
-                    id="cloudflareWidth"
-                    type="number"
-                    value={cloudflareWidth}
-                    onChange={(e) => setCloudflareWidth(e.target.value)}
-                    placeholder="2000"
-                    min="100"
-                    max="5000"
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cloudflareQuality" className="text-xs">
-                    Quality (%)
-                  </Label>
-                  <Input
-                    id="cloudflareQuality"
-                    type="number"
-                    value={cloudflareQuality}
-                    onChange={(e) => setCloudflareQuality(e.target.value)}
-                    placeholder="100"
-                    min="1"
-                    max="100"
-                    className="text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Processing Method Settings */}
-            <div className="p-3 border rounded-lg bg-muted/30">
-              <div className="flex items-center gap-2 mb-2">
-                <Settings className="h-4 w-4" />
-                <Label className="text-sm font-medium">Processing Method</Label>
-              </div>
-              <Select
-                value={processingMethod}
-                onValueChange={handleProcessingMethodChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select processing method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cloud">
-                    <div className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4" />
-                      <span>Cloud Run</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="local">
-                    <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4" />
-                      <span>Local Binary</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="desiredHeight">Desired Height (pixels)</Label>
-              <Input
-                id="desiredHeight"
-                type="number"
-                value={desiredHeight}
-                onChange={(e) => setDesiredHeight(e.target.value)}
-                placeholder="1200"
-                min="100"
-                max="5000"
-              />
-
-              {/* Aspect Ratio Preset Buttons */}
-              {originalDimensions && (
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDesiredHeight("1920");
-                      setCloudflareWidth("1080");
-                    }}
-                    className="text-xs"
-                  >
-                    9:16 (1080×1920)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDesiredHeight("1350");
-                      setCloudflareWidth("1080");
-                    }}
-                    className="text-xs"
-                  >
-                    4:5 (1080×1350)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDesiredHeight("1080");
-                      setCloudflareWidth("1080");
-                    }}
-                    className="text-xs"
-                  >
-                    1:1 (1080×1080)
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="paddingPct">Padding Percentage</Label>
-              <Input
-                id="paddingPct"
-                type="number"
-                step="0.01"
-                value={paddingPct}
-                onChange={(e) => setPaddingPct(e.target.value)}
-                placeholder="0.05"
-                min="0"
-                max="1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="whiteThresh" className="block mb-3">
-                White Threshold
-              </Label>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <Slider
-                      value={[
-                        whiteThresh === "-1" ? 90 : parseInt(whiteThresh),
-                      ]}
-                      onValueChange={(value) =>
-                        setWhiteThresh(value[0].toString())
-                      }
-                      max={255}
-                      min={0}
-                      step={1}
-                      className="w-full"
-                      disabled={whiteThresh === "-1"}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant={whiteThresh === "-1" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() =>
-                      setWhiteThresh(whiteThresh === "-1" ? "90" : "-1")
-                    }
-                    className="px-3"
-                  >
-                    Auto
-                  </Button>
-                </div>
-                <div className="flex justify-between items-center text-xs text-muted-foreground">
-                  <span>0 (Black)</span>
-                  <span className="font-medium">
-                    {whiteThresh === "-1"
-                      ? "Auto-detection"
-                      : `Value: ${whiteThresh}`}
-                  </span>
-                  <span>255 (White)</span>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handlePreview}
-              disabled={isProcessing || !image}
-              className="w-full"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Preview"
-              )}
-            </Button>
-
-            {/* Preview Action Buttons */}
-            {showPreview && processedImage && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleReplaceImage}
-                  disabled={isReplacing}
-                  className="flex-1"
-                  variant="default"
-                >
-                  {isReplacing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Replacing...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Replace Original
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleDiscardPreview}
-                  disabled={isReplacing}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Discard
-                </Button>
-              </div>
-            )}
-
-            {/* High-Resolution Processing Section */}
-            {showPreview && processedImage && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={() => handleHighResProcess(2)}
-                    disabled={isProcessingHighRes}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                  >
-                    {isProcessingHighRes && highResMultiplier === 2 ? (
-                      <>
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        2x...
-                      </>
-                    ) : (
-                      "Generate 2x"
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={() => handleHighResProcess(4)}
-                    disabled={isProcessingHighRes}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                  >
-                    {isProcessingHighRes && highResMultiplier === 4 ? (
-                      <>
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        4x...
-                      </>
-                    ) : (
-                      "Generate 4x"
-                    )}
-                  </Button>
-                </div>
-
-                {/* High-res download button */}
-                {highResImageUrl && (
-                  <Button
-                    onClick={handleHighResDownload}
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-xs"
-                  >
-                    <Download className="mr-1 h-3 w-3" />
-                    Download {highResMultiplier}x High-Res
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Debug info */}
-            {process.env.NODE_ENV === "development" && (
-              <div className="text-xs text-muted-foreground mt-2">
-                Debug: showPreview={showPreview.toString()}, hasProcessedImage=
-                {!!processedImage}
-                {processedImage && (
-                  <div>Processed image URL: {processedImage.url}</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Middle - Original Image */}
-          <div className="space-y-4">
-            <div>
+        <div className="space-y-6">
+          {/* Image Preview Section */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {/* Left: Original Image */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Original Image</Label>
                 {originalDimensions && (
@@ -671,15 +368,15 @@ export function GalleryCanvasExtensionModal({
                 )}
               </div>
               {enhancedImageUrl && (
-                <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                  <div className="relative max-w-full max-h-[400px]">
+                <div className="border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[200px] lg:min-h-[300px]">
+                  <div className="relative max-w-full max-h-[300px] lg:max-h-[400px]">
                     <Image
                       src={enhancedImageUrl}
                       alt={image?.filename || "Original image"}
                       width={0}
                       height={0}
                       sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[400px] object-contain"
+                      className="w-auto h-auto max-w-full max-h-[300px] lg:max-h-[400px] object-contain"
                       style={{ width: "auto", height: "auto" }}
                       key={enhancedImageUrl}
                     />
@@ -687,11 +384,9 @@ export function GalleryCanvasExtensionModal({
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Right - Processed Image */}
-          <div className="space-y-4">
-            <div>
+            {/* Middle: Processed Image */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">
                   {highResImageUrl
@@ -708,9 +403,9 @@ export function GalleryCanvasExtensionModal({
                   </span>
                 )}
               </div>
-              <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
+              <div className="border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[200px] lg:min-h-[300px]">
                 {highResImageUrl || processedImage ? (
-                  <div className="relative max-w-full max-h-[400px]">
+                  <div className="relative max-w-full max-h-[300px] lg:max-h-[400px]">
                     <Image
                       src={(highResImageUrl || processedImage?.url)!}
                       alt={
@@ -721,7 +416,7 @@ export function GalleryCanvasExtensionModal({
                       width={0}
                       height={0}
                       sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[400px] object-contain"
+                      className="w-auto h-auto max-w-full max-h-[300px] lg:max-h-[400px] object-contain"
                       style={{ width: "auto", height: "auto" }}
                       key={highResImageUrl || processedImage?.url}
                     />
@@ -732,7 +427,7 @@ export function GalleryCanvasExtensionModal({
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  <div className="flex items-center justify-center h-[200px] lg:h-[300px] text-muted-foreground">
                     <div className="text-center">
                       <Eye className="h-8 w-8 mx-auto mb-2" />
                       <p className="text-sm">
@@ -745,23 +440,343 @@ export function GalleryCanvasExtensionModal({
 
               {/* Toggle between processed and high-res images */}
               {processedImage && highResImageUrl && (
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setHighResImageUrl(null);
-                      setHighResDimensions(null);
-                    }}
-                    className="flex-1 text-xs"
-                  >
-                    Show Original Preview
-                  </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setHighResImageUrl(null);
+                    setHighResDimensions(null);
+                  }}
+                  className="w-full text-xs"
+                >
+                  Show Original Preview
+                </Button>
+              )}
+            </div>
+
+            {/* Right: Settings */}
+            <div className="space-y-4">
+              {/* Cloudflare Image Quality Controls */}
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <Label className="text-sm font-medium mb-2 block">
+                  Original Image Quality
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="cloudflareWidth" className="text-xs">
+                      Width (px)
+                    </Label>
+                    <Input
+                      id="cloudflareWidth"
+                      type="number"
+                      value={cloudflareWidth}
+                      onChange={(e) => setCloudflareWidth(e.target.value)}
+                      placeholder="2000"
+                      min="100"
+                      max="5000"
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cloudflareQuality" className="text-xs">
+                      Quality (%)
+                    </Label>
+                    <Input
+                      id="cloudflareQuality"
+                      type="number"
+                      value={cloudflareQuality}
+                      onChange={(e) => setCloudflareQuality(e.target.value)}
+                      placeholder="100"
+                      min="1"
+                      max="100"
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Processing Method Settings */}
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="h-4 w-4" />
+                  <Label className="text-sm font-medium">
+                    Processing Method
+                  </Label>
+                </div>
+                <Select
+                  value={processingMethod}
+                  onValueChange={handleProcessingMethodChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select processing method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cloud">
+                      <div className="flex items-center gap-2">
+                        <Cloud className="h-4 w-4" />
+                        <span>Cloud Run</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="local">
+                      <div className="flex items-center gap-2">
+                        <Monitor className="h-4 w-4" />
+                        <span>Local Binary</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="desiredHeight">Desired Height (pixels)</Label>
+                <Input
+                  id="desiredHeight"
+                  type="number"
+                  value={desiredHeight}
+                  onChange={(e) => setDesiredHeight(e.target.value)}
+                  placeholder="1200"
+                  min="100"
+                  max="5000"
+                />
+
+                {/* Aspect Ratio Preset Buttons */}
+                {originalDimensions && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDesiredHeight("1920");
+                        setCloudflareWidth("1080");
+                      }}
+                      className="text-xs"
+                    >
+                      9:16 (1080×1920)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDesiredHeight("1350");
+                        setCloudflareWidth("1080");
+                      }}
+                      className="text-xs"
+                    >
+                      4:5 (1080×1350)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDesiredHeight("1080");
+                        setCloudflareWidth("1080");
+                      }}
+                      className="text-xs"
+                    >
+                      1:1 (1080×1080)
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="paddingPct">Padding Percentage</Label>
+                <Input
+                  id="paddingPct"
+                  type="number"
+                  step="0.01"
+                  value={paddingPct}
+                  onChange={(e) => setPaddingPct(e.target.value)}
+                  placeholder="0.05"
+                  min="0"
+                  max="1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="whiteThresh" className="block mb-3">
+                  White Threshold
+                </Label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <Slider
+                        value={[
+                          whiteThresh === "-1" ? 90 : parseInt(whiteThresh),
+                        ]}
+                        onValueChange={(value) =>
+                          setWhiteThresh(value[0].toString())
+                        }
+                        max={255}
+                        min={0}
+                        step={1}
+                        className="w-full"
+                        disabled={whiteThresh === "-1"}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant={whiteThresh === "-1" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() =>
+                        setWhiteThresh(whiteThresh === "-1" ? "90" : "-1")
+                      }
+                      className="px-3"
+                    >
+                      Auto
+                    </Button>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <span>0 (Black)</span>
+                    <span className="font-medium">
+                      {whiteThresh === "-1"
+                        ? "Auto-detection"
+                        : `Value: ${whiteThresh}`}
+                    </span>
+                    <span>255 (White)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Debug info */}
+              {process.env.NODE_ENV === "development" && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  Debug: showPreview={showPreview.toString()},
+                  hasProcessedImage=
+                  {!!processedImage}
+                  {processedImage && (
+                    <div>Processed image URL: {processedImage.url}</div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        <DialogFooter className="flex flex-wrap gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {/* Preview Button */}
+            <Button
+              onClick={handlePreview}
+              disabled={isProcessing || !image}
+              className="bg-black hover:bg-gray-800 text-white"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Preview
+                </>
+              )}
+            </Button>
+
+            {/* Replace/Discard Buttons */}
+            {showPreview && processedImage && (
+              <>
+                <Button
+                  onClick={handleReplaceImage}
+                  disabled={isReplacing}
+                  variant="outline"
+                  className="border-gray-300 hover:bg-gray-50"
+                >
+                  {isReplacing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Replacing...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Replace Original
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleDiscardPreview}
+                  disabled={isReplacing}
+                  variant="outline"
+                  className="border-gray-300 hover:bg-gray-50"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Discard
+                </Button>
+              </>
+            )}
+
+            {/* High-Resolution Processing Buttons */}
+            {showPreview && processedImage && (
+              <>
+                <Button
+                  onClick={() => handleHighResProcess(2)}
+                  disabled={isProcessingHighRes}
+                  variant="outline"
+                  className="border-gray-300 hover:bg-gray-50"
+                >
+                  {isProcessingHighRes && highResMultiplier === 2 ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      2x Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ZoomIn className="mr-2 h-4 w-4" />
+                      2x High-Res
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => handleHighResProcess(4)}
+                  disabled={isProcessingHighRes}
+                  variant="outline"
+                  className="border-gray-300 hover:bg-gray-50"
+                >
+                  {isProcessingHighRes && highResMultiplier === 4 ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      4x Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ZoomIn className="mr-2 h-4 w-4" />
+                      4x High-Res
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+
+            {/* Download High-Res Button */}
+            {highResImageUrl && (
+              <Button
+                onClick={handleHighResDownload}
+                variant="outline"
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download {highResMultiplier}x High-Res
+              </Button>
+            )}
+
+            {/* Reset Button */}
+            <Button variant="outline" onClick={handleClose}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset
+            </Button>
+          </div>
+
+          <Button variant="outline" onClick={handleClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

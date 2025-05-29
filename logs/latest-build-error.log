@@ -1,0 +1,25 @@
+Build Error Log - $(date)
+
+Error Type: TypeScript/Type Check Failure
+File: src/components/galleries/BatchCanvasExtensionModal.tsx
+Line: 246
+Error: Expected 1 arguments, but got 0. 'new' expression, whose target lacks a construct signature, implicitly has an 'any' type.
+
+Code Context:
+```
+244 |       try {
+245 |         await new Promise<void>((resolve, reject) => {
+246 |           const img = new Image();
+247 |           img.onload = () => {
+248 |             resolve();
+249 |           };
+```
+
+Root Cause: 
+The global `Image` constructor is not available in the Node.js build environment. 
+In browser environments, `new Image()` works, but during SSR/build, it needs to be `new window.Image()` or proper environment checking.
+
+Next Steps:
+1. Fix the Image constructor usage
+2. Add proper environment checking 
+3. Re-run build to verify fix 

@@ -1057,8 +1057,8 @@ export function ImageCropModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Crop className="h-5 w-5" />
             Image Crop Tool
@@ -1069,658 +1069,663 @@ export function ImageCropModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Top Row: Image Preview and Live Preview Side by Side */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: Image Preview with Crop Overlay */}
-            <div className="space-y-2">
-              <Label>Image Preview & Crop Area</Label>
-              <div className="border rounded-lg p-4 bg-muted/50">
-                {currentImageUrl ? (
-                  <div className="space-y-2">
-                    <canvas
-                      ref={canvasRef}
-                      className="border rounded cursor-move max-w-full"
-                      onMouseDown={handleCanvasMouseDown}
-                      onMouseMove={handleCanvasMouseMove}
-                      onMouseUp={handleCanvasMouseUp}
-                      onMouseLeave={handleCanvasMouseUp}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Drag to move the crop area. Original:{" "}
-                      {originalDimensions?.width}×{originalDimensions?.height}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    No image selected
-                  </div>
-                )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 p-1">
+            {/* Top Row: Image Preview and Live Preview Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: Image Preview with Crop Overlay */}
+              <div className="space-y-2">
+                <Label>Image Preview & Crop Area</Label>
+                <div className="border rounded-lg p-4 bg-muted/50">
+                  {currentImageUrl ? (
+                    <div className="space-y-2">
+                      <canvas
+                        ref={canvasRef}
+                        className="border rounded cursor-move max-w-full"
+                        onMouseDown={handleCanvasMouseDown}
+                        onMouseMove={handleCanvasMouseMove}
+                        onMouseUp={handleCanvasMouseUp}
+                        onMouseLeave={handleCanvasMouseUp}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Drag to move the crop area. Original:{" "}
+                        {originalDimensions?.width}×{originalDimensions?.height}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="h-40 lg:h-48 flex items-center justify-center text-muted-foreground">
+                      No image selected
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Live Preview */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Live Preview</Label>
+                  {processingMethod === "local" &&
+                    process.env.NODE_ENV === "development" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleLivePreviewToggle(!livePreviewEnabled)
+                        }
+                        className="h-8 px-3"
+                      >
+                        {livePreviewEnabled ? (
+                          <>
+                            <Pause className="mr-1 h-3 w-3" />
+                            Disable
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-1 h-3 w-3" />
+                            Enable
+                          </>
+                        )}
+                      </Button>
+                    )}
+                </div>
+
+                <div className="border rounded-lg p-4 bg-muted/50 relative">
+                  {livePreviewEnabled &&
+                  processingMethod === "local" &&
+                  process.env.NODE_ENV === "development" &&
+                  livePreviewUrl ? (
+                    <div className="space-y-2">
+                      <CloudflareImage
+                        src={livePreviewUrl}
+                        alt="Live preview"
+                        width={400}
+                        height={400}
+                        className="w-full h-auto max-h-40 lg:max-h-48 object-contain rounded border"
+                        variant="medium"
+                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          Live Preview (400px wide)
+                        </p>
+                        {previewProcessingTime && (
+                          <p className="text-xs text-muted-foreground">
+                            {previewProcessingTime}ms
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-40 lg:h-48 flex items-center justify-center text-muted-foreground">
+                      <div className="text-center space-y-2">
+                        <Eye className="h-8 w-8 mx-auto opacity-50" />
+                        <p className="text-sm">
+                          {process.env.NODE_ENV !== "development"
+                            ? "Live preview available in development mode only"
+                            : processingMethod !== "local"
+                              ? "Live preview available in local processing mode"
+                              : !livePreviewEnabled
+                                ? "Live preview disabled"
+                                : cachedImagePath
+                                  ? "Live preview will appear here"
+                                  : "Caching image for preview..."}
+                        </p>
+                        {livePreviewEnabled &&
+                          cachedImagePath &&
+                          processingMethod === "local" &&
+                          process.env.NODE_ENV === "development" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={generateLivePreview}
+                              disabled={isGeneratingPreview}
+                            >
+                              {isGeneratingPreview ? (
+                                <>
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="mr-1 h-3 w-3" />
+                                  Generate Preview
+                                </>
+                              )}
+                            </Button>
+                          )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Generating indicator - absolutely positioned */}
+                  {isGeneratingPreview &&
+                    process.env.NODE_ENV === "development" && (
+                      <div className="absolute bottom-2 right-2">
+                        <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                      </div>
+                    )}
+
+                  {livePreviewEnabled &&
+                    processingMethod === "local" &&
+                    process.env.NODE_ENV === "development" && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {cachedImagePath ? (
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3 text-green-600" />
+                            Image cached for preview
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Caching image for preview...
+                          </div>
+                        )}
+                      </div>
+                    )}
+                </div>
               </div>
             </div>
 
-            {/* Right: Live Preview */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Live Preview</Label>
-                {processingMethod === "local" &&
-                  process.env.NODE_ENV === "development" && (
+            {/* Bottom Row: Settings in Two Columns */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column: Crop Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Crop Settings</h3>
+
+                {/* Crop Area Controls */}
+                <div className="space-y-4">
+                  <Label>Crop Area (pixels)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="cropX" className="text-xs">
+                        X Position
+                      </Label>
+                      <Input
+                        id="cropX"
+                        type="number"
+                        value={cropArea.x}
+                        onChange={(e) => {
+                          const newX = parseInt(e.target.value) || 0;
+                          if (
+                            originalDimensions &&
+                            newX + cropArea.width <= originalDimensions.width
+                          ) {
+                            setCropArea((prev) => ({
+                              ...prev,
+                              x: Math.max(0, newX),
+                            }));
+                            // Trigger live preview on input change
+                            if (shouldTriggerLivePreview()) {
+                              debouncedGeneratePreview();
+                            }
+                          }
+                        }}
+                        min="0"
+                        max={originalDimensions?.width || 0}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cropY" className="text-xs">
+                        Y Position
+                      </Label>
+                      <Input
+                        id="cropY"
+                        type="number"
+                        value={cropArea.y}
+                        onChange={(e) => {
+                          const newY = parseInt(e.target.value) || 0;
+                          if (
+                            originalDimensions &&
+                            newY + cropArea.height <= originalDimensions.height
+                          ) {
+                            setCropArea((prev) => ({
+                              ...prev,
+                              y: Math.max(0, newY),
+                            }));
+                            // Trigger live preview on input change
+                            if (shouldTriggerLivePreview()) {
+                              debouncedGeneratePreview();
+                            }
+                          }
+                        }}
+                        min="0"
+                        max={originalDimensions?.height || 0}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cropWidth" className="text-xs">
+                        Width
+                      </Label>
+                      <Input
+                        id="cropWidth"
+                        type="number"
+                        value={cropArea.width}
+                        onChange={(e) => {
+                          const newWidth = parseInt(e.target.value) || 0;
+                          if (
+                            originalDimensions &&
+                            cropArea.x + newWidth <= originalDimensions.width
+                          ) {
+                            setCropArea((prev) => ({
+                              ...prev,
+                              width: Math.max(1, newWidth),
+                            }));
+                            // Trigger live preview on input change
+                            if (shouldTriggerLivePreview()) {
+                              debouncedGeneratePreview();
+                            }
+                          }
+                        }}
+                        min="1"
+                        max={originalDimensions?.width || 0}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cropHeight" className="text-xs">
+                        Height
+                      </Label>
+                      <Input
+                        id="cropHeight"
+                        type="number"
+                        value={cropArea.height}
+                        onChange={(e) => {
+                          const newHeight = parseInt(e.target.value) || 0;
+                          if (
+                            originalDimensions &&
+                            cropArea.y + newHeight <= originalDimensions.height
+                          ) {
+                            setCropArea((prev) => ({
+                              ...prev,
+                              height: Math.max(1, newHeight),
+                            }));
+                            // Trigger live preview on input change
+                            if (shouldTriggerLivePreview()) {
+                              debouncedGeneratePreview();
+                            }
+                          }
+                        }}
+                        min="1"
+                        max={originalDimensions?.height || 0}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Crop Area Validation Status */}
+                {originalDimensions && (
+                  <div className="space-y-2">
+                    <div
+                      className={`p-2 rounded-lg text-sm ${
+                        validateCropArea(cropArea, originalDimensions)
+                          ? "bg-gray-50 text-gray-700 border border-gray-200"
+                          : "bg-gray-100 text-gray-800 border border-gray-300"
+                      }`}
+                    >
+                      {validateCropArea(cropArea, originalDimensions) ? (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4" />
+                          Crop area is valid
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <XCircle className="h-4 w-4" />
+                          Crop area exceeds image boundaries
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Scale Control */}
+                <div className="space-y-2">
+                  <Label>Scale Factor: {scale.toFixed(2)}x</Label>
+                  <Slider
+                    value={[scale]}
+                    onValueChange={(value) => {
+                      setScale(value[0]);
+                      // Trigger live preview on scale change
+                      if (shouldTriggerLivePreview()) {
+                        debouncedGeneratePreview();
+                      }
+                    }}
+                    min={0.1}
+                    max={3.0}
+                    step={0.1}
+                    className="w-full"
+                  />
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        handleLivePreviewToggle(!livePreviewEnabled)
-                      }
-                      className="h-8 px-3"
+                      onClick={() => {
+                        setScale(0.5);
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
                     >
-                      {livePreviewEnabled ? (
-                        <>
-                          <Pause className="mr-1 h-3 w-3" />
-                          Disable
-                        </>
-                      ) : (
-                        <>
-                          <Play className="mr-1 h-3 w-3" />
-                          Enable
-                        </>
-                      )}
+                      0.5x
                     </Button>
-                  )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setScale(1.0);
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                    >
+                      1.0x
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setScale(1.5);
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                    >
+                      1.5x
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setScale(2.0);
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                    >
+                      2.0x
+                    </Button>
+                  </div>
+                </div>
               </div>
 
-              <div className="border rounded-lg p-4 bg-muted/50 relative">
-                {livePreviewEnabled &&
-                processingMethod === "local" &&
-                process.env.NODE_ENV === "development" &&
-                livePreviewUrl ? (
+              {/* Right Column: Output Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Output Settings</h3>
+
+                {/* Output Dimensions */}
+                <div className="space-y-4">
+                  <Label>Output Dimensions</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="outputWidth">Width (px)</Label>
+                      <Input
+                        id="outputWidth"
+                        type="number"
+                        value={outputWidth}
+                        onChange={(e) => {
+                          setOutputWidth(e.target.value);
+                          // Trigger live preview on output dimension change
+                          if (shouldTriggerLivePreview()) {
+                            debouncedGeneratePreview();
+                          }
+                        }}
+                        placeholder="1080"
+                        min="100"
+                        max="5000"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="outputHeight">Height (px)</Label>
+                      <Input
+                        id="outputHeight"
+                        type="number"
+                        value={outputHeight}
+                        onChange={(e) => {
+                          setOutputHeight(e.target.value);
+                          // Trigger live preview on output dimension change
+                          if (shouldTriggerLivePreview()) {
+                            debouncedGeneratePreview();
+                          }
+                        }}
+                        placeholder="1920"
+                        min="100"
+                        max="5000"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Aspect Ratio Preset Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setOutputWidth("1080");
+                        setOutputHeight("1920");
+                        if (originalDimensions) {
+                          initializeCropArea(originalDimensions, 1080, 1920);
+                        }
+                        // Trigger live preview on preset change
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      9:16 (1080×1920)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setOutputWidth("1080");
+                        setOutputHeight("1350");
+                        if (originalDimensions) {
+                          initializeCropArea(originalDimensions, 1080, 1350);
+                        }
+                        // Trigger live preview on preset change
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      4:5 (1080×1350)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setOutputWidth("1080");
+                        setOutputHeight("1080");
+                        if (originalDimensions) {
+                          initializeCropArea(originalDimensions, 1080, 1080);
+                        }
+                        // Trigger live preview on preset change
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      1:1 (1080×1080)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setOutputWidth("1920");
+                        setOutputHeight("1080");
+                        if (originalDimensions) {
+                          initializeCropArea(originalDimensions, 1920, 1080);
+                        }
+                        // Trigger live preview on preset change
+                        if (shouldTriggerLivePreview()) {
+                          debouncedGeneratePreview();
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      16:9 (1920×1080)
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Processing Method */}
+                <div className="space-y-2">
+                  <Label>Processing Method</Label>
+                  <Select
+                    value={processingMethod}
+                    onValueChange={handleProcessingMethodChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cloud">
+                        <div className="flex items-center gap-2">
+                          <Cloud className="h-4 w-4" />
+                          Cloud Processing (Recommended)
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="local">
+                        <div className="flex items-center gap-2">
+                          <Monitor className="h-4 w-4" />
+                          Local Processing
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Cloudflare Settings */}
+                <div className="space-y-4">
+                  <Label>Cloudflare Image Settings</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="cloudflareWidth">Preview Width</Label>
+                      <Input
+                        id="cloudflareWidth"
+                        type="number"
+                        value={cloudflareWidth}
+                        onChange={(e) => setCloudflareWidth(e.target.value)}
+                        placeholder="3000"
+                        min="100"
+                        max="5000"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cloudflareQuality">Quality (%)</Label>
+                      <Input
+                        id="cloudflareQuality"
+                        type="number"
+                        value={cloudflareQuality}
+                        onChange={(e) => setCloudflareQuality(e.target.value)}
+                        placeholder="100"
+                        min="1"
+                        max="100"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Processing Status */}
+                {(processingStatus || error) && (
                   <div className="space-y-2">
-                    <CloudflareImage
-                      src={livePreviewUrl}
-                      alt="Live preview"
-                      width={400}
-                      height={400}
-                      className="w-full h-auto max-h-64 object-contain rounded border"
-                      variant="medium"
-                    />
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        Live Preview (400px wide)
-                      </p>
-                      {previewProcessingTime && (
-                        <p className="text-xs text-muted-foreground">
-                          {previewProcessingTime}ms
+                    <Label>Status</Label>
+                    <div className="p-3 rounded-lg bg-muted">
+                      {error ? (
+                        <div className="flex items-center gap-2 text-destructive">
+                          <XCircle className="h-4 w-4" />
+                          <span className="text-sm">{error}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          {isProcessing ||
+                          isProcessingHighRes ||
+                          isUploading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          )}
+                          <span className="text-sm">{processingStatus}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Processed Image Preview */}
+                {processedImageUrl && (
+                  <div className="space-y-2">
+                    <Label>Processed Image</Label>
+                    <div className="border rounded-lg p-2 bg-muted/50">
+                      <CloudflareImage
+                        src={processedImageUrl}
+                        alt="Processed image"
+                        width={200}
+                        height={200}
+                        className="w-full h-auto max-h-32 object-contain rounded"
+                        variant="medium"
+                      />
+                      {processedDimensions && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {processedDimensions.width}×
+                          {processedDimensions.height}
                         </p>
                       )}
                     </div>
                   </div>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    <div className="text-center space-y-2">
-                      <Eye className="h-8 w-8 mx-auto opacity-50" />
-                      <p className="text-sm">
-                        {process.env.NODE_ENV !== "development"
-                          ? "Live preview available in development mode only"
-                          : processingMethod !== "local"
-                            ? "Live preview available in local processing mode"
-                            : !livePreviewEnabled
-                              ? "Live preview disabled"
-                              : cachedImagePath
-                                ? "Live preview will appear here"
-                                : "Caching image for preview..."}
-                      </p>
-                      {livePreviewEnabled &&
-                        cachedImagePath &&
-                        processingMethod === "local" &&
-                        process.env.NODE_ENV === "development" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={generateLivePreview}
-                            disabled={isGeneratingPreview}
-                          >
-                            {isGeneratingPreview ? (
-                              <>
-                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="mr-1 h-3 w-3" />
-                                Generate Preview
-                              </>
-                            )}
-                          </Button>
-                        )}
+                )}
+
+                {/* High-res Image Preview */}
+                {highResImageUrl && (
+                  <div className="space-y-2">
+                    <Label>High-Resolution Image</Label>
+                    <div className="border rounded-lg p-2 bg-muted/50">
+                      <CloudflareImage
+                        src={highResImageUrl}
+                        alt="High-res processed image"
+                        width={200}
+                        height={200}
+                        className="w-full h-auto max-h-32 object-contain rounded"
+                        variant="large"
+                      />
+                      {highResDimensions && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {highResDimensions.width}×{highResDimensions.height}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Generating indicator - absolutely positioned */}
-                {isGeneratingPreview &&
-                  process.env.NODE_ENV === "development" && (
-                    <div className="absolute bottom-2 right-2">
-                      <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                    </div>
-                  )}
-
-                {livePreviewEnabled &&
-                  processingMethod === "local" &&
-                  process.env.NODE_ENV === "development" && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {cachedImagePath ? (
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                          Image cached for preview
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Caching image for preview...
-                        </div>
+                {/* Upload Result */}
+                {cloudflareResult && (
+                  <div className="space-y-2">
+                    <Label>Upload Result</Label>
+                    <div className="p-2 rounded-lg bg-gray-50 border border-gray-200">
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          Upload Successful
+                        </span>
+                      </div>
+                      {cloudflareResult.filename && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          Filename: {cloudflareResult.filename}
+                        </p>
                       )}
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Bottom Row: Settings in Two Columns */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Crop Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Crop Settings</h3>
-
-              {/* Crop Area Controls */}
-              <div className="space-y-4">
-                <Label>Crop Area (pixels)</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="cropX" className="text-xs">
-                      X Position
-                    </Label>
-                    <Input
-                      id="cropX"
-                      type="number"
-                      value={cropArea.x}
-                      onChange={(e) => {
-                        const newX = parseInt(e.target.value) || 0;
-                        if (
-                          originalDimensions &&
-                          newX + cropArea.width <= originalDimensions.width
-                        ) {
-                          setCropArea((prev) => ({
-                            ...prev,
-                            x: Math.max(0, newX),
-                          }));
-                          // Trigger live preview on input change
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
-                        }
-                      }}
-                      min="0"
-                      max={originalDimensions?.width || 0}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cropY" className="text-xs">
-                      Y Position
-                    </Label>
-                    <Input
-                      id="cropY"
-                      type="number"
-                      value={cropArea.y}
-                      onChange={(e) => {
-                        const newY = parseInt(e.target.value) || 0;
-                        if (
-                          originalDimensions &&
-                          newY + cropArea.height <= originalDimensions.height
-                        ) {
-                          setCropArea((prev) => ({
-                            ...prev,
-                            y: Math.max(0, newY),
-                          }));
-                          // Trigger live preview on input change
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
-                        }
-                      }}
-                      min="0"
-                      max={originalDimensions?.height || 0}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cropWidth" className="text-xs">
-                      Width
-                    </Label>
-                    <Input
-                      id="cropWidth"
-                      type="number"
-                      value={cropArea.width}
-                      onChange={(e) => {
-                        const newWidth = parseInt(e.target.value) || 0;
-                        if (
-                          originalDimensions &&
-                          cropArea.x + newWidth <= originalDimensions.width
-                        ) {
-                          setCropArea((prev) => ({
-                            ...prev,
-                            width: Math.max(1, newWidth),
-                          }));
-                          // Trigger live preview on input change
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
-                        }
-                      }}
-                      min="1"
-                      max={originalDimensions?.width || 0}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cropHeight" className="text-xs">
-                      Height
-                    </Label>
-                    <Input
-                      id="cropHeight"
-                      type="number"
-                      value={cropArea.height}
-                      onChange={(e) => {
-                        const newHeight = parseInt(e.target.value) || 0;
-                        if (
-                          originalDimensions &&
-                          cropArea.y + newHeight <= originalDimensions.height
-                        ) {
-                          setCropArea((prev) => ({
-                            ...prev,
-                            height: Math.max(1, newHeight),
-                          }));
-                          // Trigger live preview on input change
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
-                        }
-                      }}
-                      min="1"
-                      max={originalDimensions?.height || 0}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Crop Area Validation Status */}
-              {originalDimensions && (
-                <div className="space-y-2">
-                  <div
-                    className={`p-2 rounded-lg text-sm ${
-                      validateCropArea(cropArea, originalDimensions)
-                        ? "bg-gray-50 text-gray-700 border border-gray-200"
-                        : "bg-gray-100 text-gray-800 border border-gray-300"
-                    }`}
-                  >
-                    {validateCropArea(cropArea, originalDimensions) ? (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4" />
-                        Crop area is valid
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4" />
-                        Crop area exceeds image boundaries
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Scale Control */}
-              <div className="space-y-2">
-                <Label>Scale Factor: {scale.toFixed(2)}x</Label>
-                <Slider
-                  value={[scale]}
-                  onValueChange={(value) => {
-                    setScale(value[0]);
-                    // Trigger live preview on scale change
-                    if (shouldTriggerLivePreview()) {
-                      debouncedGeneratePreview();
-                    }
-                  }}
-                  min={0.1}
-                  max={3.0}
-                  step={0.1}
-                  className="w-full"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setScale(0.5);
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                  >
-                    0.5x
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setScale(1.0);
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                  >
-                    1.0x
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setScale(1.5);
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                  >
-                    1.5x
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setScale(2.0);
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                  >
-                    2.0x
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Output Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Output Settings</h3>
-
-              {/* Output Dimensions */}
-              <div className="space-y-4">
-                <Label>Output Dimensions</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="outputWidth">Width (px)</Label>
-                    <Input
-                      id="outputWidth"
-                      type="number"
-                      value={outputWidth}
-                      onChange={(e) => {
-                        setOutputWidth(e.target.value);
-                        // Trigger live preview on output dimension change
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
-                      }}
-                      placeholder="1080"
-                      min="100"
-                      max="5000"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="outputHeight">Height (px)</Label>
-                    <Input
-                      id="outputHeight"
-                      type="number"
-                      value={outputHeight}
-                      onChange={(e) => {
-                        setOutputHeight(e.target.value);
-                        // Trigger live preview on output dimension change
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
-                      }}
-                      placeholder="1920"
-                      min="100"
-                      max="5000"
-                    />
-                  </div>
-                </div>
-
-                {/* Aspect Ratio Preset Buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setOutputWidth("1080");
-                      setOutputHeight("1920");
-                      if (originalDimensions) {
-                        initializeCropArea(originalDimensions, 1080, 1920);
-                      }
-                      // Trigger live preview on preset change
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    9:16 (1080×1920)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setOutputWidth("1080");
-                      setOutputHeight("1350");
-                      if (originalDimensions) {
-                        initializeCropArea(originalDimensions, 1080, 1350);
-                      }
-                      // Trigger live preview on preset change
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    4:5 (1080×1350)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setOutputWidth("1080");
-                      setOutputHeight("1080");
-                      if (originalDimensions) {
-                        initializeCropArea(originalDimensions, 1080, 1080);
-                      }
-                      // Trigger live preview on preset change
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    1:1 (1080×1080)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setOutputWidth("1920");
-                      setOutputHeight("1080");
-                      if (originalDimensions) {
-                        initializeCropArea(originalDimensions, 1920, 1080);
-                      }
-                      // Trigger live preview on preset change
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    16:9 (1920×1080)
-                  </Button>
-                </div>
-              </div>
-
-              {/* Processing Method */}
-              <div className="space-y-2">
-                <Label>Processing Method</Label>
-                <Select
-                  value={processingMethod}
-                  onValueChange={handleProcessingMethodChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cloud">
-                      <div className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4" />
-                        Cloud Processing (Recommended)
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="local">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4" />
-                        Local Processing
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Cloudflare Settings */}
-              <div className="space-y-4">
-                <Label>Cloudflare Image Settings</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="cloudflareWidth">Preview Width</Label>
-                    <Input
-                      id="cloudflareWidth"
-                      type="number"
-                      value={cloudflareWidth}
-                      onChange={(e) => setCloudflareWidth(e.target.value)}
-                      placeholder="3000"
-                      min="100"
-                      max="5000"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cloudflareQuality">Quality (%)</Label>
-                    <Input
-                      id="cloudflareQuality"
-                      type="number"
-                      value={cloudflareQuality}
-                      onChange={(e) => setCloudflareQuality(e.target.value)}
-                      placeholder="100"
-                      min="1"
-                      max="100"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Processing Status */}
-              {(processingStatus || error) && (
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <div className="p-3 rounded-lg bg-muted">
-                    {error ? (
-                      <div className="flex items-center gap-2 text-destructive">
-                        <XCircle className="h-4 w-4" />
-                        <span className="text-sm">{error}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        {isProcessing || isProcessingHighRes || isUploading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        )}
-                        <span className="text-sm">{processingStatus}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Processed Image Preview */}
-              {processedImageUrl && (
-                <div className="space-y-2">
-                  <Label>Processed Image</Label>
-                  <div className="border rounded-lg p-2 bg-muted/50">
-                    <CloudflareImage
-                      src={processedImageUrl}
-                      alt="Processed image"
-                      width={200}
-                      height={200}
-                      className="w-full h-auto max-h-48 object-contain rounded"
-                      variant="medium"
-                    />
-                    {processedDimensions && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {processedDimensions.width}×{processedDimensions.height}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* High-res Image Preview */}
-              {highResImageUrl && (
-                <div className="space-y-2">
-                  <Label>High-Resolution Image</Label>
-                  <div className="border rounded-lg p-2 bg-muted/50">
-                    <CloudflareImage
-                      src={highResImageUrl}
-                      alt="High-res processed image"
-                      width={200}
-                      height={200}
-                      className="w-full h-auto max-h-48 object-contain rounded"
-                      variant="large"
-                    />
-                    {highResDimensions && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {highResDimensions.width}×{highResDimensions.height}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Upload Result */}
-              {cloudflareResult && (
-                <div className="space-y-2">
-                  <Label>Upload Result</Label>
-                  <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <CheckCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">
-                        Upload Successful
-                      </span>
-                    </div>
-                    {cloudflareResult.filename && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        Filename: {cloudflareResult.filename}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
-        <DialogFooter className="flex flex-wrap gap-2">
+        <DialogFooter className="flex flex-wrap gap-2 flex-shrink-0 border-t pt-4">
           <div className="flex gap-2 flex-wrap">
             {/* Process Button */}
             <Button

@@ -103,6 +103,7 @@ export function DraggableGalleryGrid({
   // Update lastSuccessfulOrder when gallery changes
   React.useEffect(() => {
     const newItems = getOrderedItems(gallery);
+
     lastSuccessfulOrder.current = newItems;
     setItems(newItems);
   }, [gallery, getOrderedItems]);
@@ -308,7 +309,7 @@ export function DraggableGalleryGrid({
                 variant="outline"
                 size="sm"
                 onClick={handleBatchCanvasExtension}
-                className="bg-blue-50 hover:bg-blue-100 border-blue-200"
+                className="bg-transparent hover:bg-blue-50/20 border-blue-300 text-blue-600 hover:text-blue-700"
               >
                 <Expand className="h-4 w-4 mr-2" />
                 Extend Canvas ({selectedImageIds.size})
@@ -317,7 +318,7 @@ export function DraggableGalleryGrid({
                 variant="outline"
                 size="sm"
                 onClick={handleBatchImageMatte}
-                className="bg-purple-50 hover:bg-purple-100 border-purple-200"
+                className="bg-transparent hover:bg-purple-50/20 border-purple-300 text-purple-600 hover:text-purple-700"
               >
                 <Palette className="h-4 w-4 mr-2" />
                 Create Matte ({selectedImageIds.size})
@@ -343,28 +344,30 @@ export function DraggableGalleryGrid({
               alignItems: "start",
             }}
           >
-            {items.map((item) => {
-              const image = gallery.images?.find(
-                (img: any) => img._id === item.id
-              );
-              if (!image) return null;
+            {(() => {
+              return items.map((item) => {
+                const image = gallery.images?.find(
+                  (img: any) => img._id === item.id
+                );
+                if (!image) return null;
 
-              return (
-                <SortableGalleryItem
-                  key={item.id}
-                  id={item.id}
-                  image={image}
-                  onDelete={onImageSelect}
-                  onImageProcessed={onImageProcessed}
-                  galleryId={gallery._id}
-                  isBatchMode={isBatchMode}
-                  isSelected={selectedImageIds.has(item.id)}
-                  onSelectionChange={(isSelected) =>
-                    handleImageSelection(item.id, isSelected)
-                  }
-                />
-              );
-            })}
+                return (
+                  <SortableGalleryItem
+                    key={item.id}
+                    id={item.id}
+                    image={image}
+                    onDelete={onImageSelect}
+                    onImageProcessed={onImageProcessed}
+                    galleryId={gallery._id}
+                    isBatchMode={isBatchMode}
+                    isSelected={selectedImageIds.has(item.id)}
+                    onSelectionChange={(isSelected) =>
+                      handleImageSelection(item.id, isSelected)
+                    }
+                  />
+                );
+              });
+            })()}
           </div>
         </SortableContext>
       </DndContext>

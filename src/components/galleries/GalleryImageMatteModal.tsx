@@ -147,8 +147,6 @@ export function GalleryImageMatteModal({
       processingMethod,
     };
 
-    console.log("Processing with parameters:", parameters);
-
     const result = await previewProcessImage({
       galleryId,
       imageId: image._id,
@@ -156,15 +154,9 @@ export function GalleryImageMatteModal({
       parameters,
     });
 
-    console.log("Preview result:", result);
-
     if (result) {
       setProcessedImage(result.processedImage);
       setShowPreview(true);
-      console.log("Preview state set:", {
-        processedImage: result.processedImage,
-        showPreview: true,
-      });
     }
   };
 

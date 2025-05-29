@@ -67,7 +67,7 @@ function pushEnvToVercel(
 
       console.log(`Adding ${specificVar} to ${environment}...`);
       execSync(
-        `vercel env add ${specificVar} ${environment} < "${tempFilePath}" --yes`,
+        `vercel env add ${specificVar} ${environment} < "${tempFilePath}"`,
         { stdio: "inherit" }
       );
 
@@ -100,10 +100,9 @@ function pushEnvToVercel(
 
       // Push to Vercel using the file to avoid shell escaping issues
       console.log(`Adding ${key}...`);
-      execSync(
-        `vercel env add ${key} ${environment} < "${tempFilePath}" --yes`,
-        { stdio: "inherit" }
-      );
+      execSync(`vercel env add ${key} ${environment} < "${tempFilePath}"`, {
+        stdio: "inherit",
+      });
 
       // Clean up temp file
       fs.unlinkSync(tempFilePath);

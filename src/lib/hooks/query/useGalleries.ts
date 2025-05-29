@@ -160,6 +160,35 @@ export function useGallery(id: string) {
       setIsLoading(true);
       setError(null);
       const result = await api.get(`/api/galleries/${id}`);
+
+      // Log debug information if available to help troubleshoot image count mismatches
+      if (result._debug) {
+        console.log(`🔍 Gallery ${id} Debug Info:`, result._debug);
+        if (result._debug.cleanupPerformed) {
+          console.log(
+            `🧹 Cleanup performed! Removed ${result._debug.orphanedImageCount} orphaned image references`
+          );
+        }
+
+        if (result._debug.orderedImagesRebuilt) {
+          console.log(
+            `🔧 orderedImages rebuilt! Added ${result._debug.orderedImagesMissing} missing images to orderedImages array`
+          );
+        }
+
+        // Additional debugging for image count mismatches
+        console.log(`📊 Image Count Analysis:`, {
+          "Original imageIds in gallery": result._debug.originalImageCount,
+          "Actual images found in DB": result._debug.foundImageCount,
+          "Orphaned references removed": result._debug.orphanedImageCount,
+          "Images array length": result.images?.length || 0,
+          "Current imageIds length": result.imageIds?.length || 0,
+          "OrderedImages missing count":
+            result._debug.orderedImagesMissing || 0,
+          "OrderedImages rebuilt": result._debug.orderedImagesRebuilt || false,
+        });
+      }
+
       setData(result);
     } catch (err) {
       setError(err as Error);

@@ -93,7 +93,7 @@ export function GalleryCropModal({
   });
   const [scale, setScale] = useState<number>(1.0);
   const [outputWidth, setOutputWidth] = useState<string>("1080");
-  const [outputHeight, setOutputHeight] = useState<string>("1920");
+  const [outputHeight, setOutputHeight] = useState<string>("1080");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("3000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
   const [processingMethod, setProcessingMethod] =
@@ -115,6 +115,7 @@ export function GalleryCropModal({
   const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
   const [isReplacing1x, setIsReplacing1x] = useState(false);
   const [isReplacing2x, setIsReplacing2x] = useState(false);
+  const [isWaitingForImage, setIsWaitingForImage] = useState(false);
   const [highResMultiplier, setHighResMultiplier] = useState<2 | 4 | null>(
     null
   );
@@ -130,7 +131,6 @@ export function GalleryCropModal({
     useState<ImageDimensions | null>(null);
 
   // Status and errors
-  const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
   const [lastProcessingTime, setLastProcessingTime] = useState(0);
@@ -177,6 +177,12 @@ export function GalleryCropModal({
   const handlePreset = (width: number, height: number) => {
     setOutputWidth(width.toString());
     setOutputHeight(height.toString());
+
+    // Immediately initialize crop area for the new dimensions
+    if (originalDimensions) {
+      initializeCropArea(originalDimensions, width, height);
+    }
+
     if (shouldTriggerLivePreview()) {
       debouncedGeneratePreview();
     }
@@ -211,14 +217,16 @@ export function GalleryCropModal({
       const cropX = Math.floor((imageDimensions.width - cropWidth) / 2);
       const cropY = Math.floor((imageDimensions.height - cropHeight) / 2);
 
-      setCropArea({
+      const newCropArea = {
         x: cropX,
         y: cropY,
         width: cropWidth,
         height: cropHeight,
-      });
+      };
+
+      setCropArea(newCropArea);
     },
-    []
+    [cropArea]
   );
 
   // Validate crop area against image boundaries
@@ -284,7 +292,6 @@ export function GalleryCropModal({
         const result = await response.json();
         if (result.success) {
           setCachedImagePath(result.cachedPath);
-          console.log("Image cached for preview:", result.cachedPath);
         }
       }
     } catch (error) {
@@ -414,18 +421,12 @@ export function GalleryCropModal({
       cloudflareWidth,
       cloudflareQuality
     );
-    console.log("URL transformation:", {
-      original: image.url,
-      enhanced: enhanced,
-      width: cloudflareWidth,
-      quality: cloudflareQuality,
-    });
     return enhanced;
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
   // Load original image dimensions
   useEffect(() => {
-    if (enhancedImageUrl) {
+    if (enhancedImageUrl && !originalDimensions) {
       const img = new window.Image();
       img.onload = () => {
         const dimensions = {
@@ -442,7 +443,7 @@ export function GalleryCropModal({
           );
         }
 
-        // Initialize crop area based on current output dimensions
+        // Only initialize crop area on first load when dimensions are loaded
         initializeCropArea(
           dimensions,
           parseInt(outputWidth),
@@ -451,7 +452,7 @@ export function GalleryCropModal({
       };
       img.src = enhancedImageUrl;
     }
-  }, [enhancedImageUrl, outputWidth, outputHeight, initializeCropArea]);
+  }, [enhancedImageUrl, originalDimensions, initializeCropArea]);
 
   // Cache image for live preview when modal opens
   useEffect(() => {
@@ -459,6 +460,23 @@ export function GalleryCropModal({
       cacheImageForPreview();
     }
   }, [isOpen, image?.url, processingMethod, cacheImageForPreview]);
+
+  // Auto-generate initial live preview when crop area is ready
+  useEffect(() => {
+    if (
+      originalDimensions &&
+      cropArea.width > 0 &&
+      cropArea.height > 0 &&
+      shouldTriggerLivePreview()
+    ) {
+      debouncedGeneratePreview();
+    }
+  }, [
+    originalDimensions,
+    cropArea,
+    shouldTriggerLivePreview,
+    debouncedGeneratePreview,
+  ]);
 
   // Load processed image dimensions when processed image changes
   useEffect(() => {
@@ -495,16 +513,20 @@ export function GalleryCropModal({
   // Draw the crop preview on canvas
   const drawCropPreview = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !enhancedImageUrl || !originalDimensions) return;
+    if (!canvas || !enhancedImageUrl || !originalDimensions) {
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     const img = new window.Image();
     img.onload = () => {
-      // Calculate canvas scale to fit image
-      const maxCanvasWidth = 400;
-      const maxCanvasHeight = 300;
+      // Calculate canvas scale to fit the responsive container
+      const maxCanvasWidth = 350; // Reduced from 400 to fit better
+      const maxCanvasHeight = 200; // Reduced from 300 to match h-32 lg:h-48
       const imageAspect = originalDimensions.width / originalDimensions.height;
 
       let canvasWidth, canvasHeight;
@@ -519,8 +541,8 @@ export function GalleryCropModal({
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
 
-      const scale = canvasWidth / originalDimensions.width;
-      setCanvasScale(scale);
+      const canvasScaleFactor = canvasWidth / originalDimensions.width;
+      setCanvasScale(canvasScaleFactor);
 
       // Clear canvas
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -533,10 +555,10 @@ export function GalleryCropModal({
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
       // Clear crop area
-      const scaledCropX = cropArea.x * scale;
-      const scaledCropY = cropArea.y * scale;
-      const scaledCropWidth = cropArea.width * scale;
-      const scaledCropHeight = cropArea.height * scale;
+      const scaledCropX = cropArea.x * canvasScaleFactor;
+      const scaledCropY = cropArea.y * canvasScaleFactor;
+      const scaledCropWidth = cropArea.width * canvasScaleFactor;
+      const scaledCropHeight = cropArea.height * canvasScaleFactor;
 
       ctx.clearRect(
         scaledCropX,
@@ -637,15 +659,15 @@ export function GalleryCropModal({
     });
 
     setDragStart({ x, y });
-
-    // Trigger live preview on drag
-    if (shouldTriggerLivePreview()) {
-      debouncedGeneratePreview();
-    }
   };
 
   const handleCanvasMouseUp = () => {
     setIsDragging(false);
+
+    // Trigger live preview only after drag is complete
+    if (shouldTriggerLivePreview()) {
+      debouncedGeneratePreview();
+    }
   };
 
   const handleProcess = async () => {
@@ -671,7 +693,6 @@ export function GalleryCropModal({
 
     setIsProcessing(true);
     setError(null);
-    setProcessingStatus("Processing image...");
 
     try {
       const processingImageUrl = getProcessingImageUrl(image.url || "");
@@ -731,7 +752,6 @@ export function GalleryCropModal({
         }
 
         setRemoteServiceUsed(result.remoteServiceUsed || false);
-        setProcessingStatus("Processing completed successfully!");
 
         toast({
           title: "Success",
@@ -780,11 +800,6 @@ export function GalleryCropModal({
 
     setIsProcessingHighRes(true);
     setHighResMultiplier(multiplier);
-    setProcessingStatus(
-      multiplier === 2
-        ? "Processing and uploading high-resolution image..."
-        : "Processing and uploading image..."
-    );
 
     try {
       const processingImageUrl = getProcessingImageUrl(image.url || "");
@@ -832,12 +847,6 @@ export function GalleryCropModal({
           const blobUrl = URL.createObjectURL(blob);
           setHighResImageUrl(blobUrl);
         }
-
-        setProcessingStatus(
-          multiplier === 2
-            ? "2x high-resolution image generated successfully"
-            : "4x high-resolution image generated successfully"
-        );
 
         toast({
           title: "Success",
@@ -913,11 +922,6 @@ export function GalleryCropModal({
 
       // Set general replacing state
       setIsReplacing(true);
-      setProcessingStatus(
-        multiplier === 1
-          ? "Saving standard resolution image..."
-          : "Saving high-resolution image..."
-      );
 
       console.log(`📤 Making API call with multiplier: ${multiplier}`);
 
@@ -962,8 +966,6 @@ export function GalleryCropModal({
         throw new Error("Failed to upload processed image to Cloudflare");
       }
 
-      setProcessingStatus("Updating gallery...");
-
       // Get the processed image ID from the upload result
       const processedImageId =
         processingResult.cloudflareUpload?.images?.[0]?.id;
@@ -1002,31 +1004,56 @@ export function GalleryCropModal({
 
       // Verify the new image is available before updating UI
       if (result && result.processedImage && result.processedImage.url) {
-        setProcessingStatus("Verifying image availability...");
+        // Wait for CDN propagation with retry mechanism
+        const waitForImageAvailability = async (
+          imageUrl: string,
+          maxRetries: number = 10,
+          delayMs: number = 1000
+        ) => {
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                  console.log(
+                    `✅ Image available on attempt ${attempt}:`,
+                    imageUrl
+                  );
+                  resolve(true);
+                };
+                img.onerror = () => {
+                  reject(new Error(`Image not available (attempt ${attempt})`));
+                };
+                // Add cache-busting parameter
+                img.src = `${imageUrl}?v=${Date.now()}`;
+              });
 
-        // Wait a moment for CDN processing and verify image loads
-        await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            console.log(
-              "✅ New image verified as available:",
-              result.processedImage.url
-            );
-            resolve(true);
-          };
-          img.onerror = () => {
-            console.warn(
-              "⚠️ New image not immediately available, proceeding anyway"
-            );
-            resolve(true);
-          };
-          // Add cache-busting parameter and small delay
-          setTimeout(() => {
-            img.src = `${result.processedImage.url}?v=${Date.now()}`;
-          }, 500);
-        });
+              // Image loaded successfully
+              return true;
+            } catch (error) {
+              console.log(
+                `⏳ Attempt ${attempt}/${maxRetries}: Image not ready yet, waiting ${delayMs}ms...`
+              );
+
+              if (attempt === maxRetries) {
+                console.warn("⚠️ Max retries reached, but proceeding anyway");
+                return false;
+              }
+
+              // Wait before next attempt
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+          }
+          return false;
+        };
+
+        console.log("🔄 Waiting for new image to be available...");
+        setIsWaitingForImage(true);
+        await waitForImageAvailability(result.processedImage.url);
+        setIsWaitingForImage(false);
 
         if (onImageProcessed) {
+          console.log("🎯 Calling onImageProcessed and closing modal...");
           onImageProcessed(result.originalImageId, result.processedImage);
           handleClose();
         }
@@ -1054,7 +1081,7 @@ export function GalleryCropModal({
       setIsReplacing(false);
       setIsReplacing1x(false);
       setIsReplacing2x(false);
-      setProcessingStatus("");
+      setIsWaitingForImage(false);
     }
   };
 
@@ -1062,9 +1089,8 @@ export function GalleryCropModal({
     setCropArea({ x: 0, y: 0, width: 0, height: 0 });
     setScale(1.0);
     setOutputWidth("1080");
-    setOutputHeight("1920");
+    setOutputHeight("1080");
     setProcessedImageUrl(null);
-    setProcessingStatus("");
     setError(null);
     setRemoteServiceUsed(false);
     setLivePreviewUrl(null);
@@ -1084,7 +1110,7 @@ export function GalleryCropModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[90vw] max-h-[85vh] overflow-hidden flex flex-col">
         <div className="flex flex-col h-full">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
@@ -1133,22 +1159,24 @@ export function GalleryCropModal({
                     )}
                 </div>
 
-                <div className="border rounded-lg p-2 bg-muted/50 relative flex-1 min-h-0">
+                <div className="border rounded-lg p-2 bg-muted/50 relative flex-1 min-h-0 max-h-[50vh]">
                   {livePreviewEnabled &&
                   processingMethod === "local" &&
                   process.env.NODE_ENV === "development" &&
                   livePreviewUrl ? (
-                    <div className="space-y-2 h-full flex flex-col">
-                      <CloudflareImage
-                        src={livePreviewUrl}
-                        alt="Live preview"
-                        width={600}
-                        height={600}
-                        className="w-full h-full object-contain rounded"
-                        variant="public"
-                      />
+                    <div className="h-full flex flex-col">
+                      <div className="flex-1 flex items-center justify-center min-h-0">
+                        <CloudflareImage
+                          src={livePreviewUrl}
+                          alt="Live preview"
+                          width={600}
+                          height={600}
+                          className="w-full h-auto max-w-full max-h-full object-contain rounded"
+                          variant="public"
+                        />
+                      </div>
                       {previewProcessingTime && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground mt-2 flex-shrink-0">
                           Generated in {previewProcessingTime}ms
                           {remoteServiceUsed && " (remote)"}
                         </p>
@@ -1177,14 +1205,14 @@ export function GalleryCropModal({
                       <div className="relative">
                         <canvas
                           ref={canvasRef}
-                          className="max-w-full h-48 border rounded cursor-crosshair"
+                          className="max-w-full h-32 lg:h-48 border rounded cursor-crosshair"
                           onMouseDown={handleCanvasMouseDown}
                           onMouseMove={handleCanvasMouseMove}
                           onMouseUp={handleCanvasMouseUp}
                         />
                       </div>
                     ) : (
-                      <div className="w-full h-48 border rounded flex items-center justify-center bg-muted">
+                      <div className="w-full h-32 lg:h-48 border rounded flex items-center justify-center bg-muted">
                         <p className="text-sm text-muted-foreground">
                           Loading image...
                         </p>
@@ -1553,14 +1581,18 @@ export function GalleryCropModal({
                         e.stopPropagation();
                         handleReplaceImage(1);
                       }}
-                      disabled={isReplacing1x || isReplacing2x}
+                      disabled={
+                        isReplacing1x || isReplacing2x || isWaitingForImage
+                      }
                       className="border-gray-300 hover:bg-gray-50"
                       variant="outline"
                     >
                       {isReplacing1x ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
+                          {isWaitingForImage
+                            ? "Waiting for image..."
+                            : "Saving..."}
                         </>
                       ) : (
                         <>
@@ -1575,14 +1607,18 @@ export function GalleryCropModal({
                         e.stopPropagation();
                         handleReplaceImage(2);
                       }}
-                      disabled={isReplacing1x || isReplacing2x}
+                      disabled={
+                        isReplacing1x || isReplacing2x || isWaitingForImage
+                      }
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                       variant="default"
                     >
                       {isReplacing2x ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
+                          {isWaitingForImage
+                            ? "Waiting for image..."
+                            : "Saving..."}
                         </>
                       ) : (
                         <>
@@ -1591,14 +1627,6 @@ export function GalleryCropModal({
                         </>
                       )}
                     </Button>
-                  </div>
-                )}
-
-                {/* Processing Status - Small text next to buttons */}
-                {processingStatus && (
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    {processingStatus}
                   </div>
                 )}
               </div>

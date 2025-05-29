@@ -27,6 +27,7 @@ import {
   Expand,
   Eye,
   RefreshCw,
+  Zap,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -71,6 +72,7 @@ export function BatchCanvasExtensionModal({
     useState<ProcessingMethod>("cloud");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
+  const [isReplacing2x, setIsReplacing2x] = useState(false);
   const [processingStatuses, setProcessingStatuses] = useState<
     ProcessingStatus[]
   >([]);
@@ -232,6 +234,47 @@ export function BatchCanvasExtensionModal({
     }
   };
 
+  // Wait for image availability with retry mechanism
+  const waitForImageAvailability = async (
+    imageUrl: string,
+    maxRetries: number = 10,
+    delayMs: number = 1000
+  ) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          // Check if we're in browser environment
+          if (typeof window === "undefined") {
+            reject(new Error("Not in browser environment"));
+            return;
+          }
+
+          const img = new window.Image();
+          img.onload = () => {
+            resolve();
+          };
+          img.onerror = () => {
+            reject(new Error(`Image not available (attempt ${attempt})`));
+          };
+          // Add cache-busting parameter
+          img.src = `${imageUrl}?v=${Date.now()}`;
+        });
+
+        // Image loaded successfully
+        return true;
+      } catch (error) {
+        if (attempt === maxRetries) {
+          console.warn("⚠️ Max retries reached, but proceeding anyway");
+          return false;
+        }
+
+        // Wait before next attempt
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    return false;
+  };
+
   const handleReplaceAll = async () => {
     const successfulPreviews = processingStatuses.filter(
       (status) => status.status === "completed" && status.previewUrl
@@ -250,6 +293,8 @@ export function BatchCanvasExtensionModal({
     setStage("replacing");
     let successCount = 0;
     let errorCount = 0;
+    const processedImages: { originalImageId: string; newImageData: any }[] =
+      [];
 
     for (let i = 0; i < successfulPreviews.length; i++) {
       const status = successfulPreviews[i];
@@ -283,9 +328,11 @@ export function BatchCanvasExtensionModal({
           updateProcessingStatus(status.imageId, "completed");
           successCount++;
 
-          if (onImageProcessed) {
-            onImageProcessed(result.originalImageId, result.processedImage);
-          }
+          // Collect processed images instead of calling onImageProcessed immediately
+          processedImages.push({
+            originalImageId: result.originalImageId,
+            newImageData: result.processedImage,
+          });
         } else {
           throw new Error("Replacement failed");
         }
@@ -301,11 +348,22 @@ export function BatchCanvasExtensionModal({
 
       // Small delay between processing
       if (i < successfulPreviews.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise<void>((resolve) => setTimeout(resolve, 500));
       }
     }
 
     setIsReplacing(false);
+
+    // Process all successful images at once to avoid multiple refreshes
+    if (processedImages.length > 0 && onImageProcessed) {
+      // Call onImageProcessed for each image (TODO: Add image availability waiting later)
+      for (const processedImage of processedImages) {
+        onImageProcessed(
+          processedImage.originalImageId,
+          processedImage.newImageData
+        );
+      }
+    }
 
     // Show completion toast
     if (successCount > 0 && errorCount === 0) {
@@ -331,6 +389,130 @@ export function BatchCanvasExtensionModal({
     }
   };
 
+  const handleReplaceAll2x = async () => {
+    const successfulPreviews = processingStatuses.filter(
+      (status) => status.status === "completed" && status.previewUrl
+    );
+
+    if (successfulPreviews.length === 0) {
+      toast({
+        title: "No Previews to Replace",
+        description: "No successful previews available for replacement",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsReplacing2x(true);
+    setStage("replacing");
+    let successCount = 0;
+    let errorCount = 0;
+    const processedImages: { originalImageId: string; newImageData: any }[] =
+      [];
+
+    for (let i = 0; i < successfulPreviews.length; i++) {
+      const status = successfulPreviews[i];
+      setCurrentProcessingIndex(i);
+
+      updateProcessingStatus(status.imageId, "processing");
+
+      try {
+        // Use 2x multiplier for high-resolution processing
+        const multiplier = 2;
+        const highResCloudflareWidth = parseInt(cloudflareWidth) * multiplier;
+
+        const enhancedImageUrl = getEnhancedImageUrl(
+          status.originalUrl!,
+          highResCloudflareWidth.toString(), // Use higher resolution source
+          cloudflareQuality
+        );
+
+        // For 2x, scale the desired height by multiplier to get true high-res
+        const targetHeight = parseInt(desiredHeight) * multiplier;
+
+        const parameters = {
+          imageUrl: enhancedImageUrl,
+          desiredHeight: targetHeight,
+          paddingPct: parseFloat(paddingPct),
+          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+          processingMethod,
+        };
+
+        const result = await replaceImageInGallery(
+          galleryId,
+          status.imageId,
+          "canvas-extension",
+          parameters
+        );
+
+        if (result) {
+          updateProcessingStatus(status.imageId, "completed");
+          successCount++;
+
+          // Collect processed images instead of calling onImageProcessed immediately
+          processedImages.push({
+            originalImageId: result.originalImageId,
+            newImageData: result.processedImage,
+          });
+        } else {
+          throw new Error("2x Replacement failed");
+        }
+      } catch (error) {
+        console.error(
+          `Failed to replace image ${status.imageId} with 2x:`,
+          error
+        );
+        updateProcessingStatus(
+          status.imageId,
+          "error",
+          error instanceof Error ? error.message : "Unknown error"
+        );
+        errorCount++;
+      }
+
+      // Small delay between processing
+      if (i < successfulPreviews.length - 1) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    setIsReplacing2x(false);
+
+    // Process all successful images at once to avoid multiple refreshes
+    if (processedImages.length > 0 && onImageProcessed) {
+      // Call onImageProcessed for each image (TODO: Add image availability waiting later)
+      for (const processedImage of processedImages) {
+        onImageProcessed(
+          processedImage.originalImageId,
+          processedImage.newImageData
+        );
+      }
+    }
+
+    // Show completion toast
+    if (successCount > 0 && errorCount === 0) {
+      toast({
+        title: "Batch 2x Replacement Complete",
+        description: `Successfully replaced ${successCount} image${successCount !== 1 ? "s" : ""} with 2x resolution`,
+      });
+      setTimeout(() => {
+        handleClose();
+      }, 2000);
+    } else if (successCount > 0 && errorCount > 0) {
+      toast({
+        title: "Batch 2x Replacement Completed with Errors",
+        description: `${successCount} successful, ${errorCount} failed`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Batch 2x Replacement Failed",
+        description: `Failed to replace ${errorCount} image${errorCount !== 1 ? "s" : ""}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleStartOver = () => {
     setStage("settings");
     setProcessingStatuses(
@@ -345,7 +527,7 @@ export function BatchCanvasExtensionModal({
   };
 
   const handleClose = () => {
-    if (!isProcessing && !isReplacing) {
+    if (!isProcessing && !isReplacing && !isReplacing2x) {
       setDesiredHeight("1200");
       setPaddingPct("0.05");
       setWhiteThresh("90");
@@ -683,13 +865,14 @@ export function BatchCanvasExtensionModal({
           )}
 
           {/* Progress Section */}
-          {(isProcessing || isReplacing) && (
+          {(isProcessing || isReplacing || isReplacing2x) && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>
                     {isProcessing && "Processing Progress"}
                     {isReplacing && "Replacement Progress"}
+                    {isReplacing2x && "2x Replacement Progress"}
                   </span>
                   <span>
                     {completedCount + errorCount} / {images.length}
@@ -707,7 +890,7 @@ export function BatchCanvasExtensionModal({
                 <Button
                   variant="outline"
                   onClick={handleStartOver}
-                  disabled={isProcessing || isReplacing}
+                  disabled={isProcessing || isReplacing || isReplacing2x}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Start Over
@@ -719,9 +902,11 @@ export function BatchCanvasExtensionModal({
               <Button
                 variant="outline"
                 onClick={handleClose}
-                disabled={isProcessing || isReplacing}
+                disabled={isProcessing || isReplacing || isReplacing2x}
               >
-                {isProcessing || isReplacing ? "Processing..." : "Cancel"}
+                {isProcessing || isReplacing || isReplacing2x
+                  ? "Processing..."
+                  : "Cancel"}
               </Button>
 
               {stage === "settings" && (
@@ -746,7 +931,9 @@ export function BatchCanvasExtensionModal({
               {stage === "preview" && (
                 <Button
                   onClick={handleReplaceAll}
-                  disabled={isReplacing || completedCount === 0}
+                  disabled={
+                    isReplacing || isReplacing2x || completedCount === 0
+                  }
                 >
                   {isReplacing ? (
                     <>
@@ -757,6 +944,28 @@ export function BatchCanvasExtensionModal({
                     <>
                       <Check className="mr-2 h-4 w-4" />
                       Replace All ({completedCount})
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {stage === "preview" && (
+                <Button
+                  onClick={handleReplaceAll2x}
+                  disabled={
+                    isReplacing || isReplacing2x || completedCount === 0
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isReplacing2x ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Replacing with 2x...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Replace All with 2x ({completedCount})
                     </>
                   )}
                 </Button>

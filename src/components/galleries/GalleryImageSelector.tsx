@@ -10,6 +10,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronsUpDown,
+  Car,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageData } from "@/app/images/columns";
@@ -158,7 +159,6 @@ export function GalleryImageSelector({
 
   // Filter cars based on search query
   const filteredCars = React.useMemo(() => {
-    // [REMOVED] // [REMOVED] console.log("Filtering cars with query:", carSearchQuery);
     if (!carsData?.cars) return [];
     const filtered = carsData.cars.filter((car) => {
       if (!carSearchQuery) return true;
@@ -166,19 +166,14 @@ export function GalleryImageSelector({
       const searchTerms = carSearchQuery.toLowerCase().split(" ");
       return searchTerms.every((term) => searchStr.includes(term));
     });
-    // [REMOVED] // [REMOVED] console.log("Filtered cars result:", filtered);
     return filtered;
   }, [carsData?.cars, carSearchQuery]);
 
   // Sort cars by year (newest first), then make, then model
   const sortedCars = React.useMemo(() => {
-    // [REMOVED] // [REMOVED] console.log("Sorting filtered cars");
     return [...filteredCars].sort((a, b) => {
-      // Sort by year descending
       if (a.year !== b.year) return b.year - a.year;
-      // Then by make
       if (a.make !== b.make) return a.make.localeCompare(b.make);
-      // Then by model
       return a.model.localeCompare(b.model);
     });
   }, [filteredCars]);
@@ -218,26 +213,20 @@ export function GalleryImageSelector({
   // Handle filter changes
   const handleFilterChange = useCallback(
     (key: string, value: string | null) => {
-      // [REMOVED] // [REMOVED] console.log("handleFilterChange called with:", { key, value });
-      // Create new URLSearchParams with current values
       const newSearchParams = new URLSearchParams(
         searchParams?.toString() || ""
       );
 
-      // Update the filter value
       if (value === null) {
         newSearchParams.delete(key);
       } else {
         newSearchParams.set(key, value);
       }
 
-      // Reset page to 1 when changing filters (except for page changes)
       if (key !== "page") {
         newSearchParams.set("page", "1");
       }
 
-      // [REMOVED] // [REMOVED] console.log("Updating URL with new params:", newSearchParams.toString());
-      // Update URL without refreshing the page
       router.replace(`${pathname}?${newSearchParams.toString()}`, {
         scroll: false,
       });
@@ -249,7 +238,6 @@ export function GalleryImageSelector({
   const handlePageChange = useCallback(
     (page: number) => {
       handleFilterChange("page", page.toString());
-      // Scroll to top when changing pages
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
     [handleFilterChange]
@@ -260,13 +248,11 @@ export function GalleryImageSelector({
 
   // Effect to handle selection state changes
   useEffect(() => {
-    // Refetch data when selection state changes to ensure UI is in sync
     mutate();
   }, [selectedImageIds, mutate]);
 
   // Effect to refresh data when filters change
   useEffect(() => {
-    // Trigger a refetch when any filter changes
     mutate();
   }, [
     currentSearch,
@@ -282,10 +268,7 @@ export function GalleryImageSelector({
   // Handle image selection with optimistic update
   const handleImageSelection = useCallback(
     (image: ImageData) => {
-      // Call the parent handler
       onImageSelect(image);
-
-      // Immediately update the local state through mutation
       mutate();
     },
     [onImageSelect, mutate]
@@ -299,7 +282,6 @@ export function GalleryImageSelector({
             <Popover
               open={carSearchOpen}
               onOpenChange={(open) => {
-                // [REMOVED] // [REMOVED] console.log("Popover onOpenChange:", open);
                 setCarSearchOpen(open);
               }}
             >
@@ -309,9 +291,7 @@ export function GalleryImageSelector({
                   role="combobox"
                   aria-expanded={carSearchOpen}
                   className="w-full justify-between"
-                  onClick={() => {
-                    // [REMOVED] // [REMOVED] console.log("PopoverTrigger Button clicked");
-                  }}
+                  onClick={() => {}}
                 >
                   {currentCarName}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -322,28 +302,18 @@ export function GalleryImageSelector({
                 align="start"
                 side="bottom"
                 sideOffset={4}
-                onInteractOutside={(e) => {
-                  console.log(
-                    "PopoverContent onInteractOutside event:",
-                    e.type
-                  );
-                }}
-                onEscapeKeyDown={() => {
-                  // [REMOVED] // [REMOVED] console.log("PopoverContent escape key pressed");
-                }}
+                onInteractOutside={(e) => {}}
+                onEscapeKeyDown={() => {}}
               >
                 <Command
                   className="w-full rounded-lg bg-background"
                   shouldFilter={false}
-                  onKeyDown={(e) => {
-                    // [REMOVED] // [REMOVED] console.log("Command onKeyDown:", e.key);
-                  }}
+                  onKeyDown={(e) => {}}
                 >
                   <CommandInput
                     placeholder="Search cars..."
                     value={carSearchQuery}
                     onValueChange={(value) => {
-                      // [REMOVED] // [REMOVED] console.log("CommandInput value changed:", value);
                       setCarSearchQuery(value);
                     }}
                     className="h-9 border-none focus:ring-0"
@@ -353,62 +323,35 @@ export function GalleryImageSelector({
                   </CommandEmpty>
                   <CommandGroup
                     className="max-h-[300px] overflow-y-auto p-1"
-                    onClick={(e) => {
-                      // [REMOVED] // [REMOVED] console.log("CommandGroup clicked");
-                    }}
+                    onClick={(e) => {}}
                   >
                     <CommandItem
-                      value="all"
                       onSelect={() => {
-                        // [REMOVED] // [REMOVED] console.log("All Cars CommandItem onSelect triggered");
-                        handleFilterChange("carId", "all");
-                        setCarSearchOpen(false);
                         setCarSearchQuery("");
+                        setCarSearchOpen(false);
                       }}
-                      onClick={(e) => {
-                        // [REMOVED] // [REMOVED] console.log("CommandItem All Cars clicked");
-                        e.stopPropagation();
-                      }}
-                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                      className="cursor-pointer"
                     >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4 flex-shrink-0 pointer-events-none",
-                          currentCarId === "all" ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <span className="pointer-events-none">All Cars</span>
+                      <div className="flex items-center">
+                        <Car className="mr-2 h-4 w-4" />
+                        All Cars
+                      </div>
                     </CommandItem>
-                    {sortedCars.map((car) => (
+                    {filteredCars.map((car) => (
                       <CommandItem
                         key={car._id}
-                        value={car._id}
                         onSelect={() => {
-                          console.log(
-                            "Car CommandItem onSelect triggered for car:",
-                            car
+                          setCarSearchQuery(
+                            `${car.year} ${car.make} ${car.model}`
                           );
-                          handleFilterChange("carId", car._id);
                           setCarSearchOpen(false);
-                          setCarSearchQuery("");
                         }}
-                        onClick={(e) => {
-                          // [REMOVED] // [REMOVED] console.log("CommandItem car clicked:", car);
-                          e.stopPropagation();
-                        }}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                        className="cursor-pointer"
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4 flex-shrink-0 pointer-events-none",
-                            currentCarId === car._id
-                              ? "opacity-100"
-                              : "opacity-0"
-                          )}
-                        />
-                        <span className="pointer-events-none">
+                        <div className="flex items-center">
+                          <Car className="mr-2 h-4 w-4" />
                           {car.year} {car.make} {car.model}
-                        </span>
+                        </div>
                       </CommandItem>
                     ))}
                   </CommandGroup>

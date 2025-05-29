@@ -8,14 +8,19 @@ import {
   Check,
   Expand,
   Palette,
-  CheckSquare,
-  Square,
   Crop,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { GalleryCanvasExtensionModal } from "./GalleryCanvasExtensionModal";
 import { GalleryImageMatteModal } from "./GalleryImageMatteModal";
 import { GalleryCropModal } from "./GalleryCropModal";
@@ -56,6 +61,7 @@ export function SortableGalleryItem({
   const [isCanvasExtensionOpen, setIsCanvasExtensionOpen] = useState(false);
   const [isImageMatteOpen, setIsImageMatteOpen] = useState(false);
   const [isCropOpen, setIsCropOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{
     width: number;
     height: number;
@@ -128,6 +134,72 @@ export function SortableGalleryItem({
     setIsCropOpen(true);
   };
 
+  // Check if this image is a processed image with original metadata
+  const isProcessedImage = Boolean(image.metadata?.originalImage);
+
+  // For processed images, show restore button even if original might be missing
+  // The API will handle recreating the original image record if needed
+  const canRestore = isProcessedImage;
+
+  const handleRestore = async () => {
+    if (!galleryId || !image.metadata?.originalImage) return;
+
+    setIsRestoring(true);
+    try {
+      const response = await fetch(
+        `/api/galleries/${galleryId}/restore-original`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            processedImageId: image._id,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        // Provide more specific error messages
+        let errorMessage = "Failed to restore original image";
+        if (response.status === 404) {
+          errorMessage =
+            "The original image is no longer available in the database. It may have been deleted.";
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "Success",
+        description: "Original image restored successfully",
+      });
+
+      // Notify parent component of the restoration
+      if (onImageProcessed) {
+        onImageProcessed(image._id, result.restoredImage);
+      }
+    } catch (error) {
+      console.error("Error restoring original image:", error);
+      toast({
+        title: "Restore Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to restore original image",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const handleImageClick = () => {
     if (isBatchMode && onSelectionChange) {
       onSelectionChange(!isSelected);
@@ -152,124 +224,146 @@ export function SortableGalleryItem({
 
   return (
     <>
-      <div
-        ref={setNodeRef}
-        style={{
-          ...style,
-          aspectRatio: aspectRatio.toString(),
-        }}
-        className={cn(
-          "relative group rounded-lg overflow-hidden bg-background border border-border",
-          "shadow-sm hover:shadow-md transition-all duration-200",
-          isDragging && "opacity-50 shadow-lg ring-2 ring-primary",
-          isBatchMode && isSelected && "ring-2 ring-blue-500 ring-offset-2"
-        )}
-      >
-        <div className="relative w-full h-full">
-          <Image
-            src={image.url}
-            alt={image.filename || "Gallery image"}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain cursor-pointer bg-muted"
-            priority={false}
-            onClick={handleImageClick}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-
-          {/* Batch selection checkbox */}
-          {isBatchMode && (
-            <div className="absolute top-2 left-2 z-10">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onSelectionChange) {
-                    onSelectionChange(!isSelected);
-                  }
-                }}
-                className="p-1 bg-background/90 rounded-md shadow-sm hover:bg-background transition-colors"
-              >
-                {isSelected ? (
-                  <CheckSquare className="h-5 w-5 text-blue-500" />
-                ) : (
-                  <Square className="h-5 w-5 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Top row buttons - hide in batch mode */}
-          {!isBatchMode && (
-            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <button
-                {...attributes}
-                {...listeners}
-                className="p-1.5 bg-background/80 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all duration-200"
-              >
-                <GripVertical className="h-4 w-4 text-foreground" />
-              </button>
-              <button
-                onClick={handleCopyUrl}
-                className="p-1.5 bg-background/80 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all duration-200"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4 text-foreground" />
-                )}
-              </button>
-              <button
-                onClick={() => onDelete(image)}
-                className="p-1.5 bg-background/80 rounded-full hover:bg-destructive/90 shadow-sm hover:shadow-md transition-all duration-200"
-              >
-                <Trash2 className="h-4 w-4 text-destructive hover:text-destructive-foreground" />
-              </button>
-            </div>
-          )}
-
-          {/* Processing buttons - show for all images in non-batch mode */}
-          {!isBatchMode && (
-            <div className="absolute top-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              {/* Crop button for all images */}
-              <button
-                onClick={handleCrop}
-                className="p-1.5 bg-green-500/80 rounded-full hover:bg-green-500 shadow-sm hover:shadow-md transition-all duration-200"
-                title="Crop Image"
-              >
-                <Crop className="h-4 w-4 text-white" />
-              </button>
-
-              {/* Canvas extension and matte buttons for horizontal images */}
-              {isHorizontal && (
-                <>
-                  <button
-                    onClick={handleCanvasExtension}
-                    className="p-1.5 bg-blue-500/80 rounded-full hover:bg-blue-500 shadow-sm hover:shadow-md transition-all duration-200"
-                    title="Extend Canvas"
-                  >
-                    <Expand className="h-4 w-4 text-white" />
-                  </button>
-                  <button
-                    onClick={handleImageMatte}
-                    className="p-1.5 bg-purple-500/80 rounded-full hover:bg-purple-500 shadow-sm hover:shadow-md transition-all duration-200"
-                    title="Create Matte"
-                  >
-                    <Palette className="h-4 w-4 text-white" />
-                  </button>
-                </>
+      <TooltipProvider>
+        <Tooltip delayDuration={1000}>
+          <TooltipTrigger asChild>
+            <div
+              ref={setNodeRef}
+              style={{
+                ...style,
+                aspectRatio: aspectRatio.toString(),
+              }}
+              className={cn(
+                "relative group rounded-lg overflow-hidden bg-background border border-border",
+                "shadow-sm hover:shadow-md transition-all duration-200",
+                isDragging && "opacity-50 shadow-lg ring-2 ring-primary",
+                isBatchMode && isSelected && "border border-gray-400 p-1",
+                isBatchMode && "cursor-pointer"
               )}
-            </div>
-          )}
+              onClick={isBatchMode ? handleImageClick : undefined}
+            >
+              <div
+                className={cn(
+                  "relative w-full h-full",
+                  isBatchMode && isSelected && "rounded-md overflow-hidden"
+                )}
+              >
+                <Image
+                  src={image.url}
+                  alt={image.filename || "Gallery image"}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-contain bg-muted cursor-pointer"
+                  priority={false}
+                  onClick={!isBatchMode ? handleImageClick : undefined}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
-          {image.filename && (
-            <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <p className="text-xs text-white truncate px-2">
-                {image.filename}
-              </p>
+                {/* Top row buttons - hide in batch mode */}
+                {!isBatchMode && (
+                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                      {...attributes}
+                      {...listeners}
+                      className="p-1.5 bg-background/80 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all duration-200"
+                    >
+                      <GripVertical className="h-4 w-4 text-foreground" />
+                    </button>
+                    <button
+                      onClick={handleCopyUrl}
+                      className="p-1.5 bg-background/80 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all duration-200"
+                    >
+                      {isCopied ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4 text-foreground" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => onDelete(image)}
+                      className="p-1.5 bg-background/80 rounded-full hover:bg-destructive/90 shadow-sm hover:shadow-md transition-all duration-200"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive hover:text-destructive-foreground" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Processing buttons - show for all images in non-batch mode */}
+                {!isBatchMode && (
+                  <div className="absolute top-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    {/* Restore button for processed images */}
+                    {canRestore && (
+                      <button
+                        onClick={handleRestore}
+                        disabled={isRestoring}
+                        className="p-1.5 bg-orange-500/80 rounded-full hover:bg-orange-500 shadow-sm hover:shadow-md transition-all duration-200"
+                        title="Restore Original Image"
+                      >
+                        <RotateCcw className="h-4 w-4 text-white" />
+                      </button>
+                    )}
+
+                    {/* Crop button for all images */}
+                    <button
+                      onClick={handleCrop}
+                      className="p-1.5 bg-green-500/80 rounded-full hover:bg-green-500 shadow-sm hover:shadow-md transition-all duration-200"
+                      title="Crop Image"
+                    >
+                      <Crop className="h-4 w-4 text-white" />
+                    </button>
+
+                    {/* Canvas extension and matte buttons for horizontal images */}
+                    {isHorizontal && (
+                      <>
+                        <button
+                          onClick={handleCanvasExtension}
+                          className="p-1.5 bg-blue-500/80 rounded-full hover:bg-blue-500 shadow-sm hover:shadow-md transition-all duration-200"
+                          title="Extend Canvas"
+                        >
+                          <Expand className="h-4 w-4 text-white" />
+                        </button>
+                        <button
+                          onClick={handleImageMatte}
+                          className="p-1.5 bg-purple-500/80 rounded-full hover:bg-purple-500 shadow-sm hover:shadow-md transition-all duration-200"
+                          title="Create Matte"
+                        >
+                          <Palette className="h-4 w-4 text-white" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Processing indicator and filename */}
+                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="flex items-center justify-between">
+                    {image.filename && (
+                      <p className="text-xs text-white truncate px-2 flex-1">
+                        {image.filename}
+                      </p>
+                    )}
+                    {isProcessedImage && (
+                      <div className="bg-orange-500/90 text-white text-xs px-2 py-1 rounded-full ml-2 flex-shrink-0">
+                        Processed
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
+          </TooltipTrigger>
+          {isBatchMode && (
+            <TooltipContent
+              side="bottom"
+              className="px-3 py-1 bg-black/90 text-white text-xs font-medium rounded-full border-0"
+            >
+              <p className="uppercase tracking-wide">
+                {isSelected ? "Click to deselect" : "Click to select"}
+              </p>
+            </TooltipContent>
           )}
-        </div>
-      </div>
+        </Tooltip>
+      </TooltipProvider>
 
       <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden">

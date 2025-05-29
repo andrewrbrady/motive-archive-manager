@@ -146,8 +146,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the new image data
-    const newImageId = processingResult.cloudflareUpload.images?.[0]?.id;
+    // Get the new image data - fix the structure lookup
+    const newImageId = processingResult.cloudflareUpload.mongoId;
 
     if (!newImageId) {
       console.error(
@@ -171,6 +171,26 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Store original image metadata in the new image for restore functionality
+    await imagesCollection.updateOne(
+      { _id: new ObjectId(newImageId) },
+      {
+        $set: {
+          "metadata.originalImage": {
+            _id: originalImage._id.toString(),
+            url: originalImage.url,
+            filename: originalImage.filename,
+            cloudflareId: originalImage.cloudflareId,
+            metadata: originalImage.metadata,
+            createdAt: originalImage.createdAt,
+          },
+          "metadata.replacedAt": new Date().toISOString(),
+          "metadata.processingType": processingType,
+          "metadata.processingParameters": parameters,
+        },
+      }
+    );
 
     // Find the index of the original image in the gallery
     const originalImageIndex = galleryImageIds.indexOf(originalImageIdString);
