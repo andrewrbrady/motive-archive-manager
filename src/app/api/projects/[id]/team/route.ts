@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { ProjectMemberRole } from "@/types/project";

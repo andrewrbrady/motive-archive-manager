@@ -5,15 +5,27 @@ import {
   ProjectTemplate as IProjectTemplate,
   ProjectType,
 } from "@/types/project";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+} from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  console.log("🔒 GET /api/projects/templates: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ GET /api/projects/templates: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromToken(request);
+    if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -29,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     // Build query
     const query: any = {
-      $or: [{ isPublic: true }, { createdBy: session.user.id }],
+      $or: [{ isPublic: true }, { createdBy: userId }],
     };
 
     // Add type filter
@@ -59,11 +71,17 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .toArray();
 
+    console.log(
+      "✅ GET /api/projects/templates: Successfully fetched templates"
+    );
     return NextResponse.json({
       templates: templates as unknown as IProjectTemplate[],
     });
   } catch (error) {
-    console.error("Error fetching project templates:", error);
+    console.error(
+      "💥 GET /api/projects/templates: Error fetching project templates:",
+      error
+    );
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
@@ -74,9 +92,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/projects/templates: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ POST /api/projects/templates: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromToken(request);
+    if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -139,7 +166,7 @@ export async function POST(request: NextRequest) {
       requiredRoles: data.requiredRoles || ["owner"],
       defaultTasks: data.defaultTasks || [],
       isPublic: data.isPublic || false,
-      createdBy: session.user.id,
+      createdBy: userId,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -151,9 +178,15 @@ export async function POST(request: NextRequest) {
       .collection("project_templates")
       .findOne({ _id: result.insertedId });
 
+    console.log(
+      "✅ POST /api/projects/templates: Successfully created template"
+    );
     return NextResponse.json({ template }, { status: 201 });
   } catch (error) {
-    console.error("Error creating project template:", error);
+    console.error(
+      "💥 POST /api/projects/templates: Error creating project template:",
+      error
+    );
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(

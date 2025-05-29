@@ -2,25 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 /**
  * GET user roles
  */
-export async function GET(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2];
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  console.log("🔒 GET /api/users/[id]/roles: Starting request");
 
-    // Check authentication and authorization
-    const session = await auth();
-    if (!session || !session.user || !session.user.roles.includes("admin")) {
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
-    }
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/users/[id]/roles: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    const { id } = await params;
 
     // Get user from Firebase
     const user = await adminAuth.getUser(id);
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     const userData = userDoc.exists ? userDoc.data() : null;
 
     // Combine custom claims with user data
-    return NextResponse.json({
+    const result = {
       uid: user.uid,
       email: user.email,
       displayName: user.displayName,
@@ -39,9 +40,17 @@ export async function GET(request: Request) {
       creativeRoles:
         user.customClaims?.creativeRoles || userData?.creativeRoles || [],
       status: user.customClaims?.status || userData?.status || "active",
-    });
+    };
+
+    console.log(
+      "✅ GET /api/users/[id]/roles: Successfully fetched user roles"
+    );
+    return NextResponse.json(result);
   } catch (error: any) {
-    console.error("Error fetching user roles:", error);
+    console.error(
+      "💥 GET /api/users/[id]/roles: Error fetching user roles:",
+      error
+    );
     return NextResponse.json(
       { error: error.message || "Failed to fetch user roles" },
       { status: 500 }
@@ -52,17 +61,23 @@ export async function GET(request: Request) {
 /**
  * UPDATE user roles
  */
-export async function PUT(request: Request) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  console.log("🔒 PUT /api/users/[id]/roles: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ PUT /api/users/[id]/roles: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2];
+    const { id } = await params;
+    const { roles, creativeRoles, status } = await request.json();
 
-    // Get request data
-    const data = await request.json();
-    const { roles, creativeRoles, status } = data;
-
-    // Validate request data
     if (!roles || !Array.isArray(roles)) {
       return NextResponse.json(
         { error: "Roles must be provided as an array" },
@@ -70,8 +85,8 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Valid role options
-    const validRoles = ["user", "admin", "editor"];
+    // Validate roles
+    const validRoles = ["user", "admin", "editor", "viewer"];
     if (!roles.every((role) => validRoles.includes(role))) {
       return NextResponse.json(
         { error: `Roles must be one of: ${validRoles.join(", ")}` },
@@ -79,36 +94,12 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Valid status options
-    const validStatus = ["active", "inactive", "suspended"];
-    if (status && !validStatus.includes(status)) {
-      return NextResponse.json(
-        { error: `Status must be one of: ${validStatus.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    console.log("🔒 PUT /api/users/[id]/roles: Updating user roles", {
+      id,
+      roles,
+    });
 
-    // Check if this is a new user registration (only "user" role, no admin)
-    const isNewUserRegistration =
-      roles.length === 1 && roles[0] === "user" && !roles.includes("admin");
-
-    // For admin operations, verify admin authentication
-    if (!isNewUserRegistration) {
-      // Check authentication and authorization
-      // [REMOVED] // [REMOVED] console.log("Attempting admin operation - checking authorization");
-      const session = await auth();
-
-      // Check if user is authenticated and has admin role
-      if (!session || !session.user || !session.user.roles.includes("admin")) {
-        // [REMOVED] // [REMOVED] console.log("Unauthorized access attempt:", session?.user?.email);
-        return NextResponse.json(
-          { error: "Unauthorized access" },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Update user custom claims in Firebase Auth
+    // Update Firebase Auth custom claims
     await adminAuth.setCustomUserClaims(id, {
       roles,
       creativeRoles: creativeRoles || [],
@@ -119,35 +110,24 @@ export async function PUT(request: Request) {
     await adminDb
       .collection("users")
       .doc(id)
-      .set(
-        {
-          roles,
-          creativeRoles: creativeRoles || [],
-          status: status || "active",
-          updatedAt: new Date(),
-        },
-        { merge: true }
-      );
+      .update({
+        roles,
+        creativeRoles: creativeRoles || [],
+        status: status || "active",
+        updatedAt: new Date(),
+      });
 
-    // Get updated user data
-    const user = await adminAuth.getUser(id);
-    const userDoc = await adminDb.collection("users").doc(id).get();
-    const userData = userDoc.exists ? userDoc.data() : null;
-
-    return NextResponse.json({
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      disabled: user.disabled,
-      roles: user.customClaims?.roles || userData?.roles || ["user"],
-      creativeRoles:
-        user.customClaims?.creativeRoles || userData?.creativeRoles || [],
-      status: user.customClaims?.status || userData?.status || "active",
-    });
-  } catch (error: any) {
-    console.error("Error updating user roles:", error);
+    console.log(
+      "✅ PUT /api/users/[id]/roles: Successfully updated user roles"
+    );
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error(
+      "💥 PUT /api/users/[id]/roles: Error updating user roles:",
+      error
+    );
     return NextResponse.json(
-      { error: error.message || "Failed to update user roles" },
+      { error: "Failed to update user roles" },
       { status: 500 }
     );
   }

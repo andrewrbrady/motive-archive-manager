@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { ObjectId } from "mongodb";
@@ -8,11 +12,29 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("🔒 GET /api/projects/[id]/assets: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ GET /api/projects/[id]/assets: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     await connectToDatabase();
@@ -24,13 +46,16 @@ export async function GET(
 
     // Check if user has access to this project
     const hasAccess =
-      project.ownerId === session.user.id ||
-      project.members.some((member: any) => member.userId === session.user.id);
+      project.ownerId === userId ||
+      project.members.some((member: any) => member.userId === userId);
 
     if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
+    console.log(
+      "✅ GET /api/projects/[id]/assets: Successfully fetched assets"
+    );
     return NextResponse.json({
       assets: project.assets,
       carIds: project.carIds,
@@ -38,7 +63,10 @@ export async function GET(
       deliverableIds: project.deliverableIds,
     });
   } catch (error) {
-    console.error("Error fetching project assets:", error);
+    console.error(
+      "💥 GET /api/projects/[id]/assets: Error fetching project assets:",
+      error
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -50,11 +78,29 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("🔒 POST /api/projects/[id]/assets: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ POST /api/projects/[id]/assets: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const body = await request.json();
     const { type, referenceId, name, url } = body;
@@ -85,10 +131,10 @@ export async function POST(
 
     // Check if user has permission to add assets
     const canAddAssets =
-      project.ownerId === session.user.id ||
+      project.ownerId === userId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
+          member.userId === userId &&
           ["owner", "manager", "photographer", "editor"].includes(member.role)
       );
 
@@ -115,7 +161,7 @@ export async function POST(
       name,
       url: url || undefined,
       addedAt: new Date(),
-      addedBy: session.user.id,
+      addedBy: userId,
     };
 
     // Update project with new asset and reference IDs
@@ -141,13 +187,17 @@ export async function POST(
       );
     }
 
+    console.log("✅ POST /api/projects/[id]/assets: Successfully added asset");
     return NextResponse.json({
       message: "Asset added successfully",
       asset: newAsset,
       assets: updatedProject.assets,
     });
   } catch (error) {
-    console.error("Error adding project asset:", error);
+    console.error(
+      "💥 POST /api/projects/[id]/assets: Error adding project asset:",
+      error
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -159,11 +209,29 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("🔒 DELETE /api/projects/[id]/assets: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ DELETE /api/projects/[id]/assets: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { searchParams } = new URL(request.url);
     const assetId = searchParams.get("assetId");
@@ -185,11 +253,10 @@ export async function DELETE(
 
     // Check if user has permission to remove assets
     const canRemoveAssets =
-      project.ownerId === session.user.id ||
+      project.ownerId === userId ||
       project.members.some(
         (member: any) =>
-          member.userId === session.user.id &&
-          ["owner", "manager"].includes(member.role)
+          member.userId === userId && ["owner", "manager"].includes(member.role)
       );
 
     if (!canRemoveAssets) {
@@ -241,7 +308,10 @@ export async function DELETE(
       assets: updatedProject.assets,
     });
   } catch (error) {
-    console.error("Error removing project asset:", error);
+    console.error(
+      "💥 DELETE /api/projects/[id]/assets: Error removing project asset:",
+      error
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

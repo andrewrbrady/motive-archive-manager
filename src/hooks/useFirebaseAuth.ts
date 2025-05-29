@@ -62,7 +62,6 @@ export function useFirebaseAuth() {
       if (!user) return false;
 
       try {
-        console.log("🔒 useFirebaseAuth: Validating token...");
         const token = await user.getIdToken(true); // Force refresh
 
         // Test the token with a simple API call
@@ -73,13 +72,6 @@ export function useFirebaseAuth() {
         });
 
         const isValid = response.ok;
-        console.log(
-          `${isValid ? "✅" : "❌"} useFirebaseAuth: Token validation ${isValid ? "successful" : "failed"}`,
-          {
-            status: response.status,
-            attempts: tokenValidationAttempts + 1,
-          }
-        );
 
         return isValid;
       } catch (error: any) {
@@ -93,12 +85,6 @@ export function useFirebaseAuth() {
   // Enhanced auth state change handler
   const handleAuthStateChange = useCallback(
     async (user: User | null) => {
-      console.log("🔒 useFirebaseAuth: Auth state changed", {
-        hasUser: !!user,
-        uid: user?.uid,
-        email: user?.email,
-      });
-
       if (!user) {
         setAuthState({
           user: null,
@@ -126,7 +112,6 @@ export function useFirebaseAuth() {
         !hasValidToken &&
         tokenValidationAttempts < MAX_TOKEN_VALIDATION_ATTEMPTS
       ) {
-        console.log("⚠️ useFirebaseAuth: Token validation failed, retrying...");
         setTokenValidationAttempts((prev) => prev + 1);
 
         // Retry after a short delay
@@ -155,8 +140,6 @@ export function useFirebaseAuth() {
   );
 
   useEffect(() => {
-    console.log("🔒 useFirebaseAuth: Setting up auth state listener");
-
     const unsubscribe = onAuthStateChanged(
       auth,
       handleAuthStateChange,
@@ -171,7 +154,6 @@ export function useFirebaseAuth() {
     );
 
     return () => {
-      console.log("🔒 useFirebaseAuth: Cleaning up auth state listener");
       unsubscribe();
     };
   }, [handleAuthStateChange]);
@@ -180,7 +162,6 @@ export function useFirebaseAuth() {
   const refreshAuth = useCallback(async () => {
     if (!authState.user) return false;
 
-    console.log("🔄 useFirebaseAuth: Refreshing authentication...");
     setAuthState((prev) => ({ ...prev, loading: true }));
 
     try {
@@ -210,22 +191,18 @@ export function useFirebaseAuth() {
   // Method to get a fresh token
   const getValidToken = useCallback(async (): Promise<string | null> => {
     if (!authState.user) {
-      console.log("❌ useFirebaseAuth: No user available for token");
       return null;
     }
 
     try {
-      console.log("🔒 useFirebaseAuth: Getting fresh token...");
       const token = await authState.user.getIdToken(true);
 
       // Validate the token
       const isValid = await validateToken(authState.user);
       if (!isValid) {
-        console.log("❌ useFirebaseAuth: Token validation failed");
         return null;
       }
 
-      console.log("✅ useFirebaseAuth: Fresh token obtained and validated");
       return token;
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Error getting token:", error);
@@ -236,13 +213,8 @@ export function useFirebaseAuth() {
   // Method to sign in with Google
   const signInWithGoogle = useCallback(async () => {
     try {
-      console.log("🔒 useFirebaseAuth: Starting Google sign in...");
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      console.log("✅ useFirebaseAuth: Google sign in successful", {
-        uid: result.user.uid,
-        email: result.user.email,
-      });
       return result.user;
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Google sign in error:", error);
@@ -253,9 +225,7 @@ export function useFirebaseAuth() {
   // Method to sign out
   const signOut = useCallback(async () => {
     try {
-      console.log("🔒 useFirebaseAuth: Signing out...");
       await firebaseSignOut(auth);
-      console.log("✅ useFirebaseAuth: Sign out successful");
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Sign out error:", error);
       throw error;
@@ -273,38 +243,42 @@ export function useFirebaseAuth() {
 
 // Enhanced useSession hook that works with Firebase Auth
 export function useSession(): SessionState {
-  const { user, loading, isAuthenticated, error } = useFirebaseAuth();
+  const { user, loading, isAuthenticated, error, getValidToken } =
+    useFirebaseAuth();
   const [sessionState, setSessionState] = useState<SessionState>({
     data: null,
     status: "loading",
     error: null,
   });
 
-  // Fetch user roles from Firestore
+  // Fetch user roles from Firestore using authenticated request
   const fetchUserRoles = useCallback(
     async (userId: string): Promise<string[]> => {
       try {
-        const response = await fetch(`/api/users/${userId}`);
+        const token = await getValidToken();
+        if (!token) {
+          return [];
+        }
+
+        const response = await fetch(`/api/users/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
         if (response.ok) {
           const userData = await response.json();
           return userData.user?.roles || [];
         }
       } catch (error) {
-        console.error("Failed to fetch user roles:", error);
+        console.error("💥 fetchUserRoles: Error fetching user roles:", error);
       }
       return [];
     },
-    []
+    [getValidToken]
   );
 
   useEffect(() => {
-    console.log("🔒 useSession: Auth state changed", {
-      loading,
-      isAuthenticated,
-      hasUser: !!user,
-      userId: user?.uid,
-    });
-
     if (loading) {
       setSessionState({
         data: null,
@@ -368,20 +342,12 @@ export function useAuthenticatedFetch() {
         Authorization: `Bearer ${token}`,
       };
 
-      console.log("🌐 useAuthenticatedFetch: Making authenticated request", {
-        url,
-        method: options.method || "GET",
-      });
-
       const response = await fetch(url, {
         ...options,
         headers,
       });
 
       if (response.status === 401) {
-        console.log(
-          "❌ useAuthenticatedFetch: Received 401, token may be expired"
-        );
         throw new Error("Authentication token expired");
       }
 

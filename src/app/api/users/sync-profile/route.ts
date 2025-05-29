@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { logger } from "@/lib/logging";
 
 /**
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Get current session
-    const session = await auth();
+    const session = await verifyAuthMiddleware();
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

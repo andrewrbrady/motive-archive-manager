@@ -75,11 +75,7 @@ export async function getCarById(carId: string): Promise<Car | null> {
     }
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(
-        `Successfully fetched car: ${car.year || "Unknown"} ${
-          car.make || "Unknown"
-        } ${car.model || "Unknown"} (ID: ${car._id?.substring(0, 8)}***)`
-      );
+      // Successfully fetched car data
     }
     return car;
   } catch (error) {
@@ -93,9 +89,7 @@ export async function getCarSpecifications(
   carId: string
 ): Promise<CarSpecifications | null> {
   if (process.env.NODE_ENV !== "production") {
-    console.log(
-      `Getting car specifications for ID: ${carId.substring(0, 8)}***`
-    );
+    // Getting car specifications for processing
   }
 
   try {
@@ -155,11 +149,12 @@ export async function getCarSpecifications(
       .map(([key, _]) => key);
 
     if (process.env.NODE_ENV !== "production") {
-      console.log(
-        `Car specifications extracted. Categories with data: ${nonEmptyFields.length}/9`
-      );
-
+      // Car specifications extracted successfully - Categories with data: nonEmptyFields.length/9
       // [REMOVED] // [REMOVED] console.log(`Car has data for these fields:`, nonEmptyFields);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      // Car specifications extracted successfully
     }
 
     return specifications;

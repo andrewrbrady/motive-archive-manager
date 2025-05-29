@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { Deliverable } from "@/models/Deliverable";
@@ -12,18 +16,31 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log(
-    "🔍 GET /api/projects/[id]/deliverables - Fetching project deliverables"
-  );
+  console.log("🔒 GET /api/projects/[id]/deliverables: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log(
+      "❌ GET /api/projects/[id]/deliverables: Authentication failed"
+    );
+    return authResult;
+  }
 
   try {
-    const session = await auth();
-    if (!session?.user) {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     console.log("📋 Project ID:", id);
@@ -37,9 +54,9 @@ export async function GET(
 
     // Check if user has access to this project
     const isMember = project.members.some(
-      (member: any) => member.userId === session.user.id
+      (member: any) => member.userId === userId
     );
-    if (!isMember && project.ownerId !== session.user.id) {
+    if (!isMember && project.ownerId !== userId) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 

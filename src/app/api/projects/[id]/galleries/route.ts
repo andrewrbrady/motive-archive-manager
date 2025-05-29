@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 
 interface ProjectGalleriesRouteParams {
   params: Promise<{ id: string }>;
@@ -12,11 +16,29 @@ export async function GET(
   request: NextRequest,
   { params }: ProjectGalleriesRouteParams
 ) {
+  console.log("🔒 GET /api/projects/[id]/galleries: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ GET /api/projects/[id]/galleries: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -32,10 +54,7 @@ export async function GET(
     // Get project and verify user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: session.user.id },
-        { "members.userId": session.user.id },
-      ],
+      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -135,11 +154,29 @@ export async function POST(
   request: NextRequest,
   { params }: ProjectGalleriesRouteParams
 ) {
+  console.log("🔒 POST /api/projects/[id]/galleries: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ POST /api/projects/[id]/galleries: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
@@ -165,9 +202,9 @@ export async function POST(
     const project = await db.collection("projects").findOne({
       _id: projectId,
       $or: [
-        { ownerId: session.user.id },
+        { ownerId: userId },
         {
-          "members.userId": session.user.id,
+          "members.userId": userId,
           "members.role": { $in: ["owner", "manager"] },
         },
       ],
@@ -231,7 +268,7 @@ export async function DELETE(
   { params }: ProjectGalleriesRouteParams
 ) {
   try {
-    const session = await auth();
+    const session = await verifyAuthMiddleware(request);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

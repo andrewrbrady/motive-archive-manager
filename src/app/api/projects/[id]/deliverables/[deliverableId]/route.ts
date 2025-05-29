@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { Deliverable } from "@/models/Deliverable";
@@ -13,14 +17,33 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; deliverableId: string }> }
 ) {
+  console.log(
+    "🔒 PUT /api/projects/[id]/deliverables/[deliverableId]: Starting request"
+  );
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log(
+      "❌ PUT /api/projects/[id]/deliverables/[deliverableId]: Authentication failed"
+    );
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user) {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const { id: projectId, deliverableId } = await params;
     const body = await request.json();
@@ -34,10 +57,8 @@ export async function PUT(
     }
 
     // Check permissions
-    const member = project.members.find(
-      (m: any) => m.userId === session.user.id
-    );
-    const isOwner = project.ownerId === session.user.id;
+    const member = project.members.find((m: any) => m.userId === userId);
+    const isOwner = project.ownerId === userId;
     const canManage =
       isOwner || (member && ["owner", "manager"].includes(member.role));
 

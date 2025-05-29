@@ -24,7 +24,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     fetcher
   );
 
-  const images = data?.images || [];
+  const images = useMemo(() => data?.images || [], [data?.images]);
 
   // Local state
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -328,7 +328,6 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         });
 
         await mutate();
-        console.log("Re-analysis result:", result);
       } catch (error) {
         console.error("Re-analysis error:", error);
         toast({

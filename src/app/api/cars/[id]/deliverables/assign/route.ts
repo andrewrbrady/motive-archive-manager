@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { dbConnect } from "@/lib/mongodb";
 import { Deliverable } from "@/models/Deliverable";
 import { adminDb } from "@/lib/firebase-admin";
@@ -44,12 +48,37 @@ function validateAssignmentPayload(body: any) {
   };
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/cars/[id]/deliverables/assign: Starting request");
+
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
+  // Check authentication and required roles
+  const authResult = await verifyAuthMiddleware(request, ["admin", "editor"]);
+  if (authResult) {
+    console.log(
+      "❌ POST /api/cars/[id]/deliverables/assign: Authentication failed"
+    );
+    return authResult;
+  }
+
   try {
-    const url = new URL(req.url);
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const currentUserId = getUserIdFromToken(tokenData);
+
+    const url = new URL(request.url);
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 3]; // -3 because URL is /cars/[id]/deliverables/assign
 
@@ -60,42 +89,8 @@ export async function POST(req: Request) {
       route: "api/cars/[id]/deliverables/assign",
     });
 
-    // Verify the user is authenticated and has appropriate permissions
-    const session = await auth();
-
-    if (!session?.user) {
-      logger.warn({
-        message: "Authentication required",
-        requestId,
-        statusCode: 401,
-      });
-
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    // Check if user has admin or editor role
-    const userRoles = session.user.roles || [];
-    const hasPermission = userRoles.some((role) =>
-      ["admin", "editor"].includes(role)
-    );
-
-    if (!hasPermission) {
-      logger.warn({
-        message: "Permission denied",
-        requestId,
-        userId: session.user.id,
-        userRoles,
-        statusCode: 403,
-      });
-
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
-    }
-
     // Parse the request body
-    const body = await req.json();
+    const body = await request.json();
 
     // Validate the payload
     const validation = validateAssignmentPayload(body);

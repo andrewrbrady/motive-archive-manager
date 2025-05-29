@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 
 interface PlatformSetting {
@@ -11,17 +11,20 @@ interface PlatformSetting {
 }
 
 // GET - Fetch platform settings for admin management
-export async function GET() {
+export async function GET(request: NextRequest) {
+  console.log("🔒 GET /api/admin/platform-settings: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/admin/platform-settings: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user is admin (you may need to adjust this based on your admin check logic)
-    // For now, assuming any authenticated user can access admin settings
-    // You might want to add a proper admin role check here
-
+    console.log(
+      "🔒 GET /api/admin/platform-settings: Authentication successful, fetching settings"
+    );
     const { db } = await connectToDatabase();
     const settings = await db
       .collection("platformSettings")
@@ -29,9 +32,18 @@ export async function GET() {
       .sort({ key: 1 })
       .toArray();
 
+    console.log(
+      "✅ GET /api/admin/platform-settings: Successfully fetched settings",
+      {
+        count: settings.length,
+      }
+    );
     return NextResponse.json(settings);
   } catch (error) {
-    console.error("Error fetching platform settings:", error);
+    console.error(
+      "💥 GET /api/admin/platform-settings: Error fetching platform settings:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to fetch platform settings" },
       { status: 500 }
@@ -41,16 +53,16 @@ export async function GET() {
 
 // POST - Save platform settings
 export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/admin/platform-settings: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ POST /api/admin/platform-settings: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user is admin (you may need to adjust this based on your admin check logic)
-    // For now, assuming any authenticated user can manage admin settings
-    // You might want to add a proper admin role check here
-
     const settings: PlatformSetting[] = await request.json();
 
     // Validate the settings
@@ -98,9 +110,15 @@ export async function POST(request: NextRequest) {
       await db.collection("platformSettings").insertMany(settings);
     }
 
+    console.log(
+      "✅ POST /api/admin/platform-settings: Successfully saved settings"
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error saving platform settings:", error);
+    console.error(
+      "💥 POST /api/admin/platform-settings: Error saving platform settings:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to save platform settings" },
       { status: 500 }
@@ -110,12 +128,18 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete a specific platform setting
 export async function DELETE(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  console.log("🔒 DELETE /api/admin/platform-settings: Starting request");
 
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log(
+      "❌ DELETE /api/admin/platform-settings: Authentication failed"
+    );
+    return authResult;
+  }
+
+  try {
     const { searchParams } = new URL(request.url);
     const key = searchParams.get("key");
 
@@ -136,9 +160,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    console.log(
+      "✅ DELETE /api/admin/platform-settings: Successfully deleted setting"
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting platform setting:", error);
+    console.error(
+      "💥 DELETE /api/admin/platform-settings: Error deleting platform setting:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to delete platform setting" },
       { status: 500 }

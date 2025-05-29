@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -12,8 +13,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Save, RotateCcw, Plus, Loader2, Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Edit, Trash2, Save, X } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 interface LengthSetting {
   key: string;
@@ -68,14 +86,19 @@ const LengthSettingsContent: React.FC = () => {
     instructions: "",
   });
 
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
+
   useEffect(() => {
-    fetchLengthSettings();
-  }, []);
+    if (isAuthenticated && hasValidToken) {
+      fetchLengthSettings();
+    }
+  }, [isAuthenticated, hasValidToken]);
 
   const fetchLengthSettings = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/admin/length-settings");
+      const response = await authenticatedFetch("/api/admin/length-settings");
       if (response.ok) {
         const data = await response.json();
         setLengthSettings(data.length > 0 ? data : defaultLengthSettings);
@@ -107,7 +130,7 @@ const LengthSettingsContent: React.FC = () => {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const response = await fetch("/api/admin/length-settings", {
+      const response = await authenticatedFetch("/api/admin/length-settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -227,7 +250,7 @@ const LengthSettingsContent: React.FC = () => {
     }
 
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `/api/admin/length-settings?key=${keyToDelete}`,
         {
           method: "DELETE",

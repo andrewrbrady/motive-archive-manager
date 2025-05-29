@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-// GET - Fetch a specific system prompt by ID
+// GET - Fetch a specific system prompt
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  console.log("🔒 GET /api/system-prompts/[id]: Starting request");
 
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/system-prompts/[id]: Authentication failed");
+    return authResult;
+  }
+
+  try {
     const { id } = await params;
 
-    if (!id || !ObjectId.isValid(id)) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid prompt ID" }, { status: 400 });
     }
 
@@ -32,9 +36,13 @@ export async function GET(
       );
     }
 
+    console.log("✅ GET /api/system-prompts/[id]: Successfully fetched prompt");
     return NextResponse.json(systemPrompt);
   } catch (error) {
-    console.error("Error fetching system prompt:", error);
+    console.error(
+      "💥 GET /api/system-prompts/[id]: Error fetching system prompt:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to fetch system prompt" },
       { status: 500 }

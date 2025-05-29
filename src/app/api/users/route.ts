@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
+import { connectToDatabase } from "@/lib/mongodb";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { logger } from "@/lib/logging";
 import { getUsers } from "@/lib/users/cache";
 
@@ -12,61 +14,33 @@ const allowedMethods = ["GET", "POST"];
  * Fetches users from Firestore with caching
  */
 export async function GET(request: NextRequest) {
-  const requestId = crypto.randomUUID();
+  console.log("🔒 GET /api/users: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/users: Authentication failed");
+    return authResult;
+  }
 
   try {
-    const session = await auth();
+    console.log("🔒 GET /api/users: Authentication successful, fetching users");
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    logger.info({
-      message: "Fetching users for team member selection",
-      requestId,
-      route: "api/users",
-      userId: session.user.id,
-    });
-
-    // Fetch users from Firestore using the cached function
-    const users = await getUsers();
-
-    // Transform to match the expected interface for backward compatibility
-    const transformedUsers = users.map((user) => ({
-      _id: user.uid, // Use Firebase UID as _id for backward compatibility
-      name: user.name,
-      email: user.email,
-      roles: user.roles,
-      creativeRoles: user.creativeRoles,
-      status: user.status,
-      firebaseUid: user.uid, // Include Firebase UID explicitly
+    // Get users from Firestore
+    const usersSnapshot = await adminDb.collection("users").get();
+    const users = usersSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
     }));
 
-    logger.info({
-      message: "Successfully fetched users from Firestore",
-      requestId,
-      userCount: transformedUsers.length,
+    console.log("✅ GET /api/users: Successfully fetched users", {
+      count: users.length,
     });
-
-    return NextResponse.json({
-      users: transformedUsers,
-      total: transformedUsers.length,
-    });
+    return NextResponse.json({ users });
   } catch (error) {
-    console.error("Error fetching users:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    logger.error({
-      message: "Error fetching users",
-      requestId,
-      error: errorMessage,
-    });
-
+    console.error("💥 GET /api/users: Error fetching users:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to fetch users" },
       { status: 500 }
     );
   }

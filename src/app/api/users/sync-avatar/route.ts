@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { auth } from "@/auth";
 import { logger } from "@/lib/logging";
 
 /**

@@ -34,18 +34,11 @@ export function useUrlParams() {
   ) => {
     const params = new URLSearchParams(searchParams?.toString() || "");
 
-    // Log the initial state
-    // [REMOVED] // [REMOVED] console.log("useUrlParams: Initial URL parameters:", params.toString());
-    // [REMOVED] // [REMOVED] console.log("useUrlParams: Updates to apply:", JSON.stringify(updates));
-    // [REMOVED] // [REMOVED] console.log("useUrlParams: Options:", JSON.stringify(options));
-
     // Handle explicit parameter removal with extra care for 'template'
     Object.entries(updates).forEach(([key, value]) => {
       if (value === null) {
-        // [REMOVED] // [REMOVED] console.log(`useUrlParams: Explicitly removing parameter: ${key}`);
         params.delete(key);
       } else {
-        // [REMOVED] // [REMOVED] console.log(`useUrlParams: Setting parameter: ${key}=${value}`);
         params.set(key, value);
       }
     });
@@ -58,9 +51,6 @@ export function useUrlParams() {
 
       currentKeys.forEach((key) => {
         if (!keysToKeep.includes(key) && !Object.keys(updates).includes(key)) {
-          console.log(
-            `useUrlParams: Removing parameter due to clearOthers: ${key}`
-          );
           params.delete(key);
         }
       });
@@ -73,30 +63,21 @@ export function useUrlParams() {
       options.context !== "tab:scripts" &&
       params.has("template")
     ) {
-      console.log(
-        `useUrlParams: Enforcing removal of template parameter in non-template context: ${options.context}`
-      );
       params.delete("template");
     }
 
     // Apply context-based cleanup if specified
     if (options.context) {
       const cleanedParams = cleanupUrlParameters(params, options.context);
-      console.log(
-        "useUrlParams: After context cleanup:",
-        cleanedParams.toString()
-      );
 
       // Use the cleaned parameters
       const url = `${pathname}?${cleanedParams.toString()}`;
-      // [REMOVED] // [REMOVED] console.log("useUrlParams: Final URL:", url);
 
       // Use replace instead of push to avoid adding to browser history
       router.replace(url);
     } else {
       // Use the cleaned parameters
       const url = `${pathname}?${params.toString()}`;
-      // [REMOVED] // [REMOVED] console.log("useUrlParams: Final URL (no context):", url);
 
       // Use replace instead of push to avoid adding to browser history
       router.replace(url);

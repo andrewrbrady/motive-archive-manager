@@ -1148,10 +1148,10 @@ export function CarImageGalleryV2({
                 <div
                   key={image._id}
                   className={cn(
-                    "relative w-full pb-[75%] rounded-md overflow-hidden cursor-pointer group transition-all duration-200",
+                    "relative w-full pb-[75%] rounded-md overflow-hidden cursor-pointer group transition-all duration-300",
                     selectedImage?._id === image._id
-                      ? "ring-2 ring-primary"
-                      : "opacity-80 hover:opacity-100"
+                      ? "!border-2 !border-white ring-2 ring-white/20 !opacity-100"
+                      : "!border-0 hover:!border-2 hover:!border-white !opacity-60 hover:!opacity-100"
                   )}
                   onClick={() => handleThumbnailClick(image)}
                   onKeyDown={(e) => {

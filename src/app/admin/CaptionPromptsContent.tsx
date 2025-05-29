@@ -25,6 +25,7 @@ import { ICaptionPrompt as ICaptionPromptFromModel } from "@/models/CaptionPromp
 import { PromptEditModal } from "@/components/projects/caption-generator/PromptEditModal";
 import { llmProviders, ProviderId } from "@/lib/llmProviders";
 import { Document } from "mongoose";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 // Client-side interface, ensuring _id is string and no Mongoose Document methods
 // Export this to be used by PromptForm.tsx
@@ -129,7 +130,7 @@ function convertToPromptTemplate(prompt: ICaptionPrompt): PromptTemplate {
 
 const CaptionPromptsContent: React.FC = () => {
   const [prompts, setPrompts] = useState<ICaptionPrompt[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<ICaptionPrompt | null>(
@@ -146,11 +147,14 @@ const CaptionPromptsContent: React.FC = () => {
   const [modalProvider, setModalProvider] = useState<ProviderId>("anthropic");
   const [modalTemperature, setModalTemperature] = useState(1.0);
 
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
+
   const fetchPrompts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/caption-prompts");
+      const response = await authenticatedFetch("/api/caption-prompts");
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to fetch prompts");
@@ -168,11 +172,14 @@ const CaptionPromptsContent: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [authenticatedFetch]);
 
   useEffect(() => {
-    fetchPrompts();
-  }, [fetchPrompts]);
+    // Only fetch when authentication is ready
+    if (isAuthenticated && hasValidToken) {
+      fetchPrompts();
+    }
+  }, [isAuthenticated, hasValidToken, fetchPrompts]);
 
   const handleOpenAddModal = () => {
     setEditingPrompt(null);
@@ -249,7 +256,7 @@ const CaptionPromptsContent: React.FC = () => {
     );
 
     try {
-      const response = await fetch(`/api/caption-prompts`, {
+      const response = await authenticatedFetch(`/api/caption-prompts`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: promptId, isDefault: true }),
@@ -283,7 +290,7 @@ const CaptionPromptsContent: React.FC = () => {
     if (!promptToDelete) return;
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/caption-prompts`, {
+      const response = await authenticatedFetch(`/api/caption-prompts`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: promptToDelete._id }),
@@ -305,10 +312,20 @@ const CaptionPromptsContent: React.FC = () => {
     }
   };
 
-  if (isLoading && prompts.length === 0) {
+  if (
+    (isLoading || !isAuthenticated || !hasValidToken) &&
+    prompts.length === 0
+  ) {
     return (
       <div className="p-6 flex justify-center items-center min-h-[300px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            {!isAuthenticated || !hasValidToken
+              ? "Authenticating..."
+              : "Loading prompts..."}
+          </p>
+        </div>
       </div>
     );
   }

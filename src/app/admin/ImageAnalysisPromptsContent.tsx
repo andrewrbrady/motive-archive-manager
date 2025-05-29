@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 interface ImageAnalysisPrompt {
   _id: string;

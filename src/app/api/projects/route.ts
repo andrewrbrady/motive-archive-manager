@@ -9,7 +9,8 @@ import {
   Project as IProject,
 } from "@/types/project";
 import {
-  withFirebaseAuth,
+  verifyAuthMiddleware,
+  getUserIdFromToken,
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
@@ -18,8 +19,17 @@ import { convertProjectForFrontend } from "@/utils/objectId";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 
 async function createProject(request: NextRequest) {
+  console.log("🔒 POST /api/projects: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ POST /api/projects: Authentication failed");
+    return authResult;
+  }
+
   try {
-    // Get the token from the authorization header
+    // Get token data and extract user ID
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.split("Bearer ")[1];
     const tokenData = await verifyFirebaseToken(token);
@@ -31,8 +41,7 @@ async function createProject(request: NextRequest) {
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    const userId = getUserIdFromToken(tokenData);
 
     const db = await getDatabase();
     const data: CreateProjectRequest = await request.json();
@@ -177,6 +186,9 @@ async function createProject(request: NextRequest) {
         .collection("projects")
         .findOne({ _id: result.insertedId });
 
+      console.log(
+        "✅ POST /api/projects: Successfully created project from template"
+      );
       return NextResponse.json(
         {
           project: convertProjectForFrontend(project),
@@ -291,24 +303,30 @@ async function createProject(request: NextRequest) {
 }
 
 async function getProjects(request: NextRequest) {
-  try {
-    console.log("Projects API: GET request received");
+  console.log("🔒 GET /api/projects: Starting request");
 
-    // Get the token from the authorization header
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ GET /api/projects: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    // Get token data and extract user ID
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.split("Bearer ")[1];
     const tokenData = await verifyFirebaseToken(token);
 
     if (!tokenData) {
-      console.log("Projects API: No authentication, returning 401");
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    const userId = getUserIdFromToken(tokenData);
+
     console.log("Projects API: Session check", {
       hasSession: true,
       userId: userId,
@@ -528,14 +546,14 @@ async function getProjects(request: NextRequest) {
       limit,
     };
 
-    console.log("Projects API: Returning response", {
+    console.log("✅ GET /api/projects: Successfully fetched projects", {
       projectsCount: response.projects.length,
       total: response.total,
     });
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Projects API: Error fetching projects:", error);
+    console.error("💥 GET /api/projects: Error fetching projects:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
@@ -566,6 +584,6 @@ function getDefaultPermissions(role: string): string[] {
   return defaultPermissions[role] || ["read"];
 }
 
-// Export the wrapped functions
-export const GET = withFirebaseAuth<any>(getProjects);
-export const POST = withFirebaseAuth<any>(createProject);
+// Export the functions directly
+export const GET = getProjects;
+export const POST = createProject;

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { adminDb } from "@/lib/firebase-admin";
 
 /**
@@ -7,16 +11,29 @@ import { adminDb } from "@/lib/firebase-admin";
  * More relaxed permissions than admin users endpoint
  */
 export async function GET(request: NextRequest) {
-  try {
-    // Check if user is authenticated
-    const session = await auth();
+  console.log("🔒 GET /api/projects/users: Starting request");
 
-    if (!session?.user) {
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ GET /api/projects/users: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     console.log("Fetching users for project team management...");
 

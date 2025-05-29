@@ -1,22 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { connectToDatabase } from "@/lib/mongodb";
 
 interface LengthSetting {
   key: string;
   name: string;
   description: string;
-  instructions: string;
+  defaultValue: number;
+  minValue: number;
+  maxValue: number;
+  unit: string;
 }
 
-// GET - Fetch length settings
-export async function GET() {
-  try {
-    const session = await auth();
-    if (!session?.user?.roles?.includes("admin")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// GET - Fetch length settings for admin management
+export async function GET(request: NextRequest) {
+  console.log("🔒 GET /api/admin/length-settings: Starting request");
 
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/admin/length-settings: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    console.log(
+      "🔒 GET /api/admin/length-settings: Authentication successful, fetching settings"
+    );
     const { db } = await connectToDatabase();
     const settings = await db
       .collection("lengthSettings")
@@ -24,9 +34,18 @@ export async function GET() {
       .sort({ key: 1 })
       .toArray();
 
+    console.log(
+      "✅ GET /api/admin/length-settings: Successfully fetched settings",
+      {
+        count: settings.length,
+      }
+    );
     return NextResponse.json(settings);
   } catch (error) {
-    console.error("Error fetching length settings:", error);
+    console.error(
+      "💥 GET /api/admin/length-settings: Error fetching length settings:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to fetch length settings" },
       { status: 500 }
@@ -34,33 +53,45 @@ export async function GET() {
   }
 }
 
-// POST - Save/update length settings
+// POST - Save length settings
 export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/admin/length-settings: Starting request");
+
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ POST /api/admin/length-settings: Authentication failed");
+    return authResult;
+  }
+
   try {
-    const session = await auth();
-    if (!session?.user?.roles?.includes("admin")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const settings: LengthSetting[] = await request.json();
 
-    const lengthSettings: LengthSetting[] = await request.json();
-
-    if (!Array.isArray(lengthSettings)) {
-      return NextResponse.json(
-        { error: "Invalid data format" },
-        { status: 400 }
-      );
-    }
-
-    // Validate each setting
-    for (const setting of lengthSettings) {
+    // Validate the settings
+    for (const setting of settings) {
       if (
         !setting.key ||
         !setting.name ||
         !setting.description ||
-        !setting.instructions
+        setting.defaultValue === undefined ||
+        setting.minValue === undefined ||
+        setting.maxValue === undefined ||
+        !setting.unit
       ) {
         return NextResponse.json(
-          { error: "Missing required fields in length setting" },
+          { error: "All fields are required for each length setting" },
+          { status: 400 }
+        );
+      }
+
+      // Validate numeric values
+      if (
+        setting.defaultValue < setting.minValue ||
+        setting.defaultValue > setting.maxValue ||
+        setting.minValue >= setting.maxValue
+      ) {
+        return NextResponse.json(
+          { error: "Invalid numeric values for length setting" },
           { status: 400 }
         );
       }
@@ -70,50 +101,41 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Invalid length setting key format. Use only letters, numbers, and underscores.",
+              "Length setting key can only contain letters, numbers, and underscores",
           },
           { status: 400 }
         );
       }
     }
 
-    const { db } = await connectToDatabase();
-
-    // Process each setting individually to avoid bulk write conflicts
-    for (const setting of lengthSettings) {
-      const existingDoc = await db
-        .collection("lengthSettings")
-        .findOne({ key: setting.key });
-
-      if (existingDoc) {
-        // Update existing document
-        await db.collection("lengthSettings").updateOne(
-          { key: setting.key },
-          {
-            $set: {
-              name: setting.name,
-              description: setting.description,
-              instructions: setting.instructions,
-              updatedAt: new Date(),
-            },
-          }
-        );
-      } else {
-        // Insert new document
-        await db.collection("lengthSettings").insertOne({
-          key: setting.key,
-          name: setting.name,
-          description: setting.description,
-          instructions: setting.instructions,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
+    // Check for duplicate keys
+    const keys = settings.map((s) => s.key);
+    const uniqueKeys = new Set(keys);
+    if (keys.length !== uniqueKeys.size) {
+      return NextResponse.json(
+        { error: "Duplicate length setting keys are not allowed" },
+        { status: 400 }
+      );
     }
 
+    const { db } = await connectToDatabase();
+
+    // Clear existing settings and insert new ones
+    await db.collection("lengthSettings").deleteMany({});
+
+    if (settings.length > 0) {
+      await db.collection("lengthSettings").insertMany(settings);
+    }
+
+    console.log(
+      "✅ POST /api/admin/length-settings: Successfully saved settings"
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error saving length settings:", error);
+    console.error(
+      "💥 POST /api/admin/length-settings: Error saving length settings:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to save length settings" },
       { status: 500 }
@@ -123,12 +145,16 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete a specific length setting
 export async function DELETE(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.roles?.includes("admin")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  console.log("🔒 DELETE /api/admin/length-settings: Starting request");
 
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ DELETE /api/admin/length-settings: Authentication failed");
+    return authResult;
+  }
+
+  try {
     const { searchParams } = new URL(request.url);
     const key = searchParams.get("key");
 
@@ -158,9 +184,15 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    console.log(
+      "✅ DELETE /api/admin/length-settings: Successfully deleted setting"
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting length setting:", error);
+    console.error(
+      "💥 DELETE /api/admin/length-settings: Error deleting length setting:",
+      error
+    );
     return NextResponse.json(
       { error: "Failed to delete length setting" },
       { status: 500 }

@@ -1,34 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 import { dbConnect } from "@/lib/mongodb";
 import { Deliverable } from "@/models/Deliverable";
 import { adminDb } from "@/lib/firebase-admin";
 import { getDatabase } from "@/lib/mongodb";
 
-export async function POST(req: NextRequest) {
-  try {
-    // Verify the user is authenticated and has appropriate permissions
-    const session = await auth();
+export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/deliverables/assign: Starting request");
 
-    if (!session?.user) {
+  // Check authentication and required roles
+  const authResult = await verifyAuthMiddleware(request, ["admin", "editor"]);
+  if (authResult) {
+    console.log("❌ POST /api/deliverables/assign: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
 
-    // Check if user has admin or editor role
-    const userRoles = session.user.roles || [];
-    const hasPermission = userRoles.some((role) =>
-      ["admin", "editor"].includes(role)
-    );
-
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
-    }
+    const currentUserId = getUserIdFromToken(tokenData);
 
     // Parse the request body
-    const body = await req.json();
+    const body = await request.json();
     const { deliverableId, userId, editorName } = body;
 
     // Validate required parameters

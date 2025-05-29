@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 // GET - Fetch a specific image analysis prompt
 async function getPrompt(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<object>> {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid prompt ID" }, { status: 400 });
@@ -42,10 +42,10 @@ async function getPrompt(
 // PUT - Update a specific image analysis prompt
 async function updatePrompt(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<object>> {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid prompt ID" }, { status: 400 });
@@ -114,10 +114,10 @@ async function updatePrompt(
 // DELETE - Delete a specific image analysis prompt
 async function deletePrompt(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<object>> {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid prompt ID" }, { status: 400 });

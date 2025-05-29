@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { PlusCircle, Edit, Trash2, Settings } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { SystemPrompt } from "@/app/api/system-prompts/route";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 const SystemPromptsContent: React.FC = () => {
   const [systemPrompts, setSystemPrompts] = useState<SystemPrompt[]>([]);
@@ -48,14 +49,20 @@ const SystemPromptsContent: React.FC = () => {
     isActive: false,
   });
 
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
+
   useEffect(() => {
-    fetchSystemPrompts();
-  }, []);
+    if (isAuthenticated && hasValidToken) {
+      fetchSystemPrompts();
+    }
+  }, [isAuthenticated, hasValidToken]);
 
   const fetchSystemPrompts = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/system-prompts");
+      setError(null);
+      const response = await authenticatedFetch("/api/system-prompts");
       if (!response.ok) {
         throw new Error("Failed to fetch system prompts");
       }
@@ -116,7 +123,7 @@ const SystemPromptsContent: React.FC = () => {
         ? { id: editingPrompt._id, ...formData }
         : { ...formData };
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -153,9 +160,12 @@ const SystemPromptsContent: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/system-prompts?id=${prompt._id}`, {
-        method: "DELETE",
-      });
+      const response = await authenticatedFetch(
+        `/api/system-prompts?id=${prompt._id}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -179,7 +189,7 @@ const SystemPromptsContent: React.FC = () => {
 
   const handleToggleActive = async (prompt: SystemPrompt) => {
     try {
-      const response = await fetch("/api/system-prompts", {
+      const response = await authenticatedFetch("/api/system-prompts", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -238,12 +248,16 @@ const SystemPromptsContent: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !isAuthenticated || !hasValidToken) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p>Loading system prompts...</p>
+          <p>
+            {!isAuthenticated || !hasValidToken
+              ? "Authenticating..."
+              : "Loading system prompts..."}
+          </p>
         </div>
       </div>
     );

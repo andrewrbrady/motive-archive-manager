@@ -2,8 +2,8 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { listUsers } from "@/lib/firestore/users";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FirestoreUser } from "@/types/firebase";
 
 // Define response types
@@ -30,23 +30,19 @@ type ApiResponse = SuccessResponse | ErrorResponse;
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse>> {
-  try {
-    // Verify the user is authenticated and has admin privileges
-    const session = await auth();
-    console.log("Session data in list API route:", {
-      sessionExists: !!session,
-      userId: session?.user?.id,
-      email: session?.user?.email,
-      roles: session?.user?.roles,
-    });
+  console.log("🔒 GET /api/users/list: Starting request");
 
-    if (!session?.user?.roles?.includes("admin")) {
-      // [REMOVED] // [REMOVED] console.log("User does not have admin role:", session?.user);
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
-    }
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ GET /api/users/list: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    console.log(
+      "🔒 GET /api/users/list: Authentication successful, fetching users"
+    );
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -58,25 +54,34 @@ export async function GET(
     );
 
     // Get users from Firestore
-    const result = await listUsers(limit, startAfter);
+    const usersSnapshot = await adminDb.collection("users").get();
+    const users: FirestoreUser[] = usersSnapshot.docs.map((doc) => ({
+      uid: doc.id,
+      email: doc.data().email || "",
+      name: doc.data().name || "",
+      creativeRoles: doc.data().creativeRoles || [],
+      roles: doc.data().roles || [],
+      status: doc.data().status || "active",
+      ...doc.data(),
+    })) as FirestoreUser[];
 
-    console.log(
-      `Found ${result.users.length} users, hasMore: ${!!result.lastDoc}`
-    );
+    console.log("✅ GET /api/users/list: Successfully fetched users", {
+      count: users.length,
+    });
 
     // Return users with pagination info
     return NextResponse.json({
-      users: result.users,
+      users: users,
       pagination: {
-        lastId: result.lastDoc?.id,
-        hasMore: !!result.lastDoc && result.users.length === limit,
+        lastId: users[users.length - 1]?.uid,
+        hasMore: false,
         limit,
       },
-    });
+    } as SuccessResponse);
   } catch (error: any) {
-    console.error("Error listing users:", error);
+    console.error("💥 GET /api/users/list: Error fetching users:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to list users" },
+      { error: error.message || "Failed to fetch users" },
       { status: 500 }
     );
   }

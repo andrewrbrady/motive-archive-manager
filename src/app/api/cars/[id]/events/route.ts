@@ -3,7 +3,11 @@ import { getDatabase } from "@/lib/mongodb";
 import { ObjectId, UpdateFilter } from "mongodb";
 import { Event, DbEvent } from "@/types/event";
 import { EventModel } from "@/models/Event";
-import { auth } from "@/auth";
+import {
+  verifyAuthMiddleware,
+  getUserIdFromToken,
+  verifyFirebaseToken,
+} from "@/lib/firebase-auth-middleware";
 
 interface Car {
   _id: ObjectId;
@@ -45,16 +49,30 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  console.log("🔒 POST /api/cars/[id]/events: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ POST /api/cars/[id]/events: Authentication failed");
+    return authResult;
+  }
+
   try {
-    // Get the current session to identify who is creating the event
-    const session = await auth();
-    if (!session?.user?.id) {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
+
+    const userId = getUserIdFromToken(tokenData);
 
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
@@ -109,7 +127,7 @@ export async function POST(request: Request) {
       location_id: locationId,
       primary_image_id: primaryImageId,
       image_ids: imageIds.length > 0 ? imageIds : undefined,
-      created_by: session.user.id, // Track who created the event
+      created_by: userId, // Track who created the event
     };
 
     const newEventId = await eventModel.create(eventData);

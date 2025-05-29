@@ -103,11 +103,6 @@ export async function analyzeImage(
     const data = await response.json();
     const analysis = data.analysis as ImageAnalysis;
 
-    console.log(
-      `Analysis results for ${imageUrl.substring(0, 30)}...`,
-      analysis
-    );
-
     console.timeEnd("imageAnalysis");
     return analysis;
   } catch (error) {

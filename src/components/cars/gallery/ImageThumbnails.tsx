@@ -37,6 +37,7 @@ export function ImageThumbnails({
   onReanalyze,
   onSetPrimary,
 }: ImageThumbnailsProps) {
+  // Force refresh: Updated thumbnail styling for no borders, white hover borders, and opacity changes
   const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
   const startIndex = currentPage * ITEMS_PER_PAGE;
   const paginatedImages = images.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -55,57 +56,84 @@ export function ImageThumbnails({
 
       <div className="bg-background rounded-lg p-4">
         <div className="grid grid-cols-3 gap-2 max-h-[800px] overflow-y-auto">
-          {paginatedImages.map((image: ExtendedImageType) => (
-            <div
-              key={image._id || image.id}
-              className={cn(
-                "relative rounded-md overflow-hidden cursor-pointer group border-2 transition-all",
-                currentImage?.id === image.id || currentImage?._id === image._id
-                  ? "border-primary ring-2 ring-primary/20"
-                  : selectedImages.has(image.id || image._id)
-                    ? "border-blue-500"
-                    : "border-transparent hover:border-primary/50"
-              )}
-              onClick={() => onImageSelect(image.id || image._id)}
-            >
-              <div className="relative">
-                <CloudflareImage
-                  src={image.url}
-                  alt={image.metadata?.description || "Thumbnail"}
-                  width={140}
-                  height={105}
-                  className="object-cover transition-all duration-200 group-hover:scale-105 w-full h-auto"
-                  sizes="140px"
-                  variant="thumbnail"
-                />
+          {paginatedImages.map((image: ExtendedImageType) => {
+            // More robust current image detection
+            const imageId = image.id || image._id;
+            const currentImageId = currentImage?.id || currentImage?._id;
+            const isCurrentImage =
+              imageId && currentImageId && imageId === currentImageId;
+            const isSelectedInEditMode = selectedImages.has(imageId);
+
+            return (
+              <div
+                key={image._id || image.id}
+                className={cn(
+                  "relative rounded-md overflow-hidden cursor-pointer group transition-all duration-300",
+                  isCurrentImage
+                    ? "!border-2 !border-white ring-2 ring-white/20 !opacity-100"
+                    : isSelectedInEditMode
+                      ? "!border-2 !border-blue-500 !opacity-100"
+                      : "!border-0 !opacity-60 hover:!opacity-100"
+                )}
+                style={{
+                  border: isCurrentImage
+                    ? "2px solid white"
+                    : isSelectedInEditMode
+                      ? "2px solid #3b82f6"
+                      : "none",
+                  opacity: isCurrentImage || isSelectedInEditMode ? 1 : 0.6,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isCurrentImage && !isSelectedInEditMode) {
+                    e.currentTarget.style.opacity = "1";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isCurrentImage && !isSelectedInEditMode) {
+                    e.currentTarget.style.opacity = "0.6";
+                  }
+                }}
+                onClick={() => onImageSelect(image.id || image._id)}
+              >
+                <div className="relative overflow-hidden">
+                  <CloudflareImage
+                    src={image.url}
+                    alt={image.metadata?.description || "Thumbnail"}
+                    width={140}
+                    height={105}
+                    className="object-cover transition-transform duration-300 group-hover:scale-110 w-full h-auto"
+                    sizes="140px"
+                    variant="thumbnail"
+                  />
+                </div>
+
+                {/* Selection overlay for edit mode */}
+                {isEditMode && (
+                  <div
+                    className={cn(
+                      "absolute inset-0 flex items-center justify-center transition-opacity",
+                      selectedImages.has(image.id || image._id)
+                        ? "opacity-100 bg-black/50"
+                        : "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSelection(image.id || image._id);
+                    }}
+                  >
+                    <CheckCircle className="w-6 h-6 text-white" />
+                  </div>
+                )}
+
+                {/* Primary image indicator */}
+                {image.metadata?.isPrimary && (
+                  <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-1">
+                    <Star className="w-3 h-3" />
+                  </div>
+                )}
               </div>
-
-              {/* Selection overlay for edit mode */}
-              {isEditMode && (
-                <div
-                  className={cn(
-                    "absolute inset-0 flex items-center justify-center transition-opacity",
-                    selectedImages.has(image.id || image._id)
-                      ? "opacity-100 bg-black/50"
-                      : "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleSelection(image.id || image._id);
-                  }}
-                >
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-              )}
-
-              {/* Primary image indicator */}
-              {image.metadata?.isPrimary && (
-                <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-1">
-                  <Star className="w-3 h-3" />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Pagination */}

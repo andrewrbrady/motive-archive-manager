@@ -1,57 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { auth } from "@/auth";
 
 // Endpoint to add a new creative role
 export async function POST(request: NextRequest) {
-  try {
-    // Check authentication and authorization
-    const session = await auth();
-    if (!session?.user || !session.user.roles.includes("admin")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+  console.log("🔒 POST /api/users/creative-roles: Starting request");
 
-    // Get and validate request data
-    const data = await request.json();
-    if (!data.role || typeof data.role !== "string") {
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ POST /api/users/creative-roles: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    const { role } = await request.json();
+
+    if (!role || typeof role !== "string") {
       return NextResponse.json(
         { error: "Role name is required" },
         { status: 400 }
       );
     }
 
-    // Clean and format the role name (ensure snake_case)
-    const roleName = data.role
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "");
-
-    if (!roleName) {
-      return NextResponse.json({ error: "Invalid role name" }, { status: 400 });
-    }
-
-    // Save the role to the creative roles collection
+    // Add the role to the config collection
     await adminDb
       .collection("config")
       .doc("creativeRoles")
-      .set(
-        {
-          roles: FieldValue.arrayUnion(roleName),
-          updatedAt: new Date(),
-          updatedBy: session.user.id,
-        },
-        { merge: true }
-      );
+      .update({
+        roles: FieldValue.arrayUnion(role),
+      });
 
-    return NextResponse.json({
-      success: true,
-      role: roleName,
-      message: "Creative role added successfully",
-    });
+    console.log("✅ POST /api/users/creative-roles: Successfully added role");
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error adding creative role:", error);
+    console.error(
+      "💥 POST /api/users/creative-roles: Error adding creative role:",
+      error
+    );
     return NextResponse.json(
       { error: error.message || "Failed to add creative role" },
       { status: 500 }
@@ -59,25 +46,97 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Endpoint to get all creative roles
-export async function GET(request: NextRequest) {
-  try {
-    // Get creative roles from config collection
-    const rolesDoc = await adminDb
-      .collection("config")
-      .doc("creativeRoles")
-      .get();
+// Endpoint to remove a creative role
+export async function DELETE(request: NextRequest) {
+  console.log("🔒 DELETE /api/users/creative-roles: Starting request");
 
-    if (!rolesDoc.exists) {
-      return NextResponse.json({ roles: [] });
+  // Check authentication and admin role
+  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  if (authResult) {
+    console.log("❌ DELETE /api/users/creative-roles: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get("role");
+
+    if (!role) {
+      return NextResponse.json(
+        { error: "Role name is required" },
+        { status: 400 }
+      );
     }
 
-    const data = rolesDoc.data();
-    return NextResponse.json({ roles: data?.roles || [] });
+    // Remove the role from the config collection
+    await adminDb
+      .collection("config")
+      .doc("creativeRoles")
+      .update({
+        roles: FieldValue.arrayRemove(role),
+      });
+
+    console.log(
+      "✅ DELETE /api/users/creative-roles: Successfully removed role"
+    );
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error getting creative roles:", error);
+    console.error(
+      "💥 DELETE /api/users/creative-roles: Error removing creative role:",
+      error
+    );
     return NextResponse.json(
-      { error: error.message || "Failed to get creative roles" },
+      { error: error.message || "Failed to remove creative role" },
+      { status: 500 }
+    );
+  }
+}
+
+// GET - Fetch all creative roles
+export async function GET(request: NextRequest) {
+  console.log("🔒 GET /api/users/creative-roles: Starting request");
+
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    console.log("❌ GET /api/users/creative-roles: Authentication failed");
+    return authResult;
+  }
+
+  try {
+    console.log(
+      "🔒 GET /api/users/creative-roles: Authentication successful, fetching roles"
+    );
+
+    // Get all unique creative roles from users
+    const usersSnapshot = await adminDb.collection("users").get();
+    const allCreativeRoles = new Set<string>();
+
+    usersSnapshot.docs.forEach((doc) => {
+      const userData = doc.data();
+      if (userData.creativeRoles && Array.isArray(userData.creativeRoles)) {
+        userData.creativeRoles.forEach((role: string) =>
+          allCreativeRoles.add(role)
+        );
+      }
+    });
+
+    const creativeRoles = Array.from(allCreativeRoles).sort();
+
+    console.log(
+      "✅ GET /api/users/creative-roles: Successfully fetched roles",
+      {
+        count: creativeRoles.length,
+      }
+    );
+    return NextResponse.json({ creativeRoles });
+  } catch (error) {
+    console.error(
+      "💥 GET /api/users/creative-roles: Error fetching creative roles:",
+      error
+    );
+    return NextResponse.json(
+      { error: "Failed to fetch creative roles" },
       { status: 500 }
     );
   }

@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { User } from "@/models/User";
-import { auth } from "@/auth";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { getUserWithAuth, updateUserRoles } from "@/lib/firestore/users";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
@@ -33,17 +33,14 @@ interface IUser {
  * Requires admin role
  */
 export async function GET(request: NextRequest) {
-  try {
-    // Check admin access
-    const session = await auth();
-    // [REMOVED] // [REMOVED] console.log("Session for getUser:", session?.user);
+  console.log("🔒 GET /api/users/[id]: Starting request");
 
-    if (!session?.user?.roles?.includes("admin")) {
-      // [REMOVED] // [REMOVED] console.log("Unauthorized access attempt:", session?.user);
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
+  try {
+    // Check authentication and admin role
+    const authResult = await verifyAuthMiddleware(request, ["admin"]);
+    if (authResult) {
+      console.log("❌ GET /api/users/[id]: Authentication failed");
+      return authResult;
     }
 
     // Extract user ID from URL
@@ -58,14 +55,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log("🔒 GET /api/users/[id]: Fetching user data", { userId });
     const user = await getUserWithAuth(userId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    console.log("✅ GET /api/users/[id]: Successfully fetched user");
     return NextResponse.json(user);
   } catch (error) {
-    console.error("Error fetching user:", error);
+    console.error("💥 GET /api/users/[id]: Error fetching user:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to fetch user",
@@ -80,17 +79,14 @@ export async function GET(request: NextRequest) {
  * Requires admin role
  */
 export async function PUT(request: NextRequest) {
-  try {
-    // Check admin access
-    const session = await auth();
-    // [REMOVED] // [REMOVED] console.log("Session for updateUser:", session?.user);
+  console.log("🔒 PUT /api/users/[id]: Starting request");
 
-    if (!session?.user?.roles?.includes("admin")) {
-      // [REMOVED] // [REMOVED] console.log("Unauthorized access attempt:", session?.user);
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
+  try {
+    // Check authentication and admin role
+    const authResult = await verifyAuthMiddleware(request, ["admin"]);
+    if (authResult) {
+      console.log("❌ PUT /api/users/[id]: Authentication failed");
+      return authResult;
     }
 
     // Extract user ID from URL
@@ -139,6 +135,11 @@ export async function PUT(request: NextRequest) {
         }
       }
 
+      console.log("🔒 PUT /api/users/[id]: Updating user roles", {
+        userId,
+        roles,
+      });
+
       // Update Firebase Auth custom claims
       await adminAuth.setCustomUserClaims(userId, {
         roles,
@@ -159,6 +160,7 @@ export async function PUT(request: NextRequest) {
 
       // Get the updated user data
       const updatedUser = await getUserWithAuth(userId);
+      console.log("✅ PUT /api/users/[id]: Successfully updated user roles");
       return NextResponse.json({ user: updatedUser });
     } else if (data.updateType === "profile") {
       // Handle profile update
@@ -170,6 +172,8 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      console.log("🔒 PUT /api/users/[id]: Updating user profile", { userId });
+
       // Update user profile in Firestore
       await adminDb.collection("users").doc(userId).update({
         profile,
@@ -178,12 +182,13 @@ export async function PUT(request: NextRequest) {
 
       // Get the updated user
       const updatedUser = await getUserWithAuth(userId);
+      console.log("✅ PUT /api/users/[id]: Successfully updated user profile");
       return NextResponse.json(updatedUser);
     }
 
     return NextResponse.json({ error: "Invalid update type" }, { status: 400 });
   } catch (error) {
-    console.error("Error updating user:", error);
+    console.error("💥 PUT /api/users/[id]: Error updating user:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to update user",
@@ -198,14 +203,14 @@ export async function PUT(request: NextRequest) {
  * Requires admin role
  */
 export async function DELETE(request: NextRequest) {
+  console.log("🔒 DELETE /api/users/[id]: Starting request");
+
   try {
-    // Check admin access
-    const session = await auth();
-    if (!session?.user?.roles?.includes("admin")) {
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 403 }
-      );
+    // Check authentication and admin role
+    const authResult = await verifyAuthMiddleware(request, ["admin"]);
+    if (authResult) {
+      console.log("❌ DELETE /api/users/[id]: Authentication failed");
+      return authResult;
     }
 
     // Extract user ID from URL
@@ -220,15 +225,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    console.log("🔒 DELETE /api/users/[id]: Deleting user", { userId });
+
     // Delete user from Firebase Auth
     await adminAuth.deleteUser(userId);
 
     // Delete user document from Firestore
     await adminDb.collection("users").doc(userId).delete();
 
+    console.log("✅ DELETE /api/users/[id]: Successfully deleted user");
     return NextResponse.json({ message: "User deleted successfully" });
   } catch (error) {
-    console.error("Error deleting user:", error);
+    console.error("💥 DELETE /api/users/[id]: Error deleting user:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to delete user",
