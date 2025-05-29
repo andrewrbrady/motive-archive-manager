@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
+import { useAPI } from "@/lib/fetcher";
 import { Deliverable, DeliverableStatus } from "@/types/deliverable";
 import { User } from "../types";
 
@@ -30,6 +31,7 @@ export function useDeliverables({
   const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const api = useAPI();
 
   const fetchDeliverables = useCallback(async () => {
     try {
@@ -50,21 +52,19 @@ export function useDeliverables({
         throw new Error("No API endpoint provided");
       }
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error(`API returned status: ${response.status}`);
+      try {
+        const data = await api.get(url);
+        // Handle both array responses and empty responses correctly
+        setDeliverables(Array.isArray(data) ? data : data.deliverables || []);
+      } catch (error: any) {
+        console.error(`API returned error:`, error);
         // Only show error for actual API errors, not empty results
-        if (response.status !== 404) {
+        if (error.status !== 404) {
           throw new Error("Failed to fetch deliverables");
         }
         // If 404, just set empty array and don't show error
         setDeliverables([]);
-        return;
       }
-
-      const data = await response.json();
-      // Handle both array responses and empty responses correctly
-      setDeliverables(Array.isArray(data) ? data : data.deliverables || []);
     } catch (error) {
       console.error("Error fetching deliverables:", error);
       toast.error("Failed to fetch deliverables");
@@ -72,15 +72,11 @@ export function useDeliverables({
     } finally {
       setIsLoading(false);
     }
-  }, [carId, apiEndpoint]);
+  }, [carId, apiEndpoint, api]);
 
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await fetch("/api/users");
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-      const data = await response.json();
+      const data = await api.get("/api/users");
 
       // Handle the correct API response structure: { users: [...], total: number }
       let usersArray;
@@ -110,7 +106,7 @@ export function useDeliverables({
       console.error("Error fetching users:", error);
       toast.error("Failed to fetch users");
     }
-  }, []);
+  }, [api]);
 
   const handleDelete = useCallback(
     async (deliverableId: string, deliverableCarId?: string) => {
@@ -124,16 +120,9 @@ export function useDeliverables({
           throw new Error("No car ID available for deletion");
         }
 
-        const response = await fetch(
-          `/api/cars/${targetCarId}/deliverables/${deliverableId}`,
-          {
-            method: "DELETE",
-          }
+        await api.delete(
+          `/api/cars/${targetCarId}/deliverables/${deliverableId}`
         );
-
-        if (!response.ok) {
-          throw new Error("Failed to delete deliverable");
-        }
 
         toast.success("Deliverable deleted successfully");
         await fetchDeliverables();
@@ -142,7 +131,7 @@ export function useDeliverables({
         toast.error("Failed to delete deliverable");
       }
     },
-    [carId, fetchDeliverables]
+    [carId, fetchDeliverables, api]
   );
 
   const handleDuplicate = useCallback(
@@ -167,17 +156,7 @@ export function useDeliverables({
         delete duplicateData.social_media_link;
         delete duplicateData.metrics;
 
-        const response = await fetch(`/api/cars/${targetCarId}/deliverables`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(duplicateData),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to duplicate deliverable");
-        }
+        await api.post(`/api/cars/${targetCarId}/deliverables`, duplicateData);
 
         toast.success("Deliverable duplicated successfully");
         await fetchDeliverables();
@@ -186,7 +165,7 @@ export function useDeliverables({
         toast.error("Failed to duplicate deliverable");
       }
     },
-    [carId, fetchDeliverables]
+    [carId, fetchDeliverables, api]
   );
 
   const handleStatusChange = useCallback(
@@ -198,55 +177,31 @@ export function useDeliverables({
         const targetCarId = deliverable?.car_id?.toString() || carId;
 
         if (!targetCarId) {
-          throw new Error("No car ID available for status update");
+          throw new Error("No car ID available for status change");
         }
 
-        const response = await fetch(
+        await api.put(
           `/api/cars/${targetCarId}/deliverables/${deliverableId}`,
           {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              status: newStatus,
-              updated_at: new Date(),
-            }),
+            status: newStatus,
           }
         );
 
-        if (!response.ok) {
-          throw new Error("Failed to update deliverable status");
-        }
-
-        // Update local state immediately for better UX
-        setDeliverables((prev) =>
-          prev.map((d) =>
-            d._id?.toString() === deliverableId
-              ? { ...d, status: newStatus }
-              : d
-          )
-        );
-
         toast.success("Status updated successfully");
+        await fetchDeliverables();
       } catch (error) {
-        console.error("Error updating status:", error);
+        console.error("Error updating deliverable status:", error);
         toast.error("Failed to update status");
       }
     },
-    [deliverables, carId]
+    [carId, deliverables, fetchDeliverables, api]
   );
 
+  // Initial data fetch
   useEffect(() => {
     fetchDeliverables();
-  }, [fetchDeliverables]);
-
-  useEffect(() => {
-    // Only fetch users if we don't already have them
-    if (allUsers.length === 0) {
-      fetchUsers();
-    }
-  }, [fetchUsers, allUsers.length]);
+    fetchUsers();
+  }, [fetchDeliverables, fetchUsers]);
 
   return {
     deliverables,

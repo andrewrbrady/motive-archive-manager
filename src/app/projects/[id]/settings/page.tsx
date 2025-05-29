@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/lib/fetcher";
 import { useRouter } from "next/navigation";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,8 @@ interface ProjectSettingsPageProps {
 export default function ProjectSettingsPage({
   params,
 }: ProjectSettingsPageProps) {
-  const { user } = useFirebaseAuth();
+  const { data: session, status } = useSession();
+  const api = useAPI();
   const router = useRouter();
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
@@ -39,15 +41,15 @@ export default function ProjectSettingsPage({
   });
 
   useEffect(() => {
-    if (!user) {
-      router.push("/auth/signin");
+    if (!session?.user?.id) {
+      console.log("ProjectSettingsPage: No session, skipping fetch");
       return;
     }
     fetchProject();
-  }, [user, resolvedParams.id]);
+  }, [session?.user?.id, resolvedParams.id]);
 
   const fetchProject = async () => {
-    if (!user) {
+    if (!session?.user?.id) {
       setError("You must be logged in to view project settings");
       setLoading(false);
       return;
@@ -56,26 +58,7 @@ export default function ProjectSettingsPage({
     try {
       setLoading(true);
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${resolvedParams.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("Project not found");
-        }
-        if (response.status === 401) {
-          throw new Error("You don't have permission to access this project");
-        }
-        throw new Error("Failed to fetch project");
-      }
-
-      const data = await response.json();
+      const data = await api.get(`/api/projects/${resolvedParams.id}`);
       setProject(data.project);
 
       // Initialize form data
@@ -84,44 +67,32 @@ export default function ProjectSettingsPage({
         description: data.project.description || "",
         primaryImageId: data.project.primaryImageId || "",
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+    } catch (err: any) {
+      if (err.status === 404) {
+        setError("Project not found");
+      } else if (err.status === 401) {
+        setError("You don't have permission to access this project");
+      } else {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!project || !user) return;
+    if (!project || !session?.user?.id) return;
 
     try {
       setSaving(true);
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          primaryImageId: formData.primaryImageId || undefined,
-        }),
+      const updatedProject = await api.put(`/api/projects/${project._id}`, {
+        title: formData.title,
+        description: formData.description,
+        primaryImageId: formData.primaryImageId || undefined,
       });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("You don't have permission to update this project");
-        }
-        throw new Error("Failed to update project");
-      }
-
-      const { project: updatedProject } = await response.json();
-      setProject(updatedProject);
+      setProject(updatedProject.project);
 
       toast({
         title: "Success",
@@ -130,13 +101,15 @@ export default function ProjectSettingsPage({
 
       // Redirect back to project page
       router.push(`/projects/${project._id}`);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
         description:
-          error instanceof Error
-            ? error.message
-            : "Failed to update project settings",
+          error?.status === 401
+            ? "You don't have permission to update this project"
+            : error instanceof Error
+              ? error.message
+              : "Failed to update project settings",
         variant: "destructive",
       });
     } finally {
@@ -152,7 +125,8 @@ export default function ProjectSettingsPage({
     setFormData({ ...formData, primaryImageId: imageId || "" });
   };
 
-  if (loading) {
+  // Show loading while authentication is being handled
+  if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">

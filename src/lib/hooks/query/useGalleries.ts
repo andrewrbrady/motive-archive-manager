@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useAPI } from "@/lib/fetcher";
 import { toast } from "@/components/ui/use-toast";
 
 export interface Gallery {
@@ -53,6 +54,7 @@ export function useGalleries(
   const [data, setData] = useState<UseGalleriesResponse["data"]>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const api = useAPI();
 
   const fetchGalleries = useCallback(async () => {
     try {
@@ -62,10 +64,7 @@ export function useGalleries(
       if (options.page) searchParams.set("page", options.page.toString());
       if (options.limit) searchParams.set("limit", options.limit.toString());
 
-      const response = await fetch(`/api/galleries?${searchParams.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch galleries");
-
-      const result = await response.json();
+      const result = await api.get(`/api/galleries?${searchParams.toString()}`);
       setData(result);
     } catch (err) {
       setError(err as Error);
@@ -77,7 +76,7 @@ export function useGalleries(
     } finally {
       setIsLoading(false);
     }
-  }, [options.search, options.page, options.limit]);
+  }, [options.search, options.page, options.limit, api]);
 
   const mutate = useCallback(async () => {
     await fetchGalleries();
@@ -95,14 +94,12 @@ export function useGallery(id: string) {
   const [data, setData] = useState<Gallery | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const api = useAPI();
 
   const fetchGallery = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/galleries/${id}`);
-      if (!response.ok) throw new Error("Failed to fetch gallery");
-
-      const result = await response.json();
+      const result = await api.get(`/api/galleries/${id}`);
       setData(result);
     } catch (err) {
       setError(err as Error);
@@ -114,7 +111,7 @@ export function useGallery(id: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, api]);
 
   const mutate = useCallback(
     async (optimisticData?: Gallery) => {
@@ -136,6 +133,8 @@ export function useGallery(id: string) {
 }
 
 export async function createGallery(data: Partial<Gallery>) {
+  // This needs to be converted to use the API centrally, but for now we'll keep it as is
+  // since it's called from components that should have useAPI available
   const response = await fetch("/api/galleries", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

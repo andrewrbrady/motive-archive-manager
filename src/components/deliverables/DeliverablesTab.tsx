@@ -3,6 +3,7 @@ import { Deliverable } from "@/types/deliverable";
 import { DeliverablesTabProps } from "./deliverables-tab/types";
 import { useDeliverables } from "./deliverables-tab/hooks/useDeliverables";
 import { useBatchMode } from "./deliverables-tab/hooks/useBatchMode";
+import { useAPI } from "@/lib/fetcher";
 import DeliverablesHeader from "./deliverables-tab/components/DeliverablesHeader";
 import DeliverableCard from "./deliverables-tab/components/DeliverableCard";
 import DeliverablesTable from "./deliverables-tab/components/DeliverablesTable";
@@ -19,6 +20,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
 
   // Get the actual carId string
   const actualCarId = Array.isArray(carId) ? carId[0] : carId;
+
+  // Initialize API hook
+  const api = useAPI();
 
   // Use our custom hooks
   const {
@@ -51,23 +55,11 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     try {
       setIsSubmittingJson(true);
 
-      const response = await fetch(
+      const result = await api.post(
         `/api/cars/${actualCarId}/deliverables/batch`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ deliverables: jsonData }),
-        }
+        { deliverables: jsonData }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create deliverables");
-      }
-
-      const result = await response.json();
       toast.success(`Successfully created ${result.count} deliverables`);
 
       // Refresh the deliverables list

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/lib/fetcher";
 import { useRouter } from "next/navigation";
 import {
   Project,
@@ -37,7 +38,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,9 +67,9 @@ export default function ProjectsPage() {
       return;
     }
 
-    // Only fetch if we have a user and session
-    if (!user || !session?.user?.id) {
-      console.log("ProjectsPage: No user or session, skipping fetch");
+    // Only fetch if we have a session
+    if (!session?.user?.id) {
+      console.log("ProjectsPage: No session, skipping fetch");
       return;
     }
 
@@ -76,11 +77,6 @@ export default function ProjectsPage() {
       fetchingRef.current = true;
       console.log("ProjectsPage: Starting to fetch projects...");
       setLoading(true);
-
-      console.log("ProjectsPage: Getting Firebase ID token...");
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-      console.log("ProjectsPage: Got Firebase ID token successfully");
 
       const params = new URLSearchParams();
 
@@ -94,22 +90,7 @@ export default function ProjectsPage() {
       const url = `/api/projects?${params.toString()}`;
       console.log("ProjectsPage: Fetching from URL:", url);
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      console.log("ProjectsPage: Response status:", response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("ProjectsPage: Response error:", errorText);
-        throw new Error(
-          `Failed to fetch projects: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data: ProjectListResponse = await response.json();
+      const data: ProjectListResponse = await api.get(url);
       console.log("ProjectsPage: Received data:", {
         projectsCount: data.projects.length,
         total: data.total,
@@ -148,18 +129,18 @@ export default function ProjectsPage() {
     }
   };
 
-  // Simplified effect - just fetch when we have user and session
+  // Simplified effect - just fetch when we have session
   useEffect(() => {
-    if (user && session?.user?.id && !initialLoadRef.current) {
+    if (session?.user?.id && !initialLoadRef.current) {
       console.log("ProjectsPage: Initial load - fetching projects");
       initialLoadRef.current = true;
       fetchProjects();
     }
-  }, [user, session?.user?.id]);
+  }, [session?.user?.id]);
 
   // Search and filter effect
   useEffect(() => {
-    if (initialLoadRef.current && user && session?.user?.id) {
+    if (initialLoadRef.current && session?.user?.id) {
       console.log("ProjectsPage: Search/filter changed, refetching projects");
       fetchProjects();
     }

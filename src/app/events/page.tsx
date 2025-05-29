@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/lib/fetcher";
 import { Event, EventType } from "@/types/event";
 import {
   Table,
@@ -38,6 +40,8 @@ interface EventWithCar extends Event {
 }
 
 export default function EventsPage() {
+  const { data: session, status } = useSession();
+  const api = useAPI();
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -81,6 +85,11 @@ export default function EventsPage() {
   };
 
   const fetchEvents = async () => {
+    if (!session?.user?.id) {
+      console.log("EventsPage: No session, skipping fetch");
+      return;
+    }
+
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -88,9 +97,7 @@ export default function EventsPage() {
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
 
-      const response = await fetch(`/api/events?${queryParams.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch events");
-      const data = await response.json();
+      const data = await api.get(`/api/events?${queryParams.toString()}`);
 
       // Fetch car information for each event
       const eventsWithCars = await Promise.all(
@@ -101,9 +108,7 @@ export default function EventsPage() {
               console.error("No car_id found for event:", event);
               return event;
             }
-            const carResponse = await fetch(`/api/cars/${carId}`);
-            if (!carResponse.ok) throw new Error("Failed to fetch car");
-            const car = await carResponse.json();
+            const car = await api.get(`/api/cars/${carId}`);
             return { ...event, car };
           } catch (error) {
             console.error("Error fetching car:", error);
@@ -114,6 +119,7 @@ export default function EventsPage() {
 
       setEvents(eventsWithCars);
     } catch (error) {
+      console.error("Error fetching events:", error);
       toast.error("Failed to load events");
     } finally {
       setIsLoading(false);
@@ -121,8 +127,23 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    fetchEvents();
-  }, [filters]);
+    if (session?.user?.id) {
+      fetchEvents();
+    }
+  }, [session?.user?.id, filters]);
+
+  // Show loading while authentication is being handled
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg">Loading...</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
