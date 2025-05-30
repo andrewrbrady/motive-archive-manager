@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { EventType } from "@/types/event";
@@ -31,6 +33,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 interface User {
   _id: string;
@@ -44,10 +47,10 @@ interface User {
 const eventFormSchema = z.object({
   type: z.nativeEnum(EventType),
   description: z.string().min(1, "Description is required"),
-  start: z.string(),
+  start: z.string().min(1, "Start date is required"),
   end: z.string().optional(),
+  assignees: z.array(z.string()),
   isAllDay: z.boolean().default(false),
-  assignees: z.array(z.string()).default([]),
 });
 
 type EventFormData = z.infer<typeof eventFormSchema>;
@@ -59,6 +62,7 @@ interface EventFormProps {
 }
 
 export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
+  const { authenticatedFetch } = useAuthenticatedFetch();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
 
@@ -77,7 +81,7 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch("/api/users");
+        const response = await authenticatedFetch("/api/users");
         if (!response.ok) throw new Error("Failed to fetch users");
         const data = await response.json();
         setUsers(data.filter((user: User) => user.status === "active"));
@@ -88,12 +92,12 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
     };
 
     fetchUsers();
-  }, []);
+  }, [authenticatedFetch]);
 
   const onSubmit = async (data: EventFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/cars/${carId}/events`, {
+      const response = await authenticatedFetch(`/api/cars/${carId}/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
