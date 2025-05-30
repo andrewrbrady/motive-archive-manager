@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { EventTypeSetting, defaultEventTypeSettings } from "@/types/eventType";
+import { useAPI } from "@/lib/fetcher";
 
 export const useEventTypeSettings = () => {
+  const api = useAPI();
   const [eventTypeSettings, setEventTypeSettings] = useState<
     EventTypeSetting[]
   >(defaultEventTypeSettings);
@@ -16,13 +18,7 @@ export const useEventTypeSettings = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch("/api/event-type-settings");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch event type settings");
-      }
-
-      const data = await response.json();
+      const data = await api.get("/api/event-type-settings");
       setEventTypeSettings(data);
     } catch (err) {
       console.error("Error fetching event type settings:", err);

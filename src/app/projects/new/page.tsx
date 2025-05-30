@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/lib/fetcher";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,7 @@ import {
   ProjectType,
   CreateProjectRequest,
 } from "@/types/project";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ProjectCreationStep {
   id: string;
@@ -71,7 +72,9 @@ const steps: ProjectCreationStep[] = [
 
 export default function NewProjectPage() {
   const { data: session, status } = useSession();
+  const api = useAPI();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
@@ -105,9 +108,7 @@ export default function NewProjectPage() {
   const fetchTemplates = async () => {
     try {
       setTemplatesLoading(true);
-      const response = await fetch("/api/projects/templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = await api.get("/api/projects/templates");
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -175,20 +176,7 @@ export default function NewProjectPage() {
         templateId: selectedTemplate?._id,
       };
 
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(projectData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create project");
-      }
-
-      const { project } = await response.json();
+      const { project } = await api.post("/api/projects", projectData);
 
       toast({
         title: "Success",
