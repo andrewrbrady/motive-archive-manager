@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { EventTypeSetting, defaultEventTypeSettings } from "@/types/eventType";
-import { useAPI } from "@/lib/fetcher";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 export const useEventTypeSettings = () => {
-  const api = useAPI();
+  const { data: session, status } = useSession();
+  const { authenticatedFetch, isAuthenticated, hasValidToken } =
+    useAuthenticatedFetch();
   const [eventTypeSettings, setEventTypeSettings] = useState<
     EventTypeSetting[]
   >(defaultEventTypeSettings);
@@ -11,14 +14,30 @@ export const useEventTypeSettings = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchEventTypeSettings();
-  }, []);
+    // Only fetch when we have proper authentication
+    if (
+      status === "authenticated" &&
+      session?.user &&
+      isAuthenticated &&
+      hasValidToken
+    ) {
+      fetchEventTypeSettings();
+    } else if (status === "unauthenticated") {
+      // If not authenticated, just use defaults and stop loading
+      setIsLoading(false);
+    }
+    // Still loading authentication - keep isLoading true
+  }, [status, session, isAuthenticated, hasValidToken]);
 
   const fetchEventTypeSettings = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await api.get("/api/event-type-settings");
+      const response = await authenticatedFetch("/api/event-type-settings");
+      if (!response.ok) {
+        throw new Error("Failed to fetch event type settings");
+      }
+      const data = await response.json();
       setEventTypeSettings(data);
     } catch (err) {
       console.error("Error fetching event type settings:", err);
