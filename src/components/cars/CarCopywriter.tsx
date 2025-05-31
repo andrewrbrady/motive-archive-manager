@@ -458,6 +458,13 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     promptHandlers.fetchPrompts();
   }, []);
 
+  // Fetch prompts when API becomes available
+  useEffect(() => {
+    if (api) {
+      promptHandlers.fetchPrompts();
+    }
+  }, [api, promptHandlers.fetchPrompts]);
+
   // Fetch event details when selected events change
   useEffect(() => {
     if (selectedEventIds.length > 0) {
