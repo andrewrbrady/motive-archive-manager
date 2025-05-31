@@ -90,11 +90,11 @@ export default function CreateKitModal({
   kit,
   isEditing = false,
 }: CreateKitModalProps) {
-  const [name, setName] = useState(kit?.name || "");
-  const [description, setDescription] = useState(kit?.description || "");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [status, setStatus] = useState<
     "available" | "checked-out" | "in-use" | "maintenance"
-  >((kit?.status as any) || "available");
+  >("available");
   const [searchQuery, setSearchQuery] = useState("");
   const [inventoryItems, setInventoryItems] = useState<StudioInventoryItem[]>(
     []
@@ -106,15 +106,6 @@ export default function CreateKitModal({
 
   // Add useAPI hook
   const api = useAPI();
-
-  // Authentication check
-  if (!api) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   // Initialize selected items from kit if editing
   useEffect(() => {
@@ -140,6 +131,8 @@ export default function CreateKitModal({
 
   // Fetch inventory items
   useEffect(() => {
+    if (!isOpen || !api) return; // Guard inside hook
+
     const fetchInventoryItems = async () => {
       setLoading(true);
       try {
@@ -165,10 +158,17 @@ export default function CreateKitModal({
       }
     };
 
-    if (isOpen) {
-      fetchInventoryItems();
-    }
+    fetchInventoryItems();
   }, [isOpen, isEditing, kit, api]);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Filter items based on search query
   const filteredItems = inventoryItems.filter((item) => {

@@ -121,6 +121,43 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   const [useCustomDescription, setUseCustomDescription] = useState(true);
   const [editableCaption, setEditableCaption] = useState<string>("");
 
+  // Resume upload after authentication (if coming back from auth)
+  useEffect(() => {
+    if (!api) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("youtube_auth_success") === "true") {
+      const storedDeliverableId = sessionStorage.getItem(
+        "youtube_upload_deliverable_id"
+      );
+      if (storedDeliverableId === deliverable._id?.toString()) {
+        // Restore form data
+        const storedTitle = sessionStorage.getItem("youtube_upload_title");
+        const storedDescription = sessionStorage.getItem(
+          "youtube_upload_description"
+        );
+        const storedTags = sessionStorage.getItem("youtube_upload_tags");
+
+        if (storedTitle) setTitle(storedTitle);
+        if (storedDescription) setDescription(storedDescription);
+        if (storedTags) setTags(storedTags);
+
+        // Clear session storage
+        sessionStorage.removeItem("youtube_upload_deliverable_id");
+        sessionStorage.removeItem("youtube_upload_title");
+        sessionStorage.removeItem("youtube_upload_description");
+        sessionStorage.removeItem("youtube_upload_tags");
+
+        // Automatically open the upload dialog
+        setIsOpen(true);
+
+        // Clear the URL parameter
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [deliverable._id, api]);
+
   // Authentication check - don't render if not authenticated
   if (!api) {
     return null;
@@ -211,41 +248,6 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       toast.error("Failed to start authentication");
     }
   };
-
-  // Resume upload after authentication (if coming back from auth)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("youtube_auth_success") === "true") {
-      const storedDeliverableId = sessionStorage.getItem(
-        "youtube_upload_deliverable_id"
-      );
-      if (storedDeliverableId === deliverable._id?.toString()) {
-        // Restore form data
-        const storedTitle = sessionStorage.getItem("youtube_upload_title");
-        const storedDescription = sessionStorage.getItem(
-          "youtube_upload_description"
-        );
-        const storedTags = sessionStorage.getItem("youtube_upload_tags");
-
-        if (storedTitle) setTitle(storedTitle);
-        if (storedDescription) setDescription(storedDescription);
-        if (storedTags) setTags(storedTags);
-
-        // Clear session storage
-        sessionStorage.removeItem("youtube_upload_deliverable_id");
-        sessionStorage.removeItem("youtube_upload_title");
-        sessionStorage.removeItem("youtube_upload_description");
-        sessionStorage.removeItem("youtube_upload_tags");
-
-        // Automatically open the upload dialog
-        setIsOpen(true);
-
-        // Clear the URL parameter
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-      }
-    }
-  }, [deliverable._id]);
 
   const handleUpload = async () => {
     if (!title.trim()) {

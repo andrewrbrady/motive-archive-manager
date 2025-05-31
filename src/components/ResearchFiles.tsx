@@ -87,18 +87,17 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   const fileListRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
 
-  // Guard clause for API availability
-  if (!api) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">Loading...</div>
-    );
-  }
-
   useEffect(() => {
+    if (!api) return; // Guard inside hook
     fetchFiles();
   }, [carId, api]);
 
   const fetchFiles = async () => {
+    if (!api) {
+      setIsLoadingFiles(false);
+      return;
+    }
+
     setIsLoadingFiles(true);
     try {
       const data = (await api.get(`cars/${carId}/research`)) as {
@@ -172,7 +171,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   };
 
   const handleUpload = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0 || !api) return;
 
     setUploading(true);
     setError(null);
@@ -239,6 +238,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
   // Add polling for processing status
   useEffect(() => {
+    if (!api) return; // Guard inside hook
+
     const processingFiles = files.filter(
       (f) => f.processingStatus === "pending"
     );
@@ -268,6 +269,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   }, [files, carId, api]);
 
   const handleDelete = async (fileId: string) => {
+    if (!api) return;
+
     try {
       await api.delete(`cars/${carId}/research?fileId=${fileId}`);
 
@@ -279,7 +282,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   };
 
   const handleDeleteAll = async () => {
-    if (!files.length) return;
+    if (!files.length || !api) return;
 
     setIsDeletingAll(true);
     setError(null);
@@ -321,6 +324,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   };
 
   const handleFileClick = async (file: ResearchFile) => {
+    if (!api) return;
+
     setIsLoadingContent(true);
     setError(null);
     try {
@@ -348,7 +353,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || !api) return;
 
     setIsSearching(true);
     setError(null);
@@ -518,6 +523,13 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
       }
     };
   }, []);
+
+  // Guard clause for API availability
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-20rem)] flex flex-col overflow-hidden overscroll-none">

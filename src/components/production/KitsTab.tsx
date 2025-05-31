@@ -101,17 +101,9 @@ export default function KitsTab() {
     return Object.keys(selectedItemsMap).filter((id) => selectedItemsMap[id]);
   }, [selectedItemsMap]);
 
-  // Authentication check
-  if (!api) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   // Fetch kits on component mount
   useEffect(() => {
+    if (!api) return;
     fetchKits();
   }, [api]);
 
@@ -122,6 +114,8 @@ export default function KitsTab() {
 
   // Reset form when opening create/edit modal
   useEffect(() => {
+    if (!api) return;
+
     if (isCreateModalOpen) {
       // [REMOVED] // [REMOVED] console.log("Modal opened, initializing form state");
 
@@ -159,6 +153,15 @@ export default function KitsTab() {
       setSelectedItemsMap({});
     }
   }, [isCreateModalOpen, currentKit, api]);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Filter inventory items based on search query
   const filteredInventoryItems = inventoryItems.filter((item) => {

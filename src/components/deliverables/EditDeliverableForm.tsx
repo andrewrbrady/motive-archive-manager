@@ -83,36 +83,9 @@ export default function EditDeliverableForm({
   );
   const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
 
-  // Authentication check - don't render if not authenticated
-  if (!api) {
-    return null;
-  }
-
-  const handleSelectOpenChange = (selectId: string, open: boolean) => {
-    setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
-  };
-
-  const isAnySelectOpen = Object.values(openSelects).some(Boolean);
-
-  // Helper function to find user UID from name (for legacy data)
-  const findUserUidFromName = (editorName: string): string | null => {
-    if (!editorName || !users.length) return null;
-    const user = users.find((u) => u.name === editorName);
-    return user ? user.uid : null;
-  };
-
-  // Initialize editor data - try firebase_uid first, then try to find UID from name
-  const getInitialEditorId = (): string | null => {
-    if (deliverable.firebase_uid) {
-      return deliverable.firebase_uid;
-    }
-    if (deliverable.editor) {
-      return findUserUidFromName(deliverable.editor);
-    }
-    return null;
-  };
-
-  const [editorId, setEditorId] = useState<string | null>(getInitialEditorId());
+  const [editorId, setEditorId] = useState<string | null>(
+    deliverable.firebase_uid || null
+  );
   const [editorName, setEditorName] = useState(deliverable.editor || "");
 
   // Helper function to safely format dates
@@ -127,22 +100,50 @@ export default function EditDeliverableForm({
     }
   };
 
+  // Helper function to find user UID from name (for legacy data)
+  const findUserUidFromName = (editorName: string): string | null => {
+    if (!editorName || !users.length) return null;
+    const user = users.find((u) => u.name === editorName);
+    return user ? user.uid : null;
+  };
+
   // Reset form data when deliverable changes
   useEffect(() => {
-    if (deliverable) {
-      setTitle(deliverable.title);
-      setPlatform(deliverable.platform);
-      setType(deliverable.type);
-      setDuration(deliverable.duration);
-      setAspectRatio(deliverable.aspect_ratio);
-      setEditorId(getInitialEditorId());
-      setEditorName(deliverable.editor || "");
-      setEditDeadline(safeFormatDate(deliverable.edit_deadline));
-      setReleaseDate(safeFormatDate(deliverable.release_date));
-      setDropboxLink(deliverable.dropbox_link || "");
-      setSocialMediaLink(deliverable.social_media_link || "");
+    if (!api || !deliverable) return;
+
+    setTitle(deliverable.title);
+    setPlatform(deliverable.platform);
+    setType(deliverable.type);
+    setDuration(deliverable.duration);
+    setAspectRatio(deliverable.aspect_ratio);
+
+    // Initialize editor data - try firebase_uid first, then try to find UID from name
+    let initialEditorId: string | null = null;
+    if (deliverable.firebase_uid) {
+      initialEditorId = deliverable.firebase_uid;
+    } else if (deliverable.editor && users.length) {
+      const user = users.find((u) => u.name === deliverable.editor);
+      initialEditorId = user ? user.uid : null;
     }
-  }, [deliverable, users]);
+    setEditorId(initialEditorId);
+
+    setEditorName(deliverable.editor || "");
+    setEditDeadline(safeFormatDate(deliverable.edit_deadline));
+    setReleaseDate(safeFormatDate(deliverable.release_date));
+    setDropboxLink(deliverable.dropbox_link || "");
+    setSocialMediaLink(deliverable.social_media_link || "");
+  }, [deliverable, users, api]);
+
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
+
+  const handleSelectOpenChange = (selectId: string, open: boolean) => {
+    setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
+  };
+
+  const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

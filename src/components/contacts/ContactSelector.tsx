@@ -51,18 +51,9 @@ export default function ContactSelector({
   const [loading, setLoading] = useState(true);
   const api = useAPI();
 
-  // Authentication check - show loading if not authenticated
-  if (!api) {
-    return (
-      <Select disabled>
-        <SelectTrigger>
-          <SelectValue placeholder="Loading..." />
-        </SelectTrigger>
-      </Select>
-    );
-  }
-
   useEffect(() => {
+    if (!api) return; // Guard inside hook
+
     const loadContacts = async () => {
       try {
         setLoading(true);
@@ -89,6 +80,17 @@ export default function ContactSelector({
 
     loadContacts();
   }, [includeInactive, api]);
+
+  // Authentication check - show loading if not authenticated
+  if (!api) {
+    return (
+      <Select disabled>
+        <SelectTrigger>
+          <SelectValue placeholder="Loading..." />
+        </SelectTrigger>
+      </Select>
+    );
+  }
 
   if (loading) {
     return (

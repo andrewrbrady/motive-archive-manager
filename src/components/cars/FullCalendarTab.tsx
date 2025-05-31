@@ -20,12 +20,9 @@ export default function FullCalendarTab({ carId }: FullCalendarTabProps) {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Authentication guard
-  if (!api) {
-    return <LoadingContainer fullHeight />;
-  }
-
   const fetchEvents = async () => {
+    if (!api) return;
+
     try {
       const data = await api.get<Event[]>(`cars/${carId}/events`);
       setEvents(data);
@@ -39,6 +36,8 @@ export default function FullCalendarTab({ carId }: FullCalendarTabProps) {
   };
 
   const fetchDeliverables = async () => {
+    if (!api) return;
+
     try {
       const data = await api.get<Deliverable[]>(`cars/${carId}/deliverables`);
       setDeliverables(data);
@@ -52,13 +51,20 @@ export default function FullCalendarTab({ carId }: FullCalendarTabProps) {
   };
 
   useEffect(() => {
+    if (!api) return;
+
     const fetchData = async () => {
       setIsLoading(true);
       await Promise.all([fetchEvents(), fetchDeliverables()]);
       setIsLoading(false);
     };
     fetchData();
-  }, [carId]);
+  }, [carId, api]);
+
+  // Authentication guard
+  if (!api) {
+    return <LoadingContainer fullHeight />;
+  }
 
   const handleEventDrop = async (args: any) => {
     // After the FullCalendar component handles the event drop, refresh the data

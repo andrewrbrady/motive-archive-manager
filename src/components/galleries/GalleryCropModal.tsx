@@ -645,11 +645,11 @@ export function GalleryCropModal({
 
   // Update canvas when crop area or enhanced image changes
   useEffect(() => {
-    if (!api) return; // Add conditional check inside async function
+    if (!api) return;
     drawCropPreview();
   }, [drawCropPreview, api]);
 
-  // Authentication guard moved to the end
+  // Authentication guard - moved after all hooks
   if (!api) {
     return null;
   }

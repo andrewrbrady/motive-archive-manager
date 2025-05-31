@@ -56,11 +56,6 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
   // Get authenticated API client
   const api = useAPI();
 
-  // Show loading while API is not ready
-  if (!api) {
-    return <div>Loading authentication...</div>;
-  }
-
   // State for labels
   const [carLabels, setCarLabels] = useState<Record<string, string>>({});
   const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
@@ -378,6 +373,8 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
 
   // Start batch processing on mount, clean up on unmount
   useEffect(() => {
+    if (!api) return; // ✅ Guard clause inside useEffect
+
     fetchTimeoutRef.current = setTimeout(processBatches, 300);
 
     return () => {
@@ -385,7 +382,7 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [processBatches]);
+  }, [processBatches, api]); // ✅ Include api in dependencies
 
   // Public API for car labels
   const fetchCarLabels = useCallback(
@@ -512,6 +509,11 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
     },
     [carDetails, fetchingCarIds]
   );
+
+  // Show loading while API is not ready
+  if (!api) {
+    return <div>Loading authentication...</div>;
+  }
 
   const value = {
     carLabels,

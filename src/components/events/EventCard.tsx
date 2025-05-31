@@ -108,25 +108,6 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
 
   const api = useAPI();
 
-  // Authentication guard
-  if (!api) {
-    return (
-      <Card className="overflow-hidden">
-        <div className="relative aspect-[16/9]">
-          <div className="w-full h-full bg-muted/50 flex flex-col items-center justify-center gap-4">
-            <LoadingSpinner size="lg" />
-          </div>
-        </div>
-        <CardContent className="pt-4">
-          <div className="space-y-3">
-            <div className="h-6 bg-muted rounded animate-pulse"></div>
-            <div className="h-4 bg-muted rounded animate-pulse w-3/4"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   useEffect(() => {
     if (!api) return;
 
@@ -199,8 +180,8 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
           });
           setUsingCarImage(false);
         } catch (error) {
-          console.error("Error fetching event image:", error);
-          // Try car's primary image as fallback
+          console.error("Error fetching first event image:", error);
+          // Try car's primary image as final fallback
           await tryCarPrimaryImage();
         }
       } else {
@@ -208,7 +189,6 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
         await tryCarPrimaryImage();
       }
 
-      // Helper function to try car's primary image
       async function tryCarPrimaryImage() {
         if (event.car?.primaryImageId) {
           try {
@@ -220,8 +200,8 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
               url: getFormattedImageUrl(carImageData.url),
             });
             setUsingCarImage(true);
-          } catch (error) {
-            console.error("Error fetching car primary image:", error);
+          } catch (carImageError) {
+            console.error("Error fetching car primary image:", carImageError);
             setPrimaryImage(null);
             setUsingCarImage(false);
           }
@@ -236,13 +216,31 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
 
     fetchEventData();
   }, [
-    api,
-    event.id,
     event.primaryImageId,
     event.imageIds,
     event.locationId,
     event.car?.primaryImageId,
+    api,
   ]);
+
+  // Authentication guard
+  if (!api) {
+    return (
+      <Card className="overflow-hidden">
+        <div className="relative aspect-[16/9]">
+          <div className="w-full h-full bg-muted/50 flex flex-col items-center justify-center gap-4">
+            <LoadingSpinner size="lg" />
+          </div>
+        </div>
+        <CardContent className="pt-4">
+          <div className="space-y-3">
+            <div className="h-6 bg-muted rounded animate-pulse"></div>
+            <div className="h-4 bg-muted rounded animate-pulse w-3/4"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const formatEventDate = () => {
     const startDate = new Date(event.start);

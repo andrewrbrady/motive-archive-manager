@@ -118,6 +118,8 @@ export default function YouTubeAuthComponent() {
 
   // Check for OAuth callback on component mount
   useEffect(() => {
+    if (!api) return; // Guard clause inside hook
+
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
     const error = urlParams.get("error");

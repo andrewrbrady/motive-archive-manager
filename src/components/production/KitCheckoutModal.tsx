@@ -70,6 +70,15 @@ export default function KitCheckoutModal({
   // Add useAPI hook
   const api = useAPI();
 
+  // Fetch users when modal opens in checkout mode
+  useEffect(() => {
+    if (!api) return; // Guard inside hook
+
+    if (isOpen && mode === "checkout") {
+      fetchUsers();
+    }
+  }, [isOpen, mode, api]);
+
   // Authentication check
   if (!api) {
     return (
@@ -82,13 +91,6 @@ export default function KitCheckoutModal({
       </Dialog>
     );
   }
-
-  // Fetch users when modal opens in checkout mode
-  useEffect(() => {
-    if (isOpen && mode === "checkout") {
-      fetchUsers();
-    }
-  }, [isOpen, mode]);
 
   const fetchUsers = async () => {
     setIsLoadingUsers(true);

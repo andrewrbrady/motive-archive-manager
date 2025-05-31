@@ -127,12 +127,9 @@ export default function NewDeliverableDialog({
     priority_level: 1,
   });
 
-  // Authentication check - don't render if not authenticated
-  if (!api) {
-    return null;
-  }
-
   useEffect(() => {
+    if (!api || !open) return;
+
     const fetchCars = async () => {
       try {
         const data = await api.get<Car[]>("cars/list");
@@ -158,11 +155,14 @@ export default function NewDeliverableDialog({
       }
     };
 
-    if (open) {
-      fetchCars();
-      fetchCreatives();
-    }
+    fetchCars();
+    fetchCreatives();
   }, [open, api]);
+
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
 
   const filterCars = (search: string) => {
     const searchTerms = search.toLowerCase().split(" ");

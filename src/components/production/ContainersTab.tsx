@@ -30,18 +30,9 @@ export default function ContainersTab() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [hoverModeActive, setHoverModeActive] = useState(false);
 
-  // Authentication check
-  if (!api) {
-    return (
-      <div className="h-96 flex items-center justify-center">
-        <LoadingContainer />
-      </div>
-    );
-  }
-
   // Fetch containers on component mount
   useEffect(() => {
-    if (!api) return;
+    if (!api) return; // Guard inside hook
     fetchContainers();
   }, [api]);
 
@@ -62,6 +53,15 @@ export default function ContainersTab() {
       setFilteredContainers(filtered);
     }
   }, [containers, searchQuery]);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingContainer />
+      </div>
+    );
+  }
 
   const fetchContainers = async () => {
     if (!api) return;

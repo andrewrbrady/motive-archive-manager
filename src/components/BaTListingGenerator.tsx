@@ -64,15 +64,10 @@ export default function BaTListingGenerator({
   const [editingText, setEditingText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Guard clause for API availability
-  if (!api) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">Loading...</div>
-    );
-  }
-
   // Fetch car details when carId changes
   useEffect(() => {
+    if (!api) return; // Guard inside hook
+
     const fetchCarDetails = async () => {
       setCarLoading(true);
       setCarError(null);
@@ -92,7 +87,8 @@ export default function BaTListingGenerator({
 
   // Fetch saved listings when carDetails is loaded
   useEffect(() => {
-    if (!carDetails) return;
+    if (!carDetails || !api) return; // Guard inside hook
+
     const fetchListings = async () => {
       try {
         const listings = (await api.get(
@@ -113,6 +109,13 @@ export default function BaTListingGenerator({
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [editingText, editingListingId]);
+
+  // Guard clause for API availability
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
 
   const handleGenerate = async () => {
     if (!carDetails) return;

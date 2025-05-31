@@ -64,15 +64,6 @@ export default function ContainersList({
   const [isHoveringPopup, setIsHoveringPopup] = useState(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Authentication check
-  if (!api) {
-    return (
-      <div className="h-96 flex items-center justify-center">
-        <LoadingContainer />
-      </div>
-    );
-  }
-
   // Fetch locations when component mounts
   useEffect(() => {
     if (!api) return;
@@ -97,6 +88,24 @@ export default function ContainersList({
 
     fetchLocations();
   }, [api]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingContainer />
+      </div>
+    );
+  }
 
   const getLocationName = (locationId: string | undefined) => {
     if (!locationId) return "No location";
@@ -168,15 +177,6 @@ export default function ContainersList({
       setHoverContainer(null);
     }, 300);
   };
-
-  // Clean up timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const handleSaveEdit = async (updatedContainer: ContainerResponse) => {
     if (!api) return;

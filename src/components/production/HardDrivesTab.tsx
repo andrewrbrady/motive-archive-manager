@@ -756,7 +756,7 @@ export default function HardDrivesTab() {
     }
   }, []);
 
-  // Add a useEffect to log when selectedDriveId changes
+  // Log when selectedDriveId changes
   useEffect(() => {
     // [REMOVED] // [REMOVED] console.log("selectedDriveId changed:", selectedDriveId);
   }, [selectedDriveId]);
@@ -769,8 +769,7 @@ export default function HardDrivesTab() {
     );
   }, [selectedDriveId]);
 
-  // Add this line anywhere before the function is used in the useEffect
-  // This ensures we check for template parameters in each render
+  // Check for template parameters in each render
   useEffect(() => {
     // Check for and remove any template parameter on the hard-drives tab
     const templateParam = getParam("template");

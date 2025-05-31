@@ -93,6 +93,16 @@ export default function DeliverablesList() {
     "storyboard_artist",
   ];
 
+  useEffect(() => {
+    if (!api) return; // Guard inside hook
+    fetchCars();
+  }, [api]);
+
+  useEffect(() => {
+    if (!api) return; // Guard inside hook
+    fetchDeliverables();
+  }, [search, status, platform, editor, type, selectedCar, page, api]);
+
   const fetchCars = async () => {
     if (!api) {
       console.log("API client not available for fetching cars");
@@ -138,18 +148,6 @@ export default function DeliverablesList() {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (api) {
-      fetchCars();
-    }
-  }, [api]);
-
-  useEffect(() => {
-    if (api) {
-      fetchDeliverables();
-    }
-  }, [search, status, platform, editor, type, selectedCar, page, api]);
 
   const handleDelete = async (id: string, carId: string) => {
     if (!confirm("Are you sure you want to delete this deliverable?")) return;

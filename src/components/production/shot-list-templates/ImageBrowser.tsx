@@ -23,16 +23,6 @@ export function ImageBrowser({ onSelectImage }: ImageBrowserProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Authentication check
-  if (!api) {
-    return (
-      <div className="text-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-        <p className="mt-2 text-sm text-muted-foreground">Authenticating...</p>
-      </div>
-    );
-  }
-
   useEffect(() => {
     const fetchImages = async () => {
       if (!api) return;
@@ -55,6 +45,16 @@ export function ImageBrowser({ onSelectImage }: ImageBrowserProps) {
 
     fetchImages();
   }, [api]);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="text-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+        <p className="mt-2 text-sm text-muted-foreground">Authenticating...</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

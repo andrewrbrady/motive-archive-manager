@@ -102,6 +102,36 @@ export function ImageMatteModal({
 
   const api = useAPI();
 
+  // Load processed image dimensions when processed image changes
+  useEffect(() => {
+    if (processedImageUrl) {
+      const img = new window.Image();
+      img.onload = () => {
+        setProcessedDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = processedImageUrl;
+    }
+  }, [processedImageUrl]);
+
+  // Load high-res image dimensions when high-res image changes
+  useEffect(() => {
+    if (highResImageUrl) {
+      const img = new window.Image();
+      img.onload = () => {
+        setHighResDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = highResImageUrl;
+    } else {
+      setHighResDimensions(null);
+    }
+  }, [highResImageUrl]);
+
   // Authentication readiness check
   if (!api && isOpen) {
     return (
@@ -125,12 +155,6 @@ export function ImageMatteModal({
       setProcessingMethod(savedMethod);
     }
   }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("imageMatteMethod", method);
-  };
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -176,9 +200,6 @@ export function ImageMatteModal({
     return enhanced;
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
-  // Get the current enhanced image URL for display
-  const currentImageUrl = enhancedImageUrl;
-
   // Load original image dimensions
   useEffect(() => {
     if (enhancedImageUrl) {
@@ -193,37 +214,14 @@ export function ImageMatteModal({
     }
   }, [enhancedImageUrl]);
 
-  // Load processed image dimensions when processed image changes
-  useEffect(() => {
-    if (processedImageUrl) {
-      const img = new window.Image();
-      img.onload = () => {
-        setProcessedDimensions({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.src = processedImageUrl;
-    } else {
-      setProcessedDimensions(null);
-    }
-  }, [processedImageUrl]);
+  // Save processing method preference to localStorage
+  const handleProcessingMethodChange = (method: ProcessingMethod) => {
+    setProcessingMethod(method);
+    localStorage.setItem("imageMatteMethod", method);
+  };
 
-  // Load high-res image dimensions when high-res image changes
-  useEffect(() => {
-    if (highResImageUrl) {
-      const img = new window.Image();
-      img.onload = () => {
-        setHighResDimensions({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.src = highResImageUrl;
-    } else {
-      setHighResDimensions(null);
-    }
-  }, [highResImageUrl]);
+  // Get the current enhanced image URL for display
+  const currentImageUrl = enhancedImageUrl;
 
   const handleProcess = async () => {
     if (!image || !enhancedImageUrl || !api) return;
