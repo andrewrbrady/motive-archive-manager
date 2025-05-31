@@ -25,7 +25,7 @@ import { ICaptionPrompt as ICaptionPromptFromModel } from "@/models/CaptionPromp
 import { PromptEditModal } from "@/components/projects/caption-generator/PromptEditModal";
 import { llmProviders, ProviderId } from "@/lib/llmProviders";
 import { Document } from "mongoose";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 // Client-side interface, ensuring _id is string and no Mongoose Document methods
 // Export this to be used by PromptForm.tsx
@@ -147,19 +147,15 @@ const CaptionPromptsContent: React.FC = () => {
   const [modalProvider, setModalProvider] = useState<ProviderId>("anthropic");
   const [modalTemperature, setModalTemperature] = useState(1.0);
 
-  const { authenticatedFetch, isAuthenticated, hasValidToken } =
-    useAuthenticatedFetch();
+  const api = useAPI();
 
   const fetchPrompts = useCallback(async () => {
+    if (!api) return;
+
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authenticatedFetch("/api/caption-prompts");
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch prompts");
-      }
-      const dataFromApi: any[] = await response.json();
+      const dataFromApi = (await api.get("/api/caption-prompts")) as any[];
       const normalizedPrompts = dataFromApi.map((item) =>
         normalizePromptData(item)
       );
@@ -172,14 +168,14 @@ const CaptionPromptsContent: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [authenticatedFetch]);
+  }, [api]);
 
   useEffect(() => {
-    // Only fetch when authentication is ready
-    if (isAuthenticated && hasValidToken) {
+    // Only fetch when API client is available
+    if (api) {
       fetchPrompts();
     }
-  }, [isAuthenticated, hasValidToken, fetchPrompts]);
+  }, [api, fetchPrompts]);
 
   const handleOpenAddModal = () => {
     setEditingPrompt(null);
@@ -244,35 +240,25 @@ const CaptionPromptsContent: React.FC = () => {
   };
 
   const handleSetDefault = async (promptId: string) => {
-    const originalPrompts = prompts.map((p) => ({ ...p }));
+    if (!api) return;
 
-    setPrompts((prevPrompts) =>
-      prevPrompts.map((p) =>
-        normalizePromptData({
-          ...p,
-          isDefault: p._id === promptId,
-        })
-      )
-    );
-
+    setIsSubmitting(true);
     try {
-      const response = await authenticatedFetch(`/api/caption-prompts`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: promptId, isDefault: true }),
+      await api.patch(`/api/caption-prompts`, {
+        id: promptId,
+        isDefault: true,
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to set default prompt");
-      }
-      toast.success("Default prompt updated successfully!");
+
+      toast.success("Default prompt updated successfully");
       fetchPrompts();
     } catch (err) {
-      setPrompts(originalPrompts);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to set default prompt";
       toast.error("Error setting default prompt", {
-        description:
-          err instanceof Error ? err.message : "An unknown error occurred",
+        description: errorMessage,
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -287,43 +273,31 @@ const CaptionPromptsContent: React.FC = () => {
   };
 
   const confirmDeletePrompt = async () => {
-    if (!promptToDelete) return;
+    if (!promptToDelete || !api) return;
+
     setIsSubmitting(true);
     try {
-      const response = await authenticatedFetch(`/api/caption-prompts`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: promptToDelete._id }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete prompt");
-      }
-      toast.success("Prompt deleted successfully!");
+      await api.delete(`/api/caption-prompts?id=${promptToDelete._id}`);
+
+      toast.success("Prompt deleted successfully");
       fetchPrompts();
       handleCloseDeleteConfirm();
     } catch (err) {
-      toast.error("Error deleting prompt", {
-        description:
-          err instanceof Error ? err.message : "An unknown error occurred",
-      });
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete prompt";
+      toast.error("Error deleting prompt", { description: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (
-    (isLoading || !isAuthenticated || !hasValidToken) &&
-    prompts.length === 0
-  ) {
+  if ((isLoading || !api) && prompts.length === 0) {
     return (
       <div className="p-6 flex justify-center items-center min-h-[300px]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {!isAuthenticated || !hasValidToken
-              ? "Authenticating..."
-              : "Loading prompts..."}
+            {!api ? "Authenticating..." : "Loading prompts..."}
           </p>
         </div>
       </div>

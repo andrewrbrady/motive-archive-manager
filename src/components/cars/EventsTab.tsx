@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 import { Event, EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,7 @@ interface EventsTabProps {
 
 export default function EventsTab({ carId }: EventsTabProps) {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const { toast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,17 +66,14 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
   const fetchEvents = async () => {
+    if (!api) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await authenticatedFetch(`/api/cars/${carId}/events`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error response:", errorData);
-        throw new Error("Failed to fetch events");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(`/api/cars/${carId}/events`)) as Event[];
       setEvents(data);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -91,15 +88,17 @@ export default function EventsTab({ carId }: EventsTabProps) {
   };
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user && carId) {
+    if (status === "authenticated" && session?.user && carId && api) {
       fetchEvents();
     }
-  }, [carId, status, session]);
+  }, [carId, status, session, api]);
 
   const handleUpdateEvent = async (
     eventId: string,
     updates: Partial<Event>
   ) => {
+    if (!api) return;
+
     try {
       // Optimistically update local state
       setEvents((currentEvents) =>
@@ -108,20 +107,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
         )
       );
 
-      const response = await authenticatedFetch(
-        `/api/cars/${carId}/events/${eventId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updates),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update event");
-      }
+      await api.put(`/api/cars/${carId}/events/${eventId}`, updates);
 
       toast({
         title: "Success",
@@ -141,22 +127,15 @@ export default function EventsTab({ carId }: EventsTabProps) {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    if (!api) return;
+
     try {
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.filter((event) => event.id !== eventId)
       );
 
-      const response = await authenticatedFetch(
-        `/api/cars/${carId}/events/${eventId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete event");
-      }
+      await api.delete(`/api/cars/${carId}/events/${eventId}`);
 
       toast({
         title: "Success",
@@ -176,21 +155,10 @@ export default function EventsTab({ carId }: EventsTabProps) {
   };
 
   const handleCreateEvent = async (eventData: Partial<Event>) => {
+    if (!api) return;
+
     try {
-      const response = await authenticatedFetch(`/api/cars/${carId}/events`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create event");
-      }
-
-      const result = await response.json();
+      const result = await api.post(`/api/cars/${carId}/events`, eventData);
       toast({
         title: "Success",
         description: "Event created successfully",
@@ -212,26 +180,14 @@ export default function EventsTab({ carId }: EventsTabProps) {
   };
 
   const handleJsonSubmit = async (jsonData: any[]) => {
+    if (!api) return;
+
     try {
       setIsSubmittingJson(true);
 
-      const response = await authenticatedFetch(
-        `/api/cars/${carId}/events/batch`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ events: jsonData }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create events");
-      }
-
-      const result = await response.json();
+      const result = (await api.post(`/api/cars/${carId}/events/batch`, {
+        events: jsonData,
+      })) as { count: number };
       toast({
         title: "Success",
         description: `Successfully created ${result.count} events`,

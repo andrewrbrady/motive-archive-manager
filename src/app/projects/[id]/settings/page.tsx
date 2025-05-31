@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 import { useRouter } from "next/navigation";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ export default function ProjectSettingsPage({
   params,
 }: ProjectSettingsPageProps) {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const router = useRouter();
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
@@ -48,13 +48,14 @@ export default function ProjectSettingsPage({
   }, [status, session, resolvedParams.id]);
 
   const fetchProject = async () => {
+    if (!api) return;
+
     try {
       setLoading(true);
 
-      const response = await authenticatedFetch(
-        `/api/projects/${resolvedParams.id}`
-      );
-      const data = await response.json();
+      const data = (await api.get(`/api/projects/${resolvedParams.id}`)) as {
+        project: Project;
+      };
       setProject(data.project);
 
       // Initialize form data
@@ -77,25 +78,17 @@ export default function ProjectSettingsPage({
   };
 
   const handleSave = async () => {
-    if (!project) return;
+    if (!project || !api) return;
 
     try {
       setSaving(true);
 
-      const response = await authenticatedFetch(
-        `/api/projects/${project._id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: formData.title,
-            description: formData.description,
-            primaryImageId: formData.primaryImageId || undefined,
-          }),
-        }
-      );
+      const updatedProject = (await api.put(`/api/projects/${project._id}`, {
+        title: formData.title,
+        description: formData.description,
+        primaryImageId: formData.primaryImageId || undefined,
+      })) as { project: Project };
 
-      const updatedProject = await response.json();
       setProject(updatedProject.project);
 
       toast({

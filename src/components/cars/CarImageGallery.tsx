@@ -76,7 +76,8 @@ export function CarImageGallery({
   if (error) {
     return (
       <div className="flex items-center justify-center h-96 text-destructive">
-        Error loading images: {error.message || error}
+        Error loading images:{" "}
+        {typeof error === "string" ? error : error.message || "Unknown error"}
       </div>
     );
   }

@@ -1,8 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
-import useSWR from "swr";
-import { fetcher } from "@/lib/fetcher";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { FilterState, ExtendedImageType } from "@/types/gallery";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
 import { useAPI } from "@/hooks/useAPI";
@@ -20,10 +19,17 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const urlPage = searchParams?.get("page");
   const currentImageId = searchParams?.get("image");
 
-  // SWR for data fetching
-  const { data, error, isLoading, mutate } = useSWR(
+  // API Query for data fetching
+  const {
+    data,
+    error,
+    isLoading,
+    refetch: mutate,
+  } = useAPIQuery<{ images: ExtendedImageType[] }>(
     `/api/cars/${carId}/images?limit=500`,
-    fetcher
+    {
+      staleTime: 60 * 1000, // 1 minute - images don't change super frequently
+    }
   );
 
   const images = useMemo(() => data?.images || [], [data?.images]);

@@ -108,6 +108,9 @@ export function CustomDropdown({
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
     }
+
+    // Return undefined for all other paths
+    return undefined;
   }, [isOpen]);
 
   // Close dropdown on escape key
@@ -122,6 +125,9 @@ export function CustomDropdown({
       document.addEventListener("keydown", handleEscape);
       return () => document.removeEventListener("keydown", handleEscape);
     }
+
+    // Return undefined for all other paths
+    return undefined;
   }, [isOpen]);
 
   const handleSelectOption = (optionValue: string) => {

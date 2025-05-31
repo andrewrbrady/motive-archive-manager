@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import Navbar from "@/components/layout/navbar";
 import { useAPI } from "@/hooks/useAPI";
+import { useToast } from "@/components/ui/use-toast";
 
 interface RawAsset {
   _id?: string;
@@ -96,24 +97,27 @@ interface RawAssetDetailsProps {
 }
 
 export default function RawAssetDetailsPage() {
-  const params = useParams();
   const router = useRouter();
+  const params = useParams();
+  const assetId = params?.id as string;
+  const { toast } = useToast();
   const api = useAPI();
+
   const [asset, setAsset] = useState<RawAsset | null>(null);
-  const [loading, setLoading] = useState(true);
   const [hardDrives, setHardDrives] = useState<HardDrive[]>([]);
-  const [locations, setLocations] = useState<Record<string, LocationData>>({});
-  const [removingDriveId, setRemovingDriveId] = useState<string | null>(null);
-  const [isRemovingDrive, setIsRemovingDrive] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [allHardDrives, setAllHardDrives] = useState<HardDrive[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [locations, setLocations] = useState<Record<string, LocationData>>({});
+  const [isRemovingDrive, setIsRemovingDrive] = useState(false);
+  const [removingDriveId, setRemovingDriveId] = useState<string | null>(null);
   const [availableLocations, setAvailableLocations] = useState<LocationData[]>(
     []
   );
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!api || !params.id) {
+      if (!api || !assetId) {
         if (!api) {
           toast({
             title: "Authentication Required",
@@ -129,7 +133,7 @@ export default function RawAssetDetailsPage() {
         setError(null);
 
         // Fetch asset details
-        const assetData = await api.get<any>(`/raw-assets/${params.id}`);
+        const assetData = await api.get<any>(`/raw-assets/${assetId}`);
         setAsset(assetData);
 
         // Fetch all hard drives for reference
@@ -153,20 +157,22 @@ export default function RawAssetDetailsPage() {
     };
 
     fetchData();
-  }, [params.id, api]);
+  }, [assetId, api]);
 
   // Fetch hard drives linked to this asset
   const fetchLinkedHardDrives = async (hardDriveIds: string[]) => {
+    if (!api) return;
+
     try {
-      const promises = hardDriveIds.map((id) =>
-        api.get<HardDrive>(`/hard-drives/${id}`).then((res) => {
-          if (!res.ok) {
-            console.warn(`Failed to fetch hard drive ${id}`);
-            return null;
-          }
-          return res.json();
-        })
-      );
+      const promises = hardDriveIds.map(async (id) => {
+        try {
+          const drive = await api.get<HardDrive>(`/hard-drives/${id}`);
+          return drive;
+        } catch (error) {
+          console.warn(`Failed to fetch hard drive ${id}:`, error);
+          return null;
+        }
+      });
 
       const results = await Promise.all(promises);
       const validDrives = results.filter(Boolean) as HardDrive[];
@@ -183,11 +189,20 @@ export default function RawAssetDetailsPage() {
 
   // Fetch location information
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
-      const response = await api.get<LocationData[]>("/locations");
+      const response = await api.get<
+        LocationData[] | { locations: LocationData[] }
+      >("/locations");
       const locationsMap: Record<string, LocationData> = {};
 
-      response.data.forEach((loc: LocationData) => {
+      // Handle both array and object with array property
+      const locationsList = Array.isArray(response)
+        ? response
+        : (response as { locations: LocationData[] }).locations || [];
+
+      locationsList.forEach((loc: LocationData) => {
         locationsMap[loc._id] = loc;
       });
 
@@ -199,18 +214,12 @@ export default function RawAssetDetailsPage() {
 
   // Handle removing a hard drive
   const handleRemoveHardDrive = async () => {
-    if (!removingDriveId || !asset?._id) return;
+    if (!removingDriveId || !asset?._id || !api) return;
 
     setIsRemovingDrive(true);
 
     try {
-      const response = await api.delete(
-        `/hard-drives/${removingDriveId}/assets/${asset._id}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to remove asset from hard drive");
-      }
+      await api.delete(`/hard-drives/${removingDriveId}/assets/${asset._id}`);
 
       // Update UI by removing the hard drive from the list
       setHardDrives((drives) =>

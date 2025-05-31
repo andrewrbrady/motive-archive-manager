@@ -4,9 +4,7 @@ import { useCallback, useRef, useMemo, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { ImageData } from "@/app/images/columns";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import useSWR, { KeyedMutator } from "swr";
-import { fetcher } from "@/lib/fetcher";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { Image } from "@/types";
 
 interface PaginationData {
@@ -54,7 +52,7 @@ interface UseImagesReturn {
   data: ImagesResponse | null;
   isLoading: boolean;
   error: Error | null;
-  mutate: KeyedMutator<ImagesResponse>;
+  mutate: () => Promise<void>;
   setFilter?: (key: string, value: string | null) => void;
 }
 
@@ -110,9 +108,15 @@ export function useImages(options: UseImagesOptions = {}): UseImagesReturn {
     queryParams.append("view", view);
   }
 
-  const { data, error, isLoading, mutate } = useSWR<ImagesResponse>(
-    `/api/images?${queryParams}`,
-    fetcher
+  const { data, error, isLoading, refetch } = useAPIQuery<ImagesResponse>(
+    `/images?${queryParams}`,
+    {
+      // Add caching configuration
+      staleTime: 1000 * 60 * 2, // Data stays fresh for 2 minutes (images change frequently)
+      gcTime: 1000 * 60 * 10, // Cache persists for 10 minutes
+      refetchOnWindowFocus: false, // Prevent refetch on window focus
+      retry: 2, // Only retry failed requests twice
+    }
   );
 
   // Use useEffect to show toast when error changes
@@ -125,6 +129,10 @@ export function useImages(options: UseImagesOptions = {}): UseImagesReturn {
       });
     }
   }, [error, toast]);
+
+  const mutate = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   return {
     data: data || null,

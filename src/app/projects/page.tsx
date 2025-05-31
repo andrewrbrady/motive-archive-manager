@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 import { useRouter } from "next/navigation";
 import {
   Project,
@@ -38,7 +38,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,8 +62,10 @@ export default function ProjectsPage() {
   >({});
 
   const fetchProjects = async () => {
-    if (fetchingRef.current) {
-      console.log("ProjectsPage: Already fetching, skipping...");
+    if (fetchingRef.current || !api) {
+      console.log(
+        "ProjectsPage: Already fetching or no API client, skipping..."
+      );
       return;
     }
 
@@ -84,8 +86,7 @@ export default function ProjectsPage() {
       const url = `/api/projects?${params.toString()}`;
       console.log("ProjectsPage: Fetching from URL:", url);
 
-      const response = await authenticatedFetch(url);
-      const data: ProjectListResponse = await response.json();
+      const data = (await api.get(url)) as ProjectListResponse;
       console.log("ProjectsPage: Received data:", {
         projectsCount: data.projects.length,
         total: data.total,

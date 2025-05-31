@@ -26,6 +26,7 @@ interface UserRecord {
   emailVerified: boolean;
   creationTime: string;
   lastSignInTime: string;
+  photoURL?: string;
   providerData: {
     providerId: string;
     uid: string;

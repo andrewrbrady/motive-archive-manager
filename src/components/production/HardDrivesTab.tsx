@@ -456,6 +456,9 @@ export default function HardDrivesTab() {
 
       return () => clearTimeout(timeoutId);
     }
+
+    // Return undefined for all other paths
+    return undefined;
   }, [searchParams, selectedDriveId, getParam, fetchDriveDetailsById]);
 
   const handleSearch = (value: string) => {
@@ -1013,10 +1016,10 @@ export default function HardDrivesTab() {
                           90
                             ? "bg-[hsl(var(--destructive))]"
                             : (drive.capacity.used / drive.capacity.total) *
-                                100 >
-                              75
-                            ? "bg-[hsl(var(--warning))]"
-                            : "bg-[hsl(var(--primary))]"
+                                  100 >
+                                75
+                              ? "bg-[hsl(var(--warning))]"
+                              : "bg-[hsl(var(--primary))]"
                         }`}
                         style={{
                           width: `${Math.min(
@@ -1037,8 +1040,8 @@ export default function HardDrivesTab() {
                       drive.status === "Available"
                         ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
                         : drive.status === "In Use"
-                        ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
-                        : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                          : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
                     }`}
                   >
                     {drive.status || "Unknown"}
@@ -1145,10 +1148,10 @@ export default function HardDrivesTab() {
                         drive.status === "Available"
                           ? "bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]"
                           : drive.status === "In Use"
-                          ? "bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]"
-                          : drive.status === "Archived"
-                          ? "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"
-                          : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                            ? "bg-[hsl(var(--warning))] text-[hsl(var(--warning-foreground))]"
+                            : drive.status === "Archived"
+                              ? "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"
+                              : "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
                       )}
                     >
                       {drive.status || "Unknown"}

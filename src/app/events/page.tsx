@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 import { Event, EventType } from "@/types/event";
 import {
   Table,
@@ -41,7 +41,7 @@ interface EventWithCar extends Event {
 
 export default function EventsPage() {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -85,6 +85,11 @@ export default function EventsPage() {
   };
 
   const fetchEvents = async () => {
+    if (!api) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -92,10 +97,9 @@ export default function EventsPage() {
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
 
-      const response = await authenticatedFetch(
+      const data = (await api.get(
         `/api/events?${queryParams.toString()}`
-      );
-      const data = await response.json();
+      )) as Event[];
 
       // Fetch car information for each event
       const eventsWithCars = await Promise.all(
@@ -106,8 +110,7 @@ export default function EventsPage() {
               console.error("No car_id found for event:", event);
               return event;
             }
-            const carResponse = await authenticatedFetch(`/api/cars/${carId}`);
-            const car = await carResponse.json();
+            const car = (await api.get(`/api/cars/${carId}`)) as Car;
             return { ...event, car };
           } catch (error) {
             console.error("Error fetching car:", error);
@@ -126,11 +129,11 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    // Only fetch when authenticated
-    if (status === "authenticated" && session?.user) {
+    // Only fetch when authenticated and API is available
+    if (status === "authenticated" && session?.user && api) {
       fetchEvents();
     }
-  }, [status, session, filters]);
+  }, [status, session, api, filters]);
 
   // Show loading while authentication is being handled
   if (status === "loading") {

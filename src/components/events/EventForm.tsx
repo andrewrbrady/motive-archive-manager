@@ -33,7 +33,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface User {
   _id: string;
@@ -62,7 +62,7 @@ interface EventFormProps {
 }
 
 export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
 
@@ -80,10 +80,10 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
 
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!api) return;
+
       try {
-        const response = await authenticatedFetch("/api/users");
-        if (!response.ok) throw new Error("Failed to fetch users");
-        const data = await response.json();
+        const data = (await api.get("/api/users")) as User[];
         setUsers(data.filter((user: User) => user.status === "active"));
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -92,23 +92,17 @@ export default function EventForm({ carId, event, onSuccess }: EventFormProps) {
     };
 
     fetchUsers();
-  }, [authenticatedFetch]);
+  }, [api]);
 
   const onSubmit = async (data: EventFormData) => {
+    if (!api) return;
+
     setIsSubmitting(true);
     try {
-      const response = await authenticatedFetch(`/api/cars/${carId}/events`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...data,
-          car_id: carId,
-        }),
+      await api.post(`/api/cars/${carId}/events`, {
+        ...data,
+        car_id: carId,
       });
-
-      if (!response.ok) throw new Error("Failed to create event");
       toast.success("Event created successfully");
       onSuccess();
     } catch (error) {

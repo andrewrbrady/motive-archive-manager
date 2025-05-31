@@ -4,7 +4,6 @@ import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import CarEntryForm, { CarEntryFormRef } from "@/components/cars/CarEntryForm";
-import { Car } from "@/types/car";
 import { PageTitle } from "@/components/ui/PageTitle";
 import type { CarFormData } from "@/components/cars/CarEntryForm";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,7 @@ export default function NewCarPage() {
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
   const carFormRef = useRef<CarEntryFormRef>(null);
 
-  const handleSubmit = async (carData: Car) => {
+  const handleSubmit = async (carData: Partial<CarFormData>) => {
     if (!api) {
       toast.error("Authentication required to create cars");
       return;

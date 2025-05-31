@@ -43,10 +43,12 @@ export default function ProjectDetailPage() {
   const { user } = useFirebaseAuth();
   const router = useRouter();
   const params = useParams();
+  const projectId = params?.id as string;
   const api = useAPI();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [invitingUser, setInvitingUser] = useState(false);
   const initialLoadRef = useRef(false);
 
   // Get tab from URL searchParams, default to "overview"
@@ -180,7 +182,7 @@ export default function ProjectDetailPage() {
       initialLoadRef.current = true;
       fetchProject();
     }
-  }, [session, status, user, params.id]);
+  }, [session, status, user, projectId]);
 
   const fetchProject = async () => {
     console.log("🔄 Fetching project data...");
@@ -197,8 +199,8 @@ export default function ProjectDetailPage() {
       const token = await user.getIdToken();
       console.log("ProjectDetailPage: Got Firebase ID token successfully");
 
-      console.log("🌐 Making request to:", `/api/projects/${params.id}`);
-      const response = await fetch(`/api/projects/${params.id}`, {
+      console.log("🌐 Making request to:", `/api/projects/${projectId}`);
+      const response = await fetch(`/api/projects/${projectId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -350,7 +352,7 @@ export default function ProjectDetailPage() {
     try {
       setInvitingUser(true);
       await api.post("/projects/users", {
-        projectId: params.id,
+        projectId: projectId,
         userEmail: email,
         role: role,
       });

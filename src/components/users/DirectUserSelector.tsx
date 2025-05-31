@@ -15,6 +15,7 @@ import { Check, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 interface DirectUserSelectorProps {
   value: string | null;
@@ -27,6 +28,14 @@ interface DirectUserSelectorProps {
   placeholder?: string;
   disabled?: boolean;
   allowUnassign?: boolean;
+}
+
+interface User {
+  uid: string;
+  name: string;
+  email: string;
+  profileImage: string;
+  image: string;
 }
 
 function DirectUserSelector({
@@ -43,17 +52,18 @@ function DirectUserSelector({
 }: DirectUserSelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Store internal state for selected user
   const [selectedUserId, setSelectedUserId] = useState<string | null>(value);
-  const [selectedUserName, setSelectedUserName] = useState<string | null>(
-    editorName || null
+  const [selectedUserName, setSelectedUserName] = useState<string>(
+    editorName || "Unassigned"
   );
 
   // Flag to prevent multiple fetch calls
   const hasFetchedRef = useRef(false);
+  const api = useAPI();
 
   // Log state changes for debugging
   useEffect(() => {
@@ -88,19 +98,15 @@ function DirectUserSelector({
     }
   }, [value, editorName, users]);
 
-  // Fetch users from API
+  // Fetch users from API using authenticated API client
   const fetchUsers = async () => {
-    if (loading || (users.length > 0 && hasFetchedRef.current)) return;
+    if (loading || (users.length > 0 && hasFetchedRef.current) || !api) return;
 
     try {
       setLoading(true);
       hasFetchedRef.current = true;
 
-      const response = await fetch("/api/users");
-      if (!response.ok)
-        throw new Error(`Failed to fetch users: ${response.status}`);
-
-      const data = await response.json();
+      const data: any = await api.get("/users");
 
       // Handle the correct API response structure: { users: [...], total: number }
       let usersArray;
@@ -113,8 +119,6 @@ function DirectUserSelector({
         console.error("Unexpected API response structure:", data);
         throw new Error("Invalid response format");
       }
-
-      // [REMOVED] // [REMOVED] console.log(`Fetched ${usersArray.length} users`);
 
       // Filter out OAuth IDs (long numeric strings)
       const filteredUsers = usersArray
@@ -150,10 +154,12 @@ function DirectUserSelector({
     }
   };
 
-  // Fetch users on mount
+  // Fetch users on mount (only when API client is available)
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (api) {
+      fetchUsers();
+    }
+  }, [api]);
 
   // Filter users based on search
   const filteredUsers = useMemo(() => {
@@ -184,8 +190,6 @@ function DirectUserSelector({
       return;
     }
 
-    // [REMOVED] // [REMOVED] console.log(`Selecting user: ${userName} (${userId})`);
-
     // Update internal state
     setSelectedUserId(userId);
     setSelectedUserName(userName);
@@ -200,8 +204,6 @@ function DirectUserSelector({
 
   // Handle unassign
   const handleClearSelection = () => {
-    // [REMOVED] // [REMOVED] console.log("Clearing selection");
-
     // Update internal state
     setSelectedUserId(null);
     setSelectedUserName("Unassigned");

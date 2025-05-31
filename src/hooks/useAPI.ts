@@ -47,30 +47,3 @@ export function useAPIStatus() {
     error,
   };
 }
-
-/**
- * Backwards compatibility hook
- * Provides the same interface as the old useAPI from fetcher.ts
- * but uses the new APIClient under the hood
- */
-export function useAPILegacy() {
-  const api = useAPI();
-
-  if (!api) {
-    // Return null methods if not authenticated - components will need to handle this
-    return {
-      get: () => Promise.reject(new Error("Authentication required")),
-      post: () => Promise.reject(new Error("Authentication required")),
-      put: () => Promise.reject(new Error("Authentication required")),
-      delete: () => Promise.reject(new Error("Authentication required")),
-    };
-  }
-
-  // Return the same interface as the old useAPI but using new APIClient
-  return {
-    get: (url: string) => api.get(url),
-    post: (url: string, data?: any) => api.post(url, data),
-    put: (url: string, data?: any) => api.put(url, data),
-    delete: (url: string) => api.delete(url),
-  };
-}

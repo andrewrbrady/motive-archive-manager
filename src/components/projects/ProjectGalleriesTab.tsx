@@ -39,7 +39,7 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Gallery {
   _id: string;
@@ -169,7 +169,7 @@ export function ProjectGalleriesTab({
   onProjectUpdate,
 }: ProjectGalleriesTabProps) {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -178,12 +178,13 @@ export function ProjectGalleriesTab({
   const [isLinking, setIsLinking] = useState(false);
 
   const fetchProjectGalleries = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await authenticatedFetch(
+      const data = (await api.get(
         `/api/projects/${project._id}/galleries`
-      );
-      const data = await response.json();
+      )) as { galleries: Gallery[] };
       setGalleries(data.galleries || []);
     } catch (error) {
       console.error("Error fetching project galleries:", error);
@@ -198,20 +199,11 @@ export function ProjectGalleriesTab({
           description:
             "Please refresh the page and try again. You may need to sign in again.",
           variant: "destructive",
-          action: (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.reload()}
-            >
-              Refresh Page
-            </Button>
-          ),
         });
       } else {
         toast({
           title: "Error",
-          description: "Failed to fetch project galleries",
+          description: "Failed to load project galleries",
           variant: "destructive",
         });
       }
@@ -221,69 +213,47 @@ export function ProjectGalleriesTab({
   };
 
   const fetchAvailableGalleries = async () => {
+    if (!api) return;
+
     try {
-      const response = await authenticatedFetch(`/api/galleries?limit=100`);
-      const data = await response.json();
-
+      const data = (await api.get("/api/galleries")) as Gallery[];
       // Filter out galleries that are already linked to this project
-      const linkedGalleryIds = new Set(galleries.map((g) => g._id));
-      const unlinkedGalleries = data.galleries.filter(
-        (gallery: Gallery) => !linkedGalleryIds.has(gallery._id)
+      const unlinkedGalleries = data.filter(
+        (gallery) =>
+          !galleries.some((linkedGallery) => linkedGallery._id === gallery._id)
       );
-
       setAvailableGalleries(unlinkedGalleries);
     } catch (error) {
       console.error("Error fetching available galleries:", error);
-
-      // Check if it's an authentication error
-      if (
-        error instanceof Error &&
-        error.message.includes("Not authenticated")
-      ) {
-        toast({
-          title: "Authentication Error",
-          description: "Please refresh the page to continue linking galleries.",
-          variant: "destructive",
-          action: (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.reload()}
-            >
-              Refresh Page
-            </Button>
-          ),
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to fetch available galleries",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: "Failed to load available galleries",
+        variant: "destructive",
+      });
     }
   };
 
+  // Load project galleries when component mounts or project changes
   useEffect(() => {
-    // Only fetch when authenticated
-    if (status === "authenticated" && session?.user && project._id) {
+    if (api && project._id) {
       fetchProjectGalleries();
     }
-  }, [status, session, project._id]);
+  }, [api, project._id]);
 
+  // Load available galleries when link dialog opens
   useEffect(() => {
-    if (isLinkDialogOpen && status === "authenticated" && session?.user) {
+    if (isLinkDialogOpen && api) {
       fetchAvailableGalleries();
     }
-  }, [isLinkDialogOpen, galleries, status, session]);
+  }, [isLinkDialogOpen, galleries, api]);
 
   const handleLinkGallery = async (galleryId: string) => {
+    if (!api) return;
+
     try {
       setIsLinking(true);
-      await authenticatedFetch(`/api/projects/${project._id}/galleries`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ galleryId }),
+      await api.post(`/api/projects/${project._id}/galleries`, {
+        galleryId,
       });
 
       toast({
@@ -293,14 +263,13 @@ export function ProjectGalleriesTab({
 
       // Refresh the galleries list
       await fetchProjectGalleries();
-      onProjectUpdate();
       setIsLinkDialogOpen(false);
+      onProjectUpdate(); // Refresh parent data if needed
     } catch (error) {
       console.error("Error linking gallery:", error);
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to link gallery",
+        description: "Failed to link gallery to project",
         variant: "destructive",
       });
     } finally {
@@ -309,26 +278,24 @@ export function ProjectGalleriesTab({
   };
 
   const handleUnlinkGallery = async (galleryId: string) => {
+    if (!api) return;
+
     try {
-      await authenticatedFetch(
-        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`,
-        { method: "DELETE" }
-      );
+      await api.delete(`/api/projects/${project._id}/galleries/${galleryId}`);
 
       toast({
         title: "Success",
-        description: "Gallery unlinked from project successfully",
+        description: "Gallery unlinked from project",
       });
 
-      // Refresh the galleries list
-      await fetchProjectGalleries();
-      onProjectUpdate();
+      // Remove from local state
+      setGalleries((prev) => prev.filter((g) => g._id !== galleryId));
+      onProjectUpdate(); // Refresh parent data if needed
     } catch (error) {
       console.error("Error unlinking gallery:", error);
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to unlink gallery",
+        description: "Failed to unlink gallery from project",
         variant: "destructive",
       });
     }
