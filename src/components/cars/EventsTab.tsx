@@ -1,44 +1,61 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { Event, EventType } from "@/types/event";
-import { toast } from "sonner";
-import ListView from "@/components/events/ListView";
-import EventBatchTemplates from "@/components/events/EventBatchTemplates";
-import EventBatchManager from "@/components/events/EventBatchManager";
-import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { PageTitle } from "@/components/ui/PageTitle";
+import { LoadingContainer } from "@/components/ui/loading-container";
+import EventBatchTemplates from "@/components/events/EventBatchTemplates";
+import EventBatchManager from "@/components/events/EventBatchManager";
+import ListView from "@/components/events/ListView";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Copy, Package, Pencil, FileJson } from "lucide-react";
-import { LoadingContainer } from "@/components/ui/loading";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { DateTimePicker } from "@/components/ui/datetime-picker";
-import { EventTypeSelector } from "@/components/events/EventTypeSelector";
+import { Pencil, FileJson, Package, Copy, Plus } from "lucide-react";
+import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import {
   CustomDropdown,
   LocationDropdown,
 } from "@/components/ui/custom-dropdown";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { EventTypeSelector } from "@/components/events/EventTypeSelector";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface EventsTabProps {
   carId: string;
 }
 
 export default function EventsTab({ carId }: EventsTabProps) {
+  const { data: session, status } = useSession();
+  const { authenticatedFetch } = useAuthenticatedFetch();
+  const { toast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBatchManager, setShowBatchManager] = useState(false);
@@ -51,7 +68,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/cars/${carId}/events`);
+      const response = await authenticatedFetch(`/api/cars/${carId}/events`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -63,17 +80,21 @@ export default function EventsTab({ carId }: EventsTabProps) {
       setEvents(data);
     } catch (error) {
       console.error("Error fetching events:", error);
-      toast.error("Failed to fetch events");
+      toast({
+        title: "Error",
+        description: "Failed to fetch events",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (carId) {
+    if (status === "authenticated" && session?.user && carId) {
       fetchEvents();
     }
-  }, [carId]);
+  }, [carId, status, session]);
 
   const handleUpdateEvent = async (
     eventId: string,
@@ -87,24 +108,34 @@ export default function EventsTab({ carId }: EventsTabProps) {
         )
       );
 
-      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
+      const response = await authenticatedFetch(
+        `/api/cars/${carId}/events/${eventId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updates),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update event");
       }
 
-      toast.success("Event updated successfully");
+      toast({
+        title: "Success",
+        description: "Event updated successfully",
+      });
     } catch (error) {
       // Revert the optimistic update on error
       fetchEvents();
       console.error("Error updating event:", error);
-      toast.error("Failed to update event");
+      toast({
+        title: "Error",
+        description: "Failed to update event",
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -116,27 +147,37 @@ export default function EventsTab({ carId }: EventsTabProps) {
         currentEvents.filter((event) => event.id !== eventId)
       );
 
-      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
-        method: "DELETE",
-      });
+      const response = await authenticatedFetch(
+        `/api/cars/${carId}/events/${eventId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Failed to delete event");
       }
 
-      toast.success("Event deleted successfully");
+      toast({
+        title: "Success",
+        description: "Event deleted successfully",
+      });
     } catch (error) {
       // Revert the optimistic update on error
       fetchEvents();
       console.error("Error deleting event:", error);
-      toast.error("Failed to delete event");
+      toast({
+        title: "Error",
+        description: "Failed to delete event",
+        variant: "destructive",
+      });
       throw error;
     }
   };
 
   const handleCreateEvent = async (eventData: Partial<Event>) => {
     try {
-      const response = await fetch(`/api/cars/${carId}/events`, {
+      const response = await authenticatedFetch(`/api/cars/${carId}/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -150,16 +191,22 @@ export default function EventsTab({ carId }: EventsTabProps) {
       }
 
       const result = await response.json();
-      toast.success("Event created successfully");
+      toast({
+        title: "Success",
+        description: "Event created successfully",
+      });
 
       // Close the modal and refresh events
       setShowCreateEvent(false);
       fetchEvents();
     } catch (error) {
       console.error("Error creating event:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create event"
-      );
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to create event",
+        variant: "destructive",
+      });
       throw error; // Re-throw so the modal knows there was an error
     }
   };
@@ -168,13 +215,16 @@ export default function EventsTab({ carId }: EventsTabProps) {
     try {
       setIsSubmittingJson(true);
 
-      const response = await fetch(`/api/cars/${carId}/events/batch`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ events: jsonData }),
-      });
+      const response = await authenticatedFetch(
+        `/api/cars/${carId}/events/batch`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ events: jsonData }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -182,15 +232,21 @@ export default function EventsTab({ carId }: EventsTabProps) {
       }
 
       const result = await response.json();
-      toast.success(`Successfully created ${result.count} events`);
+      toast({
+        title: "Success",
+        description: `Successfully created ${result.count} events`,
+      });
 
       // Refresh the events list
       fetchEvents();
     } catch (error) {
       console.error("Error creating events from JSON:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create events"
-      );
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to create events",
+        variant: "destructive",
+      });
       throw error; // Re-throw to prevent modal from closing
     } finally {
       setIsSubmittingJson(false);
@@ -319,6 +375,7 @@ function CreateEventDialog({
   onCreate: (data: Partial<Event>) => void;
   carId: string;
 }) {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     type: EventType.DETAIL,
     title: "",
@@ -336,12 +393,20 @@ function CreateEventDialog({
 
     // Validate required fields
     if (!formData.title.trim()) {
-      toast.error("Title is required");
+      toast({
+        title: "Error",
+        description: "Title is required",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!formData.start) {
-      toast.error("Start date is required");
+      toast({
+        title: "Error",
+        description: "Start date is required",
+        variant: "destructive",
+      });
       return;
     }
 

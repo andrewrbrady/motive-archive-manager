@@ -3,7 +3,7 @@ import { Deliverable } from "@/types/deliverable";
 import { DeliverablesTabProps } from "./deliverables-tab/types";
 import { useDeliverables } from "./deliverables-tab/hooks/useDeliverables";
 import { useBatchMode } from "./deliverables-tab/hooks/useBatchMode";
-import { useAPI } from "@/lib/fetcher";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import DeliverablesHeader from "./deliverables-tab/components/DeliverablesHeader";
 import DeliverableCard from "./deliverables-tab/components/DeliverableCard";
 import DeliverablesTable from "./deliverables-tab/components/DeliverablesTable";
@@ -21,8 +21,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   // Get the actual carId string
   const actualCarId = Array.isArray(carId) ? carId[0] : carId;
 
-  // Initialize API hook
-  const api = useAPI();
+  // Initialize authenticated fetch hook
+  const { authenticatedFetch } = useAuthenticatedFetch();
 
   // Use our custom hooks
   const {
@@ -55,11 +55,16 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     try {
       setIsSubmittingJson(true);
 
-      const result = await api.post(
+      const response = await authenticatedFetch(
         `/api/cars/${actualCarId}/deliverables/batch`,
-        { deliverables: jsonData }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deliverables: jsonData }),
+        }
       );
 
+      const result = await response.json();
       toast.success(`Successfully created ${result.count} deliverables`);
 
       // Refresh the deliverables list

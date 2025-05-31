@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAPI } from "@/lib/fetcher";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import {
   Project,
@@ -38,7 +38,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
-  const api = useAPI();
+  const { authenticatedFetch } = useAuthenticatedFetch();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,12 +67,6 @@ export default function ProjectsPage() {
       return;
     }
 
-    // Only fetch if we have a session
-    if (!session?.user?.id) {
-      console.log("ProjectsPage: No session, skipping fetch");
-      return;
-    }
-
     try {
       fetchingRef.current = true;
       console.log("ProjectsPage: Starting to fetch projects...");
@@ -90,7 +84,8 @@ export default function ProjectsPage() {
       const url = `/api/projects?${params.toString()}`;
       console.log("ProjectsPage: Fetching from URL:", url);
 
-      const data: ProjectListResponse = await api.get(url);
+      const response = await authenticatedFetch(url);
+      const data: ProjectListResponse = await response.json();
       console.log("ProjectsPage: Received data:", {
         projectsCount: data.projects.length,
         total: data.total,
@@ -131,20 +126,25 @@ export default function ProjectsPage() {
 
   // Simplified effect - just fetch when we have session
   useEffect(() => {
-    if (session?.user?.id && !initialLoadRef.current) {
+    // Only fetch when authenticated
+    if (
+      status === "authenticated" &&
+      session?.user &&
+      !initialLoadRef.current
+    ) {
       console.log("ProjectsPage: Initial load - fetching projects");
       initialLoadRef.current = true;
       fetchProjects();
     }
-  }, [session?.user?.id]);
+  }, [status, session]);
 
   // Search and filter effect
   useEffect(() => {
-    if (initialLoadRef.current && session?.user?.id) {
+    if (initialLoadRef.current && status === "authenticated" && session?.user) {
       console.log("ProjectsPage: Search/filter changed, refetching projects");
       fetchProjects();
     }
-  }, [search, statusFilter, typeFilter]);
+  }, [search, statusFilter, typeFilter, status, session]);
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {

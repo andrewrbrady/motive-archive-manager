@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Car } from "./useCarData";
+import { useAPI } from "@/lib/fetcher";
 
 interface CarsQueryParams {
   page?: number;
@@ -16,6 +17,7 @@ interface CarsQueryParams {
  * Hook to fetch car listings with various filters
  */
 export function useCars(params: CarsQueryParams = {}) {
+  const api = useAPI();
   const {
     page = 1,
     limit = 1000,
@@ -55,15 +57,7 @@ export function useCars(params: CarsQueryParams = {}) {
         queryParams.set("model", model);
       }
 
-      const response = await fetch(
-        `/api/cars/simple?${queryParams.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch cars");
-      }
-
-      const data = await response.json();
+      const data = await api.get(`/api/cars/simple?${queryParams.toString()}`);
 
       return {
         cars: data.cars as Car[],
@@ -85,16 +79,12 @@ export function useCars(params: CarsQueryParams = {}) {
  * Hook to fetch available makes for filtering
  */
 export function useCarMakes() {
+  const api = useAPI();
+
   return useQuery({
     queryKey: ["carMakes"],
     queryFn: async () => {
-      const response = await fetch("/api/cars/makes");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch makes");
-      }
-
-      const data = await response.json();
+      const data = await api.get("/api/cars/makes");
       return data.makes as string[];
     },
   });
@@ -104,6 +94,8 @@ export function useCarMakes() {
  * Hook to fetch available models for a specific make
  */
 export function useCarModels(make: string | null) {
+  const api = useAPI();
+
   return useQuery({
     queryKey: ["carModels", make],
     queryFn: async () => {
@@ -111,15 +103,9 @@ export function useCarModels(make: string | null) {
         return [];
       }
 
-      const response = await fetch(
+      const data = await api.get(
         `/api/cars/models?make=${encodeURIComponent(make)}`
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch models");
-      }
-
-      const data = await response.json();
       return data.models as string[];
     },
     enabled: !!make, // Only run the query if make is provided

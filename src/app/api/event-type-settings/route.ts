@@ -6,8 +6,8 @@ import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 export async function GET(request: NextRequest) {
   console.log("🔒 GET /api/event-type-settings: Starting request");
 
-  // Check authentication and admin role
-  const authResult = await verifyAuthMiddleware(request, ["admin"]);
+  // Check authentication (allow all authenticated users, not just admins)
+  const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
     console.log("❌ GET /api/event-type-settings: Authentication failed");
     return authResult;

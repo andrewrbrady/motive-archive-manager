@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAPI } from "@/lib/fetcher";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { Event, EventType } from "@/types/event";
 import {
   Table,
@@ -41,7 +41,7 @@ interface EventWithCar extends Event {
 
 export default function EventsPage() {
   const { data: session, status } = useSession();
-  const api = useAPI();
+  const { authenticatedFetch } = useAuthenticatedFetch();
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -85,11 +85,6 @@ export default function EventsPage() {
   };
 
   const fetchEvents = async () => {
-    if (!session?.user?.id) {
-      console.log("EventsPage: No session, skipping fetch");
-      return;
-    }
-
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -97,7 +92,10 @@ export default function EventsPage() {
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
 
-      const data = await api.get(`/api/events?${queryParams.toString()}`);
+      const response = await authenticatedFetch(
+        `/api/events?${queryParams.toString()}`
+      );
+      const data = await response.json();
 
       // Fetch car information for each event
       const eventsWithCars = await Promise.all(
@@ -108,7 +106,8 @@ export default function EventsPage() {
               console.error("No car_id found for event:", event);
               return event;
             }
-            const car = await api.get(`/api/cars/${carId}`);
+            const carResponse = await authenticatedFetch(`/api/cars/${carId}`);
+            const car = await carResponse.json();
             return { ...event, car };
           } catch (error) {
             console.error("Error fetching car:", error);
@@ -127,10 +126,11 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    if (session?.user?.id) {
+    // Only fetch when authenticated
+    if (status === "authenticated" && session?.user) {
       fetchEvents();
     }
-  }, [session?.user?.id, filters]);
+  }, [status, session, filters]);
 
   // Show loading while authentication is being handled
   if (status === "loading") {
