@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Car } from "./useCarData";
-import { useAPI } from "@/lib/fetcher";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CarsQueryParams {
   page?: number;
@@ -35,6 +35,8 @@ export function useCars(params: CarsQueryParams = {}) {
       { page, limit, sort, sortDirection, status, search, make, model },
     ],
     queryFn: async () => {
+      if (!api) throw new Error("Authentication required");
+
       // Construct query parameters
       const queryParams = new URLSearchParams();
       queryParams.set("page", page.toString());
@@ -57,7 +59,9 @@ export function useCars(params: CarsQueryParams = {}) {
         queryParams.set("model", model);
       }
 
-      const data = await api.get(`/api/cars/simple?${queryParams.toString()}`);
+      const data: any = await api.get(
+        `/api/cars/simple?${queryParams.toString()}`
+      );
 
       return {
         cars: data.cars as Car[],
@@ -66,6 +70,7 @@ export function useCars(params: CarsQueryParams = {}) {
         currentPage: data.pagination.currentPage,
       };
     },
+    enabled: !!api, // Only run query when API client is available
     // Add caching configuration
     staleTime: 1000 * 60 * 5, // Data stays fresh for 5 minutes
     gcTime: 1000 * 60 * 30, // Cache persists for 30 minutes
@@ -84,9 +89,12 @@ export function useCarMakes() {
   return useQuery({
     queryKey: ["carMakes"],
     queryFn: async () => {
-      const data = await api.get("/api/cars/makes");
+      if (!api) throw new Error("Authentication required");
+
+      const data: any = await api.get("/api/cars/makes");
       return data.makes as string[];
     },
+    enabled: !!api, // Only run query when API client is available
   });
 }
 
@@ -99,15 +107,16 @@ export function useCarModels(make: string | null) {
   return useQuery({
     queryKey: ["carModels", make],
     queryFn: async () => {
+      if (!api) throw new Error("Authentication required");
       if (!make) {
         return [];
       }
 
-      const data = await api.get(
+      const data: any = await api.get(
         `/api/cars/models?make=${encodeURIComponent(make)}`
       );
       return data.models as string[];
     },
-    enabled: !!make, // Only run the query if make is provided
+    enabled: !!api && !!make, // Only run the query if API is available and make is provided
   });
 }

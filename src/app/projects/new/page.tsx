@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAPI } from "@/lib/fetcher";
+import { useAPI } from "@/hooks/useAPI";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,13 +102,23 @@ export default function NewProjectPage() {
       router.push("/auth/signin");
       return;
     }
+    if (!api) return; // Wait for API to be available
     fetchTemplates();
-  }, [session, status]);
+  }, [session, status, api]);
 
   const fetchTemplates = async () => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication required to load templates",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setTemplatesLoading(true);
-      const data = await api.get("/api/projects/templates");
+      const data: any = await api.get("/api/projects/templates");
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -161,6 +171,15 @@ export default function NewProjectPage() {
   };
 
   const handleCreateProject = async () => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication required to create project",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -176,14 +195,14 @@ export default function NewProjectPage() {
         templateId: selectedTemplate?._id,
       };
 
-      const { project } = await api.post("/api/projects", projectData);
+      const result: any = await api.post("/api/projects", projectData);
 
       toast({
         title: "Success",
         description: "Project created successfully",
       });
 
-      router.push(`/projects/${project._id}`);
+      router.push(`/projects/${result.project._id}`);
     } catch (error) {
       console.error("Error creating project:", error);
       toast({
@@ -227,7 +246,7 @@ export default function NewProjectPage() {
     }
   };
 
-  if (status === "loading" || templatesLoading) {
+  if (status === "loading" || templatesLoading || !api) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">
