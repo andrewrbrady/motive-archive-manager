@@ -13,20 +13,25 @@ import type {
   ProjectCar,
   ProjectEvent,
 } from "../projects/caption-generator/types";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CarCopywriterProps {
   carId: string;
 }
 
 export function CarCopywriter({ carId }: CarCopywriterProps) {
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
+
   const config: CopywriterConfig = {
     mode: "car",
     entityId: carId,
     title: "Car Copywriter",
     apiEndpoints: {
-      captions: `/api/captions`,
-      systemPrompts: `/api/system-prompts/active`,
-      events: `/api/cars/${carId}/events`,
+      captions: `captions`,
+      systemPrompts: `system-prompts/active`,
+      events: `cars/${carId}/events`,
     },
     features: {
       allowMultipleCars: false,
@@ -40,9 +45,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     onDataFetch: async (): Promise<CopywriterData> => {
       try {
         // Fetch car details
-        const carResponse = await fetch(`/api/cars/${carId}`);
-        if (!carResponse.ok) throw new Error("Failed to fetch car details");
-        const carData = await carResponse.json();
+        const carData = (await api.get(`cars/${carId}`)) as any;
 
         // Convert to project car format
         const projectCar: ProjectCar = {
@@ -59,47 +62,47 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
         // Fetch car events
         let carEvents: ProjectEvent[] = [];
         try {
-          const eventsResponse = await fetch(`/api/cars/${carId}/events`);
-          if (eventsResponse.ok) {
-            const events = await eventsResponse.json();
-            carEvents = events.map((event: any) => ({
-              id: event._id,
-              car_id: carId,
-              type: event.type,
-              title: event.title,
-              description: event.description || "",
-              start: event.start,
-              end: event.end,
-              isAllDay: event.isAllDay,
-              teamMemberIds: event.teamMemberIds || [],
-              locationId: event.locationId,
-              primaryImageId: event.primaryImageId,
-              imageIds: event.imageIds || [],
-              createdAt: event.createdAt,
-              updatedAt: event.updatedAt,
-            }));
-          }
+          const events = (await api.get(`cars/${carId}/events`)) as any[];
+          carEvents = events.map((event: any) => ({
+            id: event._id,
+            car_id: carId,
+            type: event.type,
+            title: event.title,
+            description: event.description || "",
+            start: event.start,
+            end: event.end,
+            isAllDay: event.isAllDay,
+            teamMemberIds: event.teamMemberIds || [],
+            locationId: event.locationId,
+            primaryImageId: event.primaryImageId,
+            imageIds: event.imageIds || [],
+            createdAt: event.createdAt,
+            updatedAt: event.updatedAt,
+          }));
         } catch (error) {
           console.error("Error fetching car events:", error);
         }
 
         // Fetch system prompts
-        const systemPromptsResponse = await fetch(`/api/system-prompts/active`);
-        if (!systemPromptsResponse.ok)
-          throw new Error("Failed to fetch system prompts");
-        const systemPrompts = await systemPromptsResponse.json();
+        const systemPrompts = (await api.get(`system-prompts/active`)) as any;
 
         // Fetch length settings
-        const lengthResponse = await fetch(`/api/admin/length-settings`);
-        const lengthSettings = lengthResponse.ok
-          ? await lengthResponse.json()
-          : [];
+        let lengthSettings = [];
+        try {
+          lengthSettings = (await api.get(`admin/length-settings`)) as any[];
+        } catch (error) {
+          console.error("Error fetching length settings:", error);
+        }
 
         // Fetch saved captions
-        const captionsResponse = await fetch(`/api/captions?carId=${carId}`);
-        const savedCaptionsData = captionsResponse.ok
-          ? await captionsResponse.json()
-          : [];
+        let savedCaptionsData = [];
+        try {
+          savedCaptionsData = (await api.get(
+            `captions?carId=${carId}`
+          )) as any[];
+        } catch (error) {
+          console.error("Error fetching saved captions:", error);
+        }
 
         // Convert car captions to project caption format
         const savedCaptions = savedCaptionsData.map((caption: any) => ({
@@ -119,12 +122,9 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           const clientId =
             carData.client || carData.clientId || carData.clientInfo?._id;
           if (clientId) {
-            const clientRes = await fetch(`/api/clients/${clientId}`);
-            if (clientRes.ok) {
-              const client = await clientRes.json();
-              if (client.socialMedia?.instagram) {
-                clientHandle = `@${client.socialMedia.instagram.replace(/^@/, "")}`;
-              }
+            const client = (await api.get(`clients/${clientId}`)) as any;
+            if (client.socialMedia?.instagram) {
+              clientHandle = `@${client.socialMedia.instagram.replace(/^@/, "")}`;
             }
           }
         } catch (error) {
@@ -147,22 +147,12 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
     onSaveCaption: async (captionData: any): Promise<boolean> => {
       try {
-        const response = await fetch("/api/captions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            platform: captionData.platform,
-            carId: carId,
-            context: captionData.context,
-            caption: captionData.caption,
-          }),
+        await api.post("captions", {
+          platform: captionData.platform,
+          carId: carId,
+          context: captionData.context,
+          caption: captionData.caption,
         });
-
-        if (!response.ok) {
-          throw new Error("Failed to save caption");
-        }
 
         toast({
           title: "Success",
@@ -183,16 +173,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
     onDeleteCaption: async (captionId: string): Promise<boolean> => {
       try {
-        const response = await fetch(
-          `/api/captions?id=${captionId}&carId=${carId}`,
-          {
-            method: "DELETE",
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to delete caption");
-        }
+        await api.delete(`captions?id=${captionId}&carId=${carId}`);
 
         toast({
           title: "Success",
@@ -216,19 +197,9 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       newText: string
     ): Promise<boolean> => {
       try {
-        const response = await fetch(`/api/captions?id=${captionId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            caption: newText,
-          }),
+        await api.patch(`captions?id=${captionId}`, {
+          caption: newText,
         });
-
-        if (!response.ok) {
-          throw new Error("Failed to update caption");
-        }
 
         toast({
           title: "Success",

@@ -254,24 +254,14 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   }, [mutate, toast]);
 
   const handleDeleteSelected = useCallback(async () => {
-    if (selectedImages.size === 0) return;
+    if (selectedImages.size === 0 || !api) return;
 
     try {
       const imageIds = Array.from(selectedImages);
-      const response = await fetch(`/api/cars/${carId}/images`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageIds,
-          deleteFromStorage: true,
-        }),
+      await api.deleteWithBody(`cars/${carId}/images`, {
+        imageIds,
+        deleteFromStorage: true,
       });
-
-      if (!response.ok) {
-        throw new Error(`Delete failed: ${response.status}`);
-      }
 
       toast({
         title: "Success",
@@ -287,7 +277,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         variant: "destructive",
       });
     }
-  }, [selectedImages, carId, toast, mutate]);
+  }, [selectedImages, carId, toast, mutate, api]);
 
   const reanalyzeImage = useCallback(
     async (imageId: string, promptId?: string, modelId?: string) => {
@@ -315,7 +305,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
           requestBody.modelId = modelId;
         }
 
-        const result = await api.post("/openai/reanalyze-image", requestBody);
+        const result = await api.post("openai/reanalyze-image", requestBody);
 
         toast({
           title: "Re-analysis Complete",
@@ -345,7 +335,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       if (!api) return;
 
       try {
-        await api.patch(`/cars/${carId}/thumbnail`, {
+        await api.patch(`cars/${carId}/thumbnail`, {
           primaryImageId: imageId,
         });
 

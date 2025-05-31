@@ -7,6 +7,11 @@ import { HardDriveData } from "@/models/hard-drive";
 import CarSelector from "@/components/CarSelector";
 import { ObjectId } from "@/lib/types";
 import { Car } from "@/types/car";
+import { UrlModal } from "@/components/ui/url-modal";
+import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface EditRawAssetModalProps {
   isOpen: boolean;
@@ -110,6 +115,7 @@ export default function EditRawAssetModal({
   onSave,
   asset,
 }: EditRawAssetModalProps) {
+  const api = useAPI();
   // Keep track of the initial asset to avoid resetting form data when the component rerenders
   const [initialAssetId, setInitialAssetId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<RawAssetData>>({
@@ -130,6 +136,7 @@ export default function EditRawAssetModal({
   const [showDriveSuggestions, setShowDriveSuggestions] = useState(false);
   const [carCache, setCarCache] = useState<Record<string, any>>({});
   const driveSearchRef = useRef<HTMLDivElement>(null);
+  const [isLoadingSelectedDrives, setIsLoadingSelectedDrives] = useState(false);
 
   // Reset form data when modal is closed
   useEffect(() => {
@@ -465,31 +472,36 @@ export default function EditRawAssetModal({
 
       // Fetch selected drives
       const fetchSelectedDrives = async () => {
+        if (!api || !hardDriveIds.length) {
+          setSelectedDrives([]);
+          return;
+        }
+
         try {
           // Ensure hardDriveIds are strings
           const hardDriveIdsAsStrings = hardDriveIds.map((id) =>
             typeof id === "string" ? id : (id as any).toString()
           );
 
-          // [REMOVED] // [REMOVED] console.log("Fetching drives for IDs:", hardDriveIdsAsStrings);
-
           const promises = hardDriveIdsAsStrings.map(async (hardDriveId) => {
-            const response = await fetch(`/api/hard-drives/${hardDriveId}`);
-            if (!response.ok) {
-              console.error(`Failed to fetch drive ${hardDriveId}`);
+            try {
+              const data = await api.get<HardDriveData & { _id: ObjectId }>(
+                `/hard-drives/${hardDriveId}`
+              );
+              return {
+                _id: data._id.toString(),
+                label: data.label,
+                name: data.label, // Use label as name
+              } as HardDriveWithId;
+            } catch (error) {
+              console.error(`Failed to fetch drive ${hardDriveId}:`, error);
               return null;
             }
-            const data = await response.json();
-            return {
-              ...data,
-              _id: data._id.toString(),
-            };
           });
 
           const drives = (await Promise.all(promises)).filter(
             (drive): drive is HardDriveWithId => drive !== null
           );
-          // [REMOVED] // [REMOVED] console.log("Fetched drives:", drives);
           setSelectedDrives(drives);
         } catch (error) {
           console.error("Error fetching selected drives:", error);
@@ -841,8 +853,8 @@ export default function EditRawAssetModal({
                   ? "Saving..."
                   : "Adding..."
                 : asset
-                ? "Save Changes"
-                : "Add Raw Asset"}
+                  ? "Save Changes"
+                  : "Add Raw Asset"}
             </button>
           </div>
         </form>

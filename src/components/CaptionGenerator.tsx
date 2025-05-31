@@ -46,6 +46,8 @@ import {
   ProviderId,
   findModelById,
 } from "@/lib/llmProviders";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 type Platform = "instagram" | "youtube";
 type Template = "none" | "bat" | "dealer" | "question";
@@ -82,13 +84,9 @@ const generateQuestion = async (carDetails: BaTCarDetails) => {
 };
 
 // Function to fetch client's Instagram handle
-const fetchClientInstagram = async (clientId: string) => {
+const fetchClientInstagram = async (clientId: string, api: any) => {
   try {
-    const response = await fetch(`/api/clients/${clientId}`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch client");
-    }
-    const client = await response.json();
+    const client = await api.get(`clients/${clientId}`);
     return client.socialMedia?.instagram
       ? `@${client.socialMedia.instagram.replace(/^@/, "")}`
       : null;
@@ -99,6 +97,10 @@ const fetchClientInstagram = async (clientId: string) => {
 };
 
 export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
+
   const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
   const [carLoading, setCarLoading] = useState(true);
   const [carError, setCarError] = useState<string | null>(null);
@@ -172,16 +174,18 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       setCarLoading(true);
       setCarError(null);
       try {
-        const response = await fetch(`/api/cars/${carId}`);
-        if (!response.ok) throw new Error("Failed to fetch car details");
-        const data = await response.json();
+        const data = (await api.get(`cars/${carId}`)) as BaTCarDetails & {
+          client?: string;
+          clientId?: string;
+          clientInfo?: { _id: string };
+        };
         setCarDetails(data);
+
         // Try to get clientId from car details
         const clientId = data.client || data.clientId || data.clientInfo?._id;
         if (clientId) {
-          const clientRes = await fetch(`/api/clients/${clientId}`);
-          if (clientRes.ok) {
-            const client = await clientRes.json();
+          try {
+            const client = (await api.get(`clients/${clientId}`)) as any;
             if (client.socialMedia?.instagram) {
               setClientHandle(
                 `@${client.socialMedia.instagram.replace(/^@/, "")}`
@@ -189,7 +193,8 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
             } else {
               setClientHandle(null);
             }
-          } else {
+          } catch (clientError) {
+            console.error("Error fetching client:", clientError);
             setClientHandle(null);
           }
         } else {
@@ -205,17 +210,19 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       }
     };
     fetchCarDetails();
-  }, [carId]);
+  }, [carId, api]);
 
   // Fetch existing captions when component mounts
   useEffect(() => {
     const fetchCaptions = async () => {
       try {
-        const response = await fetch(`/api/captions?carId=${carId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch captions");
-        }
-        const captions = await response.json();
+        const captions = (await api.get(`captions?carId=${carId}`)) as Array<{
+          _id: string;
+          platform: string;
+          context: string;
+          caption: string;
+          createdAt: string;
+        }>;
         setSavedCaptions(captions);
       } catch (err) {
         console.error("Error fetching captions:", err);
@@ -223,52 +230,56 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
     };
 
     fetchCaptions();
-  }, [carId]);
+  }, [carId, api]);
 
   // Fetch prompts when component mounts (was previously on modal open)
   useEffect(() => {
+    if (!api) return;
+
     setPromptLoading(true);
     setPromptError(null);
-    fetch("/api/caption-prompts")
-      .then((res) => res.json())
-      .then((data) => {
+
+    const fetchPrompts = async () => {
+      try {
+        const data = (await api.get("caption-prompts")) as any[];
         setPromptList(Array.isArray(data) ? data : []);
-        // If no prompt is selected yet, and we have prompts, try to load default
-        // This logic will be refined in the default prompt loading useEffect
-      })
-      .catch((err) => setPromptError("Failed to fetch prompts"))
-      .finally(() => setPromptLoading(false));
-  }, []);
+      } catch (err) {
+        setPromptError("Failed to fetch prompts");
+      } finally {
+        setPromptLoading(false);
+      }
+    };
+
+    fetchPrompts();
+  }, [api]);
 
   // Fetch system prompts when component mounts
   useEffect(() => {
     fetchSystemPrompts();
-  }, []);
+  }, [api]);
 
   // Fetch length settings when component mounts
   useEffect(() => {
     fetchLengthSettings();
-  }, []);
+  }, [api]);
 
   // Refetch system prompts when length changes
   useEffect(() => {
     fetchSystemPrompts();
-  }, [length]);
+  }, [length, api]);
 
   const fetchSystemPrompts = async () => {
+    if (!api) return;
+
     try {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
       // Include length parameter if one is selected
       const lengthParam = length ? `?length=${length.key}` : "";
-      const response = await fetch(`/api/system-prompts/list${lengthParam}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch system prompts");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(
+        `system-prompts/list${lengthParam}`
+      )) as any[];
       setSystemPrompts(Array.isArray(data) ? data : []);
 
       // Auto-select the first active system prompt if available
@@ -287,16 +298,13 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   };
 
   const fetchLengthSettings = async () => {
+    if (!api) return;
+
     try {
       setLoadingLengthSettings(true);
       setLengthSettingsError(null);
 
-      const response = await fetch("/api/length-settings");
-      if (!response.ok) {
-        throw new Error("Failed to fetch length settings");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("length-settings")) as LengthSetting[];
       setLengthSettings(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching length settings:", error);
@@ -332,19 +340,14 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   // Automatically load the default prompt for the current platform on mount or when platform changes
   useEffect(() => {
     // Only load default if no prompt is selected AND the main list has potentially loaded.
-    if (selectedPrompt || promptLoading) return;
+    if (selectedPrompt || promptLoading || !api) return;
 
-    // If promptList is empty after loading, don't attempt to fetch default (unless API handles it)
-    // For now, let's assume if promptList is empty, we wait for user to create one.
-    // Or, if the default prompt API is robust, this check isn't strictly needed.
-    // if (promptList.length === 0 && !promptLoading) return;
-
-    fetch(`/api/caption-prompts?defaultOnly=true&platform=${platform}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+    const fetchDefaultPrompt = async () => {
+      try {
+        const data = (await api.get(
+          `caption-prompts?defaultOnly=true&platform=${platform}`
+        )) as any;
         if (data && data._id) {
-          // Check if a prompt is already selected by the user, if so, don't override.
-          // This condition is now at the start of the useEffect.
           setSelectedPrompt(data);
           setContext(data.prompt);
           setTone(data.tone);
@@ -362,12 +365,14 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
             setProvider(data.llmProvider as ProviderId);
           }
         }
-      })
-      .catch(() => {
+      } catch (error) {
         // Silently fail or set an error state if default prompt loading is critical
         console.warn(`No default prompt found for platform: ${platform}`);
-      });
-  }, [platform, selectedPrompt, promptLoading, lengthSettings]); // Ensure all relevant dependencies are here. `promptList` was considered but might cause too many re-runs.
+      }
+    };
+
+    fetchDefaultPrompt();
+  }, [platform, selectedPrompt, promptLoading, lengthSettings, api]);
 
   const handleGenerate = async (_captionId?: string) => {
     if (!selectedSystemPromptId) {
@@ -384,9 +389,6 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
     setError(null);
     try {
       let contextToUse = context;
-
-      // Always send the context as the prompt, regardless of client handle
-      // [REMOVED] // [REMOVED] console.log("Debug - sending prompt:", contextToUse);
 
       const clientInfo =
         includeClientHandle && clientHandle
@@ -410,58 +412,36 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
       });
 
       // Generate new caption text
-      const response = await fetch("/api/openai/generate-caption", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const data = (await api.post("openai/generate-caption", {
+        platform,
+        context: contextToUse,
+        clientInfo,
+        carDetails: {
+          _id: carDetails?._id,
+          year: carDetails?.year,
+          make: carDetails?.make,
+          model: carDetails?.model,
+          color: carDetails?.color,
+          engine: carDetails?.engine,
+          mileage: carDetails?.mileage,
+          description: carDetails?.description || "",
         },
-        body: JSON.stringify({
-          platform,
-          context: contextToUse,
-          clientInfo,
-          carDetails: {
-            _id: carDetails?._id,
-            year: carDetails?.year,
-            make: carDetails?.make,
-            model: carDetails?.model,
-            color: carDetails?.color,
-            engine: carDetails?.engine,
-            mileage: carDetails?.mileage,
-            description: carDetails?.description || "",
-          },
-          temperature,
-          tone,
-          style,
-          length: length?.key,
-          template,
-          aiModel: model,
-          systemPromptId: selectedSystemPromptId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate caption");
-      }
-
-      const data = await response.json();
+        temperature,
+        tone,
+        style,
+        length: length?.key,
+        template,
+        aiModel: model,
+        systemPromptId: selectedSystemPromptId,
+      })) as { caption: string };
 
       // If we're editing, update the existing caption
       if (_captionId) {
-        const updateResponse = await fetch(`/api/captions?id=${_captionId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            platform,
-            context,
-            caption: data.caption,
-          }),
+        await api.patch(`captions?id=${_captionId}`, {
+          platform,
+          context,
+          caption: data.caption,
         });
-
-        if (!updateResponse.ok) {
-          throw new Error("Failed to update caption");
-        }
 
         // Update the caption in the local state
         setSavedCaptions((prev) =>
@@ -480,30 +460,20 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         setEditingCaptionId(null); // Reset editing state
       } else {
         // Save new caption to MongoDB with car association
-        const saveResponse = await fetch("/api/captions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            platform,
-            carId: carDetails?._id,
-            context,
-            caption: data.caption,
-          }),
-        });
-
-        if (!saveResponse.ok) {
-          throw new Error("Failed to save caption to database");
-        }
+        const savedResult = (await api.post("captions", {
+          platform,
+          carId: carDetails?._id,
+          context,
+          caption: data.caption,
+        })) as { caption: any };
 
         // Add the new caption to the saved captions list
-        const { caption: savedCaption } = await saveResponse.json();
-        setSavedCaptions((prev) => [savedCaption, ...prev]);
+        setSavedCaptions((prev) => [savedResult.caption, ...prev]);
         setGeneratedCaption(""); // Clear the generated caption since it's now saved
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
+      toast.error("Failed to generate caption");
     } finally {
       setIsGenerating(false);
     }
@@ -527,57 +497,27 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
 
   const handleDelete = async (captionId: string) => {
     try {
-      const response = await fetch(
-        `/api/captions?id=${captionId}&carId=${carDetails?._id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete caption");
-      }
-
-      // Remove the caption from the local state
-      setSavedCaptions((prev) =>
-        prev.filter((caption) => caption._id !== captionId)
-      );
-      // Clear the generated caption if it was the one being displayed
-      if (
-        savedCaptions.find((c) => c._id === captionId)?.caption ===
-        generatedCaption
-      ) {
-        setGeneratedCaption("");
-      }
+      await api.delete(`captions?id=${captionId}`);
+      setSavedCaptions((prev) => prev.filter((c) => c._id !== captionId));
     } catch (err) {
       console.error("Error deleting caption:", err);
+      toast.error("Failed to delete caption");
     }
   };
 
   const handleEdit = async (captionId: string, currentCaption: string) => {
     try {
-      // Find the caption we're editing
       const captionToEdit = savedCaptions.find((c) => c._id === captionId);
       if (!captionToEdit) {
         throw new Error("Caption not found");
       }
 
       // Update the caption directly
-      const updateResponse = await fetch(`/api/captions?id=${captionId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          caption: currentCaption,
-          platform: captionToEdit.platform,
-          context: captionToEdit.context || "",
-        }),
+      await api.patch(`captions?id=${captionId}`, {
+        caption: currentCaption,
+        platform: captionToEdit.platform,
+        context: captionToEdit.context || "",
       });
-
-      if (!updateResponse.ok) {
-        throw new Error("Failed to update caption");
-      }
 
       // Update the caption in the local state
       setSavedCaptions((prev) =>
@@ -593,6 +533,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
     } catch (err) {
       console.error("Error editing caption:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
+      toast.error("Failed to update caption");
     }
   };
 
@@ -824,7 +765,6 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                   setPromptError(null); // Clear previous errors
                   try {
                     const method = isCreatingPrompt ? "POST" : "PATCH";
-                    const url = "/api/caption-prompts";
 
                     const payload: Record<string, any> = {
                       ...formData, // This should include name, prompt, tone, style, length, platform, etc. from PromptForm
@@ -846,33 +786,16 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                       JSON.stringify(payload, null, 2)
                     );
 
-                    const res = await fetch(url, {
-                      method,
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    });
-
-                    if (!res.ok) {
-                      const errorData = await res
-                        .json()
-                        .catch(() => ({ message: "Failed to save prompt" }));
-                      console.error(
-                        "Failed to save prompt:",
-                        res.status,
-                        errorData
-                      );
-                      throw new Error(
-                        errorData.message ||
-                          `Failed to save prompt: ${res.status}`
-                      );
-                    }
-
-                    const updatedOrCreatedPrompt = await res.json();
+                    const updatedOrCreatedPrompt = (
+                      isCreatingPrompt
+                        ? await api.post("caption-prompts", payload)
+                        : await api.patch("caption-prompts", payload)
+                    ) as any;
 
                     // Refresh prompt list
-                    const refreshedList = await fetch(
-                      "/api/caption-prompts"
-                    ).then((r) => r.json());
+                    const refreshedList = (await api.get(
+                      "caption-prompts"
+                    )) as any[];
                     setPromptList(
                       Array.isArray(refreshedList) ? refreshedList : []
                     );
@@ -899,9 +822,6 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                         updatedOrCreatedPrompt.llmProvider as ProviderId
                       );
                     }
-                    // Temperature is already part of CaptionGenerator's state,
-                    // if PromptForm can change it, that change needs to reflect back or be included in formData.
-                    // For now, assuming temperature is managed in CaptionGenerator and passed to modelParams.
 
                     setIsPromptModalOpen(false); // Close the modal upon successful save
                   } catch (err) {
@@ -911,6 +831,7 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                         ? err.message
                         : "An unexpected error occurred while saving the prompt."
                     );
+                    toast.error("Failed to save prompt");
                     // Keep modal open to show error
                   } finally {
                     setIsPromptSubmitting(false);

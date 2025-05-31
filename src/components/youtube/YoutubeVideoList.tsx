@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, FileText, Star, ThumbsUp, Video } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YoutubeVideo {
   _id: string;
@@ -27,9 +28,12 @@ interface YoutubeVideo {
 }
 
 export default function YoutubeVideoList() {
+  const api = useAPI();
   const [videos, setVideos] = useState<YoutubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -37,13 +41,7 @@ export default function YoutubeVideoList() {
       setError(null);
 
       try {
-        const response = await fetch("/api/youtube/videos");
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch videos: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = (await api.get("youtube/videos")) as YoutubeVideo[];
         setVideos(data);
       } catch (err) {
         setError(
@@ -56,24 +54,14 @@ export default function YoutubeVideoList() {
     };
 
     fetchVideos();
-  }, []);
+  }, [api]);
 
   const toggleFeatured = async (videoId: string) => {
     try {
-      const response = await fetch("/api/youtube/videos", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          video_id: videoId,
-          action: "feature",
-        }),
+      await api.put("youtube/videos", {
+        video_id: videoId,
+        action: "feature",
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update video: ${response.statusText}`);
-      }
 
       // Update the videos list
       setVideos((prevVideos) =>

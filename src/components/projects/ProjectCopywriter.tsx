@@ -59,7 +59,6 @@ export function ProjectCopywriter({
   // Use project data hook - must be called before any early returns
   const projectDataHook = useProjectData({
     projectId: project._id || "",
-    user,
   });
 
   // Derive length from selected prompt template (using promptHandlers state)
@@ -74,10 +73,10 @@ export function ProjectCopywriter({
     useGenerationHandlers();
 
   // Content saving - must be called before any early returns
-  const { saveCaption } = useCaptionSaver(user);
+  const { saveCaption } = useCaptionSaver();
 
   // Saved content management - must be called before any early returns
-  const savedCaptionsHook = useSavedCaptions(user);
+  const savedCaptionsHook = useSavedCaptions();
 
   // Helper function to update form values from prompt values
   const updateFormFromPromptValues = useCallback(

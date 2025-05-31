@@ -9,6 +9,8 @@ import CarSelector from "@/components/CarSelector";
 import { UrlModal } from "@/components/ui/url-modal";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface HardDriveWithId {
   _id: string;
@@ -32,6 +34,7 @@ export default function AddAssetModal({
   onClose,
   onAdd,
 }: AddAssetModalProps) {
+  const api = useAPI();
   const [formData, setFormData] = useState<{
     date: string;
     description: string;
@@ -54,29 +57,31 @@ export default function AddAssetModal({
   // Fetch hard drives
   useEffect(() => {
     const fetchDrives = async () => {
+      if (!api) return;
+
       setIsLoadingDrives(true);
       try {
-        const response = await fetch(
-          `/api/hard-drives?search=${encodeURIComponent(driveSearchTerm)}`
-        );
-        if (!response.ok) throw new Error("Failed to fetch hard drives");
-        const data = await response.json();
+        const data = await api.get<{
+          data: (HardDriveData & { _id: ObjectId })[];
+        }>(`/hard-drives?search=${encodeURIComponent(driveSearchTerm)}`);
         // Ensure _id is string
         setAvailableDrives(
           (data.data || []).map((drive: HardDriveData & { _id: ObjectId }) => ({
-            ...drive,
             _id: drive._id.toString(),
+            label: drive.label,
+            name: drive.label, // Use label as name since HardDriveData doesn't have name
           }))
         );
       } catch (error) {
         console.error("Error fetching hard drives:", error);
+        toast.error("Failed to fetch hard drives");
       } finally {
         setIsLoadingDrives(false);
       }
     };
 
     fetchDrives();
-  }, [driveSearchTerm]);
+  }, [driveSearchTerm, api]);
 
   // Update formData when selectedCars changes
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 /**
  * GET /api/cars/simple
@@ -10,6 +11,14 @@ import { ObjectId } from "mongodb";
  */
 export async function GET(request: NextRequest) {
   try {
+    console.log("🚗 /api/cars/simple - Starting request");
+
+    // Verify authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = Math.min(
@@ -19,17 +28,23 @@ export async function GET(request: NextRequest) {
     const view = searchParams.get("view") || "grid";
     const imageLimit = view === "list" ? 1 : 10; // Only get 1 image for list view, 10 for grid
 
-    // [REMOVED] // [REMOVED] console.log("Simple cars API request:", { page, pageSize });
+    console.log("🚗 /api/cars/simple - Query params:", {
+      page,
+      pageSize,
+      view,
+    });
 
     // Get database instance using the utility function
     const db = await getDatabase();
     if (!db) {
-      console.error("Failed to get database instance");
+      console.error("🚗 /api/cars/simple - Failed to get database instance");
       return NextResponse.json(
         { error: "Failed to connect to database" },
         { status: 500 }
       );
     }
+
+    console.log("🚗 /api/cars/simple - Database connection successful");
 
     // Build query with filters
     const query: Record<string, any> = {};

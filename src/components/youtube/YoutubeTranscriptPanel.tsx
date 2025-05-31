@@ -16,6 +16,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 interface TranscriptSegment {
   start_time: number;
@@ -65,6 +66,9 @@ export default function YoutubeTranscriptPanel({
   const [activeTab, setActiveTab] = useState("full");
   const [requestingTranscript, setRequestingTranscript] = useState(false);
   const { toast } = useToast();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     if (!videoId) return;
@@ -74,34 +78,29 @@ export default function YoutubeTranscriptPanel({
       setError(null);
 
       try {
-        const response = await fetch(
-          `/api/youtube/transcripts?video_id=${videoId}`
-        );
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            setTranscript(null);
-          } else {
-            throw new Error(
-              `Failed to fetch transcript: ${response.statusText}`
-            );
-          }
+        const data = (await api.get(
+          `youtube/transcripts?video_id=${videoId}`
+        )) as YoutubeTranscript;
+        setTranscript(data);
+      } catch (err: any) {
+        if (
+          err.message?.includes("404") ||
+          err.message?.includes("Not found")
+        ) {
+          setTranscript(null);
         } else {
-          const data = await response.json();
-          setTranscript(data);
+          setError(
+            err instanceof Error ? err.message : "An unknown error occurred"
+          );
+          console.error("Error fetching transcript:", err);
         }
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
-        );
-        console.error("Error fetching transcript:", err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchTranscript();
-  }, [videoId]);
+  }, [videoId, api]);
 
   const requestTranscription = async () => {
     if (!videoId) return;
@@ -109,22 +108,10 @@ export default function YoutubeTranscriptPanel({
     setRequestingTranscript(true);
 
     try {
-      const response = await fetch("/api/youtube/videos", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          video_id: videoId,
-          action: "transcribe",
-        }),
+      await api.put("youtube/videos", {
+        video_id: videoId,
+        action: "transcribe",
       });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to request transcription: ${response.statusText}`
-        );
-      }
 
       toast({
         title: "Transcription requested",

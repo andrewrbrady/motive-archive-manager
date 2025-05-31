@@ -31,6 +31,7 @@ import { EventType } from "@/types/event";
 import { RefreshCw } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import Link from "next/link";
+import { ObjectId } from "mongodb";
 
 interface Event {
   _id: string;
@@ -58,6 +59,11 @@ interface UserEventsProps {
 }
 
 const EVENT_TYPES = Object.values(EventType);
+
+// Helper function to check if an ID is a valid MongoDB ObjectId
+function isValidObjectId(id: string): boolean {
+  return ObjectId.isValid(id);
+}
 
 export default function UserEvents({ userId }: UserEventsProps) {
   const [events, setEvents] = useState<EventWithCar[]>([]);
@@ -252,12 +258,18 @@ export default function UserEvents({ userId }: UserEventsProps) {
                   <TableRow key={event._id}>
                     <TableCell>
                       {event.car ? (
-                        <Link
-                          href={`/cars/${event.car_id}`}
-                          className="hover:underline"
-                        >
-                          {event.car.year} {event.car.make} {event.car.model}
-                        </Link>
+                        isValidObjectId(event.car_id) ? (
+                          <Link
+                            href={`/cars/${event.car_id}`}
+                            className="hover:underline"
+                          >
+                            {event.car.year} {event.car.make} {event.car.model}
+                          </Link>
+                        ) : (
+                          <span>
+                            {event.car.year} {event.car.make} {event.car.model}
+                          </span>
+                        )
                       ) : (
                         "Unknown Car"
                       )}
@@ -267,11 +279,19 @@ export default function UserEvents({ userId }: UserEventsProps) {
                     <TableCell>{formatDate(event.start_date)}</TableCell>
                     <TableCell>{formatDate(event.end_date)}</TableCell>
                     <TableCell>
-                      <Link href={`/cars/${event.car_id}/events/${event._id}`}>
-                        <Button variant="ghost" size="sm">
+                      {isValidObjectId(event.car_id) ? (
+                        <Link
+                          href={`/cars/${event.car_id}/events/${event._id}`}
+                        >
+                          <Button variant="ghost" size="sm">
+                            View
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button variant="ghost" size="sm" disabled>
                           View
                         </Button>
-                      </Link>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

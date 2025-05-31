@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAPI } from "@/hooks/useAPI";
+
+interface TestDBResponse {
+  error?: string;
+  count?: number;
+  cars?: any[];
+}
 
 export default function TestDatabase() {
+  const api = useAPI();
   const [status, setStatus] = useState("Loading...");
-  const [cars, setCars] = useState([]);
+  const [cars, setCars] = useState<any[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!api) return;
+
     async function testConnection() {
       try {
         setStatus("Testing database connection...");
 
-        // Direct API call to check database
-        const response = await fetch("/api/test-db", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        const data = await response.json();
+        // Direct API call to check database - api is guaranteed to be non-null here
+        const data = (await api!.get("test-db")) as TestDBResponse;
 
         if (data.error) {
           setError(data.error);
@@ -38,7 +41,9 @@ export default function TestDatabase() {
     }
 
     testConnection();
-  }, []);
+  }, [api]);
+
+  if (!api) return <div>Loading...</div>;
 
   return (
     <div className="p-4">

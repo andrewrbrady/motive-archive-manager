@@ -27,6 +27,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useAPI } from "@/hooks/useAPI";
 import "react-day-picker/dist/style.css";
 
 interface BatchDeliverableFormProps {
@@ -34,10 +35,15 @@ interface BatchDeliverableFormProps {
   onDeliverableCreated?: () => void;
 }
 
+interface BatchTemplatesResponse {
+  templates: Record<string, BatchTemplate>;
+}
+
 export default function BatchDeliverableForm({
   carId,
   onDeliverableCreated,
 }: BatchDeliverableFormProps) {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<string>("");
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -45,16 +51,15 @@ export default function BatchDeliverableForm({
   const [templates, setTemplates] = useState<Record<string, BatchTemplate>>({});
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchTemplates();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchTemplates = async () => {
+    if (!api) return;
     try {
-      const response = await fetch("/api/batch-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("batch-templates")) as BatchTemplatesResponse;
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -105,6 +110,8 @@ export default function BatchDeliverableForm({
       return;
     }
 
+    if (!api) return;
+
     setIsSubmitting(true);
 
     try {
@@ -136,13 +143,7 @@ export default function BatchDeliverableForm({
           edit_dates: [],
         };
 
-        return fetch(`/api/cars/${carId}/deliverables`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(deliverableData),
-        });
+        return api.post(`cars/${carId}/deliverables`, deliverableData);
       });
 
       await Promise.all(promises);

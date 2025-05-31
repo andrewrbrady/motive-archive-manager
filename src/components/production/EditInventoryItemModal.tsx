@@ -35,6 +35,7 @@ import { LocationResponse } from "@/models/location";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { CustomTabs, TabItem } from "@/components/ui/custom-tabs";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UploadProgress {
   fileName: string;
@@ -71,12 +72,18 @@ interface FormDataType extends Omit<StudioInventoryItem, "dimensions"> {
   dimensions?: DimensionsObject | string;
 }
 
+// TypeScript interfaces for API responses
+interface ContainersResponse {
+  containers?: any[];
+}
+
 export default function EditInventoryItemModal({
   isOpen,
   onClose,
   onSave,
   item,
 }: EditInventoryItemModalProps) {
+  const api = useAPI();
   const [formData, setFormData] = useState<FormDataType>(item);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -143,11 +150,11 @@ export default function EditInventoryItemModal({
   }, [isOpen]);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
       setIsLoadingLocations(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -157,11 +164,11 @@ export default function EditInventoryItemModal({
   };
 
   const fetchContainers = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/containers");
-      if (!response.ok) throw new Error("Failed to fetch containers");
-      const data = await response.json();
-      setContainers(data);
+      const data = (await api.get("containers")) as ContainersResponse;
+      setContainers(Array.isArray(data) ? data : data.containers || []);
     } catch (error) {
       console.error("Error fetching containers:", error);
     }

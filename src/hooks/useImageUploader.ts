@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from "react";
 import { nanoid } from "nanoid";
 import { useAPI } from "@/hooks/useAPI";
+import { getValidToken } from "@/lib/api-client";
 
 interface UploadProgress {
   id: string;
@@ -38,6 +39,18 @@ export function useImageUploader({
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const api = useAPI();
+
+  // Authentication readiness check
+  if (!api) {
+    return {
+      uploadImages: async () => {},
+      progress: [],
+      isUploading: false,
+      abort: () => {},
+      error: "Loading...",
+      resetProgress: () => {},
+    };
+  }
 
   // Helper to generate a stable ID for a file
   const getFileId = (file: File) => `${file.name}-${file.lastModified}`;
@@ -196,11 +209,18 @@ export function useImageUploader({
         });
 
         try {
+          // Get authentication token for manual fetch call (needed for streaming)
+          const token = await getValidToken();
+
           const response = await fetch("/api/cloudflare/images", {
             method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
             body: formData,
             signal: controller.signal,
           });
+
           if (!response.ok || !response.body) {
             throw new Error("Upload failed");
           }

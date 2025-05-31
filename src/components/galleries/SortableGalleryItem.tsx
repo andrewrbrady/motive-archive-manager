@@ -25,6 +25,8 @@ import { GalleryCanvasExtensionModal } from "./GalleryCanvasExtensionModal";
 import { GalleryImageMatteModal } from "./GalleryImageMatteModal";
 import { GalleryCropModal } from "./GalleryCropModal";
 import { ImageData } from "@/app/images/columns";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface SortableGalleryItemProps {
   id: string;
@@ -46,6 +48,16 @@ interface SortableGalleryItemProps {
   onSelectionChange?: (isSelected: boolean) => void;
 }
 
+interface RestoreOriginalData {
+  processedImageId: string;
+}
+
+interface RestoreOriginalResponse {
+  success?: boolean;
+  restoredImage?: any;
+  error?: string;
+}
+
 export function SortableGalleryItem({
   id,
   image,
@@ -56,6 +68,7 @@ export function SortableGalleryItem({
   isSelected,
   onSelectionChange,
 }: SortableGalleryItemProps) {
+  const api = useAPI();
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isCanvasExtensionOpen, setIsCanvasExtensionOpen] = useState(false);
@@ -66,8 +79,9 @@ export function SortableGalleryItem({
     width: number;
     height: number;
   } | null>(null);
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
 
+  // Move useSortable hook before any conditional returns
   const {
     attributes,
     listeners,
@@ -85,6 +99,7 @@ export function SortableGalleryItem({
 
   // Load image dimensions to determine if it's horizontal
   React.useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     console.log(`🖼️ Image URL updated for ${image.filename}: ${image.url}`);
     const img = new window.Image();
     img.onload = () => {
@@ -94,7 +109,12 @@ export function SortableGalleryItem({
       });
     };
     img.src = image.url;
-  }, [image.url, image.filename]);
+  }, [image.url, image.filename, api]);
+
+  // Authentication guard moved to the end
+  if (!api) {
+    return null;
+  }
 
   const isHorizontal = imageDimensions
     ? imageDimensions.width > imageDimensions.height
@@ -109,13 +129,13 @@ export function SortableGalleryItem({
     try {
       await navigator.clipboard.writeText(image.url);
       setIsCopied(true);
-      toast({
+      uiToast({
         title: "Success",
         description: "Image URL copied to clipboard",
       });
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to copy URL to clipboard",
         variant: "destructive",
@@ -143,57 +163,46 @@ export function SortableGalleryItem({
   const canRestore = isProcessedImage;
 
   const handleRestore = async () => {
+    if (!api) return; // Add conditional check inside async function
     if (!galleryId || !image.metadata?.originalImage) return;
 
     setIsRestoring(true);
     try {
-      const response = await fetch(
-        `/api/galleries/${galleryId}/restore-original`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            processedImageId: image._id,
-          }),
-        }
+      const requestData: RestoreOriginalData = {
+        processedImageId: image._id,
+      };
+
+      const result = await api.post<RestoreOriginalResponse>(
+        `galleries/${galleryId}/restore-original`,
+        requestData
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-
-        // Provide more specific error messages
-        let errorMessage = "Failed to restore original image";
-        if (response.status === 404) {
-          errorMessage =
-            "The original image is no longer available in the database. It may have been deleted.";
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
-        }
-
+      if (!result.success) {
+        const errorMessage = result.error || "Failed to restore original image";
         throw new Error(errorMessage);
       }
 
-      const result = await response.json();
-
-      toast({
+      toast.success("Original image restored successfully");
+      uiToast({
         title: "Success",
         description: "Original image restored successfully",
       });
 
       // Notify parent component of the restoration
-      if (onImageProcessed) {
+      if (onImageProcessed && result.restoredImage) {
         onImageProcessed(image._id, result.restoredImage);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error restoring original image:", error);
-      toast({
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to restore original image";
+
+      toast.error(errorMessage);
+      uiToast({
         title: "Restore Failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to restore original image",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

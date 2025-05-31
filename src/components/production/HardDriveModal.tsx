@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAPI } from "@/hooks/useAPI";
 
 interface HardDriveModalProps {
   isOpen: boolean;
@@ -38,6 +39,8 @@ export default function HardDriveModal({
   drive,
 }: HardDriveModalProps) {
   // [REMOVED] // [REMOVED] console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
+
+  const api = useAPI();
 
   // Add a local state to track if we should render directly without relying on URL params
   const [forceRender, setForceRender] = useState(false);
@@ -117,17 +120,20 @@ export default function HardDriveModal({
 
   // Fetch locations when the modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchLocations();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchLocations = async () => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
       setIsLoadingLocations(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -205,20 +211,14 @@ export default function HardDriveModal({
           );
         }
 
-        // Fetch drive information from our API
-        const response = await fetch(
-          `/api/system/drives?path=/Volumes/${encodeURIComponent(path)}`
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error ||
-              "Failed to get drive information. Please ensure you select a valid drive or folder."
-          );
+        if (!api) {
+          throw new Error("API client not available");
         }
 
-        const driveInfo = await response.json();
+        // Fetch drive information from our API
+        const driveInfo = (await api.get(
+          `system/drives?path=/Volumes/${encodeURIComponent(path)}`
+        )) as any;
 
         // Update form with drive information
         setFormData((prev) => ({
@@ -234,8 +234,8 @@ export default function HardDriveModal({
           interface: driveInfo.interface.includes("Thunderbolt")
             ? "Thunderbolt"
             : driveInfo.interface.includes("USB")
-            ? "USB-C"
-            : "USB",
+              ? "USB-C"
+              : "USB",
           locationId: driveInfo.driveType.location || prev.locationId,
           notes:
             prev.notes ||
@@ -279,13 +279,14 @@ export default function HardDriveModal({
   };
 
   const handleSystemDriveInfo = async () => {
+    if (!api) {
+      setError("API client not available");
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/system/drives?path=/");
-      if (!response.ok) {
-        throw new Error("Failed to fetch system drive info");
-      }
-      const driveInfo = await response.json();
+      const driveInfo = (await api.get("system/drives?path=/")) as any;
 
       // Generate a unique label with timestamp
       const timestamp = new Date()
@@ -325,6 +326,11 @@ export default function HardDriveModal({
   };
 
   const handleScan = async () => {
+    if (!api) {
+      setError("API client not available");
+      return;
+    }
+
     try {
       if (!formData.systemName) {
         setError("Please select or enter a system path first");
@@ -336,16 +342,9 @@ export default function HardDriveModal({
       setScanResult(null);
 
       // Fetch directory listing from the drive
-      const response = await fetch(
-        `/api/system/directory?path=${encodeURIComponent(formData.systemName)}`
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to scan drive directories");
-      }
-
-      const { directories } = await response.json();
+      const { directories } = (await api.get(
+        `system/directory?path=${encodeURIComponent(formData.systemName)}`
+      )) as { directories: { name: string }[] };
 
       // Filter for directories that match YYMMDD format
       const dateRegex = /^(\d{6})$/; // Match YYMMDD format
@@ -373,49 +372,38 @@ export default function HardDriveModal({
       );
 
       // Search for raw assets with matching dates
-      const assetResponse = await fetch("/api/raw/search-by-dates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ dates: datesToSearch, driveId: formData._id }),
-      });
-
-      if (!assetResponse.ok) {
-        throw new Error("Failed to search for matching assets");
-      }
-
       const { matchedAssets, associatedAssets, newlyAssociated } =
-        await assetResponse.json();
+        (await api.post("raw/search-by-dates", {
+          dates: datesToSearch,
+          driveId: formData._id,
+        })) as {
+          matchedAssets: any[];
+          associatedAssets: any[];
+          newlyAssociated: number;
+        };
 
       // Update the form with scan results
       setFormData((prev) => ({
         ...prev,
+        rawAssets: [
+          ...(prev.rawAssets || []),
+          ...matchedAssets.map((asset: any) => asset._id),
+        ],
         notes:
           prev.notes ||
-          `Scan completed on ${new Date().toLocaleString()}.\n` +
-            `Found ${dateDirectories.length} date directories (YYMMDD format).\n` +
-            `Matched with ${matchedAssets.length} raw assets.\n` +
-            `${associatedAssets.length} assets were already associated with this drive.\n` +
-            `${newlyAssociated} assets were newly associated with this drive.`,
+          `Scan completed on ${new Date().toLocaleString()}.\nFound ${
+            matchedAssets.length
+          } matching assets in ${dateDirectories.length} date directories.\n${
+            newlyAssociated > 0
+              ? `${newlyAssociated} new associations created.`
+              : "All assets were already associated."
+          }`,
       }));
 
-      // Set scan result for display
       setScanResult({
         matchedAssets: matchedAssets.length,
-        scannedFolders: directories.length,
+        scannedFolders: dateDirectories.length,
       });
-
-      // If we found any matches, show a success message
-      if (matchedAssets.length > 0) {
-        setError(null);
-      } else if (dateDirectories.length > 0) {
-        setError(
-          "Found date directories but no matching assets in the database."
-        );
-      } else {
-        setError("No date-formatted directories (YYMMDD) found on this drive.");
-      }
     } catch (error) {
       console.error("Error scanning drive:", error);
       setError(error instanceof Error ? error.message : "Failed to scan drive");
@@ -734,8 +722,8 @@ export default function HardDriveModal({
                     ? "Saving..."
                     : "Adding..."
                   : drive
-                  ? "Save Changes"
-                  : "Add Hard Drive"}
+                    ? "Save Changes"
+                    : "Add Hard Drive"}
               </Button>
             </div>
           </form>
@@ -1022,8 +1010,8 @@ export default function HardDriveModal({
                 ? "Saving..."
                 : "Adding..."
               : drive
-              ? "Save Changes"
-              : "Add Hard Drive"}
+                ? "Save Changes"
+                : "Add Hard Drive"}
           </Button>
         </div>
       </form>

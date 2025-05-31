@@ -7,6 +7,7 @@ import React, {
   useRef,
   Suspense,
 } from "react";
+import { useAPI } from "@/hooks/useAPI";
 import { FileText, Trash2, Upload, Loader2, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
@@ -43,6 +44,7 @@ interface ResearchFilesProps {
 }
 
 export default function ResearchFiles({ carId }: ResearchFilesProps) {
+  const api = useAPI();
   const [files, setFiles] = useState<ResearchFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,16 +87,23 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
   const fileListRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
 
+  // Guard clause for API availability
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
+
   useEffect(() => {
     fetchFiles();
-  }, [carId]);
+  }, [carId, api]);
 
   const fetchFiles = async () => {
     setIsLoadingFiles(true);
     try {
-      const response = await fetch(`/api/cars/${carId}/research`);
-      if (!response.ok) throw new Error("Failed to fetch research files");
-      const data = await response.json();
+      const data = (await api.get(`cars/${carId}/research`)) as {
+        files: ResearchFile[];
+      };
       setFiles(data.files || []);
     } catch (error) {
       console.error("Error fetching research files:", error);
@@ -182,15 +191,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
         }));
 
         try {
-          const response = await fetch("/api/research/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to upload ${file.name}`);
-          }
+          const response = await api.upload("research/upload", formData);
 
           // Set progress to 100% when complete
           setUploadProgress((prev) => ({
@@ -198,22 +199,10 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
             [file.name]: 100,
           }));
 
-          const data = await response.json();
-
-          // Update files list immediately for this successful upload
-          setFiles((prev) => [...prev, data]);
-
-          return { success: true, data };
+          return response;
         } catch (error) {
           console.error(`Error uploading ${file.name}:`, error);
-          setUploadProgress((prev) => ({
-            ...prev,
-            [file.name]: 0,
-          }));
-          return {
-            success: false,
-            error: error instanceof Error ? error : new Error("Upload failed"),
-          };
+          throw error;
         }
       };
 
@@ -257,9 +246,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
 
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/cars/${carId}/research`);
-        if (!response.ok) throw new Error("Failed to fetch research files");
-        const data = await response.json();
+        const data = (await api.get(`cars/${carId}/research`)) as {
+          files: ResearchFile[];
+        };
         setFiles(data.files || []);
 
         // Stop polling if no more pending files
@@ -276,18 +265,11 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(pollInterval);
-  }, [files, carId]);
+  }, [files, carId, api]);
 
   const handleDelete = async (fileId: string) => {
     try {
-      const response = await fetch(
-        `/api/cars/${carId}/research?fileId=${fileId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to delete file");
+      await api.delete(`cars/${carId}/research?fileId=${fileId}`);
 
       setFiles((prev) => prev.filter((file) => file._id !== fileId));
     } catch (error) {
@@ -303,11 +285,7 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/cars/${carId}/research/all`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete all files");
+      await api.delete(`cars/${carId}/research/all`);
 
       setFiles([]);
       setSelectedFile(null);
@@ -346,11 +324,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     setIsLoadingContent(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/cars/${carId}/research/content?fileId=${file._id}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch file content");
-      const content = await response.text();
+      const content = (await api.get(
+        `cars/${carId}/research/content?fileId=${file._id}`
+      )) as string;
       setMarkdownContent(content);
       setSelectedFile({ ...file, content });
       setIsEditing(false);
@@ -379,17 +355,9 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
     setSearchAnswer(null);
 
     try {
-      const response = await fetch(
-        `/api/cars/${carId}/research/search?q=${encodeURIComponent(
-          searchQuery
-        )}&model=${selectedModel}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to search research content");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(
+        `cars/${carId}/research/search?q=${encodeURIComponent(searchQuery)}&model=${selectedModel}`
+      )) as { results: any[]; answer?: string };
       setSearchResults(data.results);
       setSearchAnswer(data.answer || null);
     } catch (error) {
@@ -677,8 +645,8 @@ export default function ResearchFiles({ carId }: ResearchFilesProps) {
               fileListBounce === "top"
                 ? "translate-y-[10px]"
                 : fileListBounce === "bottom"
-                ? "-translate-y-[10px]"
-                : ""
+                  ? "-translate-y-[10px]"
+                  : ""
             }`}
             onScroll={(e) => {
               handleBounce(

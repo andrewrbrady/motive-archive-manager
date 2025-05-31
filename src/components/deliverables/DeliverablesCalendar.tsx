@@ -27,6 +27,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Car {
   _id: string;
@@ -46,6 +47,14 @@ interface CalendarEvent {
   end: Date;
   resource: DeliverableWithCar & { isDeadline: boolean };
   allDay?: boolean;
+}
+
+interface CarsResponse {
+  cars: Car[];
+}
+
+interface DeliverablesResponse {
+  deliverables: DeliverableWithCar[];
 }
 
 const locales = {
@@ -70,6 +79,7 @@ const statusColors = {
 };
 
 export default function DeliverablesCalendar() {
+  const api = useAPI();
   const [deliverables, setDeliverables] = useState<DeliverableWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState<View>("month");
@@ -105,10 +115,9 @@ export default function DeliverablesCalendar() {
   ];
 
   const fetchCars = async () => {
+    if (!api) return;
     try {
-      const response = await fetch("/api/cars");
-      if (!response.ok) throw new Error("Failed to fetch cars");
-      const data = await response.json();
+      const data = (await api.get("cars")) as CarsResponse;
       setCars(data.cars);
     } catch (error) {
       console.error("Error fetching cars:", error);
@@ -117,10 +126,14 @@ export default function DeliverablesCalendar() {
   };
 
   const fetchUsers = async () => {
+    if (!api) return;
     try {
-      const response = await fetch("/api/users");
-      if (!response.ok) throw new Error("Failed to fetch users");
-      const data = await response.json();
+      const data = (await api.get("users")) as {
+        _id: string;
+        name: string;
+        creativeRoles: string[];
+        status: string;
+      }[];
       setUsers(
         data.filter(
           (user: any) =>
@@ -134,9 +147,11 @@ export default function DeliverablesCalendar() {
   };
 
   useEffect(() => {
-    fetchCars();
-    fetchUsers();
-  }, []);
+    if (api) {
+      fetchCars();
+      fetchUsers();
+    }
+  }, [api]);
 
   // Reset editor if current editor doesn't have the selected role
   useEffect(() => {
@@ -152,6 +167,7 @@ export default function DeliverablesCalendar() {
   }, [creativeRole, editor, users]);
 
   const fetchDeliverables = async () => {
+    if (!api) return;
     try {
       const params = new URLSearchParams({
         sortField: "edit_deadline",
@@ -168,9 +184,9 @@ export default function DeliverablesCalendar() {
       if (creativeRole && creativeRole !== "all")
         params.append("creative_role", creativeRole);
 
-      const response = await fetch(`/api/deliverables?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch deliverables");
-      const data = await response.json();
+      const data = (await api.get(
+        `deliverables?${params}`
+      )) as DeliverablesResponse;
       setDeliverables(data.deliverables);
     } catch (error) {
       console.error("Error fetching deliverables:", error);
@@ -182,7 +198,7 @@ export default function DeliverablesCalendar() {
 
   useEffect(() => {
     fetchDeliverables();
-  }, [search, status, platform, type, editor, selectedCar]);
+  }, [search, status, platform, type, editor, selectedCar, api]);
 
   const events = useMemo(() => {
     const allEvents: CalendarEvent[] = [];
@@ -306,7 +322,8 @@ export default function DeliverablesCalendar() {
     return {
       className: cn(
         "transition-colors",
-        isToday && "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
+        isToday &&
+          "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
       ),
     };
   };
@@ -413,25 +430,16 @@ export default function DeliverablesCalendar() {
   };
 
   const handleEventDrop = async ({ event, start, end }: any) => {
+    if (!api) return;
     try {
       const deliverable = event.resource;
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
+      await api.put(
+        `cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
         {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            edit_deadline: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-            updated_at: new Date(),
-          }),
+          edit_deadline: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+          updated_at: new Date(),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to update deliverable date");
-      }
 
       toast.success("Deadline updated successfully");
       fetchDeliverables();
@@ -442,7 +450,7 @@ export default function DeliverablesCalendar() {
   };
 
   const handleEventResize = async ({ event, start, end }: any) => {
-    if (event.resource.type === "photo_gallery") return;
+    if (event.resource.type === "photo_gallery" || !api) return;
 
     try {
       const deliverable = event.resource;
@@ -450,23 +458,13 @@ export default function DeliverablesCalendar() {
         (end.getTime() - start.getTime()) / 1000
       );
 
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
+      await api.put(
+        `cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
         {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            duration: durationInSeconds,
-            updated_at: new Date(),
-          }),
+          duration: durationInSeconds,
+          updated_at: new Date(),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to update deliverable duration");
-      }
 
       toast.success("Duration updated successfully");
       fetchDeliverables();

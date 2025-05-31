@@ -112,7 +112,6 @@ export async function POST(req: NextRequest) {
     if (transcribe) {
       // In a real implementation, you would trigger a transcription job
       // [REMOVED] // [REMOVED] console.log(`Transcription requested for video ${video_id}`);
-
       // You could make an API call to a transcription service here
       // For example:
       /*
@@ -245,14 +244,14 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Video not found" }, { status: 404 });
     }
 
-    // Also delete any associated transcript
+    // Also delete any associated transcript using direct database operation
     try {
-      await fetch(`/api/youtube/transcripts?video_id=${videoId}`, {
-        method: "DELETE",
-      });
+      // Import the transcript model if it exists
+      const { YoutubeTranscript } = await import("@/models/youtube_transcript");
+      await YoutubeTranscript.deleteMany({ video_id: videoId });
     } catch (error) {
       console.error("Error deleting associated transcript:", error);
-      // Continue even if transcript deletion fails
+      // Continue even if transcript deletion fails - model might not exist
     }
 
     return NextResponse.json({ success: true });

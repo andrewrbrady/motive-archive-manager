@@ -1,12 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 // Cache car makes for 1 hour since they don't change frequently
 export const revalidate = 3600;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    console.log("🚗 /api/cars/makes - Starting request");
+    console.log("🚗 /api/cars/makes - Request headers:", {
+      authorization: request.headers.get("authorization") || "MISSING",
+      "user-agent": request.headers.get("user-agent"),
+      origin: request.headers.get("origin"),
+    });
+
+    // Verify authentication with detailed logging
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      console.log(
+        "🚗 /api/cars/makes - Authentication failed, returning error response"
+      );
+      return authResult;
+    }
+
+    console.log("🚗 /api/cars/makes - Authentication successful");
+
     const db = await getDatabase();
+    console.log("🚗 /api/cars/makes - Database connection successful");
 
     // Use aggregation pipeline instead of distinct (API Version 1 compatible)
     const pipeline = [
@@ -34,6 +54,11 @@ export async function GET() {
     const result = await db.collection("cars").aggregate(pipeline).toArray();
     const makes = result.map((doc) => doc._id).filter(Boolean);
 
+    console.log(
+      "🚗 /api/cars/makes - Successfully fetched makes:",
+      makes.length
+    );
+
     const response = NextResponse.json({ makes });
 
     // Add cache headers for better performance
@@ -45,7 +70,7 @@ export async function GET() {
 
     return response;
   } catch (error) {
-    console.error("Error fetching makes:", error);
+    console.error("🚗 /api/cars/makes - Error fetching makes:", error);
     return NextResponse.json(
       { error: "Failed to fetch makes" },
       { status: 500 }

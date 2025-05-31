@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Client } from "@/types/contact";
 import { ObjectId } from "mongodb";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -113,6 +120,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
     const body = await request.json();
     const { db } = await connectToDatabase();
     const collection = db.collection<Client>("clients");

@@ -20,6 +20,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Platform, AspectRatio } from "@/types/scriptTemplate";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 const PLATFORMS: { value: Platform; label: string }[] = [
   { value: "instagram_reels", label: "Instagram Reels" },
@@ -35,6 +37,17 @@ const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
   { value: "4:5", label: "4:5 (Instagram)" },
 ];
 
+interface CreateScriptTemplateResponse {
+  id: string;
+  name: string;
+  description: string;
+  platforms: Platform[];
+  aspectRatio: AspectRatio;
+  rows: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface CreateScriptTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,35 +57,48 @@ export default function CreateScriptTemplateDialog({
   open,
   onOpenChange,
 }: CreateScriptTemplateDialogProps) {
+  const api = useAPI();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
   const [loading, setLoading] = useState(false);
 
+  // Authentication check
+  if (!api) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Script Template</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground">Loading...</div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await fetch("/api/script-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await api.post<CreateScriptTemplateResponse>(
+        "script-templates",
+        {
           name,
           description,
           platforms,
           aspectRatio,
           rows: [],
-        }),
-      });
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to create script template");
-      }
-
+      toast.success("Script template created successfully");
       onOpenChange(false);
       setName("");
       setDescription("");
@@ -80,6 +106,7 @@ export default function CreateScriptTemplateDialog({
       setAspectRatio("16:9");
     } catch (error) {
       console.error("Error creating script template:", error);
+      toast.error("Failed to create script template");
     } finally {
       setLoading(false);
     }

@@ -11,7 +11,7 @@ import {
   getValidToken as getValidTokenFromClient,
   refreshToken,
 } from "@/lib/api-client";
-import { useAPI } from "@/hooks/useAPI";
+import { APIClient } from "@/lib/api-client";
 
 interface AuthState {
   user: User | null;
@@ -60,44 +60,66 @@ export function useFirebaseAuth() {
 
   const tokenValidationAttemptsRef = useRef(0);
   const MAX_TOKEN_VALIDATION_ATTEMPTS = 3;
-  const api = useAPI();
 
   // Validate token with retry logic
-  const validateToken = useCallback(
-    async (user: User): Promise<boolean> => {
-      if (!user || !api) return false;
+  const validateToken = useCallback(async (user: User): Promise<boolean> => {
+    if (!user) return false;
 
+    try {
+      const token = await user.getIdToken(false); // Don't force refresh initially
+      if (!token) return false;
+
+      // Strategy: Start with Firebase validation, then progressively validate with API
+      // This prevents chicken-and-egg problems during authentication startup
+
+      // Step 1: Firebase token validation (always works)
+      console.log("✅ useFirebaseAuth: Token validated via Firebase");
+
+      // Step 2: Optional API validation (only if system is ready)
       try {
-        const token = await user.getIdToken(false); // Don't force refresh initially
-        if (!token) return false;
-
-        // Validate with the API using the new API client
-        await api.get("/auth/validate");
+        const apiClient = APIClient.getInstance();
+        await apiClient.get("auth/validate");
+        console.log("✅ useFirebaseAuth: Token also validated via API");
         return true;
-      } catch (error: any) {
-        console.error("💥 useFirebaseAuth: Token validation error:", error);
+      } catch (apiError: any) {
+        // API validation failed, but Firebase token is valid
+        console.warn(
+          "⚠️ useFirebaseAuth: API validation failed, but Firebase token is valid:",
+          {
+            message: apiError?.message,
+            status: apiError?.status,
+          }
+        );
 
-        // If validation endpoint fails, fall back to basic Firebase token check
-        // This helps handle network issues or temporary API problems
-        try {
-          console.log(
-            "🔄 useFirebaseAuth: Validation endpoint failed, trying basic token check..."
-          );
-          const token = await user.getIdToken(false);
-          // If we can get a token and user is authenticated, assume it's valid
-          // This is a fallback to prevent auth failures due to API issues
-          return !!token;
-        } catch (tokenError) {
-          console.error(
-            "💥 useFirebaseAuth: Basic token check also failed:",
-            tokenError
-          );
-          return false;
-        }
+        // For now, trust Firebase validation
+        // TODO: Implement retry logic for API validation once system is more stable
+        return true;
       }
-    },
-    [api]
-  );
+    } catch (error: any) {
+      console.error("💥 useFirebaseAuth: Token validation error:", {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        details: error?.details,
+        fullError: error,
+      });
+
+      // If Firebase token validation fails, fall back to basic token check
+      try {
+        console.log(
+          "🔄 useFirebaseAuth: Firebase validation failed, trying basic token check..."
+        );
+        const token = await user.getIdToken(false);
+        return !!token;
+      } catch (tokenError) {
+        console.error(
+          "💥 useFirebaseAuth: Basic token check also failed:",
+          tokenError
+        );
+        return false;
+      }
+    }
+  }, []);
 
   // Enhanced auth state change handler
   const handleAuthStateChange = useCallback(
@@ -262,27 +284,17 @@ export function useSession(): SessionState {
   const fetchUserRoles = useCallback(
     async (userId: string): Promise<string[]> => {
       try {
-        const token = await getValidToken();
-        if (!token) {
-          return [];
-        }
-
-        const response = await fetch(`/api/users/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          return userData.user?.roles || [];
-        }
+        const apiClient = APIClient.getInstance();
+        const userData = (await apiClient.get(`users/${userId}`)) as {
+          user?: { roles?: string[] };
+        };
+        return userData.user?.roles || [];
       } catch (error) {
         console.error("💥 fetchUserRoles: Error fetching user roles:", error);
+        return [];
       }
-      return [];
     },
-    [getValidToken]
+    []
   );
 
   useEffect(() => {

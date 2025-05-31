@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserPlus, Edit, Trash, Users } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 const CREATIVE_ROLES = [
   "video_editor",
@@ -45,48 +45,30 @@ interface CreativeRoleStats {
   count: number;
 }
 
+// TypeScript interfaces for API responses
+interface RoleStatsResponse {
+  creativeRoles: CreativeRoleStats[];
+}
+
 export default function CreativeRolesManagement() {
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const [isLoading, setIsLoading] = useState(true);
   const [roleStats, setRoleStats] = useState<CreativeRoleStats[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
 
-  // Helper function to get auth headers
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    if (!user) return {};
-    try {
-      const token = await user.getIdToken();
-      return {
-        Authorization: `Bearer ${token}`,
-      };
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return {};
-    }
-  };
-
   useEffect(() => {
-    if (user) {
+    if (api) {
       fetchRoleStats();
     }
-  }, [user]);
+  }, [api]);
 
   const fetchRoleStats = async () => {
-    if (!user) return;
+    if (!api) return;
 
     try {
       setIsLoading(true);
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch("/api/users/role-stats", { headers });
-      if (!response.ok) {
-        throw new Error("Failed to fetch role statistics");
-      }
-      const data = await response.json();
+      const data = (await api.get("users/role-stats")) as RoleStatsResponse;
       setRoleStats(data.creativeRoles || []);
     } catch (error) {
       console.error("Error fetching role stats:", error);
@@ -115,28 +97,20 @@ export default function CreativeRolesManagement() {
       return;
     }
 
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication not ready. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Convert to snake_case
     const formattedRole = newRoleName.toLowerCase().trim().replace(/\s+/g, "_");
 
     try {
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch("/api/users/creative-roles", {
-        method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ role: formattedRole }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to add creative role");
-      }
-
+      await api.post("users/creative-roles", { role: formattedRole });
       toast({
         title: "Success",
         description: "Creative role added successfully",

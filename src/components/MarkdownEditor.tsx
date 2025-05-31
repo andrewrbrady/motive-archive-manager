@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useAPI } from "@/hooks/useAPI";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Wand2, ChevronDown, Check, Settings } from "lucide-react";
@@ -69,6 +70,7 @@ export default function MarkdownEditor({
   onChange,
   readOnly = false,
 }: MarkdownEditorProps) {
+  const api = useAPI();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [enhancementType, setEnhancementType] =
@@ -76,6 +78,13 @@ export default function MarkdownEditor({
   const [customPrompt, setCustomPrompt] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
+
+  // Guard clause for API availability
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
 
   const getSelectedText = (): {
     text: string;
@@ -115,22 +124,10 @@ export default function MarkdownEditor({
           ? customPrompt
           : enhancementOptions[enhancementType].prompt;
 
-      const response = await fetch("/api/anthropic", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: selection.text,
-          prompt: prompt,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to enhance text");
-      }
-
-      const data = await response.json();
+      const data = (await api.post("anthropic", {
+        text: selection.text,
+        prompt: prompt,
+      })) as { enhancedText: string };
 
       if (data.enhancedText) {
         const newValue =

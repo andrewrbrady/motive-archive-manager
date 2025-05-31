@@ -7,11 +7,15 @@ import {
 export const dynamic = "force-dynamic";
 
 async function validateToken(request: NextRequest) {
-  console.log("🔒 GET /api/auth/validate - Token validation endpoint");
+  console.log("🔒 GET /api/auth/validate - Token validation endpoint starting");
+  console.log("🔒 Request URL:", request.url);
+  console.log("🔒 Request method:", request.method);
 
   try {
     // Get the token from the authorization header
     const authHeader = request.headers.get("authorization") || "";
+    console.log("🔒 Auth header received:", authHeader ? "Yes" : "No");
+
     const token = authHeader.split("Bearer ")[1];
 
     if (!token) {
@@ -25,6 +29,8 @@ async function validateToken(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    console.log("🔒 Token received, length:", token.length);
 
     const tokenData = await verifyFirebaseToken(token);
 

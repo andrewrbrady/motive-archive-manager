@@ -17,6 +17,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 interface StudioInventoryListProps {
   items: StudioInventoryItem[];
@@ -40,6 +41,7 @@ export default function StudioInventoryList({
   isEditMode = false,
 }: StudioInventoryListProps) {
   const { toast } = useToast();
+  const api = useAPI();
   const [editingItem, setEditingItem] = useState<StudioInventoryItem | null>(
     null
   );
@@ -68,10 +70,10 @@ export default function StudioInventoryList({
   // Fetch containers when component mounts
   useEffect(() => {
     const fetchContainers = async () => {
+      if (!api) return;
+
       try {
-        const response = await fetch("/api/containers");
-        if (!response.ok) throw new Error("Failed to fetch containers");
-        const data = await response.json();
+        const data = (await api.get("containers")) as any[];
         setContainers(data);
       } catch (error) {
         console.error("Error fetching containers:", error);
@@ -79,13 +81,13 @@ export default function StudioInventoryList({
     };
 
     fetchContainers();
-  }, []);
+  }, [api]);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
 
       // Convert array to record for easy lookup
       const locationsRecord: Record<string, LocationResponse> = {};
@@ -112,16 +114,10 @@ export default function StudioInventoryList({
   };
 
   const handleSaveEdit = async (updatedItem: StudioInventoryItem) => {
-    try {
-      const response = await fetch(`/api/studio_inventory/${updatedItem.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedItem),
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to update inventory item");
+    try {
+      await api.put(`studio_inventory/${updatedItem.id}`, updatedItem);
       onItemUpdate(updatedItem);
     } catch (error) {
       console.error("Error updating inventory item:", error);
@@ -129,12 +125,10 @@ export default function StudioInventoryList({
   };
 
   const handleDelete = async (itemId: string) => {
-    try {
-      const response = await fetch(`/api/studio_inventory/${itemId}`, {
-        method: "DELETE",
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to delete inventory item");
+    try {
+      await api.delete(`studio_inventory/${itemId}`);
       onItemDelete(itemId);
     } catch (error) {
       console.error("Error deleting inventory item:", error);
@@ -173,6 +167,8 @@ export default function StudioInventoryList({
 
   // Save all edits in batch
   const handleSaveAllEdits = async () => {
+    if (!api) return;
+
     setIsSaving(true);
     const itemsToUpdate = Object.keys(editedItems);
 
@@ -197,16 +193,9 @@ export default function StudioInventoryList({
             ...editedItems[id],
           };
 
-          return fetch(`/api/studio_inventory/${id}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(updatedItem),
-          }).then((response) => {
-            if (!response.ok) throw new Error(`Failed to update item ${id}`);
-            return updatedItem;
-          });
+          return api
+            .put(`studio_inventory/${id}`, updatedItem)
+            .then(() => updatedItem);
         })
         .filter(Boolean);
 

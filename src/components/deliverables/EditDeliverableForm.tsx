@@ -23,11 +23,31 @@ import { Deliverable, Platform, DeliverableType } from "@/types/deliverable";
 import { format } from "date-fns";
 import UserSelector from "@/components/users/UserSelector";
 import { useUsers } from "@/hooks/useUsers";
+import { useAPI } from "@/hooks/useAPI";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
   onDeliverableUpdated: () => void;
   onClose: () => void;
+}
+
+interface UpdateDeliverableData {
+  title: string;
+  platform: Platform;
+  type: DeliverableType;
+  duration: number;
+  aspect_ratio: string;
+  editor: string;
+  firebase_uid: string | null;
+  edit_deadline: string;
+  release_date: string;
+  dropbox_link: string;
+  social_media_link: string;
+}
+
+interface UpdateDeliverableResponse {
+  success: boolean;
+  error?: string;
 }
 
 export default function EditDeliverableForm({
@@ -36,6 +56,7 @@ export default function EditDeliverableForm({
   onClose,
 }: EditDeliverableFormProps) {
   const { data: users = [] } = useUsers();
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState(deliverable.title);
@@ -61,6 +82,11 @@ export default function EditDeliverableForm({
     deliverable.social_media_link || ""
   );
   const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
+
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
 
   const handleSelectOpenChange = (selectId: string, open: boolean) => {
     setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
@@ -127,39 +153,35 @@ export default function EditDeliverableForm({
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title,
-            platform,
-            type,
-            duration: type === "Photo Gallery" ? 0 : duration,
-            aspect_ratio: aspectRatio,
-            editor: editorName,
-            firebase_uid: editorId,
-            edit_deadline: new Date(editDeadline).toISOString(),
-            release_date: new Date(releaseDate).toISOString(),
-            dropbox_link: dropboxLink,
-            social_media_link: socialMediaLink,
-          }),
-        }
+      const updateData: UpdateDeliverableData = {
+        title,
+        platform,
+        type,
+        duration: type === "Photo Gallery" ? 0 : duration,
+        aspect_ratio: aspectRatio,
+        editor: editorName,
+        firebase_uid: editorId,
+        edit_deadline: new Date(editDeadline).toISOString(),
+        release_date: new Date(releaseDate).toISOString(),
+        dropbox_link: dropboxLink,
+        social_media_link: socialMediaLink,
+      };
+
+      const response = await api.put<UpdateDeliverableResponse>(
+        `cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
+        updateData
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to update deliverable");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update deliverable");
       }
 
       toast.success("Deliverable updated successfully");
       onDeliverableUpdated();
       setIsOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating deliverable:", error);
-      toast.error("Failed to update deliverable");
+      toast.error(error.message || "Failed to update deliverable");
     } finally {
       setIsLoading(false);
     }

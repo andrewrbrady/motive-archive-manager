@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useAPI } from "@/hooks/useAPI";
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ interface SavedBaTListing {
 export default function BaTListingGenerator({
   carId,
 }: BaTListingGeneratorProps) {
+  const api = useAPI();
   const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
   const [carLoading, setCarLoading] = useState(true);
   const [carError, setCarError] = useState<string | null>(null);
@@ -62,15 +64,20 @@ export default function BaTListingGenerator({
   const [editingText, setEditingText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Guard clause for API availability
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
+
   // Fetch car details when carId changes
   useEffect(() => {
     const fetchCarDetails = async () => {
       setCarLoading(true);
       setCarError(null);
       try {
-        const response = await fetch(`/api/cars/${carId}`);
-        if (!response.ok) throw new Error("Failed to fetch car details");
-        const data = await response.json();
+        const data = (await api.get(`cars/${carId}`)) as BaTCarDetails;
         setCarDetails(data);
       } catch (err) {
         setCarError(
@@ -81,27 +88,23 @@ export default function BaTListingGenerator({
       }
     };
     fetchCarDetails();
-  }, [carId]);
+  }, [carId, api]);
 
   // Fetch saved listings when carDetails is loaded
   useEffect(() => {
     if (!carDetails) return;
     const fetchListings = async () => {
       try {
-        const response = await fetch(
-          `/api/bat-listings?carId=${carDetails._id}`
-        );
-        if (!response.ok) {
-          throw new Error("Failed to fetch listings");
-        }
-        const listings = await response.json();
+        const listings = (await api.get(
+          `bat-listings?carId=${carDetails._id}`
+        )) as SavedBaTListing[];
         setSavedListings(listings);
       } catch (err) {
         console.error("Error fetching listings:", err);
       }
     };
     fetchListings();
-  }, [carDetails]);
+  }, [carDetails, api]);
 
   // Add new useEffect for textarea height adjustment
   useEffect(() => {
@@ -116,25 +119,15 @@ export default function BaTListingGenerator({
     setIsGenerating(true);
     setError(null);
     try {
-      const response = await fetch("/api/openai/generate-bat-listing", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          carDetails,
-          focus,
-          style,
-          tone,
-          length,
-          temperature,
-          additionalContext,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to generate BaT listing");
-      }
-      const data = await response.json();
+      const data = (await api.post("openai/generate-bat-listing", {
+        carDetails,
+        focus,
+        style,
+        tone,
+        length,
+        temperature,
+        additionalContext,
+      })) as { listing: string };
       setGeneratedListing(data.listing);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -156,32 +149,22 @@ export default function BaTListingGenerator({
   const handleSave = async () => {
     if (!carDetails) return;
     try {
-      const response = await fetch("/api/bat-listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const savedListing = (await api.post("bat-listings", {
+        carId: carDetails._id,
+        content: generatedListing,
+        focus,
+        style,
+        tone,
+        length,
+        additionalContext,
+        car: {
+          _id: carDetails._id,
+          year: carDetails.year,
+          make: carDetails.make,
+          model: carDetails.model,
+          color: carDetails.color,
         },
-        body: JSON.stringify({
-          carId: carDetails._id,
-          content: generatedListing,
-          focus,
-          style,
-          tone,
-          length,
-          additionalContext,
-          car: {
-            _id: carDetails._id,
-            year: carDetails.year,
-            make: carDetails.make,
-            model: carDetails.model,
-            color: carDetails.color,
-          },
-        }),
-      });
-      if (!response.ok) {
-        throw new Error("Failed to save listing");
-      }
-      const savedListing = await response.json();
+      })) as SavedBaTListing;
       setSavedListings((prev) => [savedListing, ...prev]);
       setGeneratedListing("");
     } catch (err) {
@@ -191,19 +174,9 @@ export default function BaTListingGenerator({
 
   const handleEdit = async (listingId: string, newContent: string) => {
     try {
-      const response = await fetch(`/api/bat-listings/${listingId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: newContent,
-        }),
+      await api.put(`bat-listings/${listingId}`, {
+        content: newContent,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update listing");
-      }
 
       setSavedListings((prev) =>
         prev.map((listing) =>
@@ -219,13 +192,7 @@ export default function BaTListingGenerator({
 
   const handleDelete = async (listingId: string) => {
     try {
-      const response = await fetch(`/api/bat-listings/${listingId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete listing");
-      }
+      await api.delete(`bat-listings/${listingId}`);
 
       setSavedListings((prev) =>
         prev.filter((listing) => listing._id !== listingId)

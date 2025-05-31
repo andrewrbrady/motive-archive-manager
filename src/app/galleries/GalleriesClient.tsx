@@ -216,7 +216,7 @@ export default function GalleriesClient() {
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
         <div className="space-y-6 sm:space-y-8">
-          <PageTitle title="Galleries" count={data?.pagination.total} />
+          <PageTitle title="Galleries" count={data?.pagination?.total} />
 
           <div className="space-y-4">
             {/* Search and Controls Row */}
@@ -455,27 +455,30 @@ export default function GalleriesClient() {
               </div>
 
               {/* Pagination */}
-              {data.pagination && data.pagination.pages > 1 && (
+              {data?.pagination && data.pagination.pages > 1 && (
                 <div className="mt-8 space-y-4">
                   {/* Pagination Info */}
                   <div className="flex justify-center">
                     <p className="text-sm text-muted-foreground">
                       Showing{" "}
-                      {(data.pagination.page - 1) * data.pagination.limit + 1}{" "}
+                      {((data.pagination?.page ?? 1) - 1) *
+                        (data.pagination?.limit ?? 20) +
+                        1}{" "}
                       to{" "}
                       {Math.min(
-                        data.pagination.page * data.pagination.limit,
-                        data.pagination.total
+                        (data.pagination?.page ?? 1) *
+                          (data.pagination?.limit ?? 20),
+                        data.pagination?.total ?? 0
                       )}{" "}
-                      of {data.pagination.total} galleries
+                      of {data.pagination?.total ?? 0} galleries
                     </p>
                   </div>
 
                   {/* Pagination Controls */}
                   <Pagination
                     className="flex justify-center"
-                    currentPage={data.pagination.page}
-                    totalPages={data.pagination.pages}
+                    currentPage={data.pagination?.page ?? 1}
+                    totalPages={data.pagination?.pages ?? 1}
                     onPageChange={handlePageChange}
                   />
                 </div>

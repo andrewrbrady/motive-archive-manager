@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YouTubeUploadHelperProps {
   deliverable: Deliverable;
@@ -60,9 +61,43 @@ interface CarCaption {
   createdAt: string;
 }
 
+interface CaptionsResponse {
+  captions: CarCaption[];
+}
+
+interface YouTubeAuthResponse {
+  auth_url?: string;
+  error?: string;
+}
+
+interface YouTubeUploadData {
+  deliverable_id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  privacy_status: string;
+}
+
+interface YouTubeUploadResponse {
+  success?: boolean;
+  youtube_url?: string;
+  video_id?: string;
+  requires_auth?: boolean;
+  auth_url?: string;
+  setup_required?: boolean;
+  details?: string;
+  error?: string;
+}
+
+interface LogoutResponse {
+  success?: boolean;
+  error?: string;
+}
+
 const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   deliverable,
 }) => {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
@@ -86,15 +121,20 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   const [useCustomDescription, setUseCustomDescription] = useState(true);
   const [editableCaption, setEditableCaption] = useState<string>("");
 
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
+
   // Check YouTube authentication status
   const checkAuthStatus = async () => {
     setIsCheckingAuth(true);
     try {
-      const response = await fetch("/api/youtube/auth/status");
-      const data = await response.json();
+      const data = await api.get<YouTubeAuthStatus>("youtube/auth/status");
       setAuthStatus(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error checking auth status:", error);
+      toast.error("Failed to check YouTube authentication status");
       setAuthStatus({ isAuthenticated: false, channels: [] });
     } finally {
       setIsCheckingAuth(false);
@@ -110,14 +150,13 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
 
     setLoadingCaptions(true);
     try {
-      const response = await fetch(`/api/cars/${deliverable.car_id}/captions`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch captions");
-      }
-      const data = await response.json();
+      const data = await api.get<CaptionsResponse>(
+        `cars/${deliverable.car_id}/captions`
+      );
       setCaptions(data.captions || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching captions:", error);
+      toast.error("Failed to fetch captions");
       setCaptions([]);
     } finally {
       setLoadingCaptions(false);
@@ -157,18 +196,17 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       );
 
       // Get auth URL from API
-      const response = await fetch("/api/youtube/auth/start");
-      const data = await response.json();
+      const data = await api.get<YouTubeAuthResponse>("youtube/auth/start");
 
       if (data.auth_url) {
         // Longer delay to let user read the detailed guidance
         setTimeout(() => {
-          window.location.href = data.auth_url;
+          window.location.href = data.auth_url!;
         }, 3000);
       } else {
         toast.error("Failed to start authentication");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Authentication error:", error);
       toast.error("Failed to start authentication");
     }
@@ -199,60 +237,63 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
         sessionStorage.removeItem("youtube_upload_description");
         sessionStorage.removeItem("youtube_upload_tags");
 
-        // Open the upload dialog
+        // Automatically open the upload dialog
         setIsOpen(true);
 
-        // Clean URL
-        window.history.replaceState({}, "", window.location.pathname);
+        // Clear the URL parameter
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
       }
     }
   }, [deliverable._id]);
 
   const handleUpload = async () => {
-    if (!authStatus.isAuthenticated) {
-      toast.error("Please authenticate with YouTube first");
+    if (!title.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+
+    if (!deliverable._id) {
+      toast.error("Deliverable ID is missing. Cannot upload to YouTube.");
       return;
     }
 
     setIsUploading(true);
-
     try {
       console.log("Starting YouTube upload for deliverable:", deliverable._id);
       console.log("Dropbox link:", deliverable.dropbox_link);
 
-      const response = await fetch("/api/youtube/upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          deliverable_id: deliverable._id,
-          title: title,
-          description: getDescriptionForUpload(),
-          tags: tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          privacy_status: "private", // Default to private for user uploads
-        }),
-      });
+      const deliverableId = String(deliverable._id!);
 
-      const result = await response.json();
+      const uploadData: YouTubeUploadData = {
+        deliverable_id: deliverableId,
+        title: title,
+        description: getDescriptionForUpload(),
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        privacy_status: "private", // Default to private for user uploads
+      };
 
-      if (!response.ok) {
+      const response = await api.post<YouTubeUploadResponse>(
+        "youtube/upload",
+        uploadData
+      );
+
+      if (!response.success) {
         // Handle authentication errors
-        if (response.status === 401) {
-          if (result.requires_auth || result.auth_url) {
-            toast.error("YouTube authentication required");
-            return;
-          } else if (result.setup_required) {
-            toast.error("YouTube setup required");
-            return;
-          }
+        if (response.requires_auth || response.auth_url) {
+          toast.error("YouTube authentication required");
+          return;
+        } else if (response.setup_required) {
+          toast.error("YouTube setup required");
+          return;
         }
 
         // Handle other errors
-        const errorMessage = result.details || result.error || "Upload failed";
+        const errorMessage =
+          response.details || response.error || "Upload failed";
         console.error("YouTube upload error:", errorMessage);
 
         // Handle specific "no YouTube channels" error
@@ -267,15 +308,15 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
         throw new Error(errorMessage);
       }
 
-      console.log("YouTube upload successful:", result);
+      console.log("YouTube upload successful:", response);
       toast.success(
-        `Video uploaded to YouTube successfully! ${result.youtube_url ? `\nVideo ID: ${result.video_id}` : ""}`
+        `Video uploaded to YouTube successfully! ${response.youtube_url ? `\nVideo ID: ${response.video_id}` : ""}`
       );
       setIsOpen(false);
 
       // Refresh the page to show updated social media link
       window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to upload video"
@@ -345,7 +386,7 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       sessionStorage.removeItem("youtube_upload_tags");
 
       // Clear cookies by making a request to clear them server-side
-      await fetch("/api/youtube/auth/logout", { method: "POST" });
+      await api.post("/youtube/auth/logout", {});
 
       // Reset auth status
       setAuthStatus({ isAuthenticated: false, channels: [] });

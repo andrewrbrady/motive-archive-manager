@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 import { LocationResponse } from "@/models/location";
 
 interface DropdownOption {
@@ -236,17 +237,17 @@ export function LocationDropdown({
   className = "",
   allowEmpty = true,
 }: LocationDropdownProps) {
+  const api = useAPI();
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
       setLoading(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data || []);
     } catch (error) {
       console.error("Error fetching locations:", error);

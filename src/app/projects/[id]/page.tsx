@@ -189,57 +189,52 @@ export default function ProjectDetailPage() {
     try {
       setLoading(true);
 
-      if (!user) {
-        console.log("ProjectDetailPage: No user available in fetchProject");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        console.log("ProjectDetailPage: No API client available");
+        throw new Error("Authentication required");
       }
-
-      console.log("ProjectDetailPage: Getting Firebase ID token...");
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-      console.log("ProjectDetailPage: Got Firebase ID token successfully");
 
       console.log("🌐 Making request to:", `/api/projects/${projectId}`);
-      const response = await fetch(`/api/projects/${projectId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
-      console.log("📥 Project fetch response:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
+      // Let's catch and inspect fetch errors more carefully
+      try {
+        const response = await api.get(`projects/${projectId}`);
+        const data = response as any;
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("Project not found");
+        console.log("📦 RAW API Response:", data);
+        console.log("📦 Response keys:", Object.keys(data || {}));
+        console.log("📦 data.project:", data.project);
+        console.log("📦 data.project keys:", Object.keys(data.project || {}));
+
+        console.log("📦 Project data received:", {
+          projectId: data.project?._id,
+          projectTitle: data.project?.title,
+          deliverablesCount: data.project?.deliverables?.length || 0,
+          deliverables: data.project?.deliverables || [],
+        });
+
+        setProject(data.project);
+        console.log("✅ Project state updated");
+
+        // Fetch member details after setting project
+        if (data.project?.members?.length > 0) {
+          console.log(
+            "👥 Fetching member details for",
+            data.project.members.length,
+            "members"
+          );
+          await fetchMemberDetails(
+            data.project.members.map((m: any) => m.userId)
+          );
         }
-        throw new Error("Failed to fetch project");
-      }
-
-      const data = await response.json();
-      console.log("📦 Project data received:", {
-        projectId: data.project?._id,
-        projectTitle: data.project?.title,
-        deliverablesCount: data.project?.deliverables?.length || 0,
-        deliverables: data.project?.deliverables || [],
-      });
-
-      setProject(data.project);
-      console.log("✅ Project state updated");
-
-      // Fetch member details after setting project
-      if (data.project.members.length > 0) {
-        console.log(
-          "👥 Fetching member details for",
-          data.project.members.length,
-          "members"
-        );
-        await fetchMemberDetails(
-          data.project.members.map((m: any) => m.userId)
-        );
+      } catch (apiError: any) {
+        console.error("💥 API Error details:", {
+          message: apiError.message,
+          status: apiError.status,
+          code: apiError.code,
+          fullError: apiError,
+        });
+        throw apiError;
       }
     } catch (err) {
       console.error("💥 Error fetching project:", err);
@@ -251,27 +246,15 @@ export default function ProjectDetailPage() {
   };
 
   const fetchMemberDetails = async (userIds: string[]) => {
-    if (!user) {
-      console.log("No user available for fetching member details");
+    if (!api) {
+      console.log("No API client available for fetching member details");
       return;
     }
 
     try {
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
       // Use the project-specific users endpoint (no admin required)
-      const response = await fetch("/api/projects/users", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const response = await api.get("projects/users");
+      const data = response as any;
 
       if (!data.users || !Array.isArray(data.users)) {
         throw new Error("Invalid response format");
@@ -299,28 +282,15 @@ export default function ProjectDetailPage() {
   };
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
-    if (!project) return;
+    if (!project || !api) return;
 
     try {
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
-
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
+      const response = await api.put(`projects/${project._id}`, {
+        status: newStatus,
       });
+      const updatedProject = response as any;
 
-      if (!response.ok) throw new Error("Failed to update status");
-
-      const { project: updatedProject } = await response.json();
-      setProject(updatedProject);
+      setProject(updatedProject.project);
 
       toast({
         title: "Success",
@@ -351,7 +321,7 @@ export default function ProjectDetailPage() {
 
     try {
       setInvitingUser(true);
-      await api.post("/projects/users", {
+      await api.post("projects/users", {
         projectId: projectId,
         userEmail: email,
         role: role,

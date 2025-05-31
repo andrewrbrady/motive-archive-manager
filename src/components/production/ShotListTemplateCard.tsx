@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PencilIcon, Trash2Icon } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface ShotListTemplate {
   _id: string;
@@ -20,12 +22,35 @@ interface ShotListTemplate {
 
 interface ShotListTemplateCardProps {
   template: ShotListTemplate;
+  onTemplateDeleted?: () => void;
 }
 
 export default function ShotListTemplateCard({
   template,
+  onTemplateDeleted,
 }: ShotListTemplateCardProps) {
+  const api = useAPI();
   const [loading, setLoading] = useState(false);
+
+  // Authentication check - render basic card without actions if not authenticated
+  if (!api) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{template.name}</CardTitle>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {template.description}
+          </p>
+          <div className="mt-2 text-sm text-muted-foreground">
+            {template.shots.length} shots
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this template?")) {
@@ -35,18 +60,17 @@ export default function ShotListTemplateCard({
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/shot-list-templates/${template._id}`, {
-        method: "DELETE",
-      });
+      await api.delete(`shot-list-templates/${template._id}`);
 
-      if (!response.ok) {
-        throw new Error("Failed to delete shot list template");
+      toast.success("Shot list template deleted successfully");
+
+      // Call callback to refresh the templates list
+      if (onTemplateDeleted) {
+        onTemplateDeleted();
       }
-
-      // Trigger a refresh of the templates list
-      window.location.reload();
     } catch (error) {
       console.error("Error deleting shot list template:", error);
+      toast.error("Failed to delete shot list template");
     } finally {
       setLoading(false);
     }

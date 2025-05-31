@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { X, Box, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LoadingContainer } from "@/components/ui/loading-container";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface ContainerItem {
   id: string;
@@ -21,6 +23,11 @@ interface ContainerItem {
   model?: string;
   condition?: string;
   primary_image?: string;
+}
+
+// TypeScript interfaces for API responses
+interface ContainerItemsResponse {
+  data?: ContainerItem[];
 }
 
 interface ContainerItemsModalProps {
@@ -36,30 +43,29 @@ export default function ContainerItemsModal({
   containerId,
   containerName,
 }: ContainerItemsModalProps) {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
+  const api = useAPI();
   const [items, setItems] = useState<ContainerItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (isOpen && containerId) {
+    if (isOpen && containerId && api) {
       fetchContainerItems();
     }
-  }, [isOpen, containerId]);
+  }, [isOpen, containerId, api]);
 
   const fetchContainerItems = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/containers/${containerId}/items`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch container items");
-      }
-
-      const data = await response.json();
+      const response = await api.get(`containers/${containerId}/items`);
+      const data = Array.isArray(response) ? response : [];
       setItems(data);
     } catch (error) {
       console.error("Error fetching container items:", error);
-      toast({
+      toast.error("Failed to fetch items in this container");
+      uiToast({
         title: "Error",
         description: "Failed to fetch items in this container",
         variant: "destructive",
@@ -68,6 +74,19 @@ export default function ContainerItemsModal({
       setIsLoading(false);
     }
   };
+
+  // Show loading state if API not ready
+  if (!api) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-4xl">
+          <div className="h-64 flex items-center justify-center">
+            <LoadingContainer />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -146,12 +165,12 @@ export default function ContainerItemsModal({
                             item.condition.toLowerCase() === "new"
                               ? "bg-green-100 text-green-800 border-green-300"
                               : item.condition.toLowerCase() === "good"
-                              ? "bg-blue-100 text-blue-800 border-blue-300"
-                              : item.condition.toLowerCase() === "fair"
-                              ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                              : item.condition.toLowerCase() === "poor"
-                              ? "bg-orange-100 text-orange-800 border-orange-300"
-                              : "bg-muted text-muted-foreground"
+                                ? "bg-blue-100 text-blue-800 border-blue-300"
+                                : item.condition.toLowerCase() === "fair"
+                                  ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                                  : item.condition.toLowerCase() === "poor"
+                                    ? "bg-orange-100 text-orange-800 border-orange-300"
+                                    : "bg-muted text-muted-foreground"
                           }
                         >
                           {item.condition}

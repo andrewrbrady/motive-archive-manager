@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ICaptionPrompt } from "../../app/admin/CaptionPromptsContent";
 import { getIconComponent } from "@/components/ui/IconPicker";
+import { useAPI } from "@/hooks/useAPI";
 
 // Base type for form data
 export type PromptFormData = {
@@ -65,6 +66,10 @@ interface PlatformSetting {
   icon?: string;
 }
 
+// TypeScript interfaces for API responses
+interface LengthSettingsResponse extends Array<LengthSetting> {}
+interface PlatformSettingsResponse extends Array<PlatformSetting> {}
+
 const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
   (
     {
@@ -77,6 +82,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
     },
     ref
   ) => {
+    const api = useAPI();
     const [lengthSettings, setLengthSettings] = useState<LengthSetting[]>([
       {
         key: "concise",
@@ -179,18 +185,13 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
     // Fetch length settings on component mount
     useEffect(() => {
       const fetchLengthSettings = async () => {
+        if (!api) return;
+
         try {
-          const response = await fetch("/api/length-settings");
-          if (response.ok) {
-            const settings = await response.json();
-            setLengthSettings(settings);
-          } else {
-            console.error(
-              "Failed to fetch length settings:",
-              response.status,
-              response.statusText
-            );
-          }
+          const settings = (await api.get(
+            "length-settings"
+          )) as LengthSettingsResponse;
+          setLengthSettings(settings);
         } catch (error) {
           console.error("Error fetching length settings:", error);
           // Keep default settings on error
@@ -198,23 +199,18 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
       };
 
       fetchLengthSettings();
-    }, []);
+    }, [api]);
 
     // Fetch platform settings on component mount
     useEffect(() => {
       const fetchPlatformSettings = async () => {
+        if (!api) return;
+
         try {
-          const response = await fetch("/api/platform-settings");
-          if (response.ok) {
-            const settings = await response.json();
-            setPlatformSettings(settings);
-          } else {
-            console.error(
-              "Failed to fetch platform settings:",
-              response.status,
-              response.statusText
-            );
-          }
+          const settings = (await api.get(
+            "platform-settings"
+          )) as PlatformSettingsResponse;
+          setPlatformSettings(settings);
         } catch (error) {
           console.error("Error fetching platform settings:", error);
           // Keep default settings on error
@@ -222,7 +218,7 @@ const PromptForm = forwardRef<PromptFormRef, PromptFormProps>(
       };
 
       fetchPlatformSettings();
-    }, []);
+    }, [api]);
 
     // Update form values when settings are loaded to handle invalid existing values
     useEffect(() => {

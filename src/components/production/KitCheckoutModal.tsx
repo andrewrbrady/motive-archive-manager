@@ -25,6 +25,14 @@ import { format } from "date-fns";
 import { CalendarIcon, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Kit } from "@/types/inventory";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+// TypeScript interface for API response
+interface UsersResponse {
+  data?: User[];
+  [key: string]: any;
+}
 
 interface User {
   _id: string;
@@ -59,6 +67,22 @@ export default function KitCheckoutModal({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
+  // Add useAPI hook
+  const api = useAPI();
+
+  // Authentication check
+  if (!api) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-[425px]">
+          <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   // Fetch users when modal opens in checkout mode
   useEffect(() => {
     if (isOpen && mode === "checkout") {
@@ -69,18 +93,17 @@ export default function KitCheckoutModal({
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await fetch("/api/users");
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-      const data = await response.json();
+      const response = (await api.get("users")) as UsersResponse;
+      const data = Array.isArray(response) ? response : response.data || [];
       setUsers(
         data.filter(
           (user: User) => user.status === "active" || user.active === true
         )
       );
+      toast.success("Users loaded successfully");
     } catch (error) {
       console.error("Error fetching users:", error);
+      toast.error("Failed to load users");
     } finally {
       setIsLoadingUsers(false);
     }
@@ -208,8 +231,8 @@ export default function KitCheckoutModal({
             {isLoading
               ? "Processing..."
               : mode === "checkout"
-              ? "Check Out"
-              : "Check In"}
+                ? "Check Out"
+                : "Check In"}
           </Button>
         </DialogFooter>
       </DialogContent>

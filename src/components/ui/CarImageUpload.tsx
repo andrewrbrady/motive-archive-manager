@@ -11,6 +11,8 @@ import {
 import { cn } from "@/lib/utils";
 import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
+import { getValidToken } from "@/lib/api-client";
 
 interface CarImageUploadProps {
   carId: string;
@@ -42,6 +44,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   onError,
   multiple = true,
 }) => {
+  const api = useAPI();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<FileProgress[]>([]);
@@ -57,72 +60,26 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
   const { user } = useFirebaseAuth();
 
-  // Helper function to get auth headers
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    if (!user) return {};
-    try {
-      const token = await user.getIdToken();
-      return {
-        Authorization: `Bearer ${token}`,
-      };
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return {};
-    }
-  };
+  if (!api) return <div>Loading...</div>;
 
   // Load available prompts on component mount
   useEffect(() => {
     const loadPrompts = async () => {
-      if (!user) {
-        console.log("User not authenticated yet, waiting...");
-        return; // Wait for user to be available
-      }
-
       try {
-        console.log("Loading prompts for user:", user.email);
-        const headers = await getAuthHeaders();
-        if (Object.keys(headers).length === 0) {
-          console.error("No authentication token available");
-          return;
-        }
+        console.log("Loading prompts...");
+        const data = (await api.get(
+          "admin/image-analysis-prompts/active"
+        )) as ImageAnalysisPrompt[];
+        console.log("Received prompts data:", data);
+        setAvailablePrompts(data || []);
 
-        console.log(
-          "Making request to /api/admin/image-analysis-prompts/active with headers:",
-          headers
+        // Set default prompt if available
+        const defaultPrompt = data?.find(
+          (p: ImageAnalysisPrompt) => p.isDefault
         );
-        const response = await fetch(
-          "/api/admin/image-analysis-prompts/active",
-          { headers }
-        );
-
-        console.log("Response status:", response.status);
-        console.log(
-          "Response headers:",
-          Object.fromEntries(response.headers.entries())
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Received prompts data:", data);
-          setAvailablePrompts(data || []);
-
-          // Set default prompt if available
-          const defaultPrompt = data?.find(
-            (p: ImageAnalysisPrompt) => p.isDefault
-          );
-          if (defaultPrompt) {
-            setSelectedPromptId(defaultPrompt._id);
-            console.log("Set default prompt:", defaultPrompt.name);
-          }
-        } else {
-          const errorText = await response.text();
-          console.error(
-            "Failed to fetch prompts:",
-            response.status,
-            response.statusText,
-            errorText
-          );
+        if (defaultPrompt) {
+          setSelectedPromptId(defaultPrompt._id);
+          console.log("Set default prompt:", defaultPrompt.name);
         }
       } catch (error) {
         console.error("Failed to load prompts:", error);
@@ -131,12 +88,8 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       }
     };
 
-    if (user) {
-      loadPrompts();
-    } else {
-      console.log("No user available, skipping prompt loading");
-    }
-  }, [user]);
+    loadPrompts();
+  }, [api]);
 
   // Handle file selection or drop
   const handleFiles = (files: FileList | null) => {
@@ -178,9 +131,15 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         formData.append(`file${index}`, file);
       });
 
-      // Use EventSource to handle streaming response
+      // Get auth token for manual fetch with streaming
+      const token = await getValidToken();
+
+      // Use manual fetch to handle streaming response
       const response = await fetch("/api/cloudflare/images", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
@@ -275,36 +234,44 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     file: File,
     onProgress: (percent: number) => void
   ) => {
-    return new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      formData.append("fileCount", "1");
-      formData.append("file0", file);
-      formData.append("carId", carId);
+    return new Promise<void>(async (resolve, reject) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("fileCount", "1");
+        formData.append("file0", file);
+        formData.append("carId", carId);
 
-      if (vehicleInfo) {
-        formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
+        if (vehicleInfo) {
+          formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
+        }
+
+        // Get auth token for XMLHttpRequest
+        const token = await getValidToken();
+
+        xhr.open("POST", "/api/cloudflare/images");
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            onProgress(percent);
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onProgress(100);
+            resolve();
+          } else {
+            reject(new Error("Upload failed: " + xhr.statusText));
+          }
+        };
+        xhr.onerror = () => {
+          reject(new Error("Network error during upload"));
+        };
+        xhr.send(formData);
+      } catch (error) {
+        reject(error);
       }
-
-      xhr.open("POST", "/api/cloudflare/images");
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          onProgress(percent);
-        }
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          onProgress(100);
-          resolve();
-        } else {
-          reject(new Error("Upload failed: " + xhr.statusText));
-        }
-      };
-      xhr.onerror = () => {
-        reject(new Error("Network error during upload"));
-      };
-      xhr.send(formData);
     });
   };
 

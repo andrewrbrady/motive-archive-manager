@@ -128,7 +128,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     useGenerationHandlers();
 
   // Content saving - must be called before any early returns
-  const { saveCaption } = useCaptionSaver(user);
+  const { saveCaption } = useCaptionSaver();
 
   // Initialize data
   useEffect(() => {

@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CanvasExtensionModalProps {
   isOpen: boolean;
@@ -53,6 +54,15 @@ interface CloudflareUploadResult {
   filename?: string;
   mongoId?: string;
   error?: string;
+}
+
+interface ExtendCanvasResponse {
+  success: boolean;
+  processedImageUrl: string;
+  remoteServiceUsed?: boolean;
+  remoteService?: boolean;
+  error?: string;
+  cloudflareUpload?: CloudflareUploadResult;
 }
 
 type ProcessingMethod = "cloud" | "local";
@@ -90,6 +100,7 @@ export function CanvasExtensionModal({
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
+  const api = useAPI();
 
   // Load processing method preference from localStorage
   useEffect(() => {
@@ -201,37 +212,22 @@ export function CanvasExtensionModal({
   }, [highResImageUrl]);
 
   const handleProcess = async () => {
-    if (!image || !enhancedImageUrl) return;
+    if (!image || !enhancedImageUrl || !api) return;
 
     setIsProcessing(true);
     setCloudflareResult(null);
     setRemoteServiceUsed(false);
 
     try {
-      // Use the unified API endpoint that handles both cloud and local processing
-      const apiEndpoint = "/api/images/extend-canvas";
-
-      const response = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: enhancedImageUrl,
-          desiredHeight: parseInt(desiredHeight),
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          processingMethod: processingMethod,
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to process image");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("images/extend-canvas", {
+        imageUrl: enhancedImageUrl,
+        desiredHeight: parseInt(desiredHeight),
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        processingMethod: processingMethod,
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+      })) as ExtendCanvasResponse;
 
       if (result.success) {
         setProcessedImageUrl(result.processedImageUrl);
@@ -266,7 +262,7 @@ export function CanvasExtensionModal({
   };
 
   const handleHighResProcess = async (multiplier: 2 | 4) => {
-    if (!image || !processedDimensions) return;
+    if (!image || !processedDimensions || !api) return;
 
     setIsProcessingHighRes(true);
     setHighResMultiplier(multiplier);
@@ -288,26 +284,15 @@ export function CanvasExtensionModal({
         cloudflareQuality
       );
 
-      const response = await fetch("/api/images/extend-canvas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
-          desiredHeight: targetHeight,
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-        }),
-      });
+      const result = (await api.post("images/extend-canvas", {
+        imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
+        desiredHeight: targetHeight,
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+      })) as ExtendCanvasResponse;
 
-      if (!response.ok) {
-        throw new Error("Failed to process high-resolution image");
-      }
-
-      const result = await response.json();
       setHighResImageUrl(result.processedImageUrl);
 
       toast({
@@ -326,7 +311,7 @@ export function CanvasExtensionModal({
   };
 
   const handleUploadToCloudflare = async () => {
-    if (!image || !processedImageUrl || !enhancedImageUrl) return;
+    if (!image || !processedImageUrl || !enhancedImageUrl || !api) return;
 
     setIsUploading(true);
     setCloudflareResult(null);
@@ -357,27 +342,15 @@ export function CanvasExtensionModal({
         uploadFilename = `${nameWithoutExt}_${highResMultiplier}x.${ext}`;
       }
 
-      const response = await fetch("/api/images/extend-canvas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: uploadSourceUrl,
-          desiredHeight: uploadHeight,
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          uploadToCloudflare: true,
-          originalFilename: uploadFilename,
-          originalCarId: image.carId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("images/extend-canvas", {
+        imageUrl: uploadSourceUrl,
+        desiredHeight: uploadHeight,
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        uploadToCloudflare: true,
+        originalFilename: uploadFilename,
+        originalCarId: image.carId,
+      })) as ExtendCanvasResponse;
 
       if (result.cloudflareUpload) {
         setCloudflareResult(result.cloudflareUpload);
@@ -402,7 +375,7 @@ export function CanvasExtensionModal({
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Upload Error",
         description: "Failed to upload image",
         variant: "destructive",
       });
@@ -504,6 +477,20 @@ export function CanvasExtensionModal({
     setOriginalDimensions(null);
     onClose();
   };
+
+  // Authentication readiness check
+  if (!api && isOpen) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Loading...</DialogTitle>
+            <DialogDescription>Authenticating...</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>

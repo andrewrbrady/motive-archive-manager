@@ -147,10 +147,22 @@ class APIClient {
   ): Promise<T> {
     const { headers = {}, skipAuth = false, ...requestOptions } = options;
 
-    // Ensure endpoint starts with /api or is absolute
-    const url = endpoint.startsWith("/")
-      ? endpoint
-      : `${this.baseURL}/${endpoint}`;
+    // Construct the full URL ensuring /api prefix
+    let url: string;
+
+    if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+      // Absolute URL - use as-is
+      url = endpoint;
+    } else if (endpoint.startsWith("/api/")) {
+      // Already has /api prefix - use as-is
+      url = endpoint;
+    } else if (endpoint.startsWith("/")) {
+      // Starts with / but not /api/ - prepend /api
+      url = `/api${endpoint}`;
+    } else {
+      // Relative endpoint - prepend baseURL
+      url = `${this.baseURL}/${endpoint}`;
+    }
 
     try {
       // Get authentication headers (or skip if requested)
@@ -230,11 +242,34 @@ class APIClient {
 
     // Handle responses that might not have a body (like 204 No Content)
     const contentType = response.headers.get("content-type");
+
     if (contentType && contentType.includes("application/json")) {
       return response.json();
     } else {
-      // For non-JSON responses, return the response text or an empty object
+      // For API routes, if we get HTML instead of JSON, it's likely an error page
       const text = await response.text();
+
+      // Check if this looks like an HTML error page
+      if (
+        text.trim().startsWith("<!DOCTYPE html>") ||
+        text.trim().startsWith("<html")
+      ) {
+        console.error("🚨 API returned HTML instead of JSON:", {
+          url: response.url,
+          status: response.status,
+          contentType,
+          textPreview: text.substring(0, 200) + "...",
+        });
+
+        const error: APIError = {
+          message: `API endpoint returned HTML instead of JSON (likely a server error)`,
+          status: response.status,
+        };
+
+        throw error;
+      }
+
+      // For legitimate non-JSON responses, return the text wrapped in data
       return (text ? { data: text } : {}) as T;
     }
   }

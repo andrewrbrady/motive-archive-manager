@@ -56,6 +56,35 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const { data: session, status } = useSession();
   const api = useAPI();
   const { toast } = useToast();
+
+  // Simple loading guard - don't render anything until auth is ready
+  if (status === "loading" || !api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <LoadingContainer />
+      </div>
+    );
+  }
+
+  // Authentication guard
+  if (status !== "authenticated" || !session?.user) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">
+          Please sign in to view events
+        </div>
+      </div>
+    );
+  }
+
+  return <EventsTabContent carId={carId} />;
+}
+
+// Move the main component logic to a separate component
+function EventsTabContent({ carId }: EventsTabProps) {
+  const { data: session, status } = useSession();
+  const api = useAPI();
+  const { toast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBatchManager, setShowBatchManager] = useState(false);
@@ -66,14 +95,18 @@ export default function EventsTab({ carId }: EventsTabProps) {
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
   const fetchEvents = async () => {
-    if (!api) {
+    // Check authentication first
+    if (status !== "authenticated" || !session?.user || !api) {
+      console.log(
+        "EventsTab: No authenticated session available for fetchEvents"
+      );
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      const data = (await api.get(`/api/cars/${carId}/events`)) as Event[];
+      const data = (await api.get(`cars/${carId}/events`)) as Event[];
       setEvents(data);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -107,7 +140,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
         )
       );
 
-      await api.put(`/api/cars/${carId}/events/${eventId}`, updates);
+      await api.put(`cars/${carId}/events/${eventId}`, updates);
 
       toast({
         title: "Success",
@@ -135,7 +168,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
         currentEvents.filter((event) => event.id !== eventId)
       );
 
-      await api.delete(`/api/cars/${carId}/events/${eventId}`);
+      await api.delete(`cars/${carId}/events/${eventId}`);
 
       toast({
         title: "Success",
@@ -158,7 +191,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
     if (!api) return;
 
     try {
-      const result = await api.post(`/api/cars/${carId}/events`, eventData);
+      const result = await api.post(`cars/${carId}/events`, eventData);
       toast({
         title: "Success",
         description: "Event created successfully",
@@ -185,7 +218,7 @@ export default function EventsTab({ carId }: EventsTabProps) {
     try {
       setIsSubmittingJson(true);
 
-      const result = (await api.post(`/api/cars/${carId}/events/batch`, {
+      const result = (await api.post(`cars/${carId}/events/batch`, {
         events: jsonData,
       })) as { count: number };
       toast({

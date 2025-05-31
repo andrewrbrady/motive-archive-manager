@@ -23,6 +23,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { IYoutubeChannel } from "@/models/youtube_channel";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YoutubeAddVideoDialogProps {
   open: boolean;
@@ -41,21 +42,20 @@ export default function YoutubeAddVideoDialog({
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     if (open) {
       fetchChannels();
     }
-  }, [open]);
+  }, [open, api]);
 
   const fetchChannels = async () => {
     setLoadingChannels(true);
     try {
-      const response = await fetch("/api/youtube/channels");
-      if (!response.ok) {
-        throw new Error("Failed to fetch channels");
-      }
-      const data = await response.json();
+      const data = (await api.get("youtube/channels")) as IYoutubeChannel[];
       setChannels(data);
     } catch (error) {
       console.error("Error fetching channels:", error);
@@ -93,26 +93,15 @@ export default function YoutubeAddVideoDialog({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/youtube/videos", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          video_id: videoId,
-          channel_id: channelId,
-          tags: tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          transcribe,
-        }),
+      await api.post("youtube/videos", {
+        video_id: videoId,
+        channel_id: channelId,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        transcribe,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to add video");
-      }
 
       toast({
         title: "Success",

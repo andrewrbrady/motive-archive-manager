@@ -10,9 +10,17 @@ import ContainersList from "./ContainersList";
 import AddContainerModal from "./AddContainerModal";
 import { LoadingContainer } from "@/components/ui/loading-container";
 import { Toggle } from "@/components/ui/toggle";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+// TypeScript interfaces for API responses
+interface ContainersResponse {
+  data?: ContainerResponse[];
+}
 
 export default function ContainersTab() {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
+  const api = useAPI();
   const [containers, setContainers] = useState<ContainerResponse[]>([]);
   const [filteredContainers, setFilteredContainers] = useState<
     ContainerResponse[]
@@ -22,10 +30,20 @@ export default function ContainersTab() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [hoverModeActive, setHoverModeActive] = useState(false);
 
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingContainer />
+      </div>
+    );
+  }
+
   // Fetch containers on component mount
   useEffect(() => {
+    if (!api) return;
     fetchContainers();
-  }, []);
+  }, [api]);
 
   // Apply search filter when containers or search query changes
   useEffect(() => {
@@ -46,20 +64,18 @@ export default function ContainersTab() {
   }, [containers, searchQuery]);
 
   const fetchContainers = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/containers");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch containers");
-      }
-
-      const data = await response.json();
+      const response = await api.get("containers");
+      const data = Array.isArray(response) ? response : [];
       setContainers(data);
       setFilteredContainers(data);
     } catch (error) {
       console.error("Error fetching containers:", error);
-      toast({
+      toast.error("Failed to fetch containers");
+      uiToast({
         title: "Error",
         description: "Failed to fetch containers",
         variant: "destructive",
@@ -75,29 +91,25 @@ export default function ContainersTab() {
       "id" | "containerNumber" | "createdAt" | "updatedAt"
     >
   ) => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/containers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newContainer),
-      });
+      const createdContainer = (await api.post(
+        "containers",
+        newContainer
+      )) as ContainerResponse;
 
-      if (!response.ok) {
-        throw new Error("Failed to create container");
-      }
-
-      const createdContainer = await response.json();
       setContainers((prev) => [...prev, createdContainer]);
 
-      toast({
+      toast.success("Container created successfully");
+      uiToast({
         title: "Success",
         description: "Container created successfully",
       });
     } catch (error) {
       console.error("Error creating container:", error);
-      toast({
+      toast.error("Failed to create container");
+      uiToast({
         title: "Error",
         description: "Failed to create container",
         variant: "destructive",

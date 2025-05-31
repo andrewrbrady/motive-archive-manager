@@ -55,7 +55,7 @@ export default function UserDetailsPage() {
 
       try {
         setIsLoading(true);
-        const data = await api.get<any>("/users/list-auth");
+        const data = await api.get<any>("users/list-auth");
         setUsers(data.users || []);
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -81,7 +81,7 @@ export default function UserDetailsPage() {
 
     setImporting(true);
     try {
-      await api.post("/auth/import-google-user", {
+      await api.post("auth/import-google-user", {
         email: selectedUser.email,
         displayName: selectedUser.displayName,
         uid: selectedUser.uid,
@@ -91,13 +91,43 @@ export default function UserDetailsPage() {
       toast.success("User imported successfully!");
 
       // Refresh the users list
-      const data = await api.get<any>("/users/list-auth");
+      const data = await api.get<any>("users/list-auth");
       setUsers(data.users || []);
     } catch (error: any) {
       console.error("Error importing user:", error);
       toast.error(error.message || "Failed to import user");
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleFixGoogleProviders = async (usersToFix: UserRecord[]) => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    try {
+      const results = await Promise.all(
+        usersToFix.map((user) =>
+          api.post("auth/import-google-user", {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || user.email.split("@")[0],
+            photoURL: user.providerData[0]?.photoURL || "",
+          })
+        )
+      );
+
+      const success = results.length;
+      toast.success(`Fixed ${success} user(s).`);
+
+      // Refresh the users list
+      const data = await api.get<any>("users/list-auth");
+      setUsers(data.users || []);
+    } catch (error: any) {
+      console.error("Error fixing users:", error);
+      toast.error(error.message || "Failed to fix users");
     }
   };
 
@@ -277,38 +307,7 @@ export default function UserDetailsPage() {
 
                   if (!confirmed) return;
 
-                  // For each user, call the import-google-user endpoint
-                  Promise.all(
-                    usersToFix.map((user) =>
-                      fetch("/api/auth/import-google-user", {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          uid: user.uid,
-                          email: user.email,
-                          displayName:
-                            user.displayName || user.email.split("@")[0],
-                          photoURL: user.providerData[0]?.photoURL || "",
-                        }),
-                      })
-                    )
-                  )
-                    .then((responses) =>
-                      Promise.all(responses.map((r) => r.json()))
-                    )
-                    .then((results) => {
-                      const success = results.filter((r) => r.success).length;
-                      const failed = results.length - success;
-
-                      alert(`Fixed ${success} user(s). Failed: ${failed}.`);
-                      if (success > 0) window.location.reload();
-                    })
-                    .catch((err) => {
-                      console.error("Error fixing users:", err);
-                      alert(`Error: ${err.message || "Unknown error"}`);
-                    });
+                  handleFixGoogleProviders(usersToFix);
                 }}
               >
                 Fix Google Providers

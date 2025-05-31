@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 import type { PromptTemplate, Tone, Style, Platform } from "../types";
 
 // Core prompt state interface
@@ -43,6 +44,7 @@ export interface PromptHandlerCallbacks {
 
 // Main hook for prompt management
 export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
+  const api = useAPI();
   // Internal state - initialize with sensible defaults
   const [promptList, setPromptList] = useState<PromptTemplate[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(
@@ -70,15 +72,13 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
 
   // Fetch prompts
   const fetchPrompts = useCallback(async () => {
+    if (!api) return;
+
     updatePromptLoading(true);
     updatePromptError(null);
 
     try {
-      const response = await fetch("/api/caption-prompts");
-      if (!response.ok) {
-        throw new Error("Failed to fetch prompt templates");
-      }
-      const prompts = await response.json();
+      const prompts = (await api.get("caption-prompts")) as PromptTemplate[];
       updatePromptList(prompts);
     } catch (error) {
       const errorMessage =
@@ -92,7 +92,7 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
     } finally {
       updatePromptLoading(false);
     }
-  }, [updatePromptList, updatePromptError, updatePromptLoading]);
+  }, [api, updatePromptList, updatePromptError, updatePromptLoading]);
 
   // Select prompt and update form values
   const selectPrompt = useCallback(
@@ -138,38 +138,26 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
       promptData: any,
       isCreating: boolean
     ): Promise<PromptTemplate | null> => {
-      try {
-        const url = "/api/caption-prompts";
-        const method = isCreating ? "POST" : "PATCH";
+      if (!api) return null;
 
-        // For updates, include the ID in the request body
-        // For creates, ensure we don't include any _id field
-        let payload;
+      try {
+        let savedPrompt: PromptTemplate;
+
         if (isCreating) {
           // Create a clean payload without any _id fields
           const { _id, id, ...cleanData } = promptData;
-          payload = cleanData;
+          savedPrompt = (await api.post(
+            "caption-prompts",
+            cleanData
+          )) as PromptTemplate;
         } else {
-          payload = { ...promptData, id: selectedPrompt?._id };
+          // For updates, include the ID in the request body
+          const payload = { ...promptData, id: selectedPrompt?._id };
+          savedPrompt = (await api.patch(
+            "caption-prompts",
+            payload
+          )) as PromptTemplate;
         }
-
-        const response = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error ||
-              `Failed to ${isCreating ? "create" : "update"} prompt`
-          );
-        }
-
-        const savedPrompt = await response.json();
 
         // Update local state
         if (isCreating) {
@@ -206,6 +194,7 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
       }
     },
     [
+      api,
       promptList,
       selectedPrompt,
       updatePromptList,
@@ -218,18 +207,10 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
   // Delete prompt
   const deletePrompt = useCallback(
     async (promptId: string): Promise<boolean> => {
-      try {
-        const response = await fetch("/api/caption-prompts", {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id: promptId }),
-        });
+      if (!api) return false;
 
-        if (!response.ok) {
-          throw new Error("Failed to delete prompt");
-        }
+      try {
+        await api.deleteWithBody("caption-prompts", { id: promptId });
 
         updatePromptList(promptList.filter((p) => p._id !== promptId));
 
@@ -256,6 +237,7 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
       }
     },
     [
+      api,
       promptList,
       selectedPrompt,
       updatePromptList,

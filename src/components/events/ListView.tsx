@@ -47,7 +47,8 @@ import { cn } from "@/lib/utils";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "./EventTypeSelector";
 import EditEventDialog from "./EditEventDialog";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 export interface ListViewProps {
   events: Event[];
@@ -86,7 +87,50 @@ export default function ListView({
   onEventUpdated,
   isEditMode: parentEditMode,
 }: ListViewProps) {
-  const { user } = useFirebaseAuth();
+  const { data: session, status } = useSession();
+  const api = useAPI();
+
+  // Simple loading guard - don't render anything until auth is ready
+  if (status === "loading" || !api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">Loading events...</div>
+      </div>
+    );
+  }
+
+  // Authentication guard
+  if (status !== "authenticated" || !session?.user) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">
+          Please sign in to view events
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ListViewContent
+      events={events}
+      onUpdateEvent={onUpdateEvent}
+      onDeleteEvent={onDeleteEvent}
+      onEventUpdated={onEventUpdated}
+      isEditMode={parentEditMode}
+    />
+  );
+}
+
+// Move the main component logic to a separate component
+function ListViewContent({
+  events,
+  onUpdateEvent,
+  onDeleteEvent,
+  onEventUpdated,
+  isEditMode: parentEditMode,
+}: ListViewProps) {
+  const { data: session, status } = useSession();
+  const api = useAPI();
   const [localEditMode, setLocalEditMode] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
@@ -105,31 +149,23 @@ export default function ListView({
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        if (!user) {
-          console.log("ListView: No user available for fetchUsers");
+        if (status !== "authenticated" || !session?.user || !api) {
+          console.log(
+            "ListView: No authenticated session available for fetchUsers"
+          );
           setUsers([]);
           setUsersLoading(false);
           return;
         }
 
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
-
-        const response = await fetch("/api/projects/users", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) throw new Error("Failed to fetch users");
-        const data = await response.json();
+        const data = await api.get("projects/users");
 
         // Handle the response structure from /api/projects/users
         let usersArray = [];
         if (Array.isArray(data)) {
           usersArray = data;
-        } else if (data && Array.isArray(data.users)) {
-          usersArray = data.users;
+        } else if (data && Array.isArray((data as any).users)) {
+          usersArray = (data as any).users;
         } else if (data && typeof data === "object") {
           console.warn("Unexpected users API response structure:", data);
           usersArray = [];
@@ -160,7 +196,7 @@ export default function ListView({
     };
 
     fetchUsers();
-  }, [user]);
+  }, [session, status, api]);
 
   useEffect(() => {
     if (events.length > 0) {
@@ -177,6 +213,8 @@ export default function ListView({
     if (eventsWithCars.length === 0) return;
 
     const fetchCarInfo = async () => {
+      if (!api) return;
+
       // Only fetch car info for events that don't have it yet
       const eventsNeedingCarInfo = eventsWithCars.filter(
         (event) => event.car_id && !event.car
@@ -190,9 +228,7 @@ export default function ListView({
             // Only fetch car info if we don't already have it
             if (event.car || !event.car_id) return event;
 
-            const response = await fetch(`/api/cars/${event.car_id}`);
-            if (!response.ok) throw new Error("Failed to fetch car");
-            const car = await response.json();
+            const car = (await api.get(`/cars/${event.car_id}`)) as Car;
             return {
               ...event,
               car,
@@ -207,7 +243,7 @@ export default function ListView({
     };
 
     fetchCarInfo();
-  }, [eventsWithCars.length]); // Only run when eventsWithCars length changes
+  }, [eventsWithCars.length, api]); // Only run when eventsWithCars length changes
 
   const formatEventType = (type: string) => {
     return type

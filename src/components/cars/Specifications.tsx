@@ -9,6 +9,7 @@ import { Client } from "@/types/contact";
 import { toast } from "sonner";
 import { SpecificationsEnrichment } from "./SpecificationsEnrichment";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
+import { useAPI } from "@/hooks/useAPI";
 
 // Define the car data structure as we receive it from the API
 interface CarData {
@@ -324,6 +325,9 @@ const Specifications = ({
   const [isJsonUploadModalOpen, setIsJsonUploadModalOpen] = useState(false);
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
+  // Authentication
+  const api = useAPI();
+
   // Update localSpecs when car changes or edit mode is toggled
   useEffect(() => {
     if (car._id !== lastSavedId || !isEditMode) {
@@ -424,25 +428,14 @@ const Specifications = ({
   };
 
   useEffect(() => {
+    // Only fetch clients if API is ready
+    if (!api) return;
+
     // Fetch clients when component mounts
     const fetchClients = async () => {
       try {
-        const response = await fetch("/api/clients");
-        if (!response.ok) {
-          // Get detailed error information from the response
-          let errorDetail = "";
-          try {
-            const errorData = await response.json();
-            errorDetail =
-              errorData.details || errorData.error || response.statusText;
-          } catch (parseError) {
-            errorDetail = response.statusText;
-          }
-          throw new Error(`Failed to fetch clients: ${errorDetail}`);
-        }
-
-        // Ensure the response has the expected format before using it
-        const data = await response.json();
+        // Use authenticated API call without leading slash
+        const data = (await api.get("clients")) as { clients: Client[] };
 
         if (!data || !Array.isArray(data.clients)) {
           console.warn("Unexpected response format from /api/clients:", data);
@@ -464,7 +457,6 @@ const Specifications = ({
                 name: clientMatch.name,
                 email: clientMatch.email,
                 phone: clientMatch.phone,
-                company: clientMatch.company,
               },
             }));
           }
@@ -480,7 +472,7 @@ const Specifications = ({
       }
     };
     fetchClients();
-  }, [car.client]);
+  }, [car.client, api]);
 
   return (
     <div className="space-y-6">

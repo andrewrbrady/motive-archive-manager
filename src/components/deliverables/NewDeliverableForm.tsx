@@ -21,6 +21,7 @@ import { Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { Platform, DeliverableType } from "@/types/deliverable";
 import { FirestoreUser } from "@/types/firebase";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Car {
   _id: string;
@@ -38,6 +39,7 @@ export default function NewDeliverableForm({
   carId,
   onDeliverableCreated,
 }: NewDeliverableFormProps) {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState("");
@@ -63,13 +65,15 @@ export default function NewDeliverableForm({
 
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!api) {
+        console.log("API client not available for fetching users");
+        return;
+      }
+
       try {
         // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Starting to fetch users...");
-        const response = await fetch("/api/users");
-        if (!response.ok) {
-          throw new Error("Failed to fetch users");
-        }
-        const data = await response.json();
+        const response = await api.get("users");
+        const data = response as any;
 
         // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Raw API response:", data);
         // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
@@ -99,19 +103,16 @@ export default function NewDeliverableForm({
     };
 
     // Only fetch users if we don't already have them
-    if (users.length === 0) {
+    if (users.length === 0 && api) {
       fetchUsers();
     }
 
     // Only fetch cars if no carId was provided
-    if (!carId) {
+    if (!carId && api) {
       const fetchCars = async () => {
         try {
-          const response = await fetch("/api/cars");
-          if (!response.ok) {
-            throw new Error("Failed to fetch cars");
-          }
-          const data = await response.json();
+          const response = await api.get("cars");
+          const data = response as any;
           setCars(data.cars || []);
         } catch (error) {
           console.error("Error fetching cars:", error);
@@ -123,7 +124,7 @@ export default function NewDeliverableForm({
         fetchCars();
       }
     }
-  }, []); // Remove dependencies to prevent re-fetching
+  }, [api]); // Add api as dependency
 
   const resetForm = () => {
     setTitle("");
@@ -155,6 +156,11 @@ export default function NewDeliverableForm({
       return;
     }
 
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
     const deliverableCarId = carId || selectedCarId;
 
     // Find the selected user to get both name and firebase_uid
@@ -168,8 +174,8 @@ export default function NewDeliverableForm({
     try {
       // Determine which API endpoint to use based on whether we have a car
       const apiUrl = deliverableCarId
-        ? `/api/cars/${deliverableCarId}/deliverables`
-        : `/api/deliverables`;
+        ? `cars/${deliverableCarId}/deliverables`
+        : `deliverables`;
 
       const requestBody: any = {
         title,
@@ -191,22 +197,12 @@ export default function NewDeliverableForm({
         requestBody.car_id = deliverableCarId;
       }
 
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
+      await api.post(apiUrl, requestBody);
 
-      if (!response.ok) {
-        throw new Error("Failed to create deliverable");
-      }
-
-      toast.success("Deliverable created successfully");
-      onDeliverableCreated();
-      setIsOpen(false);
+      toast.success("Deliverable created successfully!");
       resetForm();
+      setIsOpen(false);
+      onDeliverableCreated();
     } catch (error) {
       console.error("Error creating deliverable:", error);
       toast.error("Failed to create deliverable");

@@ -10,6 +10,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+interface CreateShotListTemplateResponse {
+  _id: string;
+  name: string;
+  description: string;
+  shots: any[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface CreateShotListTemplateDialogProps {
   open: boolean;
@@ -20,36 +31,50 @@ export default function CreateShotListTemplateDialog({
   open,
   onOpenChange,
 }: CreateShotListTemplateDialogProps) {
+  const api = useAPI();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Shot List Template</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <div className="text-sm text-muted-foreground">Loading...</div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await fetch("/api/shot-list-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await api.post<CreateShotListTemplateResponse>(
+        "shot-list-templates",
+        {
           name,
           description,
           shots: [],
-        }),
-      });
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to create shot list template");
-      }
-
+      toast.success("Shot list template created successfully");
       onOpenChange(false);
       setName("");
       setDescription("");
     } catch (error) {
       console.error("Error creating shot list template:", error);
+      toast.error("Failed to create shot list template");
     } finally {
       setLoading(false);
     }

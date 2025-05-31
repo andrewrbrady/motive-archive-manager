@@ -29,6 +29,7 @@ import type { ProviderId } from "@/lib/llmProviders";
 import type { BaTCarDetails } from "@/types/car-page";
 import type { Event } from "@/types/event";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CarCopywriterProps {
   carId: string;
@@ -45,6 +46,7 @@ interface CarSavedCaption {
 
 export function CarCopywriter({ carId }: CarCopywriterProps) {
   const { user } = useFirebaseAuth();
+  const api = useAPI();
 
   // Car-specific state
   const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
@@ -235,14 +237,19 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     carDetails,
     selectedSystemPromptId,
     systemPrompts,
-    formState,
+    formState.context,
+    formState.additionalContext,
     eventDetails,
+    formState.platform,
+    formState.tone,
+    formState.style,
     derivedLength,
+    formState.model,
+    formState.temperature,
   ]);
 
   const handleShowPreviewToggle = useCallback(() => {
     if (!showPreview) {
-      // Generate the LLM text when opening preview
       const generatedText = buildLLMText();
       setEditableLLMText(generatedText);
     }
@@ -281,115 +288,56 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
   // Fetch car details
   const fetchCarDetails = useCallback(async () => {
+    if (!api) return;
+
+    setLoadingCar(true);
+    setCarError(null);
+
     try {
-      setLoadingCar(true);
-      setCarError(null);
-
-      const response = await fetch(`/api/cars/${carId}`);
-      if (!response.ok) throw new Error("Failed to fetch car details");
-
-      const data = await response.json();
-
-      // Convert to BaTCarDetails format
-      const baTCarDetails: BaTCarDetails = {
-        _id: data._id,
-        year: data.year || 0,
-        make: data.make || "",
-        model: data.model || "",
-        color: data.color,
-        mileage: data.mileage,
-        engine: data.engine
-          ? {
-              type: data.engine.type,
-              displacement: data.engine.displacement,
-              power: data.engine.power
-                ? {
-                    hp: data.engine.power.hp || 0,
-                  }
-                : undefined,
-            }
-          : undefined,
-        transmission: data.transmission || { type: "" },
-        vin: data.vin,
-        condition: data.condition,
-        interior_color: data.interior_color,
-        interior_features: data.interior_features
-          ? {
-              seats: data.interior_features.seats || 0,
-              upholstery: data.interior_features.upholstery,
-            }
-          : undefined,
-        description: data.description,
+      const data = (await api.get(`cars/${carId}`)) as BaTCarDetails & {
+        client?: string;
+        clientId?: string;
+        clientInfo?: { _id: string };
       };
+      setCarDetails(data);
 
-      setCarDetails(baTCarDetails);
-
-      // Try to get clientId from car details
+      // Try to get client handle
       const clientId = data.client || data.clientId || data.clientInfo?._id;
       if (clientId) {
-        const clientRes = await fetch(`/api/clients/${clientId}`);
-        if (clientRes.ok) {
-          const client = await clientRes.json();
+        try {
+          const client = (await api.get(`clients/${clientId}`)) as any;
           if (client.socialMedia?.instagram) {
             setClientHandle(
               `@${client.socialMedia.instagram.replace(/^@/, "")}`
             );
-          } else {
-            setClientHandle(null);
           }
-        } else {
+        } catch (clientError) {
+          console.error("Error fetching client:", clientError);
           setClientHandle(null);
         }
-      } else {
-        setClientHandle(null);
       }
     } catch (error) {
       console.error("Error fetching car details:", error);
-      setCarError(
-        error instanceof Error ? error.message : "Failed to fetch car details"
-      );
-      setClientHandle(null);
+      setCarError("Failed to fetch car details");
     } finally {
       setLoadingCar(false);
     }
-  }, [carId]);
+  }, [api, carId]);
 
   // Fetch car events
   const fetchCarEvents = useCallback(async () => {
+    if (!api) return;
+
     try {
       setLoadingEvents(true);
-      const response = await fetch(`/api/cars/${carId}/events`);
-      if (!response.ok) throw new Error("Failed to fetch car events");
-
-      const data: Event[] = await response.json();
-
-      // Convert Event[] to ProjectEvent[] format for compatibility
-      const projectEvents: ProjectEvent[] = data.map((event) => ({
-        id: event.id,
-        car_id: event.car_id,
-        project_id: event.project_id,
-        type: event.type,
-        title: event.title,
-        description: event.description,
-        start: event.start,
-        end: event.end,
-        isAllDay: event.isAllDay,
-        teamMemberIds: event.teamMemberIds,
-        locationId: event.locationId,
-        primaryImageId: event.primaryImageId,
-        imageIds: event.imageIds,
-        createdAt: event.createdAt,
-        updatedAt: event.updatedAt,
-      }));
-
-      setCarEvents(projectEvents);
+      const data = (await api.get(`cars/${carId}/events`)) as ProjectEvent[];
+      setCarEvents(data || []);
     } catch (error) {
       console.error("Error fetching car events:", error);
-      // Don't show error toast for events as they're optional
     } finally {
       setLoadingEvents(false);
     }
-  }, [carId]);
+  }, [api, carId]);
 
   // Fetch event details when selected events change
   const fetchEventDetails = useCallback(async () => {
@@ -406,33 +354,23 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     }
   }, [selectedEventIds, carEvents]);
 
-  // System prompts fetch function
+  // Fetch system prompts
   const fetchSystemPrompts = useCallback(async () => {
+    if (!user || !api) return;
+
     try {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
-      if (!user) {
-        console.log(
-          "CarCopywriter: No user available for fetchSystemPrompts, skipping..."
-        );
-        return; // Return early instead of throwing error
-      }
-
-      // Get the Firebase ID token
       const token = await user.getIdToken();
-
-      const response = await fetch("/api/system-prompts/list", {
+      const data = (await api.get("system-prompts/list", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
-      if (!response.ok) throw new Error("Failed to fetch system prompts");
-
-      const data = await response.json();
+      })) as any[];
       setSystemPrompts(Array.isArray(data) ? data : []);
 
-      // Auto-select the first active system prompt if available
+      // Auto-select the first active system prompt
       const activePrompt = data.find((prompt: any) => prompt.isActive);
       if (activePrompt) {
         setSelectedSystemPromptId(activePrompt._id);
@@ -441,41 +379,37 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       }
     } catch (error) {
       console.error("Error fetching system prompts:", error);
-      setSystemPromptError(
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch system prompts"
-      );
+      setSystemPromptError("Failed to load system prompts");
     } finally {
       setLoadingSystemPrompts(false);
     }
-  }, [user]);
+  }, [user, api]);
 
   // Fetch length settings
   const fetchLengthSettings = useCallback(async () => {
-    try {
-      const response = await fetch("/api/length-settings");
-      if (!response.ok) throw new Error("Failed to fetch length settings");
+    if (!api) return;
 
-      const data = await response.json();
+    try {
+      const data = (await api.get("length-settings")) as any[];
       setLengthSettings(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching length settings:", error);
     }
-  }, []);
+  }, [api]);
 
   // Fetch saved captions
   const fetchSavedCaptions = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/captions?carId=${carId}`);
-      if (!response.ok) throw new Error("Failed to fetch captions");
+    if (!api) return;
 
-      const captions = await response.json();
-      setSavedCaptions(captions);
+    try {
+      const data = (await api.get(
+        `captions?carId=${carId}`
+      )) as CarSavedCaption[];
+      setSavedCaptions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching captions:", error);
     }
-  }, [carId]);
+  }, [api, carId]);
 
   // Event selection handlers
   const handleEventSelection = useCallback((eventId: string) => {
@@ -500,11 +434,14 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   useEffect(() => {
     fetchCarDetails();
     fetchCarEvents();
+    fetchSystemPrompts();
     fetchLengthSettings();
     fetchSavedCaptions();
   }, [
+    api,
     fetchCarDetails,
     fetchCarEvents,
+    fetchSystemPrompts,
     fetchLengthSettings,
     fetchSavedCaptions,
   ]);
@@ -573,26 +510,18 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   };
 
   const handleSaveContent = async () => {
+    if (!carDetails || !api) return;
+
     const contentToSave = generationState.generatedCaption;
-    if (!contentToSave || !carDetails) return;
+    if (!contentToSave.trim()) return;
 
     try {
-      const response = await fetch("/api/captions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          platform: formState.platform,
-          carId: carDetails._id,
-          context: formState.context,
-          caption: contentToSave,
-        }),
+      await api.post("captions", {
+        platform: formState.platform,
+        carId: carDetails._id,
+        context: formState.context,
+        caption: contentToSave,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to save caption");
-      }
 
       toast({
         title: "Success",
@@ -618,17 +547,10 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   };
 
   const handleDeleteContent = async (contentId: string) => {
-    try {
-      const response = await fetch(
-        `/api/captions?id=${contentId}&carId=${carDetails?._id}`,
-        {
-          method: "DELETE",
-        }
-      );
+    if (!api) return;
 
-      if (!response.ok) {
-        throw new Error("Failed to delete caption");
-      }
+    try {
+      await api.delete(`captions?id=${contentId}&carId=${carDetails?._id}`);
 
       toast({
         title: "Success",
@@ -648,27 +570,19 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   };
 
   const handleSaveEdit = async (contentId: string) => {
+    if (!api) return;
+
     try {
       const captionToEdit = savedCaptions.find((c) => c._id === contentId);
       if (!captionToEdit) {
         throw new Error("Caption not found");
       }
 
-      const response = await fetch(`/api/captions?id=${contentId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          caption: editingText,
-          platform: captionToEdit.platform,
-          context: captionToEdit.context || "",
-        }),
+      await api.patch(`captions?id=${contentId}`, {
+        caption: editingText,
+        platform: captionToEdit.platform,
+        context: captionToEdit.context || "",
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update caption");
-      }
 
       toast({
         title: "Success",
@@ -701,6 +615,13 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       createdAt: caption.createdAt,
     })
   );
+
+  // Loading check moved to the end - after all hooks have been called
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
 
   if (loadingCar) {
     return (

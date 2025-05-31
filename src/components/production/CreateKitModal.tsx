@@ -17,6 +17,14 @@ import { Search, Package, X, Check } from "lucide-react";
 import { Kit, StudioInventoryItem } from "@/types/inventory";
 import Image from "next/image";
 import { UrlModal } from "@/components/ui/url-modal";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+// TypeScript interface for API response
+interface StudioInventoryResponse {
+  data?: StudioInventoryItem[];
+  [key: string]: any;
+}
 
 // Completely separate component for item rendering
 function InventoryItemCard({
@@ -96,6 +104,18 @@ export default function CreateKitModal({
   // Use a simple array state for selected items
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
+  // Add useAPI hook
+  const api = useAPI();
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   // Initialize selected items from kit if editing
   useEffect(() => {
     if (isEditing && kit?.items) {
@@ -123,9 +143,10 @@ export default function CreateKitModal({
     const fetchInventoryItems = async () => {
       setLoading(true);
       try {
-        const response = await fetch("/api/studio_inventory");
-        if (!response.ok) throw new Error("Failed to fetch inventory items");
-        const data = await response.json();
+        const response = (await api.get(
+          "studio_inventory"
+        )) as StudioInventoryResponse;
+        const data = Array.isArray(response) ? response : response.data || [];
 
         // Filter out items that are already in other kits
         const availableItems = data.filter(
@@ -135,8 +156,10 @@ export default function CreateKitModal({
         );
 
         setInventoryItems(availableItems);
+        toast.success("Inventory items loaded successfully");
       } catch (error) {
         console.error("Error fetching inventory items:", error);
+        toast.error("Failed to load inventory items");
       } finally {
         setLoading(false);
       }
@@ -145,7 +168,7 @@ export default function CreateKitModal({
     if (isOpen) {
       fetchInventoryItems();
     }
-  }, [isOpen, isEditing, kit]);
+  }, [isOpen, isEditing, kit, api]);
 
   // Filter items based on search query
   const filteredItems = inventoryItems.filter((item) => {

@@ -25,7 +25,7 @@ export function useTemplateManager(shouldCreateTemplate = false) {
     try {
       setIsLoading(true);
       const data = await api.get<{ templates: Template[] }>(
-        "/shot-list-templates"
+        "shot-list-templates"
       );
       setTemplates(data.templates || []);
     } catch (error) {
@@ -76,8 +76,8 @@ export function useTemplateManager(shouldCreateTemplate = false) {
       try {
         const isUpdate = !!editingTemplate;
         const endpoint = isUpdate
-          ? `/shot-list-templates/${editingTemplate.id}`
-          : "/shot-list-templates";
+          ? `shot-list-templates/${editingTemplate.id}`
+          : "shot-list-templates";
 
         const result = isUpdate
           ? await api.put<{ template: Template }>(endpoint, data)
@@ -115,7 +115,7 @@ export function useTemplateManager(shouldCreateTemplate = false) {
       }
 
       try {
-        await api.delete(`/shot-list-templates/${templateId}`);
+        await api.delete(`shot-list-templates/${templateId}`);
 
         toast.success("Template deleted successfully");
 

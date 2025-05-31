@@ -2,6 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import ResponsiveImage from "@/components/ui/ResponsiveImage";
 import { ImageBrowserProps } from "./types";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+// TypeScript interface for API response
+interface CloudflareImagesResponse {
+  images: string[];
+}
 
 // Helper function to safely get thumbnail URL
 const getThumbnailUrl = (thumbnail: string | undefined): string => {
@@ -11,33 +18,43 @@ const getThumbnailUrl = (thumbnail: string | undefined): string => {
 };
 
 export function ImageBrowser({ onSelectImage }: ImageBrowserProps) {
+  const api = useAPI();
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="text-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+        <p className="mt-2 text-sm text-muted-foreground">Authenticating...</p>
+      </div>
+    );
+  }
+
   useEffect(() => {
     const fetchImages = async () => {
+      if (!api) return;
+
       try {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch("/api/cloudflare/images");
-        if (!response.ok) {
-          throw new Error("Failed to fetch images");
-        }
-
-        const data = await response.json();
+        const data =
+          await api.get<CloudflareImagesResponse>("cloudflare/images");
         setImages(data.images || []);
       } catch (error) {
         console.error("Error fetching images:", error);
         setError("Failed to load images. Please try again later.");
+        toast.error("Failed to load images");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchImages();
-  }, []);
+  }, [api]);
 
   if (isLoading) {
     return (

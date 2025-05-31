@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useImages } from "@/hooks/use-images";
 import { useCars } from "@/lib/hooks/query/useCars";
+import { useAPI } from "@/hooks/useAPI";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +27,11 @@ interface Car {
   year: string;
   make: string;
   model: string;
+}
+
+interface DeleteImageResponse {
+  success: boolean;
+  error?: string;
 }
 
 interface ImageFilters {
@@ -94,6 +100,8 @@ export function SimpleImageGallery({
   zoomLevel,
   mutate,
 }: SimpleImageGalleryProps) {
+  const api = useAPI();
+
   // Zoom level configurations
   const zoomConfigs = {
     1: "xl:grid-cols-8",
@@ -144,6 +152,8 @@ export function SimpleImageGallery({
   }
 
   const handleDelete = async (image: ImageData) => {
+    if (!api) return;
+
     // Try to use cloudflareId, else extract from URL
     const cloudflareId = image.cloudflareId || extractCloudflareId(image.url);
     if (!cloudflareId) {
@@ -157,14 +167,12 @@ export function SimpleImageGallery({
     try {
       const payload = { cloudflareIds: [cloudflareId] };
       // [REMOVED] // [REMOVED] console.log("Sending DELETE payload to /api/cloudflare/images:", payload);
-      const res = await fetch("/api/cloudflare/images", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await res.json();
+      const result = (await api.deleteWithBody(
+        "cloudflare/images",
+        payload
+      )) as DeleteImageResponse;
       // [REMOVED] // [REMOVED] console.log("Delete response from /api/cloudflare/images:", result);
-      if (!res.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.error || JSON.stringify(result));
       }
       toast({ title: "Deleted!", description: "Image deleted successfully" });

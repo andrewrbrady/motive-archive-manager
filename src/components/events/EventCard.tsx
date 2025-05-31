@@ -31,6 +31,14 @@ import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LocationResponse } from "@/models/location";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+// TypeScript interfaces for API responses
+interface ImageResponse {
+  _id: string;
+  url: string;
+}
 
 interface EventCardProps {
   event: Event & {
@@ -98,82 +106,98 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
   const [loading, setLoading] = useState(true);
   const [usingCarImage, setUsingCarImage] = useState(false);
 
+  const api = useAPI();
+
+  // Authentication guard
+  if (!api) {
+    return (
+      <Card className="overflow-hidden">
+        <div className="relative aspect-[16/9]">
+          <div className="w-full h-full bg-muted/50 flex flex-col items-center justify-center gap-4">
+            <LoadingSpinner size="lg" />
+          </div>
+        </div>
+        <CardContent className="pt-4">
+          <div className="space-y-3">
+            <div className="h-6 bg-muted rounded animate-pulse"></div>
+            <div className="h-4 bg-muted rounded animate-pulse w-3/4"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   useEffect(() => {
+    if (!api) return;
+
     const fetchEventData = async () => {
       setLoading(true);
 
       // Fetch location if locationId exists
       if (event.locationId) {
         try {
-          const locationResponse = await fetch(
-            `/api/locations/${event.locationId}`
+          const locationData = await api!.get<LocationResponse>(
+            `locations/${event.locationId}`
           );
-          if (locationResponse.ok) {
-            const locationData = await locationResponse.json();
-            setLocation(locationData);
-          }
+          setLocation(locationData);
         } catch (error) {
           console.error("Error fetching location:", error);
+          toast.error("Failed to load location information");
         }
       }
 
       // Fetch primary image logic with car fallback
       if (event.primaryImageId) {
         try {
-          const response = await fetch(`/api/images/${event.primaryImageId}`);
-          if (response.ok) {
-            const imageData = await response.json();
-            setPrimaryImage({
-              id: imageData._id,
-              url: getFormattedImageUrl(imageData.url),
-            });
-            setUsingCarImage(false);
-          } else {
-            // If primary image fetch fails, try the first image
-            if (
-              event.imageIds &&
-              event.imageIds.length > 0 &&
-              event.imageIds[0] !== event.primaryImageId
-            ) {
-              const fallbackResponse = await fetch(
-                `/api/images/${event.imageIds[0]}`
+          const imageData = await api!.get<ImageResponse>(
+            `images/${event.primaryImageId}`
+          );
+          setPrimaryImage({
+            id: imageData._id,
+            url: getFormattedImageUrl(imageData.url),
+          });
+          setUsingCarImage(false);
+        } catch (error) {
+          console.error("Error fetching event primary image:", error);
+          // If primary image fetch fails, try the first image
+          if (
+            event.imageIds &&
+            event.imageIds.length > 0 &&
+            event.imageIds[0] !== event.primaryImageId
+          ) {
+            try {
+              const fallbackImageData = await api!.get<ImageResponse>(
+                `images/${event.imageIds[0]}`
               );
-              if (fallbackResponse.ok) {
-                const fallbackImageData = await fallbackResponse.json();
-                setPrimaryImage({
-                  id: fallbackImageData._id,
-                  url: getFormattedImageUrl(fallbackImageData.url),
-                });
-                setUsingCarImage(false);
-              } else {
-                // Try car's primary image as final fallback
-                await tryCarPrimaryImage();
-              }
-            } else {
+              setPrimaryImage({
+                id: fallbackImageData._id,
+                url: getFormattedImageUrl(fallbackImageData.url),
+              });
+              setUsingCarImage(false);
+            } catch (fallbackError) {
+              console.error(
+                "Error fetching fallback event image:",
+                fallbackError
+              );
               // Try car's primary image as final fallback
               await tryCarPrimaryImage();
             }
+          } else {
+            // Try car's primary image as final fallback
+            await tryCarPrimaryImage();
           }
-        } catch (error) {
-          console.error("Error fetching event image:", error);
-          // Try car's primary image as fallback
-          await tryCarPrimaryImage();
         }
       } else if (event.imageIds && event.imageIds.length > 0) {
         // If no primary image but we have image IDs, use the first one
         try {
-          const response = await fetch(`/api/images/${event.imageIds[0]}`);
-          if (response.ok) {
-            const imageData = await response.json();
-            setPrimaryImage({
-              id: imageData._id,
-              url: getFormattedImageUrl(imageData.url),
-            });
-            setUsingCarImage(false);
-          } else {
-            // Try car's primary image as fallback
-            await tryCarPrimaryImage();
-          }
+          const imageData = await api!.get<ImageResponse>(
+            `images/${event.imageIds[0]}`
+          );
+          setPrimaryImage({
+            id: imageData._id,
+            url: getFormattedImageUrl(imageData.url),
+          });
+          setUsingCarImage(false);
         } catch (error) {
           console.error("Error fetching event image:", error);
           // Try car's primary image as fallback
@@ -188,20 +212,14 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
       async function tryCarPrimaryImage() {
         if (event.car?.primaryImageId) {
           try {
-            const carImageResponse = await fetch(
-              `/api/images/${event.car.primaryImageId}`
+            const carImageData = await api!.get<ImageResponse>(
+              `images/${event.car.primaryImageId}`
             );
-            if (carImageResponse.ok) {
-              const carImageData = await carImageResponse.json();
-              setPrimaryImage({
-                id: carImageData._id,
-                url: getFormattedImageUrl(carImageData.url),
-              });
-              setUsingCarImage(true);
-            } else {
-              setPrimaryImage(null);
-              setUsingCarImage(false);
-            }
+            setPrimaryImage({
+              id: carImageData._id,
+              url: getFormattedImageUrl(carImageData.url),
+            });
+            setUsingCarImage(true);
           } catch (error) {
             console.error("Error fetching car primary image:", error);
             setPrimaryImage(null);
@@ -218,6 +236,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
 
     fetchEventData();
   }, [
+    api,
     event.id,
     event.primaryImageId,
     event.imageIds,

@@ -52,9 +52,10 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 export default function StudioInventoryTab() {
-  const { toast } = useToast();
+  const { toast: shadcnToast } = useToast();
   const api = useAPI();
   const [selectedView, setSelectedView] = useState<"items" | "kits">("items");
   const [viewType, setViewType] = useState<"grid" | "list">("grid");
@@ -228,11 +229,7 @@ export default function StudioInventoryTab() {
 
   const fetchInventoryItems = async () => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to load inventory items.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -299,11 +296,7 @@ export default function StudioInventoryTab() {
       setFilteredItems(itemsWithCorrectAvailability);
     } catch (error) {
       console.error("Error fetching inventory items:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch inventory items. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to fetch inventory items. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -311,11 +304,7 @@ export default function StudioInventoryTab() {
 
   const fetchKits = async () => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to load kits.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -325,11 +314,7 @@ export default function StudioInventoryTab() {
       setFilteredKits(data);
     } catch (error) {
       console.error("Error fetching kits:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch kits. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to fetch kits. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -414,11 +399,7 @@ export default function StudioInventoryTab() {
 
   const handleAddItem = async (newItem: Omit<StudioInventoryItem, "id">) => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to add inventory items.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -433,12 +414,9 @@ export default function StudioInventoryTab() {
           model: newItem.model,
         });
 
-        toast({
-          title: "Validation Error",
-          description:
-            "Please fill in all required fields (Name, Category, Model)",
-          variant: "destructive",
-        });
+        toast.error(
+          "Please fill in all required fields (Name, Category, Model)"
+        );
         return;
       }
 
@@ -493,30 +471,20 @@ export default function StudioInventoryTab() {
       setItems((prevItems) => [...prevItems, formattedItem]);
       setIsAddItemModalOpen(false);
 
-      toast({
-        title: "Success",
-        description: "Inventory item added successfully",
-      });
+      toast.success("Inventory item added successfully");
     } catch (error) {
       console.error("Error adding inventory item:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to create inventory item",
-        variant: "destructive",
-      });
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to create inventory item"
+      );
     }
   };
 
   const handleCreateKit = async (newKit: Partial<Kit>) => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to create kits.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -551,17 +519,10 @@ export default function StudioInventoryTab() {
 
       setIsCreateKitModalOpen(false);
 
-      toast({
-        title: "Success",
-        description: "Kit created successfully",
-      });
+      toast.success("Kit created successfully");
     } catch (error) {
       console.error("Error creating kit:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create kit. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to create kit. Please try again.");
     }
   };
 
@@ -611,10 +572,7 @@ export default function StudioInventoryTab() {
     // Call the existing handleAddItem function to create the new item
     handleAddItem(duplicatedItem);
 
-    toast({
-      title: "Item Duplicated",
-      description: `A copy of "${itemToDuplicate.name}" has been created.`,
-    });
+    toast.success("A copy of the item has been created.");
   };
 
   const handleCancelSelection = () => {
@@ -641,11 +599,7 @@ export default function StudioInventoryTab() {
     data?: { checkedOutTo: string; expectedReturnDate?: Date }
   ) => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to checkout items.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -663,19 +617,14 @@ export default function StudioInventoryTab() {
       setSelectedItems([]);
       setIsSelectionMode(false);
 
-      toast({
-        title: "Success",
-        description: `${action === "checkout" ? "Checked out" : "Checked in"} ${
+      toast.success(
+        `${action === "checkout" ? "Checked out" : "Checked in"} ${
           selectedItems.length
-        } items successfully`,
-      });
+        } items successfully`
+      );
     } catch (error) {
       console.error(`Error in batch ${action}:`, error);
-      toast({
-        title: "Error",
-        description: `Failed to ${action} items`,
-        variant: "destructive",
-      });
+      toast.error(`Failed to ${action} items`);
     }
   };
 
@@ -692,20 +641,10 @@ export default function StudioInventoryTab() {
   ).length;
 
   const handleUpdateKit = async (updatedKit: Partial<Kit>) => {
-    if (!updatedKit.id) return;
+    if (!updatedKit.id || !api) return;
 
     try {
-      const response = await fetch(`/api/kits/${updatedKit.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedKit),
-      });
-
-      if (!response.ok) throw new Error("Failed to update kit");
-
-      const data = await response.json();
+      const data = await api.put<any>(`/kits/${updatedKit.id}`, updatedKit);
 
       // Update kits in state
       setKits((prevKits) =>
@@ -715,67 +654,42 @@ export default function StudioInventoryTab() {
       setIsCreateKitModalOpen(false);
       setCurrentKit(null);
 
-      toast({
-        title: "Success",
-        description: "Kit updated successfully",
-      });
+      toast.success("Kit updated successfully");
     } catch (error) {
       console.error("Error updating kit:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update kit. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to update kit. Please try again.");
     }
   };
 
   const handleDeleteKit = async () => {
-    if (!currentKit) return;
+    if (!currentKit || !api) return;
 
     try {
-      const response = await fetch(`/api/kits/${currentKit.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete kit");
+      await api.delete(`/kits/${currentKit.id}`);
 
       // Remove kit from state
       setKits((prevKits) => prevKits.filter((kit) => kit.id !== currentKit.id));
       setIsDeleteKitDialogOpen(false);
       setCurrentKit(null);
 
-      toast({
-        title: "Success",
-        description: "Kit deleted successfully",
-      });
+      toast.success("Kit deleted successfully");
     } catch (error) {
       console.error("Error deleting kit:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete kit. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to delete kit. Please try again.");
     }
   };
 
   const handleCheckoutKit = async (userId: string, returnDate: Date) => {
-    if (!currentKit) return;
+    if (!currentKit || !api) return;
 
     try {
-      const response = await fetch(`/api/kits/${currentKit.id}/checkout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const updatedKit = await api.post<any>(
+        `/kits/${currentKit.id}/checkout`,
+        {
           userId,
           expectedReturnDate: returnDate,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to check out kit");
-
-      const updatedKit = await response.json();
+        }
+      );
 
       // Update kits in state
       setKits((prevKits) =>
@@ -785,31 +699,18 @@ export default function StudioInventoryTab() {
       setIsKitCheckoutModalOpen(false);
       setCurrentKit(null);
 
-      toast({
-        title: "Success",
-        description: "Kit checked out successfully",
-      });
+      toast.success("Kit checked out successfully");
     } catch (error) {
       console.error("Error checking out kit:", error);
-      toast({
-        title: "Error",
-        description: "Failed to check out kit. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to check out kit. Please try again.");
     }
   };
 
   const handleCheckinKit = async () => {
-    if (!currentKit) return;
+    if (!currentKit || !api) return;
 
     try {
-      const response = await fetch(`/api/kits/${currentKit.id}/checkin`, {
-        method: "POST",
-      });
-
-      if (!response.ok) throw new Error("Failed to check in kit");
-
-      const updatedKit = await response.json();
+      const updatedKit = await api.post<any>(`/kits/${currentKit.id}/checkin`);
 
       // Update kits in state
       setKits((prevKits) =>
@@ -819,17 +720,10 @@ export default function StudioInventoryTab() {
       setIsKitCheckoutModalOpen(false);
       setCurrentKit(null);
 
-      toast({
-        title: "Success",
-        description: "Kit checked in successfully",
-      });
+      toast.success("Kit checked in successfully");
     } catch (error) {
       console.error("Error checking in kit:", error);
-      toast({
-        title: "Error",
-        description: "Failed to check in kit. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to check in kit. Please try again.");
     }
   };
 
@@ -869,11 +763,7 @@ export default function StudioInventoryTab() {
     itemIds: string[]
   ) => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to edit items.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -890,17 +780,10 @@ export default function StudioInventoryTab() {
       setSelectedItems([]);
       setIsSelectionMode(false);
 
-      toast({
-        title: "Success",
-        description: `Updated ${itemIds.length} items successfully`,
-      });
+      toast.success(`Updated ${itemIds.length} items successfully`);
     } catch (error) {
       console.error("Error in bulk edit:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update items",
-        variant: "destructive",
-      });
+      toast.error("Failed to update items");
     }
   };
 
@@ -1012,20 +895,13 @@ export default function StudioInventoryTab() {
     link.click();
     document.body.removeChild(link);
 
-    toast({
-      title: "Export Successful",
-      description: `Exported ${itemsToExport.length} items to CSV`,
-    });
+    toast.success(`Exported ${itemsToExport.length} items to CSV`);
   };
 
   // Fetch locations function
   const fetchLocations = async () => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to load locations.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -1036,22 +912,14 @@ export default function StudioInventoryTab() {
       setLocations(locationNames);
     } catch (error) {
       console.error("Error fetching locations:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load locations",
-        variant: "destructive",
-      });
+      toast.error("Failed to load locations");
     }
   };
 
   // Add fetch containers function
   const fetchContainers = async () => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to load containers.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -1060,22 +928,14 @@ export default function StudioInventoryTab() {
       setContainers(data);
     } catch (error) {
       console.error("Error fetching containers:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load containers",
-        variant: "destructive",
-      });
+      toast.error("Failed to load containers");
     }
   };
 
   // Fetch categories function
   const fetchCategories = async () => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to load categories.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 
@@ -1090,11 +950,7 @@ export default function StudioInventoryTab() {
   // Fetch manufacturers function
   const fetchManufacturers = async () => {
     if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to load manufacturers.",
-        variant: "destructive",
-      });
+      toast.error("Authentication Required");
       return;
     }
 

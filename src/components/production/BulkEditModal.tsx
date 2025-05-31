@@ -28,6 +28,8 @@ import { LocationResponse } from "@/models/location";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface BulkEditModalProps {
   isOpen: boolean;
@@ -48,6 +50,7 @@ export default function BulkEditModal({
   selectedItems,
   onSave,
 }: BulkEditModalProps) {
+  const api = useAPI();
   const [selectedFields, setSelectedFields] = useState<Record<string, boolean>>(
     {
       category: false,
@@ -76,33 +79,35 @@ export default function BulkEditModal({
 
   // Fetch locations and tags when modal opens
   useEffect(() => {
+    const fetchLocations = async () => {
+      if (!api) return;
+
+      try {
+        const data = await api.get<any[]>("/locations");
+        setLocations(data.map((location: any) => location.name));
+      } catch (error) {
+        console.error("Error fetching locations:", error);
+        toast.error("Failed to fetch locations");
+      }
+    };
+
+    const fetchTags = async () => {
+      if (!api) return;
+
+      try {
+        const data = await api.get<string[]>("/studio_inventory/tags");
+        setAllTags(data);
+      } catch (error) {
+        console.error("Error fetching tags:", error);
+        toast.error("Failed to fetch tags");
+      }
+    };
+
     if (isOpen) {
       fetchLocations();
       fetchTags();
     }
-  }, [isOpen]);
-
-  const fetchLocations = async () => {
-    try {
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
-      setLocations(data);
-    } catch (error) {
-      console.error("Error fetching locations:", error);
-    }
-  };
-
-  const fetchTags = async () => {
-    try {
-      const response = await fetch("/api/studio_inventory/tags");
-      if (!response.ok) throw new Error("Failed to fetch tags");
-      const data = await response.json();
-      setAllTags(data);
-    } catch (error) {
-      console.error("Error fetching tags:", error);
-    }
-  };
+  }, [isOpen, api]);
 
   const handleFieldToggle = (field: string) => {
     setSelectedFields((prev) => ({

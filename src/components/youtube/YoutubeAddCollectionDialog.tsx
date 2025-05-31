@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { X } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YoutubeVideo {
   _id: string;
@@ -47,21 +48,20 @@ export default function YoutubeAddCollectionDialog({
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     if (open) {
       fetchVideos();
     }
-  }, [open]);
+  }, [open, api]);
 
   const fetchVideos = async () => {
     setLoadingVideos(true);
     try {
-      const response = await fetch("/api/youtube/videos");
-      if (!response.ok) {
-        throw new Error("Failed to fetch videos");
-      }
-      const data = await response.json();
+      const data = (await api.get("youtube/videos")) as YoutubeVideo[];
       setVideos(data);
     } catch (error) {
       console.error("Error fetching videos:", error);
@@ -99,27 +99,16 @@ export default function YoutubeAddCollectionDialog({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/youtube/collections", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          description,
-          video_ids: selectedVideos,
-          is_featured: isFeatured,
-          tags: tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-        }),
+      await api.post("youtube/collections", {
+        name,
+        description,
+        video_ids: selectedVideos,
+        is_featured: isFeatured,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create collection");
-      }
 
       toast({
         title: "Success",

@@ -28,7 +28,7 @@ import { format } from "date-fns";
 import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface MemberDetails {
   name: string;
@@ -47,7 +47,7 @@ export function ProjectDeliverablesTab({
   memberDetails,
   onProjectUpdate,
 }: ProjectDeliverablesTabProps) {
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const [isAddDeliverableOpen, setIsAddDeliverableOpen] = useState(false);
   const [isLinkDeliverableOpen, setIsLinkDeliverableOpen] = useState(false);
   const [showJsonUpload, setShowJsonUpload] = useState(false);
@@ -84,31 +84,17 @@ export function ProjectDeliverablesTab({
   }, [project]);
 
   const fetchProjectDeliverables = async () => {
-    if (!user) {
-      console.log("No user available for fetching project deliverables");
+    if (!api) {
+      console.log("API not available for fetching project deliverables");
       return;
     }
 
     try {
       console.log("📦 Fetching project deliverables...");
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        `/api/projects/${project._id}/deliverables`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch deliverables");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(`projects/${project._id}/deliverables`)) as {
+        deliverables: any[];
+      };
       console.log(
         "✅ Project deliverables fetched:",
         data.deliverables?.length || 0
@@ -120,8 +106,8 @@ export function ProjectDeliverablesTab({
   };
 
   const fetchExistingDeliverables = async () => {
-    if (!user) {
-      console.log("No user available for fetching existing deliverables");
+    if (!api) {
+      console.log("API not available for fetching existing deliverables");
       return;
     }
 
@@ -129,20 +115,7 @@ export function ProjectDeliverablesTab({
       setIsLoadingDeliverables(true);
       console.log("📦 Fetching all existing deliverables...");
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch("/api/deliverables", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch existing deliverables");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("deliverables")) as { deliverables: any[] };
       console.log(
         "✅ Existing deliverables fetched:",
         data.deliverables?.length || 0
@@ -185,7 +158,7 @@ export function ProjectDeliverablesTab({
       return;
     }
 
-    if (!user) {
+    if (!api) {
       toast({
         title: "Error",
         description: "You must be logged in to create deliverables",
@@ -197,9 +170,6 @@ export function ProjectDeliverablesTab({
     try {
       setIsAddingDeliverable(true);
       console.log("⏳ Setting loading state...");
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
 
       const requestBody = {
         title: deliverableForm.title,
@@ -222,34 +192,13 @@ export function ProjectDeliverablesTab({
       );
       console.log(
         "🌐 Making API request to:",
-        `/api/projects/${project._id}/deliverables`
+        `projects/${project._id}/deliverables`
       );
 
-      const response = await fetch(
-        `/api/projects/${project._id}/deliverables`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(requestBody),
-        }
+      const successData = await api.post(
+        `projects/${project._id}/deliverables`,
+        requestBody
       );
-
-      console.log("📥 API response received:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log("❌ API error response:", errorData);
-        throw new Error(errorData.error || "Failed to add deliverable");
-      }
-
-      const successData = await response.json();
       console.log("✅ API success response:", successData);
 
       // Refresh project data and deliverables
@@ -300,7 +249,7 @@ export function ProjectDeliverablesTab({
   const handleLinkExistingDeliverables = async () => {
     if (selectedDeliverables.length === 0) return;
 
-    if (!user) {
+    if (!api) {
       toast({
         title: "Error",
         description: "You must be logged in to link deliverables",
@@ -313,32 +262,12 @@ export function ProjectDeliverablesTab({
       setIsLinkingDeliverables(true);
       console.log("🔗 Linking deliverables to project:", selectedDeliverables);
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
       // Link each selected deliverable to the project
       for (const deliverableId of selectedDeliverables) {
-        const response = await fetch(
-          `/api/projects/${project._id}/deliverables`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              linkExisting: true,
-              deliverableId: deliverableId,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || `Failed to link deliverable ${deliverableId}`
-          );
-        }
+        await api.post(`projects/${project._id}/deliverables`, {
+          linkExisting: true,
+          deliverableId: deliverableId,
+        });
       }
 
       // Refresh project data and deliverables
@@ -372,7 +301,7 @@ export function ProjectDeliverablesTab({
     deliverableId: string,
     status: string
   ) => {
-    if (!user) {
+    if (!api) {
       toast({
         title: "Error",
         description: "You must be logged in to update deliverable status",
@@ -382,25 +311,10 @@ export function ProjectDeliverablesTab({
     }
 
     try {
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        `/api/projects/${project._id}/deliverables`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ deliverableId, status }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update deliverable");
-      }
+      await api.put(`projects/${project._id}/deliverables`, {
+        deliverableId,
+        status,
+      });
 
       // Refresh project data and deliverables
       await onProjectUpdate();
@@ -423,7 +337,7 @@ export function ProjectDeliverablesTab({
   };
 
   const handleRemoveDeliverable = async (deliverableId: string) => {
-    if (!user) {
+    if (!api) {
       toast({
         title: "Error",
         description: "You must be logged in to remove deliverables",
@@ -435,22 +349,7 @@ export function ProjectDeliverablesTab({
     try {
       console.log("🗑️ Removing deliverable from project:", deliverableId);
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        `/api/projects/${project._id}/deliverables/${deliverableId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to remove deliverable");
-      }
+      await api.delete(`projects/${project._id}/deliverables/${deliverableId}`);
 
       console.log("✅ Deliverable removed successfully");
 
@@ -477,7 +376,7 @@ export function ProjectDeliverablesTab({
   };
 
   const handleJsonSubmit = async (jsonData: any[]) => {
-    if (!user) {
+    if (!api) {
       toast({
         title: "Error",
         description: "You must be logged in to create deliverables",
@@ -489,27 +388,10 @@ export function ProjectDeliverablesTab({
     try {
       setIsSubmittingJson(true);
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        `/api/projects/${project._id}/deliverables/batch`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ deliverables: jsonData }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create deliverables");
-      }
-
-      const result = await response.json();
+      const result = (await api.post(
+        `projects/${project._id}/deliverables/batch`,
+        { deliverables: jsonData }
+      )) as { created: number };
 
       toast({
         title: "Success",

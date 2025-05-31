@@ -2,11 +2,20 @@
 
 import React, { useState } from "react";
 import { XIcon, UploadIcon } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface ImportRawAssetsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: () => void;
+}
+
+interface ImportRawAssetsResponse {
+  success: boolean;
+  error?: string;
+  count?: number;
 }
 
 export default function ImportRawAssetsModal({
@@ -17,6 +26,20 @@ export default function ImportRawAssetsModal({
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const api = useAPI();
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-[hsl(var(--background))] rounded-lg shadow-lg w-full max-w-md mx-4 p-6">
+          <div className="flex items-center justify-center">
+            <LoadingSpinner size="lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -31,7 +54,7 @@ export default function ImportRawAssetsModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file || !api) return;
 
     setLoading(true);
     setError(null);
@@ -50,21 +73,16 @@ export default function ImportRawAssetsModal({
         return obj;
       });
 
-      // Send to API
-      const response = await fetch("/api/raw/import", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+      // Send to API using authenticated API client
+      const result = await api.post<ImportRawAssetsResponse>(
+        "raw/import",
+        data
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to import data");
-      }
-
-      const result = await response.json();
       if (result.success) {
+        toast.success(
+          `Successfully imported ${result.count || data.length} raw assets`
+        );
         onImport();
         onClose();
       } else {
@@ -72,7 +90,10 @@ export default function ImportRawAssetsModal({
       }
     } catch (err) {
       console.error("Error importing data:", err);
-      setError(err instanceof Error ? err.message : "Failed to import data");
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to import data";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

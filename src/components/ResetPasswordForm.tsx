@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 import {
   Card,
   CardContent,
@@ -25,6 +26,9 @@ export default function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     // Get token from URL
@@ -66,22 +70,10 @@ export default function ResetPasswordForm() {
     try {
       setIsLoading(true);
 
-      const response = await fetch("/api/auth/reset-password/confirm", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token,
-          password,
-        }),
+      const data = await api.post("auth/reset-password/confirm", {
+        token,
+        password,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to reset password");
-      }
 
       // Show success message
       toast({

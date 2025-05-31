@@ -5,9 +5,14 @@ import { getUnitsForType } from "@/constants/units";
 import MeasurementInputWithUnit from "@/components/MeasurementInputWithUnit";
 import { Button } from "@/components/ui/button";
 import { Pencil, Loader2 } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
 interface SpecificationsStandaloneProps {
   carId: string;
+}
+
+interface ClientsResponse {
+  clients: any[];
 }
 
 // Helper functions and subcomponents
@@ -57,6 +62,7 @@ const formatMileage = (mileage: MeasurementValue | undefined): string => {
 const SpecificationsStandalone: React.FC<SpecificationsStandaloneProps> = ({
   carId,
 }) => {
+  const api = useAPI();
   const [car, setCar] = useState<ExtendedCar | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,14 +74,12 @@ const SpecificationsStandalone: React.FC<SpecificationsStandaloneProps> = ({
   const [clients, setClients] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!carId) return;
+    if (!carId || !api) return;
     const fetchCar = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/cars/${carId}`);
-        if (!response.ok) throw new Error("Failed to fetch car data");
-        const data = await response.json();
+        const data = (await api.get(`cars/${carId}`)) as ExtendedCar;
         setCar(data);
         setLocalSpecs(data);
       } catch (err) {
@@ -85,25 +89,14 @@ const SpecificationsStandalone: React.FC<SpecificationsStandaloneProps> = ({
       }
     };
     fetchCar();
-  }, [carId]);
+  }, [carId, api]);
 
   useEffect(() => {
+    if (!api) return;
     // Fetch clients when component mounts
     const fetchClients = async () => {
       try {
-        const response = await fetch("/api/clients");
-        if (!response.ok) {
-          let errorDetail = "";
-          try {
-            const errorData = await response.json();
-            errorDetail =
-              errorData.details || errorData.error || response.statusText;
-          } catch (parseError) {
-            errorDetail = response.statusText;
-          }
-          throw new Error(`Failed to fetch clients: ${errorDetail}`);
-        }
-        const data = await response.json();
+        const data = (await api.get("clients")) as ClientsResponse;
         if (!data || !Array.isArray(data.clients)) {
           setClients([]);
           return;
@@ -114,7 +107,7 @@ const SpecificationsStandalone: React.FC<SpecificationsStandaloneProps> = ({
       }
     };
     fetchClients();
-  }, []);
+  }, [api]);
 
   const handleInputChange = (field: string, value: any) => {
     setLocalSpecs((prev) => {
@@ -151,16 +144,13 @@ const SpecificationsStandalone: React.FC<SpecificationsStandaloneProps> = ({
   };
 
   const handleSave = async () => {
-    if (!localSpecs) return;
+    if (!localSpecs || !api) return;
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(localSpecs),
-      });
-      if (!response.ok) throw new Error("Failed to update specifications");
-      const updated = await response.json();
+      const updated = (await api.put(
+        `cars/${carId}`,
+        localSpecs
+      )) as ExtendedCar;
       setCar(updated);
       setLocalSpecs(updated);
       setIsEditMode(false);

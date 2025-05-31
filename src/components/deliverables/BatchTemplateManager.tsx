@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { BatchTemplate, DeliverableTemplate } from "@/types/deliverable";
 import DeliverableTemplateGantt from "./DeliverableTemplateGantt";
+import { useAPI } from "@/hooks/useAPI";
 
 export default function BatchTemplateManager() {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,19 +46,22 @@ export default function BatchTemplateManager() {
     name: "",
     templates: [],
   });
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   // Fetch templates on mount
   const fetchTemplates = async () => {
     try {
-      const response = await fetch("/api/batch-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("batch-templates")) as {
+        templates: Record<string, BatchTemplate>;
+      };
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -91,15 +95,7 @@ export default function BatchTemplateManager() {
     }
 
     try {
-      const response = await fetch("/api/batch-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newTemplate),
-      });
-
-      if (!response.ok) throw new Error("Failed to save template");
+      await api.post("batch-templates", newTemplate);
 
       toast.success("Template saved successfully");
       fetchTemplates();
@@ -116,14 +112,7 @@ export default function BatchTemplateManager() {
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(
-        `/api/batch-templates/${encodeURIComponent(name)}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to delete template");
+      await api.delete(`batch-templates/${encodeURIComponent(name)}`);
 
       toast.success("Template deleted successfully");
       fetchTemplates();
@@ -145,15 +134,7 @@ export default function BatchTemplateManager() {
     };
 
     try {
-      const response = await fetch("/api/batch-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(duplicatedTemplate),
-      });
-
-      if (!response.ok) throw new Error("Failed to duplicate template");
+      await api.post("batch-templates", duplicatedTemplate);
 
       toast.success("Template duplicated successfully");
       fetchTemplates();

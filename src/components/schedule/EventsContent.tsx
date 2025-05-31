@@ -25,6 +25,7 @@ import Link from "next/link";
 import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { ObjectId } from "mongodb";
 
 interface Car {
   _id: string;
@@ -71,15 +72,25 @@ export default function EventsContent() {
     }
   };
 
-  const getCarId = (eventId: string) => {
-    try {
-      // First try to split by "-" and get first part
-      const parts = eventId.split("-");
-      if (parts.length > 0) return parts[0];
-      return eventId; // If no "-" found, return the whole ID
-    } catch (error) {
-      return eventId; // If any error occurs, return the original ID
+  // Helper function to check if an ID is a valid MongoDB ObjectId
+  function isValidObjectId(id: string): boolean {
+    return ObjectId.isValid(id);
+  }
+
+  // Get car ID from event - use the actual car_id field, not derived from event ID
+  const getCarId = (event: EventWithCar) => {
+    // Use the car_id field if available and valid
+    if (event.car_id && isValidObjectId(event.car_id)) {
+      return event.car_id;
     }
+
+    // If car object is available, use its _id
+    if (event.car?._id && isValidObjectId(event.car._id)) {
+      return event.car._id;
+    }
+
+    // Return null if no valid car ID is found
+    return null;
   };
 
   const fetchEvents = async () => {
@@ -228,30 +239,44 @@ export default function EventsContent() {
               {events.map((event) => (
                 <TableRow key={event._id}>
                   <TableCell>
-                    {event.car ? (
-                      <Link
-                        href={`/cars/${getCarId(event._id || "")}`}
-                        className="hover:underline"
-                      >
-                        {event.car.year} {event.car.make} {event.car.model}
-                      </Link>
-                    ) : (
-                      "Unknown Car"
-                    )}
+                    {event.car
+                      ? (() => {
+                          const carId = getCarId(event);
+                          return carId ? (
+                            <Link
+                              href={`/cars/${carId}`}
+                              className="hover:underline"
+                            >
+                              {event.car.year} {event.car.make}{" "}
+                              {event.car.model}
+                            </Link>
+                          ) : (
+                            <span>
+                              {event.car.year} {event.car.make}{" "}
+                              {event.car.model}
+                            </span>
+                          );
+                        })()
+                      : "Unknown Car"}
                   </TableCell>
                   <TableCell>{formatEventType(event.type)}</TableCell>
                   <TableCell>{formatDate(event.start_date)}</TableCell>
                   <TableCell>{formatDate(event.end_date)}</TableCell>
                   <TableCell>
-                    <Link
-                      href={`/cars/${getCarId(event._id || "")}/events/${
-                        event._id
-                      }`}
-                    >
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </Link>
+                    {(() => {
+                      const carId = getCarId(event);
+                      return carId ? (
+                        <Link href={`/cars/${carId}/events/${event._id}`}>
+                          <Button variant="ghost" size="sm">
+                            View
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button variant="ghost" size="sm" disabled>
+                          View
+                        </Button>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}

@@ -42,6 +42,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAPI } from "@/hooks/useAPI";
 
 interface RawAssetDetail {
   _id: string;
@@ -58,9 +59,22 @@ interface HardDriveWithDetails extends HardDriveData {
   };
 }
 
+interface HardDrivesResponse {
+  data?: HardDriveWithDetails[];
+  drives?: HardDriveWithDetails[];
+  meta?: {
+    total?: number;
+    totalPages?: number;
+    page?: number;
+    limit?: number;
+  };
+  debug?: any;
+}
+
 const LIMIT_OPTIONS = [10, 25, 50, 100];
 
 export default function HardDrivesTab() {
+  const api = useAPI();
   const pathname = usePathname();
   const { getParam, updateParams } = useUrlParams();
   const searchParams = useSearchParams();
@@ -109,37 +123,6 @@ export default function HardDrivesTab() {
 
   const router = useRouter();
 
-  // First add fetchWithTimeout function at the top of the component but inside it
-  const fetchWithTimeout = async (
-    url: string,
-    options = {},
-    timeout = 30000
-  ) => {
-    const controller = new AbortController();
-    const { signal } = controller;
-
-    // [REMOVED] // [REMOVED] console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
-    const timeoutId = setTimeout(() => {
-      console.warn(`Request to ${url} timed out after ${timeout}ms`);
-      controller.abort();
-    }, timeout);
-
-    try {
-      const response = await fetch(url, { ...options, signal });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === "AbortError") {
-        console.error(`Fetch aborted due to timeout: ${url}`);
-        throw new Error(
-          `Request timed out after ${timeout}ms. The server might be under heavy load.`
-        );
-      }
-      throw error;
-    }
-  };
-
   // Add retry state variables
   const [fetchAttempts, setFetchAttempts] = useState(0);
   const maxRetries = 3;
@@ -166,8 +149,10 @@ export default function HardDrivesTab() {
 
   // Fetch locations when component mounts
   useEffect(() => {
-    fetchLocations();
-  }, []);
+    if (api) {
+      fetchLocations();
+    }
+  }, [api]);
 
   // Validate current page when total pages changes
   useEffect(() => {
@@ -177,10 +162,13 @@ export default function HardDrivesTab() {
   }, [totalPages]);
 
   const fetchLocations = async () => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -188,32 +176,33 @@ export default function HardDrivesTab() {
   };
 
   const fetchDriveDetailsById = async (driveId: string) => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
       setLoading(true);
       // [REMOVED] // [REMOVED] console.log(`Fetching details for drive ID: ${driveId}`);
-      const response = await fetch(`/api/hard-drives/${driveId}`);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch drive details (status ${response.status})`
-        );
-      }
-      const driveData = await response.json();
-      setSelectedDriveForDetails(driveData);
-      // [REMOVED] // [REMOVED] console.log("Drive details loaded:", driveData);
+      const driveData = (await api.get(
+        `hard-drives/${driveId}`
+      )) as HardDriveWithDetails;
+      return driveData;
     } catch (error) {
       console.error("Error fetching drive details:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load drive details. Please try again.",
-        variant: "destructive",
-      });
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  // Modify the fetchDrives function to handle retries and timeouts
+  // Simplified fetchDrives function using useAPI pattern
   const fetchDrives = async (isRetry = false) => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     if (!isRetry) {
       setLoading(true);
       setError(null);
@@ -223,133 +212,90 @@ export default function HardDrivesTab() {
     try {
       // [REMOVED] // [REMOVED] console.log(`Fetching hard drives (attempt ${fetchAttempts + 1})...`);
 
-      let url = `/api/hard-drives?page=${currentPage}&search=${encodeURIComponent(
+      let endpoint = `hard-drives?page=${currentPage}&search=${encodeURIComponent(
         searchTerm
       )}&limit=${itemsPerPage}&include_assets=true`;
 
       if (selectedLocation && selectedLocation !== "all") {
-        url += `&location=${selectedLocation}`;
+        endpoint += `&location=${selectedLocation}`;
       }
 
-      // Increase timeout for subsequent retries
-      const timeout = 20000 + fetchAttempts * 10000; // 20s, 30s, 40s...
-      // [REMOVED] // [REMOVED] console.log(`Using timeout of ${timeout}ms for hard drives request`);
+      const data = (await api.get(endpoint)) as
+        | HardDrivesResponse
+        | HardDriveWithDetails[];
 
-      // Add explicit retry mechanism
-      const maxRetries = 3;
-      let currentAttempt = 0;
-      let lastError = null;
-
-      while (currentAttempt < maxRetries) {
-        try {
-          // Use standard fetch with timeout handled separately
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-          const response = await fetch(url, {
-            signal: controller.signal,
-            headers: {
-              "Cache-Control": "no-cache",
-              Pragma: "no-cache",
-            },
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            throw new Error(
-              `Server responded with ${response.status}: ${response.statusText}`
-            );
-          }
-
-          const data = await response.json();
-
-          // Debug info to console
-          // [REMOVED] // [REMOVED] console.log("API Response data structure:", Object.keys(data));
-
-          // Log debug information if available
-          if (data.debug) {
-            // [REMOVED] // [REMOVED] console.log("Hard drives API debug info:", data.debug);
-          }
-
-          // Try different possible response formats
-          // First check standard format (data.data)
-          let drivesList = [];
-
-          if (data.data && Array.isArray(data.data)) {
-            // [REMOVED] // [REMOVED] console.log(`Using data.data array with ${data.data.length} items`);
-            drivesList = data.data;
-          } else if (data.drives && Array.isArray(data.drives)) {
-            console.log(
-              `Using data.drives array with ${data.drives.length} items`
-            );
-            drivesList = data.drives;
-          } else if (Array.isArray(data)) {
-            console.log(
-              `Using direct array response with ${data.length} items`
-            );
-            drivesList = data;
-          } else {
-            console.warn("Unexpected API response format:", data);
-            drivesList = []; // Default to empty array
-          }
-
-          // Double-check that drivesList is actually an array
-          if (!Array.isArray(drivesList)) {
-            console.error(
-              "drivesList is not an array after processing:",
-              drivesList
-            );
-            drivesList = [];
-          }
-
-          console.log(
-            `Received ${drivesList.length} hard drives out of ${
-              data.meta?.total || 0
-            } total`
-          );
-
-          // Add defensive check to ensure each drive has required properties
-          const sanitizedDrives = drivesList.map((drive: any) => ({
-            ...drive,
-            _id: drive?._id?.toString() || Math.random().toString(), // Ensure we always have an ID
-            label: drive?.label || drive?.name || "Unnamed Drive",
-            type: drive?.type || "Unknown",
-            interface: drive?.interface || "Unknown",
-            capacity: drive?.capacity || { total: 0, used: 0 },
-            status: drive?.status || "Unknown",
-            locationDetails: drive?.locationDetails || null,
-            rawAssetDetails: Array.isArray(drive?.rawAssetDetails)
-              ? drive.rawAssetDetails
-              : [],
-          }));
-
-          setDrives(sanitizedDrives);
-          setTotalPages(data.meta?.totalPages || 1);
-          setFetchAttempts(0); // Reset attempts on success
-          setTimeoutOccurred(false);
-          setLoading(false);
-
-          // Successfully got data, break out of retry loop
-          break;
-        } catch (err) {
-          currentAttempt++;
-          lastError = err;
-          console.warn(`Attempt ${currentAttempt}/${maxRetries} failed:`, err);
-
-          if (currentAttempt < maxRetries) {
-            // Wait before retrying (exponential backoff)
-            const retryDelay = 1000 * Math.pow(2, currentAttempt);
-            // [REMOVED] // [REMOVED] console.log(`Retrying in ${retryDelay}ms...`);
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
-          }
-        }
+      // Handle both array response and object response formats
+      let actualData: HardDrivesResponse;
+      if (Array.isArray(data)) {
+        actualData = { data };
+      } else {
+        actualData = data;
       }
 
-      // If we exhausted all retries and still have an error, throw it
-      if (currentAttempt === maxRetries && lastError) {
-        throw lastError;
+      // Debug info to console
+      // [REMOVED] // [REMOVED] console.log("API Response data structure:", Object.keys(actualData));
+
+      // Log debug information if available
+      if (actualData.debug) {
+        // [REMOVED] // [REMOVED] console.log("Hard drives API debug info:", actualData.debug);
       }
+
+      // Try different possible response formats
+      let drivesList: HardDriveWithDetails[] = [];
+
+      if (actualData.data && Array.isArray(actualData.data)) {
+        // [REMOVED] // [REMOVED] console.log(`Using data.data array with ${actualData.data.length} items`);
+        drivesList = actualData.data;
+      } else if (actualData.drives && Array.isArray(actualData.drives)) {
+        console.log(
+          `Using data.drives array with ${actualData.drives.length} items`
+        );
+        drivesList = actualData.drives;
+      } else if (Array.isArray(data)) {
+        console.log(
+          `Using direct array response with ${(data as HardDriveWithDetails[]).length} items`
+        );
+        drivesList = data as HardDriveWithDetails[];
+      } else {
+        console.warn("Unexpected API response format:", actualData);
+        drivesList = []; // Default to empty array
+      }
+
+      // Double-check that drivesList is actually an array
+      if (!Array.isArray(drivesList)) {
+        console.error(
+          "drivesList is not an array after processing:",
+          drivesList
+        );
+        drivesList = [];
+      }
+
+      console.log(
+        `Received ${drivesList.length} hard drives out of ${
+          actualData.meta?.total || 0
+        } total`
+      );
+
+      // Add defensive check to ensure each drive has required properties
+      const sanitizedDrives = drivesList.map((drive: any) => ({
+        ...drive,
+        _id: drive?._id?.toString() || Math.random().toString(), // Ensure we always have an ID
+        label: drive?.label || drive?.name || "Unnamed Drive",
+        type: drive?.type || "Unknown",
+        interface: drive?.interface || "Unknown",
+        capacity: drive?.capacity || { total: 0, used: 0 },
+        status: drive?.status || "Unknown",
+        locationDetails: drive?.locationDetails || null,
+        rawAssetDetails: Array.isArray(drive?.rawAssetDetails)
+          ? drive.rawAssetDetails
+          : [],
+      }));
+
+      setDrives(sanitizedDrives);
+      setTotalPages(actualData.meta?.totalPages || 1);
+      setFetchAttempts(0); // Reset attempts on success
+      setTimeoutOccurred(false);
+      setLoading(false);
     } catch (err) {
       console.error("Error fetching hard drives:", err);
 
@@ -598,28 +544,41 @@ export default function HardDrivesTab() {
   };
 
   const handleDelete = async (driveId: string) => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this hard drive?")) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/hard-drives/${driveId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete hard drive");
+      await api.delete(`hard-drives/${driveId}`);
       fetchDrives();
+      toast({
+        title: "Success",
+        description: "Hard drive deleted successfully",
+      });
     } catch (err) {
       console.error("Error deleting hard drive:", err);
       setError("Failed to delete hard drive");
+      toast({
+        title: "Error",
+        description: "Failed to delete hard drive",
+        variant: "destructive",
+      });
     }
   };
 
   const handleSave = async (driveData: Partial<HardDriveData>) => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
-      const method = selectedDrive ? "PUT" : "POST";
-      const url = selectedDrive
-        ? `/api/hard-drives/${selectedDrive._id}`
-        : "/api/hard-drives";
+      const isEdit = !!selectedDrive;
 
       // Map the form data fields to what the API expects for both POST and PUT
       const apiData = {
@@ -639,18 +598,18 @@ export default function HardDrivesTab() {
         label: driveData.label,
       };
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(apiData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("API Error Response:", errorData);
-        throw new Error(errorData.error || "Failed to save hard drive");
+      if (isEdit) {
+        await api.put(`hard-drives/${selectedDrive._id}`, apiData);
+        toast({
+          title: "Success",
+          description: "Hard drive updated successfully",
+        });
+      } else {
+        await api.post("hard-drives", apiData);
+        toast({
+          title: "Success",
+          description: "Hard drive created successfully",
+        });
       }
 
       fetchDrives();
@@ -658,9 +617,14 @@ export default function HardDrivesTab() {
       setSelectedDrive(undefined);
     } catch (err) {
       console.error("Error saving hard drive:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to save hard drive"
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to save hard drive";
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 

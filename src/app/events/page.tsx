@@ -107,13 +107,19 @@ export default function EventsPage() {
           try {
             const carId = event.car_id;
             if (!carId) {
-              console.error("No car_id found for event:", event);
+              // Don't log as error - car_id is optional for events
+              console.log("Event without car_id (project-level event):", {
+                id: event.id,
+                type: event.type,
+                title: event.title,
+                project_id: event.project_id,
+              });
               return event;
             }
             const car = (await api.get(`/api/cars/${carId}`)) as Car;
             return { ...event, car };
           } catch (error) {
-            console.error("Error fetching car:", error);
+            console.error("Error fetching car for event:", event.id, error);
             return event;
           }
         })
@@ -240,8 +246,14 @@ export default function EventsPage() {
                         >
                           {`${event.car.year} ${event.car.make} ${event.car.model}`}
                         </Link>
+                      ) : event.project_id ? (
+                        <span className="text-muted-foreground italic">
+                          Project Event
+                        </span>
                       ) : (
-                        "Loading..."
+                        <span className="text-muted-foreground italic">
+                          General Event
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>{formatEventType(event.type)}</TableCell>

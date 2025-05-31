@@ -26,6 +26,7 @@ import { Plus, Users, MoreHorizontal, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 interface User {
   _id: string;
@@ -51,6 +52,7 @@ export function ProjectTeamTab({
   memberDetails,
   onProjectUpdate,
 }: ProjectTeamTabProps) {
+  const api = useAPI();
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [memberForm, setMemberForm] = useState({
     userId: "",
@@ -77,17 +79,11 @@ export function ProjectTeamTab({
   }, []);
 
   const fetchAvailableUsers = async () => {
+    if (!api) return;
+
     try {
       setLoadingUsers(true);
-      const response = await fetch("/api/projects/users", {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = (await api.get("projects/users")) as { users: any[] };
 
       if (!data.users || !Array.isArray(data.users)) {
         throw new Error("Invalid response format");
@@ -117,24 +113,14 @@ export function ProjectTeamTab({
 
   const handleAddMember = async () => {
     if (!memberForm.userId.trim()) return;
+    if (!api) return;
 
     try {
       setIsAddingMember(true);
-      const response = await fetch(`/api/projects/${project._id}/team`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: memberForm.userId,
-          role: memberForm.role,
-        }),
+      await api.post(`projects/${project._id}/team`, {
+        userId: memberForm.userId,
+        role: memberForm.role,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to add team member");
-      }
 
       // Refresh project data
       await onProjectUpdate();
@@ -164,18 +150,10 @@ export function ProjectTeamTab({
   };
 
   const handleRemoveMember = async (userId: string) => {
-    try {
-      const response = await fetch(
-        `/api/projects/${project._id}/team?userId=${userId}`,
-        {
-          method: "DELETE",
-        }
-      );
+    if (!api) return;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to remove team member");
-      }
+    try {
+      await api.delete(`projects/${project._id}/team?userId=${userId}`);
 
       // Refresh project data
       await onProjectUpdate();
@@ -197,19 +175,10 @@ export function ProjectTeamTab({
   };
 
   const handleUpdateMemberRole = async (userId: string, newRole: string) => {
-    try {
-      const response = await fetch(`/api/projects/${project._id}/team`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId, role: newRole }),
-      });
+    if (!api) return;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update member role");
-      }
+    try {
+      await api.put(`projects/${project._id}/team`, { userId, role: newRole });
 
       // Refresh project data
       await onProjectUpdate();

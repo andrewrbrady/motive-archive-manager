@@ -28,6 +28,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 const BUSINESS_TYPES = [
   "Dealership",
@@ -68,6 +69,9 @@ export default function CreateClientDialog({
 }: CreateClientDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -93,21 +97,13 @@ export default function CreateClientDialog({
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setLoading(true);
-      const response = await fetch("/api/clients", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...values,
-          status: "active",
-          documents: [],
-          cars: [],
-          notes: "",
-        }),
+      await api.post("clients", {
+        ...values,
+        status: "active",
+        documents: [],
+        cars: [],
+        notes: "",
       });
-
-      if (!response.ok) throw new Error("Failed to create client");
 
       toast({
         title: "Success",

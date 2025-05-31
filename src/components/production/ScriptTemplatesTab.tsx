@@ -38,6 +38,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAPI } from "@/hooks/useAPI";
 
 type Platform = "instagram_reels" | "youtube_shorts" | "youtube" | "stream_otv";
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
@@ -75,6 +76,23 @@ interface Template {
   updatedAt: string;
 }
 
+interface ScriptTemplatesResponse {
+  data?: Template[];
+  templates?: Template[];
+  // Support both possible response formats
+}
+
+interface ScriptTemplateResponse {
+  id: string;
+  name: string;
+  description: string;
+  platforms: Platform[];
+  aspectRatio: AspectRatio;
+  rows: ScriptRow[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ScriptTemplatesTabProps {
   shouldCreateTemplate?: boolean;
 }
@@ -82,6 +100,7 @@ interface ScriptTemplatesTabProps {
 export default function ScriptTemplatesTab({
   shouldCreateTemplate = false,
 }: ScriptTemplatesTabProps) {
+  const api = useAPI();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -103,8 +122,10 @@ export default function ScriptTemplatesTab({
   });
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
+    if (api) {
+      fetchTemplates();
+    }
+  }, [api]);
 
   useEffect(() => {
     const templateId = searchParams?.get("template");
@@ -125,18 +146,27 @@ export default function ScriptTemplatesTab({
     }
   }, [shouldCreateTemplate]);
 
+  // Authentication check
+  if (!api) {
+    return <LoadingContainer />;
+  }
+
   const fetchTemplates = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/script-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
-      setTemplates(data);
+      const response =
+        await api.get<ScriptTemplatesResponse>("script-templates");
+
+      // Handle different possible response formats
+      const templatesData = response.data || response.templates || response;
+      const templatesArray = Array.isArray(templatesData) ? templatesData : [];
+
+      setTemplates(templatesArray);
 
       // REMOVING THIS: Don't automatically select first template
       // Only select from URL parameter if it exists
-      if (data.length > 0 && searchParams?.get("template")) {
-        const templateFromUrl = data.find(
+      if (templatesArray.length > 0 && searchParams?.get("template")) {
+        const templateFromUrl = templatesArray.find(
           (t: Template) => t.id === searchParams.get("template")
         );
         if (templateFromUrl) {
@@ -160,19 +190,20 @@ export default function ScriptTemplatesTab({
 
   const handleSubmit = async (data: Partial<Template>) => {
     try {
-      const endpoint = "/api/script-templates";
-      const method = editingTemplate ? "PUT" : "POST";
       const body = editingTemplate ? { ...data, id: editingTemplate.id } : data;
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) throw new Error("Failed to save template");
+      let response: ScriptTemplateResponse;
+      if (editingTemplate) {
+        response = await api.put<ScriptTemplateResponse>(
+          "script-templates",
+          body
+        );
+      } else {
+        response = await api.post<ScriptTemplateResponse>(
+          "script-templates",
+          body
+        );
+      }
 
       await fetchTemplates();
       setIsCreating(false);
@@ -191,14 +222,15 @@ export default function ScriptTemplatesTab({
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(`/api/script-templates/${templateId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete template");
+      await api.delete(`script-templates/${templateId}`);
 
       await fetchTemplates();
       toast.success("Template deleted successfully");
+
+      // Clear selected template if it was the deleted one
+      if (selectedTemplate?.id === templateId) {
+        setSelectedTemplate(null);
+      }
     } catch (error) {
       console.error("Error deleting template:", error);
       toast.error("Failed to delete template");
@@ -208,17 +240,19 @@ export default function ScriptTemplatesTab({
   const handleEdit = (template: Template) => {
     setEditingTemplate(template);
     form.reset(template);
+    setIsCreating(true);
   };
 
   const handleCancelEdit = () => {
     setEditingTemplate(null);
+    setIsCreating(false);
     form.reset();
   };
 
   const handleAddRow = () => {
     const currentRows = form.getValues("rows") || [];
-    const newRow = {
-      id: crypto.randomUUID(),
+    const newRow: ScriptRow = {
+      id: Math.random().toString(36).substr(2, 9),
       time: "",
       video: "",
       audio: "",
@@ -230,7 +264,7 @@ export default function ScriptTemplatesTab({
     if (selectedTemplate && editingTemplate?.id === selectedTemplate.id) {
       setSelectedTemplate({
         ...selectedTemplate,
-        rows: [...selectedTemplate.rows, newRow],
+        rows: [...currentRows, newRow],
       });
     }
   };
@@ -252,18 +286,13 @@ export default function ScriptTemplatesTab({
   const handleDuplicate = async (template: Template) => {
     try {
       const { id, createdAt, updatedAt, ...templateData } = template;
-      const response = await fetch("/api/script-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await api.post<ScriptTemplateResponse>(
+        "script-templates",
+        {
           ...templateData,
           name: `${templateData.name} (Copy)`,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to duplicate template");
+        }
+      );
 
       await fetchTemplates();
       toast.success("Template duplicated successfully");

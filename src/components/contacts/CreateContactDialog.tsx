@@ -20,12 +20,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface CreateContactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+}
+
+interface CreateContactData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  role: string;
+  company: string;
+  status: "active" | "inactive";
+  notes: string;
+}
+
+interface CreateContactResponse {
+  success: boolean;
+  contact?: any;
+  error?: string;
 }
 
 export default function CreateContactDialog({
@@ -34,7 +52,7 @@ export default function CreateContactDialog({
   onSuccess,
 }: CreateContactDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateContactData>({
     firstName: "",
     lastName: "",
     email: "",
@@ -44,6 +62,12 @@ export default function CreateContactDialog({
     status: "active" as "active" | "inactive",
     notes: "",
   });
+  const api = useAPI();
+
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,17 +79,13 @@ export default function CreateContactDialog({
 
     setLoading(true);
     try {
-      const response = await fetch("/api/contacts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await api.post<CreateContactResponse>(
+        "contacts",
+        formData
+      );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create contact");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to create contact");
       }
 
       toast.success("Contact created successfully");

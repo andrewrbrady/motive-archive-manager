@@ -11,6 +11,12 @@ interface ReceiptItem {
 }
 
 async function getReceipt(id: string) {
+  // Validate ObjectId format before using it
+  if (!ObjectId.isValid(id)) {
+    console.error(`Invalid ObjectId format: ${id}`);
+    throw new Error("Invalid receipt ID format");
+  }
+
   const client = await clientPromise;
   if (!client) {
     throw new Error("Failed to connect to database");

@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { addDays } from "date-fns";
 import { CalendarDays } from "lucide-react";
 import { format } from "date-fns";
+import { useAPI } from "@/hooks/useAPI";
 
 interface EventTemplate {
   type: EventType;
@@ -40,10 +41,16 @@ interface EventBatchTemplatesProps {
   onEventsCreated: () => void;
 }
 
+// TypeScript interfaces for API responses
+interface EventTemplatesResponse {
+  templates: Record<string, BatchTemplate>;
+}
+
 export default function EventBatchTemplates({
   carId,
   onEventsCreated,
 }: EventBatchTemplatesProps) {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [templates, setTemplates] = useState<Record<string, BatchTemplate>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
@@ -59,10 +66,10 @@ export default function EventBatchTemplates({
   }, [isOpen]);
 
   const fetchTemplates = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/event-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("event-templates")) as EventTemplatesResponse;
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -73,6 +80,11 @@ export default function EventBatchTemplates({
   const handleSubmit = async () => {
     if (!selectedTemplate) {
       toast.error("Please select a template");
+      return;
+    }
+
+    if (!api) {
+      toast.error("Authentication not ready. Please try again.");
       return;
     }
 
@@ -98,19 +110,13 @@ export default function EventBatchTemplates({
           ? format(endEventDate, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx")
           : undefined;
 
-        return fetch(`/api/cars/${carId}/events`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            type: event.type,
-            description: event.description,
-            start: startISOString,
-            end: endISOString,
-            isAllDay: event.isAllDay,
-            car_id: carId,
-          }),
+        return api.post(`cars/${carId}/events`, {
+          type: event.type,
+          description: event.description,
+          start: startISOString,
+          end: endISOString,
+          isAllDay: event.isAllDay,
+          car_id: carId,
         });
       });
 

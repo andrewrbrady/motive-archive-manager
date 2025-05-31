@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useAPI } from "@/hooks/useAPI";
 import { FileText, Trash2, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
@@ -21,6 +22,7 @@ interface DocumentationFilesProps {
 }
 
 export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
+  const api = useAPI();
   const [files, setFiles] = useState<DocumentationFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,14 +36,15 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
 
   useEffect(() => {
     fetchFiles();
-  }, [carId]);
+  }, [carId, api]);
 
   const fetchFiles = async () => {
+    if (!api) return;
     setIsLoadingFiles(true);
     try {
-      const response = await fetch(`/api/cars/${carId}/documentation`);
-      if (!response.ok) throw new Error("Failed to fetch documentation files");
-      const data = await response.json();
+      const data = (await api.get(`cars/${carId}/documentation`)) as {
+        files: DocumentationFile[];
+      };
       setFiles(data.files || []);
     } catch (error) {
       console.error("Error fetching documentation files:", error);
@@ -88,6 +91,7 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
   };
 
   const handleUpload = async () => {
+    if (!api) return;
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -196,19 +200,10 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
   };
 
   const handleDelete = async (fileId: string) => {
+    if (!api) return;
     setIsDeletingFile(fileId);
     try {
-      const response = await fetch("/api/documentation/delete", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fileId, carId }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete file");
-      }
+      await api.deleteWithBody("documentation/delete", { fileId, carId });
 
       setFiles((prev) => prev.filter((file) => file._id !== fileId));
       toast.success("File deleted successfully");
@@ -240,6 +235,13 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
       "...";
     return `${truncatedName}.${extension}`;
   };
+
+  // Guard clause for API availability - moved to end after all hooks
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -34,6 +34,8 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
+import { useAPI } from "@/hooks/useAPI";
+import { toast as hotToast } from "react-hot-toast";
 
 interface GalleryCanvasExtensionModalProps {
   isOpen: boolean;
@@ -58,6 +60,24 @@ interface ImageDimensions {
   height: number;
 }
 
+interface ExtendCanvasData {
+  imageUrl: string;
+  desiredHeight: number;
+  paddingPct: number;
+  whiteThresh: number;
+  uploadToCloudflare: boolean;
+  originalFilename: string;
+  requestedWidth: number;
+  requestedHeight: number;
+  scaleMultiplier: number;
+}
+
+interface ExtendCanvasResponse {
+  success?: boolean;
+  processedImageUrl?: string;
+  error?: string;
+}
+
 export function GalleryCanvasExtensionModal({
   isOpen,
   onClose,
@@ -65,6 +85,7 @@ export function GalleryCanvasExtensionModal({
   galleryId,
   onImageReplaced,
 }: GalleryCanvasExtensionModalProps) {
+  const api = useAPI();
   const [desiredHeight, setDesiredHeight] = useState<string>("1200");
   const [paddingPct, setPaddingPct] = useState<string>("0.05");
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
@@ -96,23 +117,7 @@ export function GalleryCanvasExtensionModal({
     isReplacing,
   } = useGalleryImageProcessing();
 
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "canvasExtensionMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("canvasExtensionMethod", method);
-  };
-
-  // Helper function to build enhanced Cloudflare URL
+  // Helper function to build enhanced Cloudflare URL (moved before useMemo)
   const getEnhancedImageUrl = (
     baseUrl: string,
     width?: string,
@@ -139,8 +144,20 @@ export function GalleryCanvasExtensionModal({
     return getEnhancedImageUrl(image.url, cloudflareWidth, cloudflareQuality);
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
+  // Load processing method preference from localStorage
+  useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
+    const savedMethod = localStorage.getItem(
+      "canvasExtensionMethod"
+    ) as ProcessingMethod;
+    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
+      setProcessingMethod(savedMethod);
+    }
+  }, [api]);
+
   // Load original image dimensions
   useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     if (enhancedImageUrl) {
       const img = new window.Image();
       img.onload = () => {
@@ -151,10 +168,11 @@ export function GalleryCanvasExtensionModal({
       };
       img.src = enhancedImageUrl;
     }
-  }, [enhancedImageUrl]);
+  }, [enhancedImageUrl, api]);
 
   // Load processed image dimensions when processed image changes
   useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     if (processedImage?.url) {
       const img = new window.Image();
       img.onload = () => {
@@ -167,10 +185,11 @@ export function GalleryCanvasExtensionModal({
     } else {
       setProcessedDimensions(null);
     }
-  }, [processedImage?.url]);
+  }, [processedImage?.url, api]);
 
   // Load high-res image dimensions when high-res image changes
   useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     if (highResImageUrl) {
       const img = new window.Image();
       img.onload = () => {
@@ -183,9 +202,21 @@ export function GalleryCanvasExtensionModal({
     } else {
       setHighResDimensions(null);
     }
-  }, [highResImageUrl]);
+  }, [highResImageUrl, api]);
+
+  // Authentication guard moved to the end
+  if (!api) {
+    return null;
+  }
+
+  // Save processing method preference to localStorage
+  const handleProcessingMethodChange = (method: ProcessingMethod) => {
+    setProcessingMethod(method);
+    localStorage.setItem("canvasExtensionMethod", method);
+  };
 
   const handlePreview = async () => {
+    if (!api) return; // Add conditional check inside async function
     if (!image || !enhancedImageUrl) return;
 
     const parameters = {
@@ -210,6 +241,7 @@ export function GalleryCanvasExtensionModal({
   };
 
   const handleReplaceImage = async () => {
+    if (!api) return; // Add conditional check inside async function
     if (!image || !processedImage) return;
 
     const parameters = {
@@ -234,6 +266,7 @@ export function GalleryCanvasExtensionModal({
   };
 
   const handleHighResProcess = async (multiplier: 2 | 4) => {
+    if (!api) return; // Add conditional check inside async function
     if (!image || !processedDimensions) return;
 
     setIsProcessingHighRes(true);
@@ -256,39 +289,49 @@ export function GalleryCanvasExtensionModal({
         cloudflareQuality
       );
 
-      const response = await fetch("/api/images/extend-canvas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
-          desiredHeight: targetHeight,
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-          requestedWidth: processedDimensions.width,
-          requestedHeight: parseInt(desiredHeight),
-          scaleMultiplier: multiplier,
-        }),
-      });
+      const requestData: ExtendCanvasData = {
+        imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
+        desiredHeight: targetHeight,
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+        requestedWidth: processedDimensions.width,
+        requestedHeight: parseInt(desiredHeight),
+        scaleMultiplier: multiplier,
+      };
 
-      if (!response.ok) {
-        throw new Error("Failed to process high-resolution image");
+      const result = await api.post<ExtendCanvasResponse>(
+        "images/extend-canvas",
+        requestData
+      );
+
+      if (!result.success || !result.processedImageUrl) {
+        const errorMessage =
+          result.error || "Failed to process high-resolution image";
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
       setHighResImageUrl(result.processedImageUrl);
 
+      hotToast.success(
+        `${multiplier}x high-resolution image processed successfully (${targetWidth}×${targetHeight})`
+      );
       toast({
         title: "Success",
         description: `${multiplier}x high-resolution image processed successfully (${targetWidth}×${targetHeight})`,
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error processing high-resolution image:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : `Failed to process ${multiplier}x high-resolution image`;
+
+      hotToast.error(errorMessage);
       toast({
         title: "Error",
-        description: `Failed to process ${multiplier}x high-resolution image`,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

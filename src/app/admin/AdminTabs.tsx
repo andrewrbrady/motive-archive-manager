@@ -28,18 +28,47 @@ import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
+import { useAPI } from "@/hooks/useAPI";
+
+// TypeScript interfaces for API responses
+interface OAuthDebugResponse {
+  oauthConfig: {
+    environment: {
+      NODE_ENV: string;
+      VERCEL_ENV?: string;
+      baseUrl: string;
+      oauthCallbackUrl: string;
+    };
+    google: {
+      clientIdSet: boolean;
+      clientSecretSet: boolean;
+      expectedCallbackUrl: string;
+    };
+  };
+  troubleshooting: {
+    redirectUriIssue: {
+      description: string;
+    };
+  };
+}
+
+interface UserDebugResponse {
+  userDebugInfo: any;
+}
 
 export default function AdminTabs() {
+  const api = useAPI();
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
   const [userDebugData, setUserDebugData] = useState<any>(null);
   const [debugLoading, setDebugLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
 
   const fetchOAuthDebug = async () => {
+    if (!api) return;
+
     setDebugLoading(true);
     try {
-      const response = await fetch("/api/auth/debug-oauth");
-      const data = await response.json();
+      const data = (await api.get("auth/debug-oauth")) as OAuthDebugResponse;
       setOauthDebugData(data);
     } catch (error) {
       console.error("Error fetching OAuth debug:", error);
@@ -49,14 +78,13 @@ export default function AdminTabs() {
   };
 
   const debugUser = async () => {
-    if (!userEmail) return;
+    if (!userEmail || !api) return;
 
     setDebugLoading(true);
     try {
-      const response = await fetch(
-        `/api/auth/debug-oauth?user=${encodeURIComponent(userEmail)}`
-      );
-      const data = await response.json();
+      const data = (await api.get(
+        `auth/debug-oauth?user=${encodeURIComponent(userEmail)}`
+      )) as UserDebugResponse;
       setUserDebugData(data.userDebugInfo);
     } catch (error) {
       console.error("Error debugging user:", error);

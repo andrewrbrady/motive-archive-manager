@@ -1,10 +1,16 @@
 import React from "react";
 import Link from "next/link";
 import { VehicleInventoryItem } from "@/types/inventory";
+import { ObjectId } from "mongodb";
 
 interface ListViewProps {
   cars: VehicleInventoryItem[];
   currentSearchParams: string;
+}
+
+// Helper function to check if an ID is a valid MongoDB ObjectId
+function isValidObjectId(id: string): boolean {
+  return ObjectId.isValid(id);
 }
 
 export function ListView({ cars, currentSearchParams }: ListViewProps) {
@@ -28,12 +34,17 @@ export function ListView({ cars, currentSearchParams }: ListViewProps) {
           {cars.map((car) => (
             <tr key={car.id} className="group hover:bg-muted/50">
               <td className="py-2 px-3 border">
-                <Link
-                  href={`/cars/${car.id}?${currentSearchParams}`}
-                  className="flex items-center gap-3"
-                >
-                  {car.year}
-                </Link>
+                {/* Only link to car detail if the ID is a valid ObjectId */}
+                {isValidObjectId(car.id) ? (
+                  <Link
+                    href={`/cars/${car.id}?${currentSearchParams}`}
+                    className="flex items-center gap-3 text-blue-600 hover:text-blue-800"
+                  >
+                    {car.year}
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-3">{car.year}</span>
+                )}
               </td>
               <td className="py-2 px-3 border">{car.make}</td>
               <td className="py-2 px-3 border">{car.model}</td>

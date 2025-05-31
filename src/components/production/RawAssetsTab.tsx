@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/tooltip";
 import { debounce } from "lodash";
 import { CarIcon, HardDriveIcon } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 const LIMIT_OPTIONS = [100, 10, 25, 50];
 
@@ -221,6 +223,7 @@ export default function RawAssetsTab() {
   const router = useRouter();
   const { getParam, updateParams } = useUrlParams();
   const { fetchCarLabels, fetchDriveLabels } = useLabels();
+  const api = useAPI();
   const [assets, setAssets] = useState<RawAsset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<RawAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -507,17 +510,10 @@ export default function RawAssetsTab() {
   // Function to fetch a specific asset by ID
   const fetchAssetById = useCallback(
     async (assetId: string) => {
+      if (!api) return;
+
       try {
-        // [REMOVED] // [REMOVED] console.log(`Fetching specific asset by ID: ${assetId}`);
-        const response = await fetch(`/api/raw/${assetId}`);
-
-        if (!response.ok) {
-          throw new Error(
-            `Server error: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const asset = await response.json();
+        const asset = await api.get<any>(`/raw/${assetId}`);
 
         if (!asset || !asset._id) {
           throw new Error(`Asset not found: ${assetId}`);
@@ -549,10 +545,10 @@ export default function RawAssetsTab() {
         // Let the useEffect handle label fetching instead of doing it here
       } catch (error) {
         console.error(`Error fetching asset ${assetId}:`, error);
-        // No need to set global error state for a single asset fetch failure
+        toast.error("Failed to fetch asset details");
       }
     },
-    [getParam] // Only depend on getParam
+    [getParam, api] // Added api to dependencies
   );
 
   // Handle Escape key press for both modals
@@ -771,40 +767,29 @@ export default function RawAssetsTab() {
   );
 
   // Handle delete button click
-  const handleDeleteAsset = useCallback(async (assetId: string) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this asset? This cannot be undone."
-      )
-    )
-      return;
+  const handleDelete = useCallback(
+    async (assetId: string) => {
+      if (!api) return;
+      if (!window.confirm("Are you sure you want to delete this asset?"))
+        return;
 
-    try {
-      const response = await fetch(`/api/raw/${assetId}`, {
-        method: "DELETE",
-      });
+      try {
+        await api.delete(`/raw/${assetId}`);
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to delete asset: ${response.status} ${response.statusText}`
-        );
+        // Remove from local state
+        setAssets((prev) => prev.filter((a) => a._id !== assetId));
+        toast.success("Asset deleted successfully");
+      } catch (error) {
+        console.error(`Error deleting asset ${assetId}:`, error);
+        toast.error("Failed to delete asset");
       }
-
-      // Remove from local state
-      setAssets((prev) => prev.filter((a) => a._id !== assetId));
-      // [REMOVED] // [REMOVED] console.log(`Asset ${assetId} deleted successfully`);
-    } catch (error) {
-      console.error(`Error deleting asset ${assetId}:`, error);
-      alert(
-        `Failed to delete asset: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }, []);
+    },
+    [api]
+  );
 
   // Handle bulk delete function
   const handleDeleteAll = useCallback(async () => {
+    if (!api) return;
     if (
       !window.confirm(
         "Are you sure you want to delete ALL assets? This cannot be undone!"
@@ -820,30 +805,20 @@ export default function RawAssetsTab() {
 
     try {
       setLoading(true);
-      const response = await fetch("/api/raw/delete-all", {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete all assets");
-      }
+      await api.delete("/raw/delete-all");
 
       // Clear local state
       setAssets([]);
       setTotalPages(1);
       setCurrentPage(1);
-      alert("All assets have been deleted.");
+      toast.success("All assets have been deleted");
     } catch (error) {
       console.error("Error deleting all assets:", error);
-      alert(
-        `Error deleting all assets: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      toast.error("Failed to delete all assets");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   // Handle closing the edit modal
   const handleCloseModal = useCallback(() => {
@@ -854,31 +829,17 @@ export default function RawAssetsTab() {
   // Handle save from edit modal
   const handleSave = useCallback(
     async (updatedAsset: Partial<RawAssetData>) => {
+      if (!api) return;
+
       try {
         if (!updatedAsset._id) {
           throw new Error("Missing asset ID");
         }
 
-        const response = await fetch(`/api/raw/${updatedAsset._id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updatedAsset),
-        });
-
-        const result = await response.json();
-        // [REMOVED] // [REMOVED] console.log("Server response:", result); // Debug log
-
-        if (!response.ok) {
-          // Get the error message from the server response if available
-          const errorMessage =
-            result.error ||
-            result.message ||
-            response.statusText ||
-            "Failed to update asset";
-          throw new Error(errorMessage);
-        }
+        const result = await api.put<any>(
+          `/raw/${updatedAsset._id}`,
+          updatedAsset
+        );
 
         // Make sure we have a valid result before proceeding
         if (!result || typeof result !== "object") {
@@ -939,16 +900,15 @@ export default function RawAssetsTab() {
         // Close the modal
         handleCloseModal();
 
-        // [REMOVED] // [REMOVED] console.log("Asset updated successfully:", updatedData);
+        toast.success("Asset updated successfully");
       } catch (error) {
         console.error("Error updating asset:", error);
-        // Show the actual error message from the server
-        alert(
-          error instanceof Error ? error.message : "Unknown error occurred"
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update asset"
         );
       }
     },
-    [handleCloseModal, fetchCarLabels, fetchDriveLabels]
+    [handleCloseModal, fetchCarLabels, fetchDriveLabels, api]
   );
 
   // Handle adding a new asset
@@ -965,16 +925,12 @@ export default function RawAssetsTab() {
   // Handle add asset
   const handleAddAsset = useCallback(
     async (newAsset: RawAssetData) => {
-      try {
-        const response = await fetch("/api/raw", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newAsset),
-        });
+      if (!api) return;
 
-        if (!response.ok) {
+      try {
+        const result = await api.post<any>("/raw", newAsset);
+
+        if (!result.ok) {
           throw new Error("Failed to add asset");
         }
 
@@ -985,15 +941,16 @@ export default function RawAssetsTab() {
         // [REMOVED] // [REMOVED] console.log("Asset added successfully");
       } catch (error) {
         console.error("Error adding asset:", error);
-        alert(
-          `Failed to add asset: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
+        toast.error("Failed to add asset");
       }
     },
-    [handleCloseAddAsset, fetchAssets]
+    [handleCloseAddAsset, fetchAssets, api]
   );
+
+  // Add authentication check
+  if (!api) {
+    return <LoadingContainer />;
+  }
 
   if (loading) {
     return (
@@ -1214,7 +1171,7 @@ export default function RawAssetsTab() {
                   key={asset._id?.toString() || Math.random().toString()}
                   asset={asset}
                   onEdit={handleEdit}
-                  onDelete={handleDeleteAsset}
+                  onDelete={handleDelete}
                   onClick={handleAssetClick}
                 />
               ))

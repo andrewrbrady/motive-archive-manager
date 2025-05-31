@@ -9,6 +9,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
+import { useAPI } from "@/hooks/useAPI";
 
 // Car details interface for storing raw car data
 export interface CarDetails {
@@ -52,6 +53,14 @@ const LabelsContext = createContext<LabelsContextType>(defaultContext);
 export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
+  // Get authenticated API client
+  const api = useAPI();
+
+  // Show loading while API is not ready
+  if (!api) {
+    return <div>Loading authentication...</div>;
+  }
+
   // State for labels
   const [carLabels, setCarLabels] = useState<Record<string, string>>({});
   const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
@@ -71,7 +80,7 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
   // Internal implementation for car labels that doesn't get exposed directly
   const fetchCarLabelsInternal = useCallback(
     async (carIds: string[]) => {
-      if (!carIds.length) return {};
+      if (!carIds.length || !api) return {};
 
       // Filter out already cached IDs
       const uncachedIds = carIds.filter((id) => !carLabels[id]);
@@ -85,17 +94,9 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       try {
-        const response = await fetch("/api/cars/labels", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ carIds: uncachedIds }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch car labels: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = (await api.post("api/cars/labels", {
+          carIds: uncachedIds,
+        })) as any;
 
         // Handle both response formats: {cars: []} and {data: []}
         const carsArray = Array.isArray(data.cars)
@@ -239,13 +240,13 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
         });
       }
     },
-    [carLabels]
+    [carLabels, api]
   );
 
   // Internal implementation for drive labels
   const fetchDriveLabelsInternal = useCallback(
     async (driveIds: string[]) => {
-      if (!driveIds.length) return {};
+      if (!driveIds.length || !api) return {};
 
       // Filter out already cached IDs
       const uncachedIds = driveIds.filter((id) => !driveLabels[id]);
@@ -259,17 +260,9 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
       });
 
       try {
-        const response = await fetch(
-          `/api/hard-drives?ids=${uncachedIds.join(",")}`
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch drive labels: ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
+        const data = (await api.get(
+          `api/hard-drives?ids=${uncachedIds.join(",")}`
+        )) as any;
         const drives = data.drives || data.data || [];
 
         if (!Array.isArray(drives)) {
@@ -330,7 +323,7 @@ export const LabelsProvider: React.FC<{ children: ReactNode }> = ({
         });
       }
     },
-    [driveLabels]
+    [driveLabels, api]
   );
 
   // Process batches of pending IDs periodically - NOW DEFINED AFTER THE INTERNAL FUNCTIONS

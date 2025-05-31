@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 import type { FormState } from "./formHandlers";
 import type { ProjectEvent, LengthSetting } from "../types";
 import type { BaTCarDetails } from "@/types/car-page";
@@ -27,6 +28,7 @@ export interface GenerationContext {
 
 // Generation handlers
 export function useGenerationHandlers() {
+  const api = useAPI();
   const [generationState, setGenerationState] = useState<GenerationState>({
     isGenerating: false,
     generatedCaption: "",
@@ -68,6 +70,14 @@ export function useGenerationHandlers() {
       context: GenerationContext,
       formState: FormState
     ): Promise<string | null> => {
+      if (!api) {
+        updateGenerationState({
+          error: "API not available",
+          isGenerating: false,
+        });
+        return null;
+      }
+
       // Validate inputs
       const validationError = validateGeneration(context, formState);
       if (validationError) {
@@ -149,47 +159,11 @@ export function useGenerationHandlers() {
           requestPayload.customLLMText = context.editableLLMText;
         }
 
-        // Create timeout for the entire request (55 seconds to stay under Vercel's 60s limit)
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  "Request timeout - the server took too long to respond"
-                )
-              ),
-            55000
-          )
-        );
-
         // Generate new caption text
-        const fetchPromise = fetch("/api/openai/generate-project-caption", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestPayload),
-        });
-
-        const response = (await Promise.race([
-          fetchPromise,
-          timeoutPromise,
-        ])) as Response;
-
-        if (!response.ok) {
-          const errorData = await response.json();
-
-          // Handle specific timeout errors
-          if (response.status === 408) {
-            throw new Error(
-              "The caption generation timed out. Please try again with a simpler prompt or fewer details."
-            );
-          }
-
-          throw new Error(errorData.error || "Failed to generate caption");
-        }
-
-        const data = await response.json();
+        const data = (await api.post(
+          "openai/generate-project-caption",
+          requestPayload
+        )) as any;
         const caption = data.caption;
 
         updateGenerationState({
@@ -241,7 +215,7 @@ export function useGenerationHandlers() {
         return null;
       }
     },
-    [validateGeneration, updateGenerationState]
+    [api, validateGeneration, updateGenerationState]
   );
 
   const clearGeneration = useCallback(() => {
@@ -276,7 +250,8 @@ export function useGenerationHandlers() {
 }
 
 // Hook for saving captions
-export function useCaptionSaver(user?: any) {
+export function useCaptionSaver() {
+  const api = useAPI();
   const [isSaving, setIsSaving] = useState(false);
 
   const saveCaption = useCallback(
@@ -288,37 +263,17 @@ export function useCaptionSaver(user?: any) {
       carIds: string[] = [],
       eventIds: string[] = []
     ): Promise<boolean> => {
-      if (!caption) return false;
+      if (!caption || !api) return false;
 
       setIsSaving(true);
       try {
-        if (!user) {
-          throw new Error("No authenticated user found");
-        }
-
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
-
-        const response = await fetch(`/api/projects/${projectId}/captions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            caption,
-            platform,
-            context: context || "",
-            carIds,
-            eventIds,
-          }),
+        await api.post(`projects/${projectId}/captions`, {
+          caption,
+          platform,
+          context: context || "",
+          carIds,
+          eventIds,
         });
-
-        if (!response.ok) {
-          throw new Error("Failed to save caption");
-        }
-
-        const responseData = await response.json();
 
         toast({
           title: "Success",
@@ -338,7 +293,7 @@ export function useCaptionSaver(user?: any) {
         setIsSaving(false);
       }
     },
-    [user]
+    [api]
   );
 
   return {
@@ -348,7 +303,8 @@ export function useCaptionSaver(user?: any) {
 }
 
 // Hook for managing saved captions
-export function useSavedCaptions(user?: any) {
+export function useSavedCaptions() {
+  const api = useAPI();
   const [savedCaptions, setSavedCaptions] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
@@ -388,31 +344,12 @@ export function useSavedCaptions(user?: any) {
 
   const handleSaveEdit = useCallback(
     async (projectId: string, captionId: string) => {
+      if (!api) return false;
+
       try {
-        if (!user) {
-          throw new Error("No authenticated user found");
-        }
-
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
-
-        const response = await fetch(
-          `/api/projects/${projectId}/captions?id=${captionId}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              caption: editingText,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to update caption");
-        }
+        await api.patch(`projects/${projectId}/captions?id=${captionId}`, {
+          caption: editingText,
+        });
 
         // Update local state
         setSavedCaptions((prev) =>
@@ -442,32 +379,15 @@ export function useSavedCaptions(user?: any) {
         return false;
       }
     },
-    [editingText, user]
+    [api, editingText]
   );
 
   const handleDeleteCaption = useCallback(
     async (projectId: string, captionId: string) => {
+      if (!api) return false;
+
       try {
-        if (!user) {
-          throw new Error("No authenticated user found");
-        }
-
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
-
-        const response = await fetch(
-          `/api/projects/${projectId}/captions?id=${captionId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to delete caption");
-        }
+        await api.delete(`projects/${projectId}/captions?id=${captionId}`);
 
         // Update local state
         setSavedCaptions((prev) =>
@@ -490,7 +410,7 @@ export function useSavedCaptions(user?: any) {
         return false;
       }
     },
-    [user]
+    [api]
   );
 
   const handleEditTextChange = useCallback((text: string) => {

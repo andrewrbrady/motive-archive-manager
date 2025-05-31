@@ -15,19 +15,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Edit, Trash2, Play } from "lucide-react";
 import { IYoutubeCollection } from "@/models/youtube_collection";
 import Image from "next/image";
+import { useAPI } from "@/hooks/useAPI";
 
 export default function YoutubeCollectionList() {
   const [collections, setCollections] = useState<IYoutubeCollection[]>([]);
   const [loading, setLoading] = useState(true);
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     const fetchCollections = async () => {
       try {
-        const response = await fetch("/api/youtube/collections");
-        if (!response.ok) {
-          throw new Error("Failed to fetch collections");
-        }
-        const data = await response.json();
+        const data = (await api.get(
+          "youtube/collections"
+        )) as IYoutubeCollection[];
         setCollections(data);
       } catch (error) {
         console.error("Error fetching collections:", error);
@@ -37,7 +39,7 @@ export default function YoutubeCollectionList() {
     };
 
     fetchCollections();
-  }, []);
+  }, [api]);
 
   if (loading) {
     return (
