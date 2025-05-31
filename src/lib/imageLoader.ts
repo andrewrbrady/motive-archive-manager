@@ -1,4 +1,5 @@
 import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { api } from "@/lib/api-client";
 
 export interface PaginatedImagesResponse {
   images: ImageData[];
@@ -72,15 +73,10 @@ export async function loadCarImages(
     queryParams.append("category", category);
   }
 
-  const response = await fetch(
-    `/api/cars/${carId}/images?${queryParams.toString()}`
+  const data = await api.get<PaginatedImagesResponse>(
+    `/cars/${carId}/images?${queryParams.toString()}`
   );
 
-  if (!response.ok) {
-    throw new Error("Failed to load images");
-  }
-
-  const data = await response.json();
   return data;
 }
 
@@ -101,15 +97,9 @@ export async function loadClientCarImages(
     limit: limit.toString(),
   });
 
-  const response = await fetch(
-    `/api/clients/${clientId}/cars?${queryParams.toString()}`
+  const data = await api.get<any>(
+    `/clients/${clientId}/cars?${queryParams.toString()}`
   );
-
-  if (!response.ok) {
-    throw new Error("Failed to load client cars");
-  }
-
-  const data = await response.json();
 
   // Extract primary images from cars
   const images = data.cars
@@ -137,13 +127,7 @@ export async function loadClientCarImages(
  * Loads a single image by ID
  */
 export async function loadImageById(imageId: string): Promise<ImageData> {
-  const response = await fetch(`/api/images/${imageId}`);
-
-  if (!response.ok) {
-    throw new Error("Failed to load image");
-  }
-
-  const data = await response.json();
+  const data = await api.get<ImageData>(`/images/${imageId}`);
   return data;
 }
 

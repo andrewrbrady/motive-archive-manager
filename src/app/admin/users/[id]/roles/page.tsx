@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UserRolesData {
   uid: string;
@@ -22,6 +23,8 @@ interface UserRolesData {
 
 export default function UserRolesPage() {
   const params = useParams();
+  const router = useRouter();
+  const api = useAPI();
   const id = params?.id?.toString();
 
   if (!id) {
@@ -33,6 +36,7 @@ export default function UserRolesPage() {
 
 function UserRolesContent({ userId }: { userId: string }) {
   const router = useRouter();
+  const api = useAPI();
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,6 +46,7 @@ function UserRolesContent({ userId }: { userId: string }) {
     creativeRoles: string[];
     status: string;
   } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Available roles and creative roles
   const availableRoles = ["user", "editor", "admin"];
@@ -210,15 +215,7 @@ function UserRolesContent({ userId }: { userId: string }) {
       });
 
       // Attempt to refresh the session to sync the role changes
-      try {
-        await fetch("/api/auth/refresh-session");
-      } catch (refreshError) {
-        console.error(
-          "Error refreshing session after role update:",
-          refreshError
-        );
-        // Don't fail the update if this fails
-      }
+      await refreshSession();
     } catch (error) {
       console.error("Error updating user roles:", error);
       toast.error(
@@ -226,6 +223,27 @@ function UserRolesContent({ userId }: { userId: string }) {
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const refreshSession = async () => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      await api.post("/auth/refresh-session");
+      toast.success("Session refreshed successfully");
+
+      // Optionally reload the page to reflect changes
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error refreshing session:", error);
+      toast.error(error.message || "Failed to refresh session");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -263,6 +281,19 @@ function UserRolesContent({ userId }: { userId: string }) {
         >
           Back to Users
         </Button>
+      </div>
+    );
+  }
+
+  if (!api) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+          <p className="text-muted-foreground">
+            Please log in to manage user roles
+          </p>
+        </div>
       </div>
     );
   }

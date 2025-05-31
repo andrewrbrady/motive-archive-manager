@@ -1,6 +1,7 @@
 /**
  * Utilities for handling deliverable assignment operations
  */
+import { api } from "@/lib/api-client";
 
 /**
  * Assigns a user to a deliverable or unassigns if userId is null
@@ -32,24 +33,7 @@ export async function assignDeliverable(
     };
 
     // Call the API endpoint
-    const response = await fetch(`/api/cars/${carId}/deliverables/assign`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    });
-
-    // Parse the response
-    const responseData = await response.json();
-    // [REMOVED] // [REMOVED] console.log("Assignment response:", responseData);
-
-    // Check if the response was successful
-    if (!response.ok) {
-      throw new Error(
-        responseData.error || "Failed to update deliverable assignment"
-      );
-    }
+    await api.post(`/cars/${carId}/deliverables/assign`, request);
 
     return true;
   } catch (error) {

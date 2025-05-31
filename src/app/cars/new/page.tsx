@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import CarEntryForm, { CarEntryFormRef } from "@/components/cars/CarEntryForm";
@@ -12,34 +11,31 @@ import { Button } from "@/components/ui/button";
 import { FileJson } from "lucide-react";
 import { toast } from "sonner";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
+import { useAPI } from "@/hooks/useAPI";
+import Navbar from "@/components/layout/navbar";
 
 export default function NewCarPage() {
   const router = useRouter();
+  const api = useAPI();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showJsonUpload, setShowJsonUpload] = useState(false);
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
   const carFormRef = useRef<CarEntryFormRef>(null);
 
-  const handleSubmit = async (formData: Partial<CarFormData>) => {
+  const handleSubmit = async (carData: Car) => {
+    if (!api) {
+      toast.error("Authentication required to create cars");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      const response = await fetch("/api/cars", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create car");
-      }
-
-      const data = await response.json();
-      router.push(`/cars/${data._id}`);
-    } catch (error) {
+      await api.post("/cars", carData);
+      toast.success("Car created successfully!");
+      router.push("/cars");
+    } catch (error: any) {
       console.error("Error creating car:", error);
-      toast.error("Failed to create car. Please try again.");
+      toast.error(error.message || "Failed to create car");
     } finally {
       setIsSubmitting(false);
     }
@@ -71,6 +67,22 @@ export default function NewCarPage() {
       setIsSubmittingJson(false);
     }
   };
+
+  if (!api) {
+    return (
+      <div>
+        <Navbar />
+        <div className="container mx-auto py-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+            <p className="text-muted-foreground">
+              Please log in to create cars
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AuthGuard>

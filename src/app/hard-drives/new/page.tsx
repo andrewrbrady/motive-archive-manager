@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
-// import Navbar from "@/components/layout/navbar";
-// import Footer from "@/components/layout/footer";
+import Navbar from "@/components/layout/navbar";
 import { Loader2, HardDriveIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -17,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAPI } from "@/hooks/useAPI";
 
 interface HardDriveData {
   label: string;
@@ -40,6 +39,7 @@ interface LocationOption {
 
 export default function NewHardDrivePage() {
   const router = useRouter();
+  const api = useAPI();
   const [drive, setDrive] = useState<HardDriveData>({
     label: "",
     type: "HDD",
@@ -54,13 +54,15 @@ export default function NewHardDrivePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Fetch locations on load
+  // Fetch locations on page load
   useEffect(() => {
     const fetchLocations = async () => {
+      if (!api) {
+        return;
+      }
+
       try {
-        const response = await fetch("/api/locations");
-        if (!response.ok) throw new Error("Failed to fetch locations");
-        const data = await response.json();
+        const data = await api.get<any>("/locations");
         setLocations(data.locations || []);
       } catch (error) {
         console.error("Error fetching locations:", error);
@@ -69,40 +71,36 @@ export default function NewHardDrivePage() {
           description: "Failed to load locations",
           variant: "destructive",
         });
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchLocations();
-  }, []);
+  }, [api]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to create hard drives",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const response = await fetch("/api/hard-drives", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(drive),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create hard drive");
-      }
-
-      const result = await response.json();
+      await api.post("/hard-drives", drive);
 
       toast({
         title: "Success",
         description: "Hard drive created successfully",
       });
 
-      // Navigate to the new drive details page
-      router.push(`/hard-drives/${result.hard_drive._id}`);
+      // Navigate back to the hard drives list
+      router.push("/hard-drives");
     } catch (error) {
       console.error("Error creating hard drive:", error);
       toast({
@@ -145,6 +143,22 @@ export default function NewHardDrivePage() {
   const handleBack = () => {
     router.push("/production");
   };
+
+  if (!api) {
+    return (
+      <div className="container mx-auto p-6">
+        <Navbar />
+        <div className="mt-8 text-center">
+          <h1 className="text-2xl font-semibold mb-4">
+            Authentication Required
+          </h1>
+          <p className="text-muted-foreground">
+            Please log in to create hard drives
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

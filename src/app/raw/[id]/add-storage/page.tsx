@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, HardDriveIcon, Loader2, Search, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PageTitle } from "@/components/ui/PageTitle";
+import { useAPI } from "@/hooks/useAPI";
 
 interface RawAsset {
   _id: string;
@@ -42,6 +43,7 @@ interface HardDrive {
 export default function AddStoragePage() {
   const router = useRouter();
   const params = useParams();
+  const api = useAPI();
   const assetId = params?.id as string;
 
   const [asset, setAsset] = useState<RawAsset | null>(null);
@@ -55,28 +57,27 @@ export default function AddStoragePage() {
   // Fetch asset and available hard drives
   useEffect(() => {
     const fetchData = async () => {
+      if (!api || !assetId) {
+        if (!api) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to access this page",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
 
         // Fetch the asset details
-        const assetResponse = await fetch(`/api/raw-assets/${assetId}`);
-        if (!assetResponse.ok) {
-          throw new Error(`Failed to fetch asset: ${assetResponse.statusText}`);
-        }
-
-        const assetData = await assetResponse.json();
+        const assetData = await api.get<any>(`/raw-assets/${assetId}`);
         setAsset(assetData);
 
         // Fetch all hard drives
-        const drivesResponse = await fetch("/api/hard-drives");
-        if (!drivesResponse.ok) {
-          throw new Error(
-            `Failed to fetch hard drives: ${drivesResponse.statusText}`
-          );
-        }
-
-        const drivesData = await drivesResponse.json();
+        const drivesData = await api.get<any>("/hard-drives");
 
         // Filter out hard drives that already contain this asset
         const filteredDrives = drivesData.hard_drives.filter(
@@ -97,10 +98,8 @@ export default function AddStoragePage() {
       }
     };
 
-    if (assetId) {
-      fetchData();
-    }
-  }, [assetId]);
+    fetchData();
+  }, [assetId, api]);
 
   // Filter drives based on search query
   const filteredDrives = availableDrives.filter((drive) => {
@@ -126,6 +125,15 @@ export default function AddStoragePage() {
 
   // Handle save button click
   const handleSave = async () => {
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save changes",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (selectedDrives.length === 0) {
       toast({
         title: "Warning",
@@ -140,18 +148,11 @@ export default function AddStoragePage() {
     try {
       // Process each selected drive in parallel
       const promises = selectedDrives.map((driveId) =>
-        fetch(`/api/hard-drives/${driveId}/assets`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ assetId }),
-        }).then((response) => {
-          if (!response.ok) {
-            throw new Error(`Failed to add asset to drive ${driveId}`);
-          }
-          return { driveId, success: true };
-        })
+        api
+          .post(`/hard-drives/${driveId}/assets`, { assetId })
+          .then((response) => {
+            return { driveId, success: true };
+          })
       );
 
       const results = await Promise.allSettled(promises);
@@ -194,7 +195,7 @@ export default function AddStoragePage() {
   };
 
   // Loading state
-  if (loading) {
+  if (loading || !api) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8 flex justify-center items-center">

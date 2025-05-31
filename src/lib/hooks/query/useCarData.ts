@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ObjectId } from "mongodb";
+import { api } from "@/lib/api-client";
 
 // Define types
 export interface MeasurementValue {
@@ -63,11 +64,7 @@ export function useCarData(carId: string) {
   return useQuery({
     queryKey: ["car", carId],
     queryFn: async () => {
-      const response = await fetch(`/api/cars/${carId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch car data");
-      }
-      return (await response.json()) as Car;
+      return await api.get<Car>(`/cars/${carId}`);
     },
   });
 }
@@ -86,20 +83,7 @@ export function useUpdateCar() {
       carId: string;
       data: Partial<Car>;
     }) => {
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to update car");
-      }
-
-      return await response.json();
+      return await api.patch(`/cars/${carId}`, data);
     },
     onSuccess: (data, { carId }) => {
       // Invalidate both the car and carImages queries
@@ -117,16 +101,7 @@ export function useDeleteCar() {
 
   return useMutation({
     mutationFn: async (carId: string) => {
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete car");
-      }
-
-      return await response.json();
+      return await api.delete(`/cars/${carId}`);
     },
     onSuccess: (_, carId) => {
       // Remove this car from all queries

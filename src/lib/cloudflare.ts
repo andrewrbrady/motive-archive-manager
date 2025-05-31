@@ -1,6 +1,7 @@
 import { getCache, setCache } from "./cache";
 import { AIImageAnalysis } from "@/types/car";
 import path from "path";
+import { api } from "@/lib/api-client";
 
 export interface ImageMetadata {
   angle?: string;
@@ -50,17 +51,9 @@ export async function getCloudflareImageMetadata(
     }
 
     // If not in cache, fetch from API
-    const response = await fetch(`/api/cloudflare/metadata/${imageId}`);
-
-    if (!response.ok) {
-      console.error(
-        "Failed to fetch Cloudflare image metadata:",
-        await response.text()
-      );
-      return null;
-    }
-
-    const data: CloudflareImageResponse = await response.json();
+    const data = await api.get<CloudflareImageResponse>(
+      `/cloudflare/metadata/${imageId}`
+    );
 
     if (!data.success) {
       console.error("Cloudflare API error:", data.errors);
@@ -81,23 +74,11 @@ export async function updateCloudflareImageMetadata(
   metadata: ImageMetadata
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/cloudflare/metadata/${imageId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ metadata }),
-    });
+    const data = await api.patch<{ success: boolean }>(
+      `/cloudflare/metadata/${imageId}`,
+      { metadata }
+    );
 
-    if (!response.ok) {
-      console.error(
-        "Failed to update Cloudflare image metadata:",
-        await response.text()
-      );
-      return false;
-    }
-
-    const data = await response.json();
     if (data.success) {
       // Update cache with new metadata
       setCache(imageId, metadata);
@@ -157,28 +138,7 @@ export async function uploadToCloudflare(
 
   try {
     // [REMOVED] // [REMOVED] console.log("Sending request to /api/upload");
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      // Try to parse error response
-      const errorData = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
-      console.error("Upload failed:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
-      });
-      throw new Error(
-        `Failed to upload image to Cloudflare: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const result = await response.json();
-    // [REMOVED] // [REMOVED] console.log("Upload response:", result);
+    const result = await api.upload<any>("/upload", formData);
 
     // Extract image ID either from result.id or from imageUrl path
     const imageId =
@@ -418,14 +378,7 @@ export async function fetchImageById(imageId: string): Promise<string> {
     }
 
     // Make API call to get image by ID
-    const response = await fetch(`/api/images/${imageId}`);
-
-    if (!response.ok) {
-      console.error(`Failed to fetch image ${imageId}:`, response.statusText);
-      return "";
-    }
-
-    const data = await response.json();
+    const data = await api.get<{ url: string }>(`/images/${imageId}`);
 
     // The API already returns a formatted URL
     if (data && data.url) {

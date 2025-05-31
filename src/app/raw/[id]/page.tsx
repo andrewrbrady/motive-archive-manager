@@ -43,6 +43,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import Navbar from "@/components/layout/navbar";
+import { useAPI } from "@/hooks/useAPI";
 
 interface RawAsset {
   _id?: string;
@@ -93,8 +95,10 @@ interface RawAssetDetailsProps {
   };
 }
 
-export default function RawAssetDetails({ params }: any) {
+export default function RawAssetDetailsPage() {
+  const params = useParams();
   const router = useRouter();
+  const api = useAPI();
   const [asset, setAsset] = useState<RawAsset | null>(null);
   const [loading, setLoading] = useState(true);
   const [hardDrives, setHardDrives] = useState<HardDrive[]>([]);
@@ -102,34 +106,42 @@ export default function RawAssetDetails({ params }: any) {
   const [removingDriveId, setRemovingDriveId] = useState<string | null>(null);
   const [isRemovingDrive, setIsRemovingDrive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [allHardDrives, setAllHardDrives] = useState<HardDrive[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<LocationData[]>(
+    []
+  );
 
-  // Fetch asset data
   useEffect(() => {
-    const fetchAsset = async () => {
+    const fetchData = async () => {
+      if (!api || !params.id) {
+        if (!api) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to access this page",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/raw/${params.id}`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch asset: ${response.statusText}`);
-        }
+        // Fetch asset details
+        const assetData = await api.get<any>(`/raw-assets/${params.id}`);
+        setAsset(assetData);
 
-        const data = await response.json();
-        setAsset(data);
+        // Fetch all hard drives for reference
+        const drivesData = await api.get<any>("/hard-drives");
+        setAllHardDrives(drivesData.hard_drives || []);
 
-        // If the asset has hard drives, fetch them
-        if (data.hardDriveIds && data.hardDriveIds.length > 0) {
-          await fetchLinkedHardDrives(data.hardDriveIds);
-        }
-
-        // If the asset has a location, store it for later reference
-        if (data.location) {
-          await fetchLocations();
-        }
+        // Fetch locations for editing
+        const locationsData = await api.get<any>("/locations");
+        setAvailableLocations(locationsData.locations || []);
       } catch (err) {
         console.error("Error fetching asset details:", err);
-        setError("Failed to load asset details. Please try again later.");
+        setError("Failed to load asset details. Please try again.");
         toast({
           title: "Error",
           description: "Failed to load asset details",
@@ -140,16 +152,14 @@ export default function RawAssetDetails({ params }: any) {
       }
     };
 
-    if (params.id) {
-      fetchAsset();
-    }
-  }, [params.id]);
+    fetchData();
+  }, [params.id, api]);
 
   // Fetch hard drives linked to this asset
   const fetchLinkedHardDrives = async (hardDriveIds: string[]) => {
     try {
       const promises = hardDriveIds.map((id) =>
-        fetch(`/api/hard-drives/${id}`).then((res) => {
+        api.get<HardDrive>(`/hard-drives/${id}`).then((res) => {
           if (!res.ok) {
             console.warn(`Failed to fetch hard drive ${id}`);
             return null;
@@ -174,15 +184,10 @@ export default function RawAssetDetails({ params }: any) {
   // Fetch location information
   const fetchLocations = async () => {
     try {
-      const response = await fetch("/api/locations");
-      if (!response.ok) {
-        throw new Error("Failed to fetch locations");
-      }
-
-      const data = await response.json();
+      const response = await api.get<LocationData[]>("/locations");
       const locationsMap: Record<string, LocationData> = {};
 
-      data.locations.forEach((loc: LocationData) => {
+      response.data.forEach((loc: LocationData) => {
         locationsMap[loc._id] = loc;
       });
 
@@ -199,11 +204,8 @@ export default function RawAssetDetails({ params }: any) {
     setIsRemovingDrive(true);
 
     try {
-      const response = await fetch(
-        `/api/hard-drives/${removingDriveId}/assets/${asset._id}`,
-        {
-          method: "DELETE",
-        }
+      const response = await api.delete(
+        `/hard-drives/${removingDriveId}/assets/${asset._id}`
       );
 
       if (!response.ok) {
@@ -365,6 +367,7 @@ export default function RawAssetDetails({ params }: any) {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navbar />
       <main className="container mx-auto px-4 py-8">
         <div className="mt-8 mb-4">
           <Button

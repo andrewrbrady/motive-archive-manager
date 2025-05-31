@@ -331,6 +331,22 @@ class APIClient {
   }
 
   /**
+   * DELETE request with body and automatic authentication
+   * Some APIs require a body in DELETE requests for complex operations
+   */
+  async deleteWithBody<T>(
+    endpoint: string,
+    data?: any,
+    options?: Omit<RequestOptions, "method" | "body">
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "DELETE",
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  /**
    * Upload method for multipart/form-data requests (like file uploads)
    */
   async upload<T>(

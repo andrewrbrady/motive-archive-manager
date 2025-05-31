@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { api } from "@/lib/api-client";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -83,24 +84,15 @@ export async function analyzeImage(
   try {
     // [REMOVED] // [REMOVED] console.log(`Analyzing image: ${imageUrl}`);
 
-    const response = await fetch("/api/openai/analyze-image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const data = await api.post<{ analysis: ImageAnalysis }>(
+      "/openai/analyze-image",
+      {
         imageUrl,
         vehicleInfo,
         promptId,
-      }),
-    });
+      }
+    );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to analyze image");
-    }
-
-    const data = await response.json();
     const analysis = data.analysis as ImageAnalysis;
 
     console.timeEnd("imageAnalysis");

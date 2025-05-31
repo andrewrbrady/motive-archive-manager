@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAPI } from "@/hooks/useAPI";
 
 interface HardDriveEditPageProps {
   params: {
@@ -45,6 +46,7 @@ interface LocationOption {
 
 export default function HardDriveEditPage({ params }: any) {
   const router = useRouter();
+  const api = useAPI();
   const [drive, setDrive] = useState<HardDriveData>({
     label: "",
     type: "HDD",
@@ -63,14 +65,18 @@ export default function HardDriveEditPage({ params }: any) {
   // Fetch hard drive data on load
   useEffect(() => {
     const fetchDrive = async () => {
+      if (!api) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to access this page",
+          variant: "destructive",
+        });
+        return;
+      }
+
       try {
         setLoading(true);
-        const response = await fetch(`/api/hard-drives/${params.id}`);
-        if (!response.ok)
-          throw new Error(
-            `Error fetching drive details: ${response.statusText}`
-          );
-        const data = await response.json();
+        const data = await api.get<any>(`/hard-drives/${params.id}`);
 
         // Convert the data to the expected format
         setDrive({
@@ -101,10 +107,12 @@ export default function HardDriveEditPage({ params }: any) {
     };
 
     const fetchLocations = async () => {
+      if (!api) {
+        return;
+      }
+
       try {
-        const response = await fetch("/api/locations");
-        if (!response.ok) throw new Error("Failed to fetch locations");
-        const data = await response.json();
+        const data = await api.get<any>("/locations");
         setLocations(data.locations || []);
       } catch (error) {
         console.error("Error fetching locations:", error);
@@ -118,24 +126,24 @@ export default function HardDriveEditPage({ params }: any) {
 
     fetchDrive();
     fetchLocations();
-  }, [params.id]);
+  }, [params.id, api]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save changes",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const response = await fetch(`/api/hard-drives/${params.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(drive),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update hard drive");
-      }
+      await api.put(`/hard-drives/${params.id}`, drive);
 
       toast({
         title: "Success",
@@ -187,7 +195,7 @@ export default function HardDriveEditPage({ params }: any) {
     router.push(`/hard-drives/${params.id}`);
   };
 
-  if (loading) {
+  if (loading || !api) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />

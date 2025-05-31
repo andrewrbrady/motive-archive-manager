@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/hooks/useFirebaseAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -13,8 +14,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserIcon, MailIcon, PhoneIcon } from "lucide-react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UserRecord {
   uid: string;
@@ -33,30 +36,80 @@ interface UserRecord {
 }
 
 export default function UserDetailsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const api = useAPI();
   const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
-    async function fetchUsers() {
-      try {
-        const response = await fetch("/api/users/list-auth");
-        const data = await response.json();
+    const fetchUsers = async () => {
+      if (!api) {
+        toast.error("Authentication required");
+        return;
+      }
 
-        if (response.ok) {
-          setUsers(data.users || []);
-        } else {
-          setError(data.error || "Failed to fetch users");
-        }
-      } catch (err: any) {
-        setError(err.message || "An error occurred");
+      try {
+        setIsLoading(true);
+        const data = await api.get<any>("/users/list-auth");
+        setUsers(data.users || []);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
       } finally {
         setIsLoading(false);
       }
-    }
+    };
 
     fetchUsers();
-  }, []);
+  }, [api]);
+
+  const handleImportUser = async () => {
+    if (!api) {
+      toast.error("Authentication required to import users");
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error("Please select a user to import");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      await api.post("/auth/import-google-user", {
+        email: selectedUser.email,
+        displayName: selectedUser.displayName,
+        uid: selectedUser.uid,
+        photoURL: selectedUser.photoURL,
+      });
+
+      toast.success("User imported successfully!");
+
+      // Refresh the users list
+      const data = await api.get<any>("/users/list-auth");
+      setUsers(data.users || []);
+    } catch (error: any) {
+      console.error("Error importing user:", error);
+      toast.error(error.message || "Failed to import user");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  if (!api) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+          <p className="text-muted-foreground">Please log in to manage users</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">

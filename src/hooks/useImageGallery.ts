@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
 import { FilterState, ExtendedImageType } from "@/types/gallery";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
+import { useAPI } from "@/hooks/useAPI";
 
 export function useImageGallery(carId: string, vehicleInfo?: any) {
   const router = useRouter();
@@ -12,6 +13,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const lastNavigationRef = useRef<number>(0);
+  const api = useAPI();
 
   // URL-based state
   const isEditMode = searchParams?.get("mode") === "edit";
@@ -283,7 +285,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
   const reanalyzeImage = useCallback(
     async (imageId: string, promptId?: string, modelId?: string) => {
-      if (isReanalyzing) return;
+      if (isReanalyzing || !api) return;
 
       setIsReanalyzing(true);
       try {
@@ -307,20 +309,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
           requestBody.modelId = modelId;
         }
 
-        const response = await fetch("/api/openai/reanalyze-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.details || "Re-analysis failed");
-        }
-
-        const result = await response.json();
+        const result = await api.post("/openai/reanalyze-image", requestBody);
 
         toast({
           title: "Re-analysis Complete",
@@ -342,26 +331,17 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         setIsReanalyzing(false);
       }
     },
-    [isReanalyzing, carId, toast, mutate]
+    [isReanalyzing, carId, toast, mutate, api]
   );
 
   const handleSetPrimaryImage = useCallback(
     async (imageId: string) => {
-      try {
-        const response = await fetch(`/api/cars/${carId}/thumbnail`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ primaryImageId: imageId }),
-        });
+      if (!api) return;
 
-        if (!response.ok) {
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: "Failed to update primary image" }));
-          throw new Error(errorData.error || "Failed to update primary image");
-        }
+      try {
+        await api.patch(`/cars/${carId}/thumbnail`, {
+          primaryImageId: imageId,
+        });
 
         toast({
           title: "Success",
@@ -382,7 +362,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         throw error; // Re-throw so the UI can handle the error state
       }
     },
-    [carId, toast, mutate]
+    [carId, toast, mutate, api]
   );
 
   return {

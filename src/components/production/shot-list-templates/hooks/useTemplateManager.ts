@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Template, ShotTemplate } from "../types";
+import { useAPI } from "@/hooks/useAPI";
 
 export function useTemplateManager(shouldCreateTemplate = false) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const api = useAPI();
 
   // State
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -18,13 +20,13 @@ export function useTemplateManager(shouldCreateTemplate = false) {
 
   // Fetch templates
   const fetchTemplates = useCallback(async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/shot-list-templates");
-      if (!response.ok) {
-        throw new Error("Failed to fetch templates");
-      }
-      const data = await response.json();
+      const data = await api.get<{ templates: Template[] }>(
+        "/shot-list-templates"
+      );
       setTemplates(data.templates || []);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -32,7 +34,7 @@ export function useTemplateManager(shouldCreateTemplate = false) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [api]);
 
   // Initialize
   useEffect(() => {
@@ -69,31 +71,20 @@ export function useTemplateManager(shouldCreateTemplate = false) {
 
   const handleSave = useCallback(
     async (data: Partial<Template>) => {
+      if (!api) return;
+
       try {
-        const url = editingTemplate
-          ? `/api/shot-list-templates/${editingTemplate.id}`
-          : "/api/shot-list-templates";
+        const isUpdate = !!editingTemplate;
+        const endpoint = isUpdate
+          ? `/shot-list-templates/${editingTemplate.id}`
+          : "/shot-list-templates";
 
-        const method = editingTemplate ? "PUT" : "POST";
-
-        const response = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to ${editingTemplate ? "update" : "create"} template`
-          );
-        }
-
-        const result = await response.json();
+        const result = isUpdate
+          ? await api.put<{ template: Template }>(endpoint, data)
+          : await api.post<{ template: Template }>(endpoint, data);
 
         toast.success(
-          `Template ${editingTemplate ? "updated" : "created"} successfully`
+          `Template ${isUpdate ? "updated" : "created"} successfully`
         );
 
         // Refresh templates
@@ -114,23 +105,17 @@ export function useTemplateManager(shouldCreateTemplate = false) {
         );
       }
     },
-    [editingTemplate, fetchTemplates]
+    [editingTemplate, fetchTemplates, api]
   );
 
   const handleDelete = useCallback(
     async (templateId: string) => {
-      if (!confirm("Are you sure you want to delete this template?")) {
+      if (!api || !confirm("Are you sure you want to delete this template?")) {
         return;
       }
 
       try {
-        const response = await fetch(`/api/shot-list-templates/${templateId}`, {
-          method: "DELETE",
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete template");
-        }
+        await api.delete(`/shot-list-templates/${templateId}`);
 
         toast.success("Template deleted successfully");
 
@@ -146,7 +131,7 @@ export function useTemplateManager(shouldCreateTemplate = false) {
         toast.error("Failed to delete template");
       }
     },
-    [fetchTemplates, selectedTemplate]
+    [fetchTemplates, selectedTemplate, api]
   );
 
   const handleDuplicate = useCallback(

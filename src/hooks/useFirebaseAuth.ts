@@ -11,6 +11,7 @@ import {
   getValidToken as getValidTokenFromClient,
   refreshToken,
 } from "@/lib/api-client";
+import { useAPI } from "@/hooks/useAPI";
 
 interface AuthState {
   user: User | null;
@@ -59,46 +60,44 @@ export function useFirebaseAuth() {
 
   const tokenValidationAttemptsRef = useRef(0);
   const MAX_TOKEN_VALIDATION_ATTEMPTS = 3;
+  const api = useAPI();
 
   // Validate token with retry logic
-  const validateToken = useCallback(async (user: User): Promise<boolean> => {
-    if (!user) return false;
+  const validateToken = useCallback(
+    async (user: User): Promise<boolean> => {
+      if (!user || !api) return false;
 
-    try {
-      const token = await user.getIdToken(false); // Don't force refresh initially
-      if (!token) return false;
-
-      // Validate with the API
-      const response = await fetch("/api/auth/validate", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      return response.ok;
-    } catch (error: any) {
-      console.error("💥 useFirebaseAuth: Token validation error:", error);
-
-      // If validation endpoint fails, fall back to basic Firebase token check
-      // This helps handle network issues or temporary API problems
       try {
-        console.log(
-          "🔄 useFirebaseAuth: Validation endpoint failed, trying basic token check..."
-        );
-        const token = await user.getIdToken(false);
-        // If we can get a token and user is authenticated, assume it's valid
-        // This is a fallback to prevent auth failures due to API issues
-        return !!token;
-      } catch (tokenError) {
-        console.error(
-          "💥 useFirebaseAuth: Basic token check also failed:",
-          tokenError
-        );
-        return false;
+        const token = await user.getIdToken(false); // Don't force refresh initially
+        if (!token) return false;
+
+        // Validate with the API using the new API client
+        await api.get("/auth/validate");
+        return true;
+      } catch (error: any) {
+        console.error("💥 useFirebaseAuth: Token validation error:", error);
+
+        // If validation endpoint fails, fall back to basic Firebase token check
+        // This helps handle network issues or temporary API problems
+        try {
+          console.log(
+            "🔄 useFirebaseAuth: Validation endpoint failed, trying basic token check..."
+          );
+          const token = await user.getIdToken(false);
+          // If we can get a token and user is authenticated, assume it's valid
+          // This is a fallback to prevent auth failures due to API issues
+          return !!token;
+        } catch (tokenError) {
+          console.error(
+            "💥 useFirebaseAuth: Basic token check also failed:",
+            tokenError
+          );
+          return false;
+        }
       }
-    }
-  }, []);
+    },
+    [api]
+  );
 
   // Enhanced auth state change handler
   const handleAuthStateChange = useCallback(

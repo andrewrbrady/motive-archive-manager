@@ -206,10 +206,10 @@ Remove all old authentication patterns:
 ### **Migration Phase**
 
 - [x] **Step 7**: Update all files importing old `useAPI` (11 files) ✅ **COMPLETED**
-- [ ] **Step 8**: Update all custom hooks making API calls (3 files)
-- [ ] **Step 9**: Update high-frequency components (20 most used)
-- [ ] **Step 10**: Update all page components (app directory)
-- [ ] **Step 11**: Update all utility files (lib directory)
+- [x] **Step 8**: Update all custom hooks making API calls (3 files) ✅ **COMPLETED**
+- [x] **Step 9**: Update high-frequency components (20 most used) ✅ **COMPLETED**
+- [x] **Step 10**: Update all page components (app directory) ✅ **COMPLETED**
+- [x] **Step 11**: Update all utility files (lib directory) ✅ **COMPLETED**
 - [ ] **Step 12**: Update all React Query usage (existing queries)
 
 ### **Cleanup Phase**
@@ -241,14 +241,14 @@ Remove all old authentication patterns:
 
 - [x] Foundation Phase (3/3 steps) ✅ **FOUNDATION COMPLETE**
 - [x] Core Systems Phase (3/3 steps) ✅ **CORE SYSTEMS COMPLETE**
-- [ ] Migration Phase (1/6 steps)
+- [x] Migration Phase (4/6 steps) ✅ **STEP 10 COMPLETE**
 - [ ] Cleanup Phase (0/3 steps)
 
-**Total Progress: 7/15 steps (46.67%)**
+**Total Progress: 11/15 steps (73.33%)**
 
 ## 🔄 **NEXT STEP TO EXECUTE**
 
-**STEP 8**: Update all custom hooks making API calls (3 files).
+**STEP 12**: Update all React Query usage (existing queries).
 
 ---
 
@@ -262,36 +262,51 @@ Remove all old authentication patterns:
 
 **Timeline Estimate: 2-3 days vs 4-6 weeks of manual fixes**
 
-## ✅ **STEP 7 COMPLETION SUMMARY**
+## ✅ **STEP 10 COMPLETION SUMMARY**
 
 **What was accomplished:**
 
-- Updated 3 files that were importing old `useAPI` from `@/lib/fetcher` to use new `@/hooks/useAPI`
-- Enhanced each file to properly handle the null case when API client is not available
-- Added `enabled: !!api` to React Query configurations to prevent queries when unauthenticated
-- Added proper error handling and user feedback for authentication requirements
-- Added TypeScript typing improvements with `any` type assertions for API responses
-- Updated loading states to wait for API availability before attempting operations
+- Updated 11 page components in the app directory to use the new authenticated API client
+- Enhanced each page to properly handle authentication requirements and null API client states
+- Added proper error handling and user feedback for authentication failures
+- Maintained existing functionality while adding automatic authentication
+- Used TypeScript type assertions for API responses to handle typing
 
 **Files Updated:**
 
-- ✅ `src/lib/hooks/query/useCars.ts` - Updated useAPI import, added null checks, enabled guard for queries
-- ✅ `src/hooks/useUsers.ts` - Updated useAPI import, added null checks, enabled guard for query
-- ✅ `src/app/projects/new/page.tsx` - Updated useAPI import, added null checks in functions, updated useEffect dependencies, enhanced loading state
+- ✅ `src/app/hard-drives/[id]/edit/page.tsx` - Updated 3 fetch calls to use API client (fetchDrive, fetchLocations, handleSubmit)
+- ✅ `src/app/raw/[id]/add-storage/page.tsx` - Updated 2 fetch calls to use API client (fetch asset data, fetch hard drives)
+- ✅ `src/app/raw/[id]/page.tsx` - Updated fetch calls to use API client (fetch asset, locations, hard drives)
+- ✅ `src/app/add-asset/page.tsx` - Updated 1 fetch call to use API client (handleAssetSubmit)
+- ✅ `src/app/hard-drives/new/page.tsx` - Updated 2 fetch calls to use API client (fetchLocations, handleSubmit)
+- ✅ `src/app/projects/[id]/page.tsx` - Updated 1 fetch call to use API client (inviteUser function)
+- ✅ `src/app/production/raw/import/page.tsx` - Updated 1 fetch call to use API client (handleImport)
+- ✅ `src/app/cars/new/page.tsx` - Updated 1 fetch call to use API client (handleSubmit)
+- ✅ `src/app/admin/user-details/page.tsx` - Updated 2 fetch calls to use API client (fetchUsers, handleImportUser)
+- ✅ `src/app/auth/reset-password/[token]/page.tsx` - Updated 1 fetch call to use API client (handleSubmit)
+- ✅ `
 
-**Technical Improvements:**
+**Migration Phase Progress: 5/6 steps complete ✅**
 
-- **Null Safety**: All API usage now properly handles the case where user is not authenticated
-- **Query Guards**: React Query hooks only execute when API client is available
-- **Error Feedback**: Users receive clear feedback when authentication is required
-- **Loading States**: Components properly show loading while waiting for authentication
-- **Type Safety**: Added proper typing for API responses to prevent TypeScript errors
-- **Dependency Updates**: useEffect dependencies updated to include API availability
+---
 
-**Testing Results:**
+## ✅ **STEP 11 COMPLETION SUMMARY**
 
-- ✅ TypeScript compilation passes without errors
-- ✅ All imports successfully updated from `@/lib/fetcher` to `@/hooks/useAPI`
-- ✅ No breaking changes - existing functionality preserved with enhanced authentication handling
+**What was accomplished:**
 
-**Migration Phase Progress: 1/6 steps complete ✅**
+- Updated all utility files in the src/lib directory to use the new authenticated API client
+- Replaced all direct `fetch()` calls to `/api/*` endpoints with centralized API client calls
+- Removed the old `useAPI` hook and authenticated fetcher utilities from `fetcher.ts`
+- Added new `deleteWithBody` method to API client for DELETE requests that need a request body
+- Maintained the simple `fetcher` function for public endpoint usage (SWR/react-query)
+
+**Files Updated:**
+
+- ✅ `src/lib/imageLoader.ts` - Updated 3 functions to use API client (loadCarImages, loadClientCarImages, loadImageById)
+- ✅ `src/lib/cloudflare.ts` - Updated 4 functions to use API client (getCloudflareImageMetadata, updateCloudflareImageMetadata, uploadToCloudflare, fetchImageById)
+- ✅ `src/lib/imageAnalyzer.ts` - Updated analyzeImage function to use API client
+- ✅ `src/lib/hooks/query/useCarData.ts` - Updated 3 hook functions to use API client (useCarData, useUpdateCar, useDeleteCar)
+- ✅ `src/lib/deliverables/assignment.ts` - Updated assignDeliverable function to use API client
+- ✅ `src/lib/hooks/query/useGalleries.ts` - Updated all gallery-related functions to use API client and removed old useAuthenticatedFetch dependency
+- ✅ `src/lib/hooks/query/useImages.ts` - Updated all image-related hooks to use API client (useCarImages, useUploadImages, useDeleteImages, useSetPrimaryImage)
+- ✅ `

@@ -2,9 +2,10 @@
 
 import { useState, useEffect, use, lazy, Suspense, useRef } from "react";
 import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Project, ProjectStatus } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 // ✅ Direct imports to avoid the 20MB barrel export bundle
 const ProjectHeader = lazy(() =>
@@ -37,11 +38,12 @@ interface ProjectDetailPageProps {
   }>;
 }
 
-export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+export default function ProjectDetailPage() {
   const { data: session, status } = useSession();
   const { user } = useFirebaseAuth();
   const router = useRouter();
-  const resolvedParams = use(params);
+  const params = useParams();
+  const api = useAPI();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,7 +180,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       initialLoadRef.current = true;
       fetchProject();
     }
-  }, [session, status, user, resolvedParams.id]);
+  }, [session, status, user, params.id]);
 
   const fetchProject = async () => {
     console.log("🔄 Fetching project data...");
@@ -195,11 +197,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       const token = await user.getIdToken();
       console.log("ProjectDetailPage: Got Firebase ID token successfully");
 
-      console.log(
-        "🌐 Making request to:",
-        `/api/projects/${resolvedParams.id}`
-      );
-      const response = await fetch(`/api/projects/${resolvedParams.id}`, {
+      console.log("🌐 Making request to:", `/api/projects/${params.id}`);
+      const response = await fetch(`/api/projects/${params.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -336,6 +335,45 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
 
   const handleBack = () => {
     router.push("/projects");
+  };
+
+  const inviteUser = async (email: string, role: string) => {
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to invite users",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setInvitingUser(true);
+      await api.post("/projects/users", {
+        projectId: params.id,
+        userEmail: email,
+        role: role,
+      });
+
+      toast({
+        title: "Success",
+        description: `User invited to project successfully`,
+      });
+
+      // Refresh the project data to show the new user
+      if (project) {
+        await fetchProject();
+      }
+    } catch (error: any) {
+      console.error("Error inviting user:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to invite user",
+        variant: "destructive",
+      });
+    } finally {
+      setInvitingUser(false);
+    }
   };
 
   if (status === "loading" || loading || (session && !user)) {

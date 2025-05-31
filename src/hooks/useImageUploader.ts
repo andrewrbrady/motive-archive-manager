@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from "react";
 import { nanoid } from "nanoid";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UploadProgress {
   id: string;
@@ -36,6 +37,7 @@ export function useImageUploader({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const api = useAPI();
 
   // Helper to generate a stable ID for a file
   const getFileId = (file: File) => `${file.name}-${file.lastModified}`;

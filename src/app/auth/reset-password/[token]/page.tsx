@@ -1,89 +1,112 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "@/components/ui/use-toast";
+import { EyeIcon, EyeOffIcon, LockIcon } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
-export default function ResetPassword({ params }: any) {
+export default function ResetPasswordPage() {
+  const params = useParams();
   const router = useRouter();
-  const { token } = params;
+  const api = useAPI();
+  const token = params?.token as string;
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isValidToken, setIsValidToken] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Verify token on load
   useEffect(() => {
     const verifyToken = async () => {
       try {
-        const response = await fetch(
-          `/api/auth/verify-reset-token?token=${token}`
-        );
-
-        if (!response.ok) {
+        if (!api) {
           setIsValidToken(false);
-          setError("This reset link is invalid or has expired.");
+          setError("Authentication service unavailable");
+          return;
         }
-      } catch (err) {
+
+        const response = (await api.post("/auth/verify-reset-token", {
+          token: token,
+        })) as any;
+
+        if (!response.success) {
+          setIsValidToken(false);
+          setError("Invalid or expired reset token");
+        }
+      } catch (err: any) {
+        console.error("Token verification error:", err);
         setIsValidToken(false);
-        setError("An error occurred while verifying the reset link.");
+        setError("Invalid or expired reset token");
       }
     };
 
     if (token) {
       verifyToken();
     }
-  }, [token]);
+  }, [token, api]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication service unavailable",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long");
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
       return;
     }
 
-    setIsSubmitting(true);
-    setError("");
-    setMessage("");
+    setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/update-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token, password }),
+      await api.post("/auth/update-password", {
+        token: token,
+        password: password,
       });
 
-      const data = await response.json();
+      toast({
+        title: "Success",
+        description: "Password updated successfully",
+      });
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to reset password");
-      }
-
-      setMessage(
-        "Your password has been reset successfully. You can now sign in with your new password."
-      );
-      setPassword("");
-      setConfirmPassword("");
-
-      // Redirect to sign in page after 3 seconds
-      setTimeout(() => {
-        router.push("/auth/signin");
-      }, 3000);
-    } catch (err: any) {
-      setError(err.message || "An error occurred. Please try again.");
+      router.push("/auth/signin");
+    } catch (error: any) {
+      console.error("Error updating password:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password",
+        variant: "destructive",
+      });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -130,7 +153,7 @@ export default function ResetPassword({ params }: any) {
                 placeholder="Enter your new password"
               />
               <p className="text-xs text-muted-foreground">
-                Password must be at least 8 characters long
+                Password must be at least 6 characters long
               </p>
             </div>
 
@@ -156,10 +179,10 @@ export default function ResetPassword({ params }: any) {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={loading}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Resetting..." : "Reset Password"}
+              {loading ? "Resetting..." : "Reset Password"}
             </button>
           </form>
         ) : (
