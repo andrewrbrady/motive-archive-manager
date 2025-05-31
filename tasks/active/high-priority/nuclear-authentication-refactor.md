@@ -200,7 +200,7 @@ Remove all old authentication patterns:
 ### **Core Systems Phase**
 
 - [x] **Step 4**: Integrate APIClient with Firebase Auth (`getValidToken`) ✅ **COMPLETED**
-- [ ] **Step 5**: Create global error boundary for auth failures
+- [x] **Step 5**: Create global error boundary for auth failures ✅ **COMPLETED**
 - [ ] **Step 6**: Set up TypeScript definitions for all API endpoints
 
 ### **Migration Phase**
@@ -240,15 +240,15 @@ Remove all old authentication patterns:
 **Current Progress:**
 
 - [x] Foundation Phase (3/3 steps) ✅ **FOUNDATION COMPLETE**
-- [x] Core Systems Phase (1/3 steps)
+- [x] Core Systems Phase (2/3 steps)
 - [ ] Migration Phase (0/6 steps)
 - [ ] Cleanup Phase (0/3 steps)
 
-**Total Progress: 4/15 steps (26.67%)**
+**Total Progress: 5/15 steps (33.33%)**
 
 ## 🔄 **NEXT STEP TO EXECUTE**
 
-**STEP 5**: Create global error boundary for auth failures.
+**STEP 6**: Set up TypeScript definitions for all API endpoints.
 
 ---
 
@@ -262,64 +262,41 @@ Remove all old authentication patterns:
 
 **Timeline Estimate: 2-3 days vs 4-6 weeks of manual fixes**
 
-## ✅ **STEP 3 COMPLETION SUMMARY**
+## ✅ **STEP 5 COMPLETION SUMMARY**
 
 **What was accomplished:**
 
-- Created comprehensive `hooks/useAPIQuery.ts` with React Query integration
-- Implemented all major hook types: `useAPIQuery`, `useAPIMutation`, `useAPIPutMutation`, `useAPIPatchMutation`, `useAPIDeleteMutation`, `useAPIUploadMutation`
-- Added utility hooks: `usePrefetchAPI`, `useAPIQueryClient`, `useAPIPaginatedQuery`
-- Full TypeScript support with generics
-- Automatic authentication for all queries and mutations
-- Proper loading states and error handling
-- Query invalidation on mutations
-- Created test component to validate functionality
+- Created comprehensive `AuthErrorBoundary` class component that catches all authentication-related errors
+- Built intelligent error detection system that distinguishes between auth errors and general errors
+- Implemented specialized UI for authentication errors with sign-in, retry, and navigation actions
+- Created `ReactQueryErrorHandler` component that bridges React Query errors to Error Boundaries
+- Integrated both components into the global providers system for app-wide error handling
+- Added comprehensive error logging and debugging features for development
+- Created comprehensive test component to validate error boundary functionality
 
 **Key Features:**
 
-- **Automatic Authentication**: All queries/mutations automatically use authenticated APIClient
-- **Loading States**: Proper handling when user is not authenticated
-- **TypeScript Support**: Full generic typing for all operations
-- **React Query Integration**: Seamless integration with existing React Query patterns
-- **Error Handling**: Comprehensive error handling with authentication requirements
-- **Cache Management**: Automatic query invalidation on mutations
+- **Smart Error Detection**: Automatically identifies authentication errors by message content
+- **User-Friendly UI**: Beautiful, accessible error screens with clear actions
+- **React Query Integration**: Seamlessly handles errors from API queries and mutations
+- **Global Coverage**: Catches errors from any component in the app
+- **Recovery Actions**: Users can sign in, retry, refresh, or navigate home
+- **Development Tools**: Detailed error information in development mode
+- **Production Ready**: Error logging hooks for external monitoring services
 
 **Files Created/Modified:**
 
-- ✅ `src/hooks/useAPIQuery.ts` - New comprehensive React Query integration
-- ✅ `src/hooks/__test-useAPIQuery.tsx` - Test component for validation
-
-**Foundation Phase Complete**: All foundational infrastructure is now in place for the nuclear authentication refactor.
-
-## ✅ **STEP 4 COMPLETION SUMMARY**
-
-**What was accomplished:**
-
-- Extracted centralized `getValidToken()` and `refreshToken()` functions from APIClient to standalone exports
-- Updated `useFirebaseAuth` hook to use the centralized authentication functions instead of duplicating logic
-- Ensured consistency across the entire app by having one source of truth for authentication token management
-- Created comprehensive authentication integration test file to verify functionality
-- All TypeScript compilation passes without errors
-
-**Key Improvements:**
-
-- **Centralized Authentication**: Both APIClient and useFirebaseAuth now use the same authentication functions
-- **Eliminated Duplication**: Removed duplicate token management logic from useFirebaseAuth
-- **Consistency**: All authentication calls now go through the same centralized functions
-- **Better Error Handling**: Consistent error messages and logging across all authentication operations
-- **Testability**: Created test functions to verify authentication integration works correctly
-
-**Files Created/Modified:**
-
-- ✅ `src/lib/api-client.ts` - Exported centralized `getValidToken` and `refreshToken` functions
-- ✅ `src/hooks/useFirebaseAuth.ts` - Updated to use centralized authentication functions
-- ✅ `src/lib/__test-auth-integration.ts` - Created comprehensive test suite
+- ✅ `src/components/error-boundaries/AuthErrorBoundary.tsx` - Global auth error boundary component
+- ✅ `src/components/error-boundaries/ReactQueryErrorHandler.tsx` - React Query error bridge
+- ✅ `src/app/providers.tsx` - Integrated error boundaries into app providers
+- ✅ `src/components/error-boundaries/__test-auth-error-boundary.tsx` - Comprehensive test suite
 
 **Technical Benefits:**
 
-- **Single Source of Truth**: All token operations now use the same underlying Firebase Auth calls
-- **Reduced Complexity**: No more duplicate authentication logic scattered across files
-- **Better Debugging**: Centralized logging makes authentication issues easier to trace
-- **Improved Reliability**: Consistent token refresh and error handling patterns
+- **Automatic Error Handling**: All authentication errors now automatically show user-friendly UI
+- **No Manual Error Handling**: Components no longer need to handle auth errors individually
+- **Consistent UX**: All auth failures show the same professional error interface
+- **Developer Experience**: Clear error detection and debugging tools
+- **Reliability**: Graceful error recovery prevents app crashes
 
-**Core Systems Phase Progress: 1/3 steps complete**
+**Core Systems Phase Progress: 2/3 steps complete**
