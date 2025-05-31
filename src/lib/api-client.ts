@@ -2,6 +2,62 @@ import { auth } from "@/lib/firebase";
 import { getIdToken } from "firebase/auth";
 
 /**
+ * Gets a valid authentication token from Firebase
+ * This is exported so it can be used independently or by the APIClient
+ */
+export async function getValidToken(): Promise<string> {
+  try {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error("Authentication required - no user logged in");
+    }
+
+    const token = await getIdToken(currentUser, false); // false = use cached token if valid
+
+    if (!token) {
+      throw new Error("Authentication required - failed to get token");
+    }
+
+    return token;
+  } catch (error: any) {
+    console.error(
+      "💥 getValidToken: Failed to get authentication token:",
+      error
+    );
+    throw new Error("Authentication required - please sign in");
+  }
+}
+
+/**
+ * Refreshes the authentication token by forcing a new token request
+ * This is exported so it can be used independently or by the APIClient
+ */
+export async function refreshToken(): Promise<string> {
+  try {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error("Authentication required - no user logged in");
+    }
+
+    const token = await getIdToken(currentUser, true); // true = force refresh
+
+    if (!token) {
+      throw new Error("Authentication required - failed to refresh token");
+    }
+
+    return token;
+  } catch (error: any) {
+    console.error(
+      "💥 refreshToken: Failed to refresh authentication token:",
+      error
+    );
+    throw new Error("Authentication required - please sign in again");
+  }
+}
+
+/**
  * Nuclear Authentication API Client
  *
  * This singleton class ensures that ALL API calls are automatically authenticated.
@@ -9,7 +65,7 @@ import { getIdToken } from "firebase/auth";
  *
  * Key Features:
  * - Singleton pattern ensures consistency across the entire app
- * - Automatic authentication on every request
+ * - Automatic authentication on every request using centralized getValidToken
  * - Built-in token refresh and retry logic
  * - TypeScript support with generics
  * - Comprehensive error handling
@@ -44,60 +100,9 @@ class APIClient {
   private constructor() {}
 
   /**
-   * Gets a valid authentication token from Firebase
-   * This is the core authentication method that every request uses
-   */
-  private async getValidToken(): Promise<string> {
-    try {
-      const currentUser = auth.currentUser;
-
-      if (!currentUser) {
-        throw new Error("Authentication required - no user logged in");
-      }
-
-      const token = await getIdToken(currentUser, false); // false = use cached token if valid
-
-      if (!token) {
-        throw new Error("Authentication required - failed to get token");
-      }
-
-      return token;
-    } catch (error: any) {
-      console.error("💥 APIClient: Failed to get authentication token:", error);
-      throw new Error("Authentication required - please sign in");
-    }
-  }
-
-  /**
-   * Refreshes the authentication token by forcing a new token request
-   */
-  private async refreshToken(): Promise<string> {
-    try {
-      const currentUser = auth.currentUser;
-
-      if (!currentUser) {
-        throw new Error("Authentication required - no user logged in");
-      }
-
-      const token = await getIdToken(currentUser, true); // true = force refresh
-
-      if (!token) {
-        throw new Error("Authentication required - failed to refresh token");
-      }
-
-      return token;
-    } catch (error: any) {
-      console.error(
-        "💥 APIClient: Failed to refresh authentication token:",
-        error
-      );
-      throw new Error("Authentication required - please sign in again");
-    }
-  }
-
-  /**
    * Gets authentication headers for requests
    * This method ALWAYS gets called for every request (unless skipAuth is true)
+   * Now uses the centralized getValidToken function
    */
   private async getAuthHeaders(skipAuth = false): Promise<HeadersInit> {
     const baseHeaders: HeadersInit = {
@@ -109,7 +114,7 @@ class APIClient {
     }
 
     try {
-      const token = await this.getValidToken();
+      const token = await getValidToken(); // Using centralized function
       return {
         ...baseHeaders,
         Authorization: `Bearer ${token}`,
@@ -153,8 +158,8 @@ class APIClient {
         );
 
         try {
-          // Try to refresh the token
-          await this.refreshToken();
+          // Try to refresh the token using centralized function
+          await refreshToken();
 
           // Retry the request with fresh token
           const freshAuthHeaders = await this.getAuthHeaders(skipAuth);

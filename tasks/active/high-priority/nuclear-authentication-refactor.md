@@ -195,11 +195,11 @@ Remove all old authentication patterns:
 
 - [x] **Step 1**: Create `lib/api-client.ts` with full APIClient class ✅ **COMPLETED**
 - [x] **Step 2**: Create `hooks/useAPI.ts` with new authenticated hook ✅ **COMPLETED**
-- [ ] **Step 3**: Create `hooks/useAPIQuery.ts` with React Query integration
+- [x] **Step 3**: Create `hooks/useAPIQuery.ts` with React Query integration ✅ **COMPLETED**
 
 ### **Core Systems Phase**
 
-- [ ] **Step 4**: Integrate APIClient with Firebase Auth (`getValidToken`)
+- [x] **Step 4**: Integrate APIClient with Firebase Auth (`getValidToken`) ✅ **COMPLETED**
 - [ ] **Step 5**: Create global error boundary for auth failures
 - [ ] **Step 6**: Set up TypeScript definitions for all API endpoints
 
@@ -239,16 +239,16 @@ Remove all old authentication patterns:
 
 **Current Progress:**
 
-- [x] Foundation Phase (2/3 steps) ✅ **Steps 1-2 Complete**
-- [ ] Core Systems Phase (0/3 steps)
+- [x] Foundation Phase (3/3 steps) ✅ **FOUNDATION COMPLETE**
+- [x] Core Systems Phase (1/3 steps)
 - [ ] Migration Phase (0/6 steps)
 - [ ] Cleanup Phase (0/3 steps)
 
-**Total Progress: 2/15 steps (13.3%)**
+**Total Progress: 4/15 steps (26.67%)**
 
 ## 🔄 **NEXT STEP TO EXECUTE**
 
-**STEP 3**: Create `hooks/useAPIQuery.ts` with React Query integration for seamless data fetching.
+**STEP 5**: Create global error boundary for auth failures.
 
 ---
 
@@ -261,3 +261,65 @@ Remove all old authentication patterns:
 - The pattern is industry-standard and will scale with the application
 
 **Timeline Estimate: 2-3 days vs 4-6 weeks of manual fixes**
+
+## ✅ **STEP 3 COMPLETION SUMMARY**
+
+**What was accomplished:**
+
+- Created comprehensive `hooks/useAPIQuery.ts` with React Query integration
+- Implemented all major hook types: `useAPIQuery`, `useAPIMutation`, `useAPIPutMutation`, `useAPIPatchMutation`, `useAPIDeleteMutation`, `useAPIUploadMutation`
+- Added utility hooks: `usePrefetchAPI`, `useAPIQueryClient`, `useAPIPaginatedQuery`
+- Full TypeScript support with generics
+- Automatic authentication for all queries and mutations
+- Proper loading states and error handling
+- Query invalidation on mutations
+- Created test component to validate functionality
+
+**Key Features:**
+
+- **Automatic Authentication**: All queries/mutations automatically use authenticated APIClient
+- **Loading States**: Proper handling when user is not authenticated
+- **TypeScript Support**: Full generic typing for all operations
+- **React Query Integration**: Seamless integration with existing React Query patterns
+- **Error Handling**: Comprehensive error handling with authentication requirements
+- **Cache Management**: Automatic query invalidation on mutations
+
+**Files Created/Modified:**
+
+- ✅ `src/hooks/useAPIQuery.ts` - New comprehensive React Query integration
+- ✅ `src/hooks/__test-useAPIQuery.tsx` - Test component for validation
+
+**Foundation Phase Complete**: All foundational infrastructure is now in place for the nuclear authentication refactor.
+
+## ✅ **STEP 4 COMPLETION SUMMARY**
+
+**What was accomplished:**
+
+- Extracted centralized `getValidToken()` and `refreshToken()` functions from APIClient to standalone exports
+- Updated `useFirebaseAuth` hook to use the centralized authentication functions instead of duplicating logic
+- Ensured consistency across the entire app by having one source of truth for authentication token management
+- Created comprehensive authentication integration test file to verify functionality
+- All TypeScript compilation passes without errors
+
+**Key Improvements:**
+
+- **Centralized Authentication**: Both APIClient and useFirebaseAuth now use the same authentication functions
+- **Eliminated Duplication**: Removed duplicate token management logic from useFirebaseAuth
+- **Consistency**: All authentication calls now go through the same centralized functions
+- **Better Error Handling**: Consistent error messages and logging across all authentication operations
+- **Testability**: Created test functions to verify authentication integration works correctly
+
+**Files Created/Modified:**
+
+- ✅ `src/lib/api-client.ts` - Exported centralized `getValidToken` and `refreshToken` functions
+- ✅ `src/hooks/useFirebaseAuth.ts` - Updated to use centralized authentication functions
+- ✅ `src/lib/__test-auth-integration.ts` - Created comprehensive test suite
+
+**Technical Benefits:**
+
+- **Single Source of Truth**: All token operations now use the same underlying Firebase Auth calls
+- **Reduced Complexity**: No more duplicate authentication logic scattered across files
+- **Better Debugging**: Centralized logging makes authentication issues easier to trace
+- **Improved Reliability**: Consistent token refresh and error handling patterns
+
+**Core Systems Phase Progress: 1/3 steps complete**

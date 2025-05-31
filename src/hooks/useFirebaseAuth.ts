@@ -7,6 +7,10 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
+import {
+  getValidToken as getValidTokenFromClient,
+  refreshToken,
+} from "@/lib/api-client";
 
 interface AuthState {
   user: User | null;
@@ -127,7 +131,7 @@ export function useFirebaseAuth() {
         tokenValidationAttemptsRef.current++;
         try {
           console.log("🔄 useFirebaseAuth: Attempting token refresh...");
-          await user.getIdToken(true); // Force refresh
+          await refreshToken(); // Use centralized refresh function
           isValid = await validateToken(user);
         } catch (error) {
           console.error("💥 useFirebaseAuth: Token refresh failed:", error);
@@ -171,7 +175,8 @@ export function useFirebaseAuth() {
     setAuthState((prev) => ({ ...prev, loading: true }));
 
     try {
-      await authState.user.getIdToken(true); // Force token refresh
+      // Use the centralized refreshToken function
+      await refreshToken();
       const hasValidToken = await validateToken(authState.user);
 
       setAuthState((prev) => ({
@@ -201,15 +206,8 @@ export function useFirebaseAuth() {
     }
 
     try {
-      // Try to get the current token first
-      let token = await authState.user.getIdToken(false);
-
-      // If we don't have a valid token state, try refreshing
-      if (!authState.hasValidToken) {
-        console.log("🔄 getValidToken: Refreshing token...");
-        token = await authState.user.getIdToken(true); // Force refresh
-      }
-
+      // Use the centralized getValidToken function
+      const token = await getValidTokenFromClient();
       return token;
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Error getting token:", error);
