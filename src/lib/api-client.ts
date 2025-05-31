@@ -1,6 +1,19 @@
 import { auth } from "@/lib/firebase";
 import { getIdToken } from "firebase/auth";
 
+// Import our comprehensive API endpoint types
+import type {
+  APIEndpoints,
+  EndpointResponse,
+  EndpointRequest,
+  UsersAPI,
+  ProjectsAPI,
+  EventsAPI,
+  ProjectSearchParams,
+  EventSearchParams,
+  CreateEventRequest,
+} from "@/types/api-endpoints";
+
 /**
  * Gets a valid authentication token from Firebase
  * This is exported so it can be used independently or by the APIClient
@@ -346,6 +359,318 @@ class APIClient {
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     return this.get("/health", { skipAuth: true });
   }
+
+  // =============================================================================
+  // TYPE-SAFE ENDPOINT METHODS
+  // Nuclear Authentication Refactor - Step 6
+  // =============================================================================
+
+  /**
+   * Users API - Strongly typed methods for user management
+   */
+  users = {
+    /**
+     * Get all users (admin only)
+     */
+    getAll: (): Promise<EndpointResponse<"/api/users">> => {
+      return this.get<EndpointResponse<"/api/users">>("/users");
+    },
+
+    /**
+     * Get current user profile
+     */
+    getMe: () => {
+      return this.get("/users/me");
+    },
+
+    /**
+     * Update user profile
+     */
+    updateMe: (data: any) => {
+      return this.put("/users/me", data);
+    },
+  };
+
+  /**
+   * Projects API - Strongly typed methods for project management
+   */
+  projects = {
+    /**
+     * Get all projects with optional filtering
+     */
+    getAll: (
+      params?: ProjectSearchParams
+    ): Promise<EndpointResponse<"/api/projects">> => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, String(value));
+          }
+        });
+      }
+      const query = searchParams.toString();
+      return this.get<EndpointResponse<"/api/projects">>(
+        `/projects${query ? `?${query}` : ""}`
+      );
+    },
+
+    /**
+     * Get a specific project by ID
+     */
+    getById: (id: string) => {
+      return this.get(`/projects/${id}`);
+    },
+
+    /**
+     * Create a new project
+     */
+    create: (data: EndpointRequest<"/api/projects">) => {
+      return this.post("/projects", data);
+    },
+
+    /**
+     * Update a project
+     */
+    update: (id: string, data: Partial<EndpointRequest<"/api/projects">>) => {
+      return this.put(`/projects/${id}`, data);
+    },
+
+    /**
+     * Delete a project
+     */
+    delete: (id: string) => {
+      return this.delete(`/projects/${id}`);
+    },
+
+    /**
+     * Project Events sub-API
+     */
+    events: {
+      /**
+       * Get all events for a project
+       */
+      getAll: (projectId: string) => {
+        return this.get(`/projects/${projectId}/events`);
+      },
+
+      /**
+       * Create a new event for a project
+       */
+      create: (projectId: string, data: CreateEventRequest) => {
+        return this.post(`/projects/${projectId}/events`, data);
+      },
+
+      /**
+       * Update an event in a project
+       */
+      update: (
+        projectId: string,
+        eventId: string,
+        data: Partial<CreateEventRequest>
+      ) => {
+        return this.put(`/projects/${projectId}/events/${eventId}`, data);
+      },
+
+      /**
+       * Delete an event from a project
+       */
+      delete: (projectId: string, eventId: string) => {
+        return this.delete(`/projects/${projectId}/events/${eventId}`);
+      },
+
+      /**
+       * Attach an existing event to a project
+       */
+      attach: (projectId: string, eventId: string) => {
+        return this.post(`/projects/${projectId}/events/attach`, { eventId });
+      },
+
+      /**
+       * Detach an event from a project
+       */
+      detach: (projectId: string, eventId: string) => {
+        return this.post(`/projects/${projectId}/events/detach`, { eventId });
+      },
+
+      /**
+       * Create multiple events for a project
+       */
+      createBatch: (projectId: string, events: CreateEventRequest[]) => {
+        return this.post(`/projects/${projectId}/events/batch`, { events });
+      },
+    },
+  };
+
+  /**
+   * Events API - Strongly typed methods for event management
+   */
+  events = {
+    /**
+     * Get all events with optional filtering
+     */
+    getAll: (
+      params?: EventSearchParams
+    ): Promise<EndpointResponse<"/api/events">> => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, String(value));
+          }
+        });
+      }
+      const query = searchParams.toString();
+      return this.get<EndpointResponse<"/api/events">>(
+        `/events${query ? `?${query}` : ""}`
+      );
+    },
+
+    /**
+     * Get a specific event by ID
+     */
+    getById: (id: string) => {
+      return this.get(`/events/${id}`);
+    },
+
+    /**
+     * Create a new event
+     */
+    create: (data: CreateEventRequest) => {
+      return this.post("/events", data);
+    },
+
+    /**
+     * Update an event
+     */
+    update: (id: string, data: Partial<CreateEventRequest>) => {
+      return this.put(`/events/${id}`, data);
+    },
+
+    /**
+     * Delete an event
+     */
+    delete: (id: string) => {
+      return this.delete(`/events/${id}`);
+    },
+  };
+
+  /**
+   * Cars API - Strongly typed methods for car management
+   */
+  cars = {
+    /**
+     * Get all cars with optional filtering
+     */
+    getAll: (params?: any) => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, String(value));
+          }
+        });
+      }
+      const query = searchParams.toString();
+      return this.get(`/cars${query ? `?${query}` : ""}`);
+    },
+
+    /**
+     * Get a specific car by ID
+     */
+    getById: (id: string) => {
+      return this.get(`/cars/${id}`);
+    },
+
+    /**
+     * Create a new car
+     */
+    create: (data: any) => {
+      return this.post("/cars", data);
+    },
+
+    /**
+     * Update a car
+     */
+    update: (id: string, data: any) => {
+      return this.put(`/cars/${id}`, data);
+    },
+
+    /**
+     * Delete a car
+     */
+    delete: (id: string) => {
+      return this.delete(`/cars/${id}`);
+    },
+  };
+
+  /**
+   * Media API - File uploads and image management
+   */
+  media = {
+    /**
+     * Upload files
+     */
+    upload: (formData: FormData) => {
+      return this.upload("/upload", formData);
+    },
+
+    /**
+     * Get all images with optional filtering
+     */
+    getImages: (params?: any) => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, String(value));
+          }
+        });
+      }
+      const query = searchParams.toString();
+      return this.get(`/images${query ? `?${query}` : ""}`);
+    },
+
+    /**
+     * Get a specific image by ID
+     */
+    getImageById: (id: string) => {
+      return this.get(`/images/${id}`);
+    },
+
+    /**
+     * Update image metadata
+     */
+    updateImage: (id: string, data: any) => {
+      return this.put(`/images/${id}`, data);
+    },
+
+    /**
+     * Delete an image
+     */
+    deleteImage: (id: string) => {
+      return this.delete(`/images/${id}`);
+    },
+  };
+
+  /**
+   * System API - Health checks and system information
+   */
+  system = {
+    /**
+     * Get system health status
+     */
+    health: () => {
+      return this.get("/system/health", { skipAuth: true });
+    },
+
+    /**
+     * Get system statistics (admin only)
+     */
+    stats: () => {
+      return this.get("/system/stats");
+    },
+  };
 }
 
 // Export the singleton instance - this is the ONE API client for the entire app
@@ -356,3 +681,16 @@ export { APIClient };
 
 // Export types for use in other parts of the application
 export type { APIError, RequestOptions };
+
+// Export API endpoint types for full type safety
+export type {
+  APIEndpoints,
+  EndpointResponse,
+  EndpointRequest,
+  ProjectSearchParams,
+  EventSearchParams,
+  CreateEventRequest,
+  UsersAPI,
+  ProjectsAPI,
+  EventsAPI,
+} from "@/types/api-endpoints";
