@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAPI } from "@/lib/fetcher";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ export default function ProjectSettingsPage({
   params,
 }: ProjectSettingsPageProps) {
   const { data: session, status } = useSession();
-  const api = useAPI();
+  const { authenticatedFetch } = useAuthenticatedFetch();
   const router = useRouter();
   const resolvedParams = use(params);
   const [project, setProject] = useState<Project | null>(null);
@@ -41,24 +41,20 @@ export default function ProjectSettingsPage({
   });
 
   useEffect(() => {
-    if (!session?.user?.id) {
-      console.log("ProjectSettingsPage: No session, skipping fetch");
-      return;
+    // Only fetch when authenticated
+    if (status === "authenticated" && session?.user) {
+      fetchProject();
     }
-    fetchProject();
-  }, [session?.user?.id, resolvedParams.id]);
+  }, [status, session, resolvedParams.id]);
 
   const fetchProject = async () => {
-    if (!session?.user?.id) {
-      setError("You must be logged in to view project settings");
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
 
-      const data = await api.get(`/api/projects/${resolvedParams.id}`);
+      const response = await authenticatedFetch(
+        `/api/projects/${resolvedParams.id}`
+      );
+      const data = await response.json();
       setProject(data.project);
 
       // Initialize form data
@@ -81,17 +77,25 @@ export default function ProjectSettingsPage({
   };
 
   const handleSave = async () => {
-    if (!project || !session?.user?.id) return;
+    if (!project) return;
 
     try {
       setSaving(true);
 
-      const updatedProject = await api.put(`/api/projects/${project._id}`, {
-        title: formData.title,
-        description: formData.description,
-        primaryImageId: formData.primaryImageId || undefined,
-      });
+      const response = await authenticatedFetch(
+        `/api/projects/${project._id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: formData.title,
+            description: formData.description,
+            primaryImageId: formData.primaryImageId || undefined,
+          }),
+        }
+      );
 
+      const updatedProject = await response.json();
       setProject(updatedProject.project);
 
       toast({

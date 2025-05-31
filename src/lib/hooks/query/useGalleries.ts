@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
-import { useAPI } from "@/lib/fetcher";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { toast } from "@/components/ui/use-toast";
 
 export interface Gallery {
@@ -55,20 +55,15 @@ export function useGalleries(
   const [data, setData] = useState<UseGalleriesResponse["data"]>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const api = useAPI();
-  const {
-    isAuthenticated,
-    hasValidToken,
-    loading: authLoading,
-  } = useFirebaseAuth();
+  const { data: session, status } = useSession();
+  const { authenticatedFetch } = useAuthenticatedFetch();
 
   const fetchGalleries = useCallback(async () => {
-    // Don't fetch if authentication is still loading or not ready
-    if (authLoading || !isAuthenticated || !hasValidToken) {
+    // Only fetch when authenticated
+    if (status !== "authenticated" || !session?.user) {
       console.log("🐛 useGalleries: Waiting for authentication...", {
-        authLoading,
-        isAuthenticated,
-        hasValidToken,
+        status,
+        hasUser: !!session?.user,
       });
       return;
     }
@@ -85,7 +80,10 @@ export function useGalleries(
         "🐛 useGalleries: Fetching data from:",
         `/api/galleries?${searchParams.toString()}`
       );
-      const result = await api.get(`/api/galleries?${searchParams.toString()}`);
+      const response = await authenticatedFetch(
+        `/api/galleries?${searchParams.toString()}`
+      );
+      const result = await response.json();
       console.log("🐛 useGalleries: Raw API result:", result);
       console.log("🐛 useGalleries: Result type:", typeof result);
       console.log(
@@ -115,10 +113,9 @@ export function useGalleries(
     options.search,
     options.page,
     options.limit,
-    api,
-    authLoading,
-    isAuthenticated,
-    hasValidToken,
+    status,
+    session,
+    authenticatedFetch,
   ]);
 
   const mutate = useCallback(async () => {
@@ -127,14 +124,14 @@ export function useGalleries(
 
   // Initial fetch - only when authentication is ready
   useEffect(() => {
-    if (!authLoading && isAuthenticated && hasValidToken) {
+    if (status === "authenticated" && session?.user) {
       fetchGalleries();
-    } else if (!authLoading && !isAuthenticated) {
-      // If not authenticated and auth loading is done, set appropriate state
+    } else if (status === "unauthenticated") {
+      // If not authenticated, set appropriate state
       setIsLoading(false);
       setError(new Error("Not authenticated"));
     }
-  }, [fetchGalleries, authLoading, isAuthenticated, hasValidToken]);
+  }, [fetchGalleries, status, session]);
 
   return { data, isLoading, error, mutate };
 }
@@ -143,23 +140,20 @@ export function useGallery(id: string) {
   const [data, setData] = useState<Gallery | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const api = useAPI();
-  const {
-    isAuthenticated,
-    hasValidToken,
-    loading: authLoading,
-  } = useFirebaseAuth();
+  const { data: session, status } = useSession();
+  const { authenticatedFetch } = useAuthenticatedFetch();
 
   const fetchGallery = useCallback(async () => {
-    // Don't fetch if authentication is still loading or not ready
-    if (authLoading || !isAuthenticated || !hasValidToken) {
+    // Only fetch when authenticated
+    if (status !== "authenticated" || !session?.user) {
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      const result = await api.get(`/api/galleries/${id}`);
+      const response = await authenticatedFetch(`/api/galleries/${id}`);
+      const result = await response.json();
 
       // Log debug information if available to help troubleshoot image count mismatches
       if (result._debug) {
@@ -200,7 +194,7 @@ export function useGallery(id: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [id, api, authLoading, isAuthenticated, hasValidToken]);
+  }, [id, status, session, authenticatedFetch]);
 
   const mutate = useCallback(
     async (optimisticData?: Gallery) => {
@@ -215,13 +209,13 @@ export function useGallery(id: string) {
 
   // Initial fetch - only when authentication is ready
   useEffect(() => {
-    if (!authLoading && isAuthenticated && hasValidToken) {
+    if (status === "authenticated" && session?.user) {
       fetchGallery();
-    } else if (!authLoading && !isAuthenticated) {
+    } else if (status === "unauthenticated") {
       setIsLoading(false);
       setError(new Error("Not authenticated"));
     }
-  }, [fetchGallery, authLoading, isAuthenticated, hasValidToken]);
+  }, [fetchGallery, status, session]);
 
   return { data, isLoading, error, mutate };
 }

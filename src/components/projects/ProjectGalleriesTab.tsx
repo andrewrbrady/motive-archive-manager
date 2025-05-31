@@ -38,8 +38,8 @@ import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
-import { useAPI } from "@/lib/fetcher";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 
 interface Gallery {
   _id: string;
@@ -168,8 +168,8 @@ export function ProjectGalleriesTab({
   project,
   onProjectUpdate,
 }: ProjectGalleriesTabProps) {
-  const api = useAPI();
-  const { isAuthenticated, hasValidToken, user } = useFirebaseAuth();
+  const { data: session, status } = useSession();
+  const { authenticatedFetch } = useAuthenticatedFetch();
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,7 +180,10 @@ export function ProjectGalleriesTab({
   const fetchProjectGalleries = async () => {
     try {
       setIsLoading(true);
-      const data = await api.get(`/api/projects/${project._id}/galleries`);
+      const response = await authenticatedFetch(
+        `/api/projects/${project._id}/galleries`
+      );
+      const data = await response.json();
       setGalleries(data.galleries || []);
     } catch (error) {
       console.error("Error fetching project galleries:", error);
@@ -219,7 +222,8 @@ export function ProjectGalleriesTab({
 
   const fetchAvailableGalleries = async () => {
     try {
-      const data = await api.get(`/api/galleries?limit=100`);
+      const response = await authenticatedFetch(`/api/galleries?limit=100`);
+      const data = await response.json();
 
       // Filter out galleries that are already linked to this project
       const linkedGalleryIds = new Set(galleries.map((g) => g._id));
@@ -261,21 +265,26 @@ export function ProjectGalleriesTab({
   };
 
   useEffect(() => {
-    if (project._id) {
+    // Only fetch when authenticated
+    if (status === "authenticated" && session?.user && project._id) {
       fetchProjectGalleries();
     }
-  }, [project._id]);
+  }, [status, session, project._id]);
 
   useEffect(() => {
-    if (isLinkDialogOpen) {
+    if (isLinkDialogOpen && status === "authenticated" && session?.user) {
       fetchAvailableGalleries();
     }
-  }, [isLinkDialogOpen, galleries]);
+  }, [isLinkDialogOpen, galleries, status, session]);
 
   const handleLinkGallery = async (galleryId: string) => {
     try {
       setIsLinking(true);
-      await api.post(`/api/projects/${project._id}/galleries`, { galleryId });
+      await authenticatedFetch(`/api/projects/${project._id}/galleries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ galleryId }),
+      });
 
       toast({
         title: "Success",
@@ -301,8 +310,9 @@ export function ProjectGalleriesTab({
 
   const handleUnlinkGallery = async (galleryId: string) => {
     try {
-      await api.delete(
-        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`
+      await authenticatedFetch(
+        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`,
+        { method: "DELETE" }
       );
 
       toast({
@@ -354,11 +364,12 @@ export function ProjectGalleriesTab({
             Debug: Authentication Status
           </h4>
           <div className="text-xs text-yellow-700 space-y-1">
-            <div>Authenticated: {isAuthenticated ? "✅ Yes" : "❌ No"}</div>
-            <div>Valid Token: {hasValidToken ? "✅ Yes" : "❌ No"}</div>
-            <div>User ID: {user?.uid || "None"}</div>
-            <div>User Email: {user?.email || "None"}</div>
-            {(!isAuthenticated || !hasValidToken) && (
+            <div>
+              Authenticated: {status === "authenticated" ? "✅ Yes" : "❌ No"}
+            </div>
+            <div>User ID: {session?.user?.id || "None"}</div>
+            <div>User Email: {session?.user?.email || "None"}</div>
+            {status !== "authenticated" && (
               <Button
                 size="sm"
                 variant="outline"

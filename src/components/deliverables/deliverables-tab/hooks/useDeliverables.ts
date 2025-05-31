@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import { useAPI } from "@/lib/fetcher";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { Deliverable, DeliverableStatus } from "@/types/deliverable";
 import { User } from "../types";
 
@@ -31,9 +32,16 @@ export function useDeliverables({
   const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  const api = useAPI();
+  const { data: session, status } = useSession();
+  const { authenticatedFetch } = useAuthenticatedFetch();
 
   const fetchDeliverables = useCallback(async () => {
+    // Only fetch when authenticated
+    if (status !== "authenticated" || !session?.user) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       let url = apiEndpoint;
 
@@ -53,7 +61,8 @@ export function useDeliverables({
       }
 
       try {
-        const data = await api.get(url);
+        const response = await authenticatedFetch(url);
+        const data = await response.json();
         // Handle both array responses and empty responses correctly
         setDeliverables(Array.isArray(data) ? data : data.deliverables || []);
       } catch (error: any) {
@@ -72,11 +81,17 @@ export function useDeliverables({
     } finally {
       setIsLoading(false);
     }
-  }, [carId, apiEndpoint, api]);
+  }, [carId, apiEndpoint, status, session, authenticatedFetch]);
 
   const fetchUsers = useCallback(async () => {
+    // Only fetch when authenticated
+    if (status !== "authenticated" || !session?.user) {
+      return;
+    }
+
     try {
-      const data = await api.get("/api/users");
+      const response = await authenticatedFetch("/api/users");
+      const data = await response.json();
 
       // Handle the correct API response structure: { users: [...], total: number }
       let usersArray;
@@ -106,7 +121,7 @@ export function useDeliverables({
       console.error("Error fetching users:", error);
       toast.error("Failed to fetch users");
     }
-  }, [api]);
+  }, [status, session, authenticatedFetch]);
 
   const handleDelete = useCallback(
     async (deliverableId: string, deliverableCarId?: string) => {
@@ -120,8 +135,9 @@ export function useDeliverables({
           throw new Error("No car ID available for deletion");
         }
 
-        await api.delete(
-          `/api/cars/${targetCarId}/deliverables/${deliverableId}`
+        await authenticatedFetch(
+          `/api/cars/${targetCarId}/deliverables/${deliverableId}`,
+          { method: "DELETE" }
         );
 
         toast.success("Deliverable deleted successfully");
@@ -131,7 +147,7 @@ export function useDeliverables({
         toast.error("Failed to delete deliverable");
       }
     },
-    [carId, fetchDeliverables, api]
+    [carId, fetchDeliverables, authenticatedFetch]
   );
 
   const handleDuplicate = useCallback(
@@ -156,7 +172,11 @@ export function useDeliverables({
         delete duplicateData.social_media_link;
         delete duplicateData.metrics;
 
-        await api.post(`/api/cars/${targetCarId}/deliverables`, duplicateData);
+        await authenticatedFetch(`/api/cars/${targetCarId}/deliverables`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(duplicateData),
+        });
 
         toast.success("Deliverable duplicated successfully");
         await fetchDeliverables();
@@ -165,7 +185,7 @@ export function useDeliverables({
         toast.error("Failed to duplicate deliverable");
       }
     },
-    [carId, fetchDeliverables, api]
+    [carId, fetchDeliverables, authenticatedFetch]
   );
 
   const handleStatusChange = useCallback(
@@ -180,10 +200,12 @@ export function useDeliverables({
           throw new Error("No car ID available for status change");
         }
 
-        await api.put(
+        await authenticatedFetch(
           `/api/cars/${targetCarId}/deliverables/${deliverableId}`,
           {
-            status: newStatus,
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
           }
         );
 
@@ -194,7 +216,7 @@ export function useDeliverables({
         toast.error("Failed to update status");
       }
     },
-    [carId, deliverables, fetchDeliverables, api]
+    [carId, deliverables, fetchDeliverables, authenticatedFetch]
   );
 
   // Initial data fetch
