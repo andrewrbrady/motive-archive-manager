@@ -356,18 +356,14 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
   // Fetch system prompts
   const fetchSystemPrompts = useCallback(async () => {
-    if (!user || !api) return;
+    if (!api) return;
 
     try {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
-      const token = await user.getIdToken();
-      const data = (await api.get("system-prompts/list", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })) as any[];
+      // Remove manual Authorization header - useAPI() handles authentication automatically
+      const data = (await api.get("system-prompts/list")) as any[];
       setSystemPrompts(Array.isArray(data) ? data : []);
 
       // Auto-select the first active system prompt
@@ -383,7 +379,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     } finally {
       setLoadingSystemPrompts(false);
     }
-  }, [user, api]);
+  }, [api]);
 
   // Fetch length settings
   const fetchLengthSettings = useCallback(async () => {
@@ -430,13 +426,28 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     }
   }, [selectedEventIds.length, carEvents]);
 
-  // Initialize data on mount
+  // Initialize all data on mount with parallel fetching
   useEffect(() => {
-    fetchCarDetails();
-    fetchCarEvents();
-    fetchSystemPrompts();
-    fetchLengthSettings();
-    fetchSavedCaptions();
+    if (!api) return;
+
+    const fetchAllData = async () => {
+      console.time("CarCopywriter-parallel-fetch");
+      try {
+        await Promise.all([
+          fetchCarDetails(),
+          fetchCarEvents(),
+          fetchSystemPrompts(),
+          fetchLengthSettings(),
+          fetchSavedCaptions(),
+        ]);
+      } catch (error) {
+        console.error("Error in parallel fetch:", error);
+      } finally {
+        console.timeEnd("CarCopywriter-parallel-fetch");
+      }
+    };
+
+    fetchAllData();
   }, [
     api,
     fetchCarDetails,
@@ -446,24 +457,10 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     fetchSavedCaptions,
   ]);
 
-  // Fetch system prompts only when user is available
-  useEffect(() => {
-    if (user) {
-      fetchSystemPrompts();
-    }
-  }, [user, fetchSystemPrompts]);
-
-  // Fetch prompts when component mounts - separate useEffect to avoid dependency issues
+  // Fetch prompts separately to avoid conflicts with other prompt management
   useEffect(() => {
     promptHandlers.fetchPrompts();
-  }, []);
-
-  // Fetch prompts when API becomes available
-  useEffect(() => {
-    if (api) {
-      promptHandlers.fetchPrompts();
-    }
-  }, [api, promptHandlers.fetchPrompts]);
+  }, [promptHandlers.fetchPrompts]);
 
   // Fetch event details when selected events change
   useEffect(() => {

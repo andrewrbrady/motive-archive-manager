@@ -18,9 +18,13 @@ import type { User } from "firebase/auth";
 
 interface UseProjectDataProps {
   projectId: string;
+  skipPromptTemplates?: boolean;
 }
 
-export function useProjectData({ projectId }: UseProjectDataProps) {
+export function useProjectData({
+  projectId,
+  skipPromptTemplates = false,
+}: UseProjectDataProps) {
   const api = useAPI();
 
   // Car-related state
@@ -238,35 +242,42 @@ export function useProjectData({ projectId }: UseProjectDataProps) {
     }
   };
 
-  // Fetch project data when projectId changes
+  // Fetch all data when component mounts or projectId changes
   useEffect(() => {
-    if (projectId && api) {
-      fetchProjectCars();
-      fetchProjectEvents();
-      fetchProjectCaptions();
-    }
-  }, [projectId, api]);
+    if (!api) return;
 
-  // Fetch system prompts when component mounts
-  useEffect(() => {
-    if (api) {
-      fetchSystemPrompts();
-    }
-  }, [api]);
+    const fetchAllData = async () => {
+      console.time("useProjectData-parallel-fetch");
+      try {
+        // Create array of promises for parallel execution
+        const promises = [];
 
-  // Fetch length settings when component mounts
-  useEffect(() => {
-    if (api) {
-      fetchLengthSettings();
-    }
-  }, [api]);
+        // Project-specific data (only if projectId exists)
+        if (projectId) {
+          promises.push(
+            fetchProjectCars(),
+            fetchProjectEvents(),
+            fetchProjectCaptions()
+          );
+        }
 
-  // Fetch prompt templates when component mounts
-  useEffect(() => {
-    if (api) {
-      fetchPromptTemplates();
-    }
-  }, [api]);
+        // Global data (always fetch)
+        promises.push(fetchSystemPrompts(), fetchLengthSettings());
+
+        if (!skipPromptTemplates) {
+          promises.push(fetchPromptTemplates());
+        }
+
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Error in parallel fetch:", error);
+      } finally {
+        console.timeEnd("useProjectData-parallel-fetch");
+      }
+    };
+
+    fetchAllData();
+  }, [projectId, api, skipPromptTemplates]);
 
   // Fetch detailed car information when selected cars change
   useEffect(() => {

@@ -59,6 +59,7 @@ export function ProjectCopywriter({
   // Use project data hook - must be called before any early returns
   const projectDataHook = useProjectData({
     projectId: project._id || "",
+    skipPromptTemplates: true, // Skip since we use promptHandlers for prompt management
   });
 
   // Derive length from selected prompt template (using promptHandlers state)
@@ -103,10 +104,10 @@ export function ProjectCopywriter({
     [formHandlers, formState.additionalContext]
   );
 
-  // Fetch prompts when component mounts - must be called before any early returns
+  // Fetch prompts when component mounts or when fetchPrompts becomes available
   useEffect(() => {
     promptHandlers.fetchPrompts();
-  }, []);
+  }, [promptHandlers.fetchPrompts]);
 
   // Initialize savedCaptionsHook with project content - must be called before any early returns
   useEffect(() => {
