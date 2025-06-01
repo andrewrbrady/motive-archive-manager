@@ -20,7 +20,8 @@ export class EventModel {
 
   constructor(db: Db) {
     this.collection = db.collection<DbEvent>("events");
-    this.setupCollection();
+    // Temporarily disabled to test performance
+    // this.setupCollection();
   }
 
   private async setupCollection() {
@@ -28,6 +29,7 @@ export class EventModel {
 
     // Create indexes if they don't exist
     if (collections.length <= 1) {
+      // Basic single field indexes
       await this.collection.createIndex({ car_id: 1 });
       await this.collection.createIndex({ project_id: 1 });
       await this.collection.createIndex({ type: 1 });

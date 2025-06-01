@@ -9,20 +9,38 @@ export function cloudflareImageLoader({
   width,
   quality = 85,
 }: CloudflareImageLoaderProps): string {
-  // For Cloudflare Images URLs, we should NOT transform them further
-  // since they already use named variants like "public", "thumbnail", etc.
-  // But we need to acknowledge the width parameter to satisfy Next.js
+  // For Cloudflare Images URLs, implement proper width-based optimization
   if (
     src.includes("imagedelivery.net") ||
     src.includes("cloudflareimages.com")
   ) {
-    // Return the URL as-is since it's already optimized by Cloudflare
-    // The width parameter is acknowledged but not used since Cloudflare uses named variants
+    // Parse the Cloudflare Images URL to extract components
+    const urlPattern =
+      /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)(?:\/(.+))?$/;
+    const match = src.match(urlPattern);
+
+    if (match) {
+      const [, accountHash, imageId] = match;
+
+      // Cap the maximum width to 1200px for performance
+      const cappedWidth = Math.min(width, 1200);
+
+      // Use Cloudflare's flexible resizing with width and quality parameters
+      const transformations = [`w=${cappedWidth}`];
+
+      if (quality !== 85) {
+        transformations.push(`q=${quality}`);
+      }
+
+      // Build the URL with transformations
+      return `https://imagedelivery.net/${accountHash}/${imageId}/${transformations.join(",")}`;
+    }
+
+    // If URL doesn't match expected pattern, return as-is
     return src;
   }
 
-  // For non-Cloudflare URLs, we could implement width-based optimization here
-  // For now, return as-is (Next.js will handle them)
+  // For non-Cloudflare URLs, return as-is (Next.js will handle them)
   return src;
 }
 

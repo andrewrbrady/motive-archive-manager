@@ -99,7 +99,10 @@ export async function GET(request: Request) {
         thumbnailImage: firstImageId
           ? (() => {
               const imageData = imageMap.get(firstImageId);
-              const formattedUrl = getFormattedImageUrl(imageData?.url);
+              const formattedUrl = getFormattedImageUrl(
+                imageData?.url,
+                "thumbnail"
+              );
               return formattedUrl
                 ? {
                     ...imageData,

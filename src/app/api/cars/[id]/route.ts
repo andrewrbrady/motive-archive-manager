@@ -367,7 +367,7 @@ export async function GET(request: Request) {
               if (thumbnailImage) {
                 gallery.thumbnailImage = {
                   _id: thumbnailImage._id.toString(),
-                  url: thumbnailImage.url,
+                  url: getFormattedImageUrl(thumbnailImage.url, "thumbnail"),
                 };
               }
             }
@@ -471,7 +471,10 @@ export async function GET(request: Request) {
           thumbnailImage: gallery.thumbnailImage
             ? {
                 _id: gallery.thumbnailImage._id?.toString() || "",
-                url: getFormattedImageUrl(gallery.thumbnailImage.url),
+                url: getFormattedImageUrl(
+                  gallery.thumbnailImage.url,
+                  "thumbnail"
+                ),
               }
             : undefined,
           createdAt: gallery.createdAt || "",

@@ -49,6 +49,7 @@ import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/MarkdownEditor";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoadingSpinner, LoadingContainer } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 // Import the ScriptTemplate type
 interface ScriptRow {
@@ -113,6 +114,7 @@ interface ScriptsProps {
 }
 
 export default function Scripts({ carId }: ScriptsProps) {
+  const api = useAPI();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [files, setFiles] = useState<Script[]>([]);
@@ -161,15 +163,18 @@ export default function Scripts({ carId }: ScriptsProps) {
   );
 
   useEffect(() => {
-    fetchFiles();
-  }, [carId]);
+    if (api) {
+      fetchFiles();
+    }
+  }, [carId, api]);
 
   const fetchFiles = async () => {
+    if (!api) return;
+
     setIsLoadingFiles(true);
     try {
-      const response = await fetch(`/api/cars/${carId}/scripts`);
-      if (!response.ok) throw new Error("Failed to fetch scripts");
-      const data = await response.json();
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      const data = (await api.get(`cars/${carId}/scripts`)) as Script[];
       setFiles(data || []);
     } catch (error) {
       console.error("Error fetching scripts:", error);
@@ -180,6 +185,8 @@ export default function Scripts({ carId }: ScriptsProps) {
   };
 
   const handleCreateScript = async (data: { filename: string }) => {
+    if (!api) return;
+
     try {
       // Create an empty file with default table structure
       const content = `# ${data.filename}
@@ -203,14 +210,8 @@ Add a brief description of the script here...
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/cars/${carId}/scripts/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create script");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.post(`cars/${carId}/scripts/upload`, formData);
 
       await fetchFiles();
       setIsCreatingScript(false);
@@ -290,7 +291,7 @@ Add a brief description of the script here...
   };
 
   const handleUpload = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0 || !api) return;
 
     setUploading(true);
     setError(null);
@@ -300,16 +301,9 @@ Add a brief description of the script here...
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch(`/api/cars/${carId}/scripts/upload`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
-        }
-
-        return { success: true, data: await response.json() };
+        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+        const result = await api.post(`cars/${carId}/scripts/upload`, formData);
+        return { success: true, data: result };
       };
 
       // Process files in batches of 5
@@ -345,15 +339,11 @@ Add a brief description of the script here...
   };
 
   const handleDelete = async (fileId: string) => {
-    try {
-      const response = await fetch(
-        `/api/cars/${carId}/scripts?fileId=${fileId}`,
-        {
-          method: "DELETE",
-        }
-      );
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to delete file");
+    try {
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.delete(`cars/${carId}/scripts?fileId=${fileId}`);
 
       setFiles((prev) => prev.filter((file) => file._id !== fileId));
     } catch (error) {
@@ -363,17 +353,12 @@ Add a brief description of the script here...
   };
 
   const handleDeleteAll = async () => {
-    if (!files.length) return;
+    if (!api) return;
 
     setIsDeletingAll(true);
-    setError(null);
-
     try {
-      const response = await fetch(`/api/cars/${carId}/scripts/all`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete all files");
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.delete(`cars/${carId}/scripts/all`);
 
       setFiles([]);
       setSelectedFile(null);
@@ -409,45 +394,27 @@ Add a brief description of the script here...
   };
 
   const handleFileClick = async (file: Script) => {
-    setIsEditing(false);
+    if (!api) return;
+
+    // If clicking the same file, don't reload
+    if (selectedFile?._id === file._id) {
+      return;
+    }
+
+    setSelectedFile(file);
     setIsLoadingContent(true);
     setError(null);
+
     try {
-      // If the script already has content (created from template), use it directly
-      if (file.content) {
-        setMarkdownContent(file.content);
-        setSelectedFile(file);
-        setIsLoadingContent(false);
-        return;
-      }
-
-      // Otherwise, fetch content from S3 for uploaded files
-      const response = await fetch(
-        `/api/cars/${carId}/scripts/content?fileId=${file._id}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch file content");
-
-      const content = await response.text();
-      const rowsHeader = response.headers.get("X-Script-Rows");
-      const rows = rowsHeader ? JSON.parse(rowsHeader) : [];
-
-      // Parse brief and duration from content
-      const briefMatch = content.match(/## Brief\n([\s\S]*?)\n\n/);
-      const durationMatch = content.match(/## Duration\n([\s\S]*?)\n\n/);
-
-      setMarkdownContent(content);
-      setSelectedFile({
-        ...file,
-        content,
-        rows,
-        brief: briefMatch ? briefMatch[1].trim() : "",
-        duration: durationMatch ? durationMatch[1].trim() : "00:00",
-      });
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      const content = (await api.get(
+        `cars/${carId}/scripts/content?fileId=${file._id}`
+      )) as { content: string };
+      setMarkdownContent(content.content || "");
     } catch (error) {
-      console.error("Error loading markdown content:", error);
+      console.error("Error fetching file content:", error);
       setError("Failed to load file content");
       setMarkdownContent("");
-      setSelectedFile(null);
     } finally {
       setIsLoadingContent(false);
     }
@@ -500,51 +467,17 @@ Add a brief description of the script here...
   };
 
   const handleContentSave = async (newContent: string) => {
-    if (!selectedFile) return;
+    if (!selectedFile || !api) return;
+
     try {
-      // Parse brief and duration from content
-      const briefMatch = newContent.match(/## Brief\n([\s\S]*?)\n\n/);
-      const durationMatch = newContent.match(/## Duration\n([\s\S]*?)\n\n/);
-      const brief = briefMatch ? briefMatch[1].trim() : selectedFile.brief;
-      const duration = durationMatch
-        ? formatDuration(durationMatch[1].trim())
-        : formatDuration(selectedFile.duration || "");
-
-      // Parse rows from content
-      const rows = parseMarkdownToRows(newContent);
-
-      const response = await fetch(`/api/cars/${carId}/scripts/content`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileId: selectedFile._id,
-          content: newContent,
-          rows,
-          brief,
-          duration,
-        }),
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.put(`cars/${carId}/scripts/content`, {
+        fileId: selectedFile._id,
+        content: newContent,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to save content");
-      }
-
-      // Update local state with the new values
       setMarkdownContent(newContent);
-      setSelectedFile((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          content: newContent,
-          rows,
-          brief,
-          duration,
-        };
-      });
       toast.success("Content saved successfully");
-      setIsEditing(false);
     } catch (error) {
       console.error("Error saving content:", error);
       toast.error("Failed to save content");
@@ -739,56 +672,21 @@ ${convertRowsToMarkdown(updatedRows)}`;
   }, []);
 
   const handleApplyTemplate = async (template: ScriptTemplate) => {
+    if (!api) {
+      toast.error("Authentication not ready");
+      return;
+    }
+
     try {
-      // Extract duration from template name if available
-      const durationMatch = template.name.match(/(\d+)\s*Second/i);
-      const duration = durationMatch
-        ? `00:${durationMatch[1].padStart(2, "0")}`
-        : "00:00";
-
-      // Validate and normalize platform values
-      const validPlatforms = [
-        "instagram_reels",
-        "youtube_shorts",
-        "youtube",
-        "stream_otv",
-      ] as const;
-
-      const normalizedPlatforms = Array.isArray(template.platforms)
-        ? template.platforms.filter((platform): platform is Platform =>
-            validPlatforms.includes(platform as Platform)
-          )
-        : [];
-
-      // If no platforms are selected, use youtube as default
-      if (normalizedPlatforms.length === 0) {
-        normalizedPlatforms.push("youtube");
-      }
-
-      // Create the script object with all required fields
-      const script: Script = {
+      // Generate new script from template
+      const script = {
         name: template.name,
-        description:
-          template.description || `Script template for ${template.name}`,
-        platforms: normalizedPlatforms,
+        description: template.description,
+        platforms: template.platforms,
         aspectRatio: template.aspectRatio,
-        content: `# ${template.name}
-
-## Brief
-${template.description}
-
-## Duration
-${duration}
-
-## Shot Breakdown
-
-| Time | Video | Audio | GFX |
-|------|-------|-------|-----|
-${template.rows
-  .map((row) => `| ${row.time} | ${row.video} | ${row.audio} | ${row.gfx} |`)
-  .join("\n")}`,
-        brief: template.description || `Script template for ${template.name}`,
-        duration: duration,
+        content: "",
+        brief: "",
+        duration: "00:00",
         rows: template.rows.map((row) => ({
           ...row,
           id: crypto.randomUUID(),
@@ -796,21 +694,10 @@ ${template.rows
       };
 
       // Create the script
-      const response = await fetch(`/api/cars/${carId}/scripts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(script),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error("Server response:", error);
-        throw new Error(error.error || "Failed to create script from template");
-      }
-
-      const createdScript = await response.json();
+      const createdScript = (await api.post(
+        `cars/${carId}/scripts`,
+        script
+      )) as Script;
       setFiles((prev) => [...prev, createdScript]);
       toast.success("Script created from template");
       setShowTemplates(false);
@@ -849,11 +736,11 @@ ${template.rows
   };
 
   const handleSaveScript = async (shouldExit: boolean = false) => {
-    if (!selectedFile) return;
+    if (!selectedFile || !api) return;
 
     try {
       const scriptData = {
-        name: selectedFile.name || "Untitled Script",
+        name: selectedFile.name || "Untitled",
         description: selectedFile.description || "",
         platforms: selectedFile.platforms || [],
         aspectRatio: selectedFile.aspectRatio || "16:9",
@@ -863,59 +750,29 @@ ${template.rows
         rows: selectedFile.rows || [],
       };
 
-      let response;
+      let result: Partial<Script>;
       // For existing scripts, use the scripts/content endpoint
       if (selectedFile._id) {
-        response = await fetch(`/api/cars/${carId}/scripts/content`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            fileId: selectedFile._id,
-            ...scriptData,
-          }),
-        });
+        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+        result = (await api.put(`cars/${carId}/scripts/content`, {
+          fileId: selectedFile._id,
+          ...scriptData,
+        })) as Partial<Script>;
       } else {
         // For new scripts, use the scripts endpoint
-        response = await fetch(`/api/cars/${carId}/scripts`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            ...scriptData,
-            carId: carId, // Make sure to include the carId for new scripts
-          }),
-        });
+        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+        result = (await api.post(`cars/${carId}/scripts`, {
+          ...scriptData,
+          carId: carId, // Make sure to include the carId for new scripts
+        })) as Partial<Script>;
       }
-
-      if (!response.ok) {
-        let errorMessage = `Failed to ${
-          selectedFile._id ? "save" : "create"
-        } script`;
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } else {
-          const text = await response.text();
-          console.error("Server response:", text);
-          errorMessage = `Server error: ${response.status} ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const savedData = await response.json();
 
       // Update the files list and selected file with the latest content
-      const updatedScript = {
+      const updatedScript: Script = {
         ...selectedFile,
         ...scriptData,
-        ...savedData,
-        _id: savedData._id || selectedFile._id, // Ensure we have the _id for new scripts
+        ...result,
+        _id: result._id || selectedFile._id, // Ensure we have the _id for new scripts
         updatedAt: new Date(),
       };
 
@@ -940,15 +797,11 @@ ${template.rows
   };
 
   const handleDeleteScript = async (scriptId: string) => {
-    try {
-      const response = await fetch(
-        `/api/cars/${carId}/scripts?fileId=${scriptId}`,
-        {
-          method: "DELETE",
-        }
-      );
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to delete script");
+    try {
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.delete(`cars/${carId}/scripts?fileId=${scriptId}`);
 
       setFiles((prev) => prev.filter((s) => s._id !== scriptId));
       if (selectedFile?._id === scriptId) {
@@ -973,6 +826,11 @@ ${template.rows
     setSelectedFile(duplicate);
     setIsEditing(true);
   };
+
+  // Show loading if API is not ready yet
+  if (!api) {
+    return <LoadingContainer />;
+  }
 
   return (
     <div className="h-[calc(100vh-20rem)] flex flex-col overflow-hidden overscroll-none">

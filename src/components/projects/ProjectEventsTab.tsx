@@ -80,7 +80,7 @@ import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "@/components/events/EventTypeSelector";
 import { LoadingContainer } from "@/components/ui/loading";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface ProjectEventsTabProps {
   projectId: string;
@@ -122,7 +122,7 @@ const getEventTypeIcon = (type: EventType) => {
 };
 
 export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState("grid"); // Start with grid view for projects
@@ -135,46 +135,25 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   const [showEditEvent, setShowEditEvent] = useState(false);
 
   const fetchEvents = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
+      console.time("ProjectEventsTab-parallel-fetch");
 
-      if (!user) {
-        console.log("ProjectEventsTab: No user available in fetchEvents");
-        throw new Error("No authenticated user found");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      const response = (await api.get(
+        `projects/${projectId}/events`
+      )) as Event[];
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/events`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error response:", errorData);
-        throw new Error("Failed to fetch events");
-      }
-
-      const data = await response.json();
-
-      // Fetch car information for events that have car_id
-      // Also check which events are attached vs created
+      // Fetch car information for events that have car_id in parallel
       const eventsWithCars = await Promise.all(
-        data.map(async (event: Event) => {
+        response.map(async (event: Event) => {
           try {
-            let car = null;
+            let car: Car | undefined = undefined;
             if (event.car_id) {
-              const carResponse = await fetch(`/api/cars/${event.car_id}`, {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-              if (carResponse.ok) {
-                car = await carResponse.json();
-              }
+              // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+              car = (await api.get(`cars/${event.car_id}`)) as Car;
             }
 
             // Check if this event was created specifically for this project
@@ -190,6 +169,7 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
             console.error("Error fetching car:", error);
             return {
               ...event,
+              car: undefined,
               isAttached: event.project_id !== projectId,
             };
           }
@@ -202,35 +182,22 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
       toast.error("Failed to fetch events");
     } finally {
       setIsLoading(false);
+      console.timeEnd("ProjectEventsTab-parallel-fetch");
     }
   };
 
   useEffect(() => {
-    if (projectId && user) {
+    if (projectId && api) {
       fetchEvents();
     }
-  }, [projectId, user]);
+  }, [projectId, api]);
 
   const handleCreateEvent = async (eventData: Partial<Event>) => {
+    if (!api) return;
+
     try {
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
-
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/events`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(eventData),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create event");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.post(`projects/${projectId}/events`, eventData);
 
       await fetchEvents();
       toast.success("Event created successfully");
@@ -242,25 +209,11 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   const handleAttachEvent = async (eventId: string) => {
+    if (!api) return;
+
     try {
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
-
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/events/attach`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ eventId }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to attach event");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.post(`projects/${projectId}/events/attach`, { eventId });
 
       await fetchEvents();
       toast.success("Event attached successfully");
@@ -272,25 +225,11 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   const handleDetachEvent = async (eventId: string) => {
+    if (!api) return;
+
     try {
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
-
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/events/detach`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ eventId }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to detach event");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.post(`projects/${projectId}/events/detach`, { eventId });
 
       await fetchEvents();
       toast.success("Event detached successfully");
@@ -304,13 +243,9 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
     eventId: string,
     updates: Partial<Event>
   ) => {
+    if (!api) return;
+
     try {
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
-
-      const token = await user.getIdToken();
-
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.map((event) =>
@@ -318,21 +253,8 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
         )
       );
 
-      const response = await fetch(
-        `/api/projects/${projectId}/events/${eventId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(updates),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update event");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.put(`projects/${projectId}/events/${eventId}`, updates);
 
       toast.success("Event updated successfully");
     } catch (error) {
@@ -345,31 +267,16 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    if (!api) return;
+
     try {
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
-
-      const token = await user.getIdToken();
-
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.filter((event) => event.id !== eventId)
       );
 
-      const response = await fetch(
-        `/api/projects/${projectId}/events/${eventId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete event");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      await api.delete(`projects/${projectId}/events/${eventId}`);
 
       toast.success("Event deleted successfully");
     } catch (error) {
@@ -387,30 +294,16 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   const handleJsonSubmit = async (jsonData: any[]) => {
+    if (!api) return;
+
     try {
       setIsSubmittingJson(true);
 
-      if (!user) {
-        throw new Error("No authenticated user found");
-      }
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      const result = (await api.post(`projects/${projectId}/events/batch`, {
+        events: jsonData,
+      })) as { count: number };
 
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/events/batch`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ events: jsonData }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create events");
-      }
-
-      const result = await response.json();
       toast.success(`Successfully created ${result.count} events`);
 
       // Refresh the events list
@@ -426,7 +319,8 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
     }
   };
 
-  if (isLoading) {
+  // Show loading if API is not ready yet
+  if (!api || isLoading) {
     return <LoadingContainer />;
   }
 
@@ -607,7 +501,6 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
           onOpenChange={setShowAttachEvent}
           onAttach={handleAttachEvent}
           projectId={projectId}
-          user={user}
         />
 
         {/* Edit Event Dialog */}
@@ -888,14 +781,13 @@ function AttachEventDialog({
   onOpenChange,
   onAttach,
   projectId,
-  user,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAttach: (eventId: string) => void;
   projectId: string;
-  user: any;
 }) {
+  const api = useAPI();
   const [availableEvents, setAvailableEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
@@ -924,48 +816,31 @@ function AttachEventDialog({
   };
 
   const fetchAvailableEvents = async () => {
-    if (!user) {
-      console.log("No user available for fetching available events");
+    if (!api) {
+      console.log("No API available for fetching available events");
       return;
     }
 
     try {
       setIsLoading(true);
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
       const queryParams = new URLSearchParams();
       if (filters.type && filters.type !== "all") {
         queryParams.append("type", filters.type);
       }
 
-      const response = await fetch(`/api/events?${queryParams.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Error fetching events:", errorData);
-        throw new Error(errorData.error || "Failed to fetch events");
-      }
-      const data = await response.json();
+      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+      const data = (await api.get(
+        `events?${queryParams.toString()}`
+      )) as Event[];
 
       // Filter out events that are already attached to this project
-      let projectEvents = [];
+      let projectEvents: Event[] = [];
       try {
-        const projectEventsResponse = await fetch(
-          `/api/projects/${projectId}/events`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        if (projectEventsResponse.ok) {
-          projectEvents = await projectEventsResponse.json();
-        }
+        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+        projectEvents = (await api.get(
+          `projects/${projectId}/events`
+        )) as Event[];
       } catch (error) {
         console.warn("Could not fetch project events for filtering:", error);
         // Continue without filtering - better to show all events than none
@@ -973,22 +848,16 @@ function AttachEventDialog({
 
       const attachedEventIds = new Set(projectEvents.map((e: Event) => e.id));
 
-      // Fetch car information for events that have car_id
+      // Fetch car information for events that have car_id in parallel
       const eventsWithCars = await Promise.all(
         data
           .filter((event: Event) => !attachedEventIds.has(event.id))
           .map(async (event: Event) => {
             try {
               if (event.car_id) {
-                const carResponse = await fetch(`/api/cars/${event.car_id}`, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                });
-                if (carResponse.ok) {
-                  const car = await carResponse.json();
-                  return { ...event, car };
-                }
+                // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+                const car = (await api.get(`cars/${event.car_id}`)) as Car;
+                return { ...event, car };
               }
               return event;
             } catch (error) {
@@ -1009,10 +878,10 @@ function AttachEventDialog({
   };
 
   useEffect(() => {
-    if (open && user) {
+    if (open && api) {
       fetchAvailableEvents();
     }
-  }, [open, filters, projectId, user]);
+  }, [open, filters, projectId, api]);
 
   const handleAttachSelected = async () => {
     if (selectedEvents.size === 0) {

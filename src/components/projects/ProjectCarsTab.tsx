@@ -31,7 +31,7 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { CarGridSelector } from "../cars/CarGridSelector";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Car {
   _id: string;
@@ -66,6 +66,7 @@ function ProjectCarCard({
   car: Car;
   onUnlink: (carId: string) => void;
 }) {
+  const api = useAPI();
   const [primaryImage, setPrimaryImage] = useState<{
     id?: string;
     url: string;
@@ -98,44 +99,39 @@ function ProjectCarCard({
       }
 
       // Case 2: We have image IDs but no loaded images
-      if (car.imageIds?.length && car.primaryImageId) {
-        // Fetch the primary image
+      if (car.imageIds?.length && car.primaryImageId && api) {
+        // Fetch the primary image using authenticated API
         const fetchImage = async () => {
           try {
-            const response = await fetch(`/api/images/${car.primaryImageId}`);
-
-            if (response.ok) {
-              const imageData = await response.json();
-              setPrimaryImage({
-                id: imageData._id,
-                url: getFormattedImageUrl(imageData.url),
-              });
-            } else {
-              // If primary image fetch fails, try the first image
-              if (
-                car.imageIds &&
-                car.imageIds.length > 0 &&
-                car.imageIds[0] !== car.primaryImageId
-              ) {
-                const fallbackResponse = await fetch(
-                  `/api/images/${car.imageIds[0]}`
-                );
-                if (fallbackResponse.ok) {
-                  const fallbackImageData = await fallbackResponse.json();
-                  setPrimaryImage({
-                    id: fallbackImageData._id,
-                    url: getFormattedImageUrl(fallbackImageData.url),
-                  });
-                } else {
-                  setPrimaryImage(null);
-                }
-              } else {
+            const imageData = (await api.get(
+              `images/${car.primaryImageId}`
+            )) as any;
+            setPrimaryImage({
+              id: imageData._id,
+              url: getFormattedImageUrl(imageData.url),
+            });
+          } catch (error) {
+            // If primary image fetch fails, try the first image
+            if (
+              car.imageIds &&
+              car.imageIds.length > 0 &&
+              car.imageIds[0] !== car.primaryImageId
+            ) {
+              try {
+                const fallbackImageData = (await api.get(
+                  `images/${car.imageIds[0]}`
+                )) as any;
+                setPrimaryImage({
+                  id: fallbackImageData._id,
+                  url: getFormattedImageUrl(fallbackImageData.url),
+                });
+              } catch (fallbackError) {
+                console.error("Error fetching fallback image:", fallbackError);
                 setPrimaryImage(null);
               }
+            } else {
+              setPrimaryImage(null);
             }
-          } catch (error) {
-            console.error("Error fetching image:", error);
-            setPrimaryImage(null);
           } finally {
             setLoading(false);
           }
@@ -151,7 +147,7 @@ function ProjectCarCard({
     };
 
     findPrimaryImage();
-  }, [car._id, car.imageIds, car.images, car.primaryImageId]);
+  }, [car._id, car.imageIds, car.images, car.primaryImageId, api]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -257,7 +253,7 @@ export function ProjectCarsTab({
   project,
   onProjectUpdate,
 }: ProjectCarsTabProps) {
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const [projectCars, setProjectCars] = useState<Car[]>([]);
   const [loadingProjectCars, setLoadingProjectCars] = useState(false);
   const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
@@ -267,26 +263,16 @@ export function ProjectCarsTab({
   const fetchProjectCars = useCallback(async () => {
     try {
       setLoadingProjectCars(true);
+      console.time("ProjectCarsTab-fetchProjectCars");
 
-      if (!user) {
-        console.log("ProjectCarsTab: No user available for fetchProjectCars");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        console.log("ProjectCarsTab: No API available for fetchProjectCars");
+        throw new Error("No authenticated API found");
       }
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${project._id}/cars`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch project cars");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(`projects/${project._id}/cars`)) as {
+        cars?: Car[];
+      };
       setProjectCars(data.cars || []);
     } catch (error) {
       console.error("Error fetching project cars:", error);
@@ -297,15 +283,16 @@ export function ProjectCarsTab({
       });
     } finally {
       setLoadingProjectCars(false);
+      console.timeEnd("ProjectCarsTab-fetchProjectCars");
     }
-  }, [user, project._id]);
+  }, [api, project._id]);
 
   // Fetch project cars on component mount and when project changes
   useEffect(() => {
-    if (user && project._id) {
+    if (api && project._id) {
       fetchProjectCars();
     }
-  }, [fetchProjectCars, user, project._id]);
+  }, [fetchProjectCars, api, project._id]);
 
   const handleLinkCars = async () => {
     if (selectedCarIds.length === 0) {
@@ -320,29 +307,14 @@ export function ProjectCarsTab({
     try {
       setIsLinkingCar(true);
 
-      if (!user) {
-        console.log("ProjectCarsTab: No user available for handleLinkCars");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        console.log("ProjectCarsTab: No API available for handleLinkCars");
+        throw new Error("No authenticated API found");
       }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
 
       // Link cars one by one (could be optimized with a batch endpoint)
       for (const carId of selectedCarIds) {
-        const response = await fetch(`/api/projects/${project._id}/cars`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ carId }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to link car ${carId}`);
-        }
+        await api.post(`projects/${project._id}/cars`, { carId });
       }
 
       // Refresh project data and cars
@@ -369,28 +341,12 @@ export function ProjectCarsTab({
 
   const handleUnlinkCar = async (carId: string) => {
     try {
-      if (!user) {
-        console.log("ProjectCarsTab: No user available for handleUnlinkCar");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        console.log("ProjectCarsTab: No API available for handleUnlinkCar");
+        throw new Error("No authenticated API found");
       }
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        `/api/projects/${project._id}/cars?carId=${carId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to unlink car");
-      }
+      await api.delete(`projects/${project._id}/cars?carId=${carId}`);
 
       // Refresh project data and cars
       await onProjectUpdate();
@@ -428,7 +384,7 @@ export function ProjectCarsTab({
             }}
           >
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button size="sm" disabled={!api}>
                 <Plus className="h-4 w-4 mr-2" />
                 Link Cars
               </Button>
@@ -467,7 +423,7 @@ export function ProjectCarsTab({
                 </Button>
                 <Button
                   onClick={handleLinkCars}
-                  disabled={isLinkingCar || selectedCarIds.length === 0}
+                  disabled={isLinkingCar || selectedCarIds.length === 0 || !api}
                 >
                   {isLinkingCar ? (
                     <>
@@ -484,7 +440,11 @@ export function ProjectCarsTab({
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        {loadingProjectCars ? (
+        {!api ? (
+          <div className="flex items-center justify-center h-32">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : loadingProjectCars ? (
           <div className="flex items-center justify-center h-32">
             <LoadingSpinner size="lg" />
           </div>

@@ -10,6 +10,7 @@ import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CarCardProps {
   car: Car;
@@ -34,8 +35,9 @@ const CarCard = memo(function CarCard({
     });
   }
 
+  const api = useAPI();
   const [primaryImage, setPrimaryImage] = useState<{
-    id?: string;
+    id: string;
     url: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,70 +45,57 @@ const CarCard = memo(function CarCard({
   useEffect(() => {
     // Simplified image selection logic
     const findPrimaryImage = () => {
-      setLoading(true);
-
-      // Case 1: We have an array of images
-      if (car.images && Array.isArray(car.images) && car.images.length > 0) {
-        // Try to find the image marked as primary first
-        const primaryImg = car.images.find(
-          (img) =>
-            // Check for explicit primary flag in metadata
-            img.metadata?.isPrimary ||
-            // Or check against primaryImageId
-            (car.primaryImageId && img._id === car.primaryImageId)
-        );
-
-        // Use primary image if found, otherwise use first image
-        const imageToUse = primaryImg || car.images[0];
-
-        setPrimaryImage({
-          id: imageToUse._id,
-          url: getFormattedImageUrl(imageToUse.url),
-        });
-
+      // Case 1: We have loaded images with URLs
+      if (car.images && car.images.length > 0) {
+        const primary = car.images.find((img) => img.metadata?.isPrimary);
+        if (primary) {
+          setPrimaryImage({
+            id: primary._id,
+            url: getFormattedImageUrl(primary.url),
+          });
+        } else {
+          // Use first image if no primary is marked
+          setPrimaryImage({
+            id: car.images[0]._id,
+            url: getFormattedImageUrl(car.images[0].url),
+          });
+        }
         setLoading(false);
         return;
       }
 
-      // Case 2: We have image IDs but no loaded images
-      if (car.imageIds?.length && car.primaryImageId) {
-        // Fetch the primary image
+      // Case 2: We have image IDs but no loaded images - fetch using authenticated API
+      if (car.imageIds?.length && car.primaryImageId && api) {
+        // Fetch the primary image using authenticated API
         const fetchImage = async () => {
           try {
-            const response = await fetch(`/api/images/${car.primaryImageId}`);
-
-            if (response.ok) {
-              const imageData = await response.json();
-              setPrimaryImage({
-                id: imageData._id,
-                url: getFormattedImageUrl(imageData.url),
-              });
-            } else {
-              // If primary image fetch fails, try the first image
-              if (
-                car.imageIds &&
-                car.imageIds.length > 0 &&
-                car.imageIds[0] !== car.primaryImageId
-              ) {
-                const fallbackResponse = await fetch(
-                  `/api/images/${car.imageIds[0]}`
+            const imageData = await api.get(`images/${car.primaryImageId}`);
+            setPrimaryImage({
+              id: (imageData as any)._id,
+              url: getFormattedImageUrl((imageData as any).url),
+            });
+          } catch (error) {
+            // If primary image fetch fails, try the first image
+            if (
+              car.imageIds &&
+              car.imageIds.length > 0 &&
+              car.imageIds[0] !== car.primaryImageId
+            ) {
+              try {
+                const fallbackImageData = await api.get(
+                  `images/${car.imageIds[0]}`
                 );
-                if (fallbackResponse.ok) {
-                  const fallbackImageData = await fallbackResponse.json();
-                  setPrimaryImage({
-                    id: fallbackImageData._id,
-                    url: getFormattedImageUrl(fallbackImageData.url),
-                  });
-                } else {
-                  setPrimaryImage(null);
-                }
-              } else {
+                setPrimaryImage({
+                  id: (fallbackImageData as any)._id,
+                  url: getFormattedImageUrl((fallbackImageData as any).url),
+                });
+              } catch (fallbackError) {
+                console.error("Error fetching fallback image:", fallbackError);
                 setPrimaryImage(null);
               }
+            } else {
+              setPrimaryImage(null);
             }
-          } catch (error) {
-            console.error("Error fetching image:", error);
-            setPrimaryImage(null);
           } finally {
             setLoading(false);
           }
@@ -122,7 +111,7 @@ const CarCard = memo(function CarCard({
     };
 
     findPrimaryImage();
-  }, [car._id, car.imageIds, car.images, car.primaryImageId]);
+  }, [car._id, car.imageIds, car.images, car.primaryImageId, api]);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
@@ -135,15 +124,13 @@ const CarCard = memo(function CarCard({
       return;
     }
 
+    if (!api) {
+      alert("Authentication not ready. Please try again.");
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/cars/${car._id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete car");
-      }
-
+      await api.delete(`cars/${car._id}`);
       // Refresh the page to update the list
       window.location.reload();
     } catch (error) {

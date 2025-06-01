@@ -15,6 +15,8 @@ import {
 import { Inspection } from "@/types/inspection";
 import { toast } from "sonner";
 import InspectionList from "./InspectionList";
+import { useAPI } from "@/hooks/useAPI";
+import { InspectionSkeleton } from "./optimized/inspections";
 
 interface InspectionTabProps {
   carId: string;
@@ -22,34 +24,34 @@ interface InspectionTabProps {
 
 export default function InspectionTab({ carId }: InspectionTabProps) {
   const router = useRouter();
+  const api = useAPI();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch inspections for this car
   const fetchInspections = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/cars/${carId}/inspections`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch inspections");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(`cars/${carId}/inspections`)) as {
+        inspections?: Inspection[];
+      };
       setInspections(data.inspections || []);
     } catch (error) {
       console.error("Error fetching inspections:", error);
       toast.error("Failed to load inspections");
+      setInspections([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (carId) {
+    if (carId && api) {
       fetchInspections();
     }
-  }, [carId]);
+  }, [carId, api]);
 
   const handleCreateInspection = () => {
     // Navigate to the new inspection page
@@ -74,6 +76,11 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
     (i) => i.status === "needs_attention"
   ).length;
   const totalInspections = inspections.length;
+
+  // Show skeleton loading state
+  if (isLoading) {
+    return <InspectionSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
@@ -142,11 +149,7 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
       )}
 
       {/* Main Content */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : totalInspections === 0 ? (
+      {totalInspections === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />

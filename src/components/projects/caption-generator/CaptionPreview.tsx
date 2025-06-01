@@ -3,7 +3,16 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Copy, Pencil, Trash2, X, Eye, FileText } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Pencil,
+  Trash2,
+  X,
+  Eye,
+  FileText,
+  Plus,
+} from "lucide-react";
 import { Platform, SavedCaption } from "./types";
 import { getIconComponent } from "@/components/ui/IconPicker";
 
@@ -31,6 +40,11 @@ interface CaptionPreviewProps {
   onSaveEdit: (captionId: string) => void;
   onEditTextChange: (text: string) => void;
   onDeleteCaption: (captionId: string) => void;
+
+  // Optional load more functionality
+  hasMoreCaptions?: boolean;
+  onLoadMoreCaptions?: () => void;
+  loadingCaptions?: boolean;
 }
 
 export function CaptionPreview({
@@ -50,6 +64,9 @@ export function CaptionPreview({
   onSaveEdit,
   onEditTextChange,
   onDeleteCaption,
+  hasMoreCaptions,
+  onLoadMoreCaptions,
+  loadingCaptions,
 }: CaptionPreviewProps) {
   const [isEditingPreview, setIsEditingPreview] = useState(false);
   const [previewEditText, setPreviewEditText] = useState("");
@@ -350,6 +367,28 @@ export function CaptionPreview({
                       </div>
                     </div>
                   ))}
+
+                  {/* Load More Captions Button */}
+                  {hasMoreCaptions && onLoadMoreCaptions && (
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onLoadMoreCaptions}
+                        disabled={loadingCaptions}
+                        className="w-full border-[hsl(var(--border))] text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))]"
+                      >
+                        {loadingCaptions ? (
+                          <>Loading more captions...</>
+                        ) : (
+                          <>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Load More Captions
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

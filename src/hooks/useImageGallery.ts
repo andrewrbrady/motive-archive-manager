@@ -6,6 +6,233 @@ import { FilterState, ExtendedImageType } from "@/types/gallery";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
 import { useAPI } from "@/hooks/useAPI";
 
+// Enhanced caching utilities for image gallery
+interface ImageGalleryCacheItem {
+  data: {
+    images: ExtendedImageType[];
+    pagination?: {
+      totalImages?: number;
+      totalPages?: number;
+      currentPage?: number;
+    };
+  };
+  timestamp: number;
+  carLastModified?: number;
+  filters: string; // Serialized filters for cache key
+  searchQuery: string;
+}
+
+interface ImageMetadataCache {
+  [imageId: string]: {
+    metadata: any;
+    timestamp: number;
+  };
+}
+
+const CACHE_PREFIX = "img_gallery_";
+const METADATA_CACHE_PREFIX = "img_meta_";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for API responses
+const METADATA_CACHE_DURATION = 60 * 60 * 1000; // 1 hour for metadata
+
+// Enhanced cache utilities
+const cacheUtils = {
+  // Cache API responses with filter-based keys
+  setCacheData: (
+    carId: string,
+    filters: FilterState,
+    searchQuery: string,
+    data: any,
+    carLastModified?: number
+  ) => {
+    try {
+      const filterKey = JSON.stringify(filters);
+      const cacheKey = `${CACHE_PREFIX}${carId}_${btoa(filterKey)}_${btoa(searchQuery || "")}`;
+
+      const cacheItem: ImageGalleryCacheItem = {
+        data,
+        timestamp: Date.now(),
+        carLastModified,
+        filters: filterKey,
+        searchQuery,
+      };
+
+      localStorage.setItem(cacheKey, JSON.stringify(cacheItem));
+      console.log("📦 Cached gallery data:", { carId, filters, searchQuery });
+    } catch (error) {
+      console.warn("Failed to cache gallery data:", error);
+    }
+  },
+
+  // Get cached API responses
+  getCacheData: (
+    carId: string,
+    filters: FilterState,
+    searchQuery: string,
+    carLastModified?: number
+  ) => {
+    try {
+      const filterKey = JSON.stringify(filters);
+      const cacheKey = `${CACHE_PREFIX}${carId}_${btoa(filterKey)}_${btoa(searchQuery || "")}`;
+
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return null;
+
+      const cacheItem: ImageGalleryCacheItem = JSON.parse(cached);
+      const now = Date.now();
+
+      // Check if cache has expired
+      if (now - cacheItem.timestamp > CACHE_DURATION) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+
+      // Check if car has been modified since cache
+      if (
+        carLastModified &&
+        cacheItem.carLastModified &&
+        carLastModified > cacheItem.carLastModified
+      ) {
+        localStorage.removeItem(cacheKey);
+        console.log("🔄 Cache invalidated due to car modification");
+        return null;
+      }
+
+      console.log("💾 Using cached gallery data:", {
+        carId,
+        filters,
+        searchQuery,
+      });
+      return cacheItem.data;
+    } catch (error) {
+      console.warn("Failed to read cached gallery data:", error);
+      return null;
+    }
+  },
+
+  // Cache image metadata
+  setImageMetadata: (imageId: string, metadata: any) => {
+    try {
+      const metadataCache: ImageMetadataCache = JSON.parse(
+        localStorage.getItem(`${METADATA_CACHE_PREFIX}metadata`) || "{}"
+      );
+
+      metadataCache[imageId] = {
+        metadata,
+        timestamp: Date.now(),
+      };
+
+      localStorage.setItem(
+        `${METADATA_CACHE_PREFIX}metadata`,
+        JSON.stringify(metadataCache)
+      );
+    } catch (error) {
+      console.warn("Failed to cache image metadata:", error);
+    }
+  },
+
+  // Get cached image metadata
+  getImageMetadata: (imageId: string) => {
+    try {
+      const metadataCache: ImageMetadataCache = JSON.parse(
+        localStorage.getItem(`${METADATA_CACHE_PREFIX}metadata`) || "{}"
+      );
+
+      const cached = metadataCache[imageId];
+      if (!cached) return null;
+
+      const now = Date.now();
+      if (now - cached.timestamp > METADATA_CACHE_DURATION) {
+        delete metadataCache[imageId];
+        localStorage.setItem(
+          `${METADATA_CACHE_PREFIX}metadata`,
+          JSON.stringify(metadataCache)
+        );
+        return null;
+      }
+
+      return cached.metadata;
+    } catch (error) {
+      console.warn("Failed to read cached image metadata:", error);
+      return null;
+    }
+  },
+
+  // Clear cache for a specific car
+  clearCarCache: (carId: string) => {
+    try {
+      const keys = Object.keys(localStorage);
+      const carCacheKeys = keys.filter((key) =>
+        key.startsWith(`${CACHE_PREFIX}${carId}_`)
+      );
+
+      carCacheKeys.forEach((key) => localStorage.removeItem(key));
+      console.log(
+        `🗑️ Cleared cache for car ${carId}: ${carCacheKeys.length} entries`
+      );
+    } catch (error) {
+      console.warn("Failed to clear car cache:", error);
+    }
+  },
+
+  // Clear all expired cache entries
+  clearExpiredCache: () => {
+    try {
+      const keys = Object.keys(localStorage);
+      const now = Date.now();
+      let clearedCount = 0;
+
+      keys.forEach((key) => {
+        if (key.startsWith(CACHE_PREFIX)) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(key) || "{}");
+            if (cached.timestamp && now - cached.timestamp > CACHE_DURATION) {
+              localStorage.removeItem(key);
+              clearedCount++;
+            }
+          } catch {
+            localStorage.removeItem(key);
+            clearedCount++;
+          }
+        }
+      });
+
+      if (clearedCount > 0) {
+        console.log(`🧹 Cleared ${clearedCount} expired cache entries`);
+      }
+    } catch (error) {
+      console.warn("Failed to clear expired cache:", error);
+    }
+  },
+
+  // Invalidate cache when images are modified
+  invalidateImageCache: (carId: string, imageId?: string) => {
+    try {
+      if (imageId) {
+        // Clear metadata cache for specific image
+        const metadataCache: ImageMetadataCache = JSON.parse(
+          localStorage.getItem(`${METADATA_CACHE_PREFIX}metadata`) || "{}"
+        );
+        delete metadataCache[imageId];
+        localStorage.setItem(
+          `${METADATA_CACHE_PREFIX}metadata`,
+          JSON.stringify(metadataCache)
+        );
+      }
+
+      // Clear all gallery cache for the car
+      cacheUtils.clearCarCache(carId);
+      console.log(
+        `🔄 Invalidated cache for car ${carId}${imageId ? ` and image ${imageId}` : ""}`
+      );
+    } catch (error) {
+      console.warn("Failed to invalidate image cache:", error);
+    }
+  },
+};
+
+// Export cache utilities for external use
+export const imageGalleryCacheUtils = cacheUtils;
+
 export function useImageGallery(carId: string, vehicleInfo?: any) {
   const router = useRouter();
   const { fastReplace } = useFastRouter();
@@ -19,20 +246,27 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const urlPage = searchParams?.get("page");
   const currentImageId = searchParams?.get("image");
 
-  // API Query for data fetching
-  const {
-    data,
-    error,
-    isLoading,
-    refetch: mutate,
-  } = useAPIQuery<{ images: ExtendedImageType[] }>(
-    `/api/cars/${carId}/images?limit=500`,
-    {
-      staleTime: 60 * 1000, // 1 minute - images don't change super frequently
-    }
+  // Enhanced caching state
+  const [cachedData, setCachedData] = useState<any>(null);
+  const carLastModified = useMemo(
+    () =>
+      vehicleInfo?.updatedAt
+        ? new Date(vehicleInfo.updatedAt).getTime()
+        : undefined,
+    [vehicleInfo?.updatedAt]
   );
 
-  const images = useMemo(() => data?.images || [], [data?.images]);
+  // Local state for pagination and incremental loading
+  const [currentLimit, setCurrentLimit] = useState(50);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [totalImagesAvailable, setTotalImagesAvailable] = useState<
+    number | undefined
+  >(undefined);
+  const [additionalImages, setAdditionalImages] = useState<ExtendedImageType[]>(
+    []
+  );
+  const loadMoreTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Local state
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -48,80 +282,289 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
   const itemsPerPage = 15;
 
+  // Cache cleanup on mount
+  useEffect(() => {
+    cacheUtils.clearExpiredCache();
+  }, []);
+
+  // Check for cached data before making API call
+  useEffect(() => {
+    // Temporarily disable caching to prevent issues
+    // const cached = cacheUtils.getCacheData(carId, filters, searchQuery, carLastModified);
+    // if (cached) {
+    //   setCachedData(cached);
+    // } else {
+    //   setCachedData(null);
+    // }
+    setCachedData(null);
+  }, [carId, filters, searchQuery, carLastModified]);
+
+  // Extract image type arrays from vehicle info for filtering
+  const originalImageIds = useMemo(() => {
+    const ids = new Set(vehicleInfo?.imageIds || []);
+    return ids;
+  }, [vehicleInfo?.imageIds]);
+
+  const processedImageIds = useMemo(() => {
+    const ids = new Set(vehicleInfo?.processedImageIds || []);
+    return ids;
+  }, [vehicleInfo?.processedImageIds]);
+
+  // Build API query parameters from current filters and search
+  const buildApiQuery = useCallback(
+    (limit: number, skip = 0) => {
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+      });
+
+      if (skip > 0) {
+        params.append("skip", skip.toString());
+      }
+
+      // Add filter parameters - ALL now supported server-side
+      if (filters.angle) params.append("angle", filters.angle);
+      if (filters.movement) params.append("movement", filters.movement);
+      if (filters.view) params.append("view", filters.view);
+      if (filters.tod) params.append("timeOfDay", filters.tod);
+      if (filters.side) params.append("side", filters.side);
+      if (filters.imageType) params.append("imageType", filters.imageType);
+
+      // Add search query
+      if (searchQuery) params.append("search", searchQuery);
+
+      return params.toString();
+    },
+    [filters, searchQuery]
+  );
+
+  // API Query for initial data fetching with enhanced caching
+  const apiLimit = 50;
+  const apiQueryString = buildApiQuery(apiLimit);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch: mutate,
+  } = useAPIQuery<{
+    images: ExtendedImageType[];
+    pagination?: {
+      totalImages?: number;
+      totalPages?: number;
+      currentPage?: number;
+    };
+  }>(`/api/cars/${carId}/images?${apiQueryString}`, {
+    staleTime: 60 * 1000, // 1 minute
+    // Disable cached data for now to prevent issues
+    // initialData: cachedData,
+  });
+
+  // Cache successful API responses when data changes (disabled for now)
+  useEffect(() => {
+    // Temporarily disable caching to prevent issues
+    // if (data) {
+    //   cacheUtils.setCacheData(carId, filters, searchQuery, data, carLastModified);
+    //
+    //   // Cache image metadata for faster access
+    //   data.images?.forEach((image: ExtendedImageType) => {
+    //     if (image.metadata) {
+    //       cacheUtils.setImageMetadata(image.id || image._id, image.metadata);
+    //     }
+    //   });
+    // }
+  }, [data, carId, filters, searchQuery, carLastModified]);
+
+  // Enhanced image data with cached metadata (simplified for now)
+  const enhancedImages = useMemo(() => {
+    const baseImages = data?.images || [];
+
+    // Temporarily disable metadata enhancement to prevent issues
+    return baseImages;
+
+    // return baseImages.map((image: ExtendedImageType) => {
+    //   const imageId = image.id || image._id;
+    //   const cachedMetadata = cacheUtils.getImageMetadata(imageId);
+    //
+    //   if (cachedMetadata && !image.metadata) {
+    //     return {
+    //       ...image,
+    //       metadata: cachedMetadata,
+    //     };
+    //   }
+    //
+    //   return image;
+    // });
+  }, [data?.images]);
+
+  // Combine initial images with incrementally loaded images
+  const images = useMemo(() => {
+    const initialImages = enhancedImages;
+    const allImages = [...initialImages, ...additionalImages];
+
+    // Deduplicate by ID
+    const seenIds = new Set<string>();
+    const deduplicated = allImages.filter((image) => {
+      const imageId = image.id || image._id;
+      if (seenIds.has(imageId)) {
+        return false;
+      }
+      seenIds.add(imageId);
+      return true;
+    });
+
+    return deduplicated;
+  }, [enhancedImages, additionalImages]);
+
+  // Helper function for search query matching
+  const matchesSearchQuery = useCallback(
+    (image: ExtendedImageType, query: string) => {
+      const lowerQuery = query.toLowerCase();
+      return (
+        image.metadata?.description?.toLowerCase().includes(lowerQuery) ||
+        image.filename?.toLowerCase().includes(lowerQuery) ||
+        image.metadata?.angle?.toLowerCase().includes(lowerQuery) ||
+        image.metadata?.view?.toLowerCase().includes(lowerQuery) ||
+        (image.id || image._id)?.toLowerCase().includes(lowerQuery)
+      );
+    },
+    []
+  );
+
   // Memoized filter options
   const filterOptions = useMemo(() => {
-    const options = {
-      angles: new Set<string>(),
-      views: new Set<string>(),
-      movements: new Set<string>(),
-      tods: new Set<string>(),
-      sides: new Set<string>(),
-    };
+    if (!images || images.length === 0) {
+      return {
+        angles: [],
+        views: [],
+        movements: [],
+        tods: [],
+        sides: [],
+      };
+    }
+
+    // Extract all unique metadata values
+    const angles = new Set<string>();
+    const views = new Set<string>();
+    const movements = new Set<string>();
+    const tods = new Set<string>();
+    const sides = new Set<string>();
 
     images.forEach((image: ExtendedImageType) => {
-      const { metadata } = image;
-      if (metadata?.angle?.trim()) options.angles.add(metadata.angle.trim());
-      if (metadata?.view?.trim()) options.views.add(metadata.view.trim());
-      if (metadata?.movement?.trim())
-        options.movements.add(metadata.movement.trim());
-      if (metadata?.tod?.trim()) options.tods.add(metadata.tod.trim());
-      if (metadata?.side?.trim()) options.sides.add(metadata.side.trim());
+      // Check direct metadata
+      if (image.metadata?.angle) angles.add(image.metadata.angle);
+      if (image.metadata?.view) views.add(image.metadata.view);
+      if (image.metadata?.movement) movements.add(image.metadata.movement);
+      if (image.metadata?.tod) tods.add(image.metadata.tod);
+      if (image.metadata?.side) sides.add(image.metadata.side);
+
+      // Check nested metadata for processed images
+      const originalMetadata = image.metadata?.originalImage?.metadata;
+      if (originalMetadata) {
+        if (originalMetadata.angle) angles.add(originalMetadata.angle);
+        if (originalMetadata.view) views.add(originalMetadata.view);
+        if (originalMetadata.movement) movements.add(originalMetadata.movement);
+        if (originalMetadata.tod) tods.add(originalMetadata.tod);
+        if (originalMetadata.side) sides.add(originalMetadata.side);
+      }
+
+      // Map category to view for processed images
+      if (image.metadata?.category) {
+        views.add(image.metadata.category);
+      }
     });
 
     return {
-      angles: Array.from(options.angles).sort(),
-      views: Array.from(options.views).sort(),
-      movements: Array.from(options.movements).sort(),
-      tods: Array.from(options.tods).sort(),
-      sides: Array.from(options.sides).sort(),
+      angles: Array.from(angles).sort(),
+      views: Array.from(views).sort(),
+      movements: Array.from(movements).sort(),
+      tods: Array.from(tods).sort(),
+      sides: Array.from(sides).sort(),
     };
   }, [images]);
 
   // Memoized filtered images
   const filteredImages = useMemo(() => {
-    return images.filter((image: ExtendedImageType) => {
-      // Filter by metadata filters
-      const matchesFilters = Object.entries(filters).every(([key, value]) => {
-        if (!value) return true;
-        const metadataValue =
-          image.metadata?.[key as keyof typeof image.metadata];
-        return metadataValue === value;
-      });
+    const filtered = images.filter((image: ExtendedImageType) => {
+      const imageId = image.id || image._id;
 
-      // Filter by search query
-      const matchesSearch =
-        !searchQuery ||
-        image.metadata?.description
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        image.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        image.metadata?.angle
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        image.metadata?.view?.toLowerCase().includes(searchQuery.toLowerCase());
+      // Check if any filters are active
+      if (Object.keys(filters).length === 0 && !searchQuery) {
+        return true;
+      }
 
-      return matchesFilters && matchesSearch;
+      // Apply search query filter first
+      if (searchQuery && !matchesSearchQuery(image, searchQuery)) {
+        return false;
+      }
+
+      // Apply each filter
+      for (const [key, value] of Object.entries(filters)) {
+        if (!value) continue; // Skip empty filters
+
+        // Handle server-side metadata filters (ALL are now processed on the backend)
+        // Skip client-side filtering for these as they're already filtered by API
+        if (
+          ["angle", "view", "movement", "tod", "side", "imageType"].includes(
+            key
+          )
+        ) {
+          continue; // These are ALL handled server-side now
+        }
+
+        // Apply any remaining client-side filters here if needed
+      }
+
+      return true;
     });
-  }, [images, filters, searchQuery]);
 
-  // Memoized current image
+    // Remove duplicates based on image ID
+    const deduplicated = filtered.reduce((acc, current) => {
+      const id = current.id || current._id;
+      if (!acc.find((item) => (item.id || item._id) === id)) {
+        acc.push(current);
+      }
+      return acc;
+    }, [] as ExtendedImageType[]);
+
+    return deduplicated;
+  }, [
+    images,
+    filters,
+    searchQuery,
+    originalImageIds,
+    processedImageIds,
+    matchesSearchQuery,
+  ]);
+
+  // Current image based on URL
   const currentImage = useMemo(() => {
-    if (!currentImageId) return filteredImages[0];
-    return (
-      filteredImages.find(
+    const currentImageId = searchParams?.get("image") || null;
+
+    if (!currentImageId || filteredImages.length === 0) {
+      return filteredImages[0] || null;
+    }
+
+    const found = filteredImages.find(
+      (img) => (img.id || img._id) === currentImageId
+    );
+
+    return found || filteredImages[0] || null;
+  }, [filteredImages, searchParams]);
+
+  // Local state for current image index (direct approach)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Sync currentImageIndex with URL when URL changes
+  useEffect(() => {
+    if (currentImageId && filteredImages.length > 0) {
+      const index = filteredImages.findIndex(
         (img: ExtendedImageType) =>
           img.id === currentImageId || img._id === currentImageId
-      ) || filteredImages[0]
-    );
-  }, [filteredImages, currentImageId]);
-
-  const mainIndex = useMemo(() => {
-    if (!currentImage) return 0;
-    return filteredImages.findIndex(
-      (img: ExtendedImageType) =>
-        img.id === currentImage.id || img._id === currentImage._id
-    );
-  }, [filteredImages, currentImage]);
+      );
+      if (index >= 0) {
+        setCurrentImageIndex(index);
+      }
+    }
+  }, [currentImageId, filteredImages]);
 
   // Memoized paginated images
   const paginatedImages = useMemo(() => {
@@ -129,20 +572,81 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     return filteredImages.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredImages, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
+  // Calculate pagination based on server data when available, fallback to client-side
+  const serverPagination = useMemo(() => {
+    // Check if we have client-side-only filters that the server doesn't handle
+    const hasClientSideOnlyFilters = Boolean(
+      filters.hasImageId // Only hasImageId is client-side only now - imageType is server-side
+    );
+
+    // Use server pagination only if server is doing the filtering
+    if (
+      data?.pagination?.totalImages !== undefined &&
+      !hasClientSideOnlyFilters
+    ) {
+      // Use server pagination data for server-side filtered results
+      return {
+        totalImages: data.pagination.totalImages,
+        totalPages: Math.ceil(data.pagination.totalImages / itemsPerPage),
+        currentPage: currentPage + 1, // Convert to 1-based for display
+        itemsPerPage,
+        startIndex: currentPage * itemsPerPage + 1,
+        endIndex: Math.min(
+          (currentPage + 1) * itemsPerPage,
+          data.pagination.totalImages
+        ),
+        isServerPagination: true,
+      };
+    } else {
+      // Use client-side pagination for client-filtered results
+      const clientTotalImages = filteredImages.length;
+      console.log("📊 Using client-side pagination:", {
+        hasClientSideOnlyFilters,
+        clientTotalImages,
+        activeFilters: filters,
+        imagesLoaded: images.length,
+        note: "imageType is now server-side",
+      });
+
+      return {
+        totalImages: clientTotalImages,
+        totalPages: Math.ceil(clientTotalImages / itemsPerPage),
+        currentPage: currentPage + 1, // Convert to 1-based for display
+        itemsPerPage,
+        startIndex: currentPage * itemsPerPage + 1,
+        endIndex: Math.min((currentPage + 1) * itemsPerPage, clientTotalImages),
+        isServerPagination: false,
+      };
+    }
+  }, [
+    data?.pagination?.totalImages,
+    filters,
+    filteredImages.length,
+    currentPage,
+    itemsPerPage,
+    images.length,
+  ]);
+
+  const totalPages = serverPagination.totalPages;
 
   // Handlers
   const handlePageChange = useCallback(
     (newPage: number) => {
       try {
+        console.log("Manual page change to:", newPage + 1);
+        setIsNavigating(true); // Block early loading during manual navigation
         setCurrentPage(newPage);
         const params = new URLSearchParams(searchParams?.toString() || "");
         params.set("page", (newPage + 1).toString());
         router.replace(`?${params.toString()}`, { scroll: false });
+
+        // Reset navigation flag after a brief delay
+        setTimeout(() => setIsNavigating(false), 500);
       } catch (error) {
         console.error("Error changing page:", error);
         // Fallback: just update local state
         setCurrentPage(newPage);
+        setIsNavigating(false);
       }
     },
     [searchParams, router]
@@ -151,16 +655,12 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const setMainImage = useCallback(
     (imageId: string) => {
       try {
-        // Minimal throttling for ultra-responsive feel
-        const now = Date.now();
-        if (now - lastNavigationRef.current < 50) {
-          return; // Skip if called within 50ms of last call
-        }
-        lastNavigationRef.current = now;
+        console.log("setMainImage called with:", imageId);
 
         const imageIndex = filteredImages.findIndex(
           (img: ExtendedImageType) => img.id === imageId || img._id === imageId
         );
+        console.log("Found image at index:", imageIndex);
         if (imageIndex >= 0) {
           const targetPage = Math.floor(imageIndex / itemsPerPage);
 
@@ -180,7 +680,10 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
             // Use ultra-fast router for instant navigation
             const newUrl = `?${params.toString()}`;
+            console.log("Updating URL to:", newUrl);
             fastReplace(newUrl, { scroll: false });
+          } else {
+            console.log("URL already has correct values, skipping update");
           }
         }
       } catch (error) {
@@ -200,28 +703,87 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
   const handleNext = useCallback(() => {
     try {
-      const nextIndex = (mainIndex + 1) % filteredImages.length;
+      console.log("=== HANDLE NEXT START ===");
+
+      // Get the current actual index in the array
+      const currentActualIndex = filteredImages.findIndex(
+        (img: ExtendedImageType) => {
+          const matches =
+            img.id === (currentImage?.id || currentImage?._id) ||
+            img._id === (currentImage?.id || currentImage?._id);
+          return matches;
+        }
+      );
+
+      console.log("Current state:", {
+        currentActualIndex,
+        filteredImagesLength: filteredImages.length,
+        currentImageId: currentImage?.id || currentImage?._id,
+      });
+
+      // Calculate next index directly
+      const nextIndex = (currentActualIndex + 1) % filteredImages.length;
       const nextImage = filteredImages[nextIndex];
+
+      console.log("Navigation calculation:", {
+        currentActualIndex,
+        nextIndex,
+        nextImageId: nextImage?.id || nextImage?._id,
+        calculation: `(${currentActualIndex} + 1) % ${filteredImages.length} = ${nextIndex}`,
+      });
+
       if (nextImage) {
+        // Use setMainImage which handles pagination automatically
         setMainImage(nextImage.id || nextImage._id);
       }
+      console.log("=== HANDLE NEXT END ===");
     } catch (error) {
       console.error("Error navigating to next image:", error);
     }
-  }, [mainIndex, filteredImages, setMainImage]);
+  }, [filteredImages, currentImage, setMainImage]);
 
   const handlePrev = useCallback(() => {
     try {
+      console.log("=== HANDLE PREV START ===");
+
+      // Get the current actual index in the array
+      const currentActualIndex = filteredImages.findIndex(
+        (img: ExtendedImageType) => {
+          const matches =
+            img.id === (currentImage?.id || currentImage?._id) ||
+            img._id === (currentImage?.id || currentImage?._id);
+          return matches;
+        }
+      );
+
+      console.log("Current state:", {
+        currentActualIndex,
+        filteredImagesLength: filteredImages.length,
+        currentImageId: currentImage?.id || currentImage?._id,
+      });
+
+      // Calculate prev index directly
       const prevIndex =
-        (mainIndex - 1 + filteredImages.length) % filteredImages.length;
+        (currentActualIndex - 1 + filteredImages.length) %
+        filteredImages.length;
       const prevImage = filteredImages[prevIndex];
+
+      console.log("Navigation calculation:", {
+        currentActualIndex,
+        prevIndex,
+        prevImageId: prevImage?.id || prevImage?._id,
+        calculation: `(${currentActualIndex} - 1 + ${filteredImages.length}) % ${filteredImages.length} = ${prevIndex}`,
+      });
+
       if (prevImage) {
+        // Use setMainImage which handles pagination automatically
         setMainImage(prevImage.id || prevImage._id);
       }
+      console.log("=== HANDLE PREV END ===");
     } catch (error) {
       console.error("Error navigating to previous image:", error);
     }
-  }, [mainIndex, filteredImages, setMainImage]);
+  }, [filteredImages, currentImage, setMainImage]);
 
   const toggleImageSelection = useCallback((imageId: string) => {
     setSelectedImages((prev) => {
@@ -235,8 +797,91 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     });
   }, []);
 
+  // Optimized load more images function with better performance
+  const loadMoreImages = useCallback(async () => {
+    // Clear any existing timeout
+    if (loadMoreTimeoutRef.current) {
+      clearTimeout(loadMoreTimeoutRef.current);
+    }
+
+    // Debounce the actual loading with shorter delay for better UX
+    loadMoreTimeoutRef.current = setTimeout(async () => {
+      if (
+        isLoadingMore ||
+        isNavigating || // Don't load during manual navigation
+        !totalImagesAvailable ||
+        images.length >= totalImagesAvailable ||
+        !api
+      ) {
+        return;
+      }
+
+      setIsLoadingMore(true);
+      try {
+        // PERFORMANCE OPTIMIZATION: Load fewer images per batch but more frequently
+        // This reduces the memory footprint and improves response time
+        const batchSize = 25; // Reduced from 50 to 25 for faster loading
+        const newLimit = images.length + batchSize;
+
+        // Use skip parameter instead of relying on client-side deduplication
+        const skip = images.length;
+        const apiQueryString = buildApiQuery(batchSize, skip);
+
+        const additionalData = await api.get<{
+          images: ExtendedImageType[];
+          pagination?: {
+            totalImages?: number;
+            totalPages?: number;
+            currentPage?: number;
+          };
+        }>(`/api/cars/${carId}/images?${apiQueryString}`);
+
+        if (additionalData?.images && additionalData.images.length > 0) {
+          // PERFORMANCE FIX: Use functional update to avoid stale closures
+          setAdditionalImages((prev) => {
+            // Deduplicate by ID to prevent duplicates from race conditions
+            const existingIds = new Set([
+              ...(data?.images || []).map((img) => img.id || img._id),
+              ...prev.map((img) => img.id || img._id),
+            ]);
+
+            const newImages = additionalData.images.filter(
+              (img) => !existingIds.has(img.id || img._id)
+            );
+
+            return [...prev, ...newImages];
+          });
+
+          setCurrentLimit(newLimit);
+
+          // Update total available count if provided
+          if (additionalData.pagination?.totalImages !== undefined) {
+            setTotalImagesAvailable(additionalData.pagination.totalImages);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading more images:", error);
+        // Don't spam the user with error messages for background loading
+      } finally {
+        setIsLoadingMore(false);
+      }
+    }, 150); // Reduced debounce time from 300ms to 150ms for more responsive loading
+  }, [
+    buildApiQuery,
+    isLoadingMore,
+    isNavigating,
+    totalImagesAvailable,
+    images.length,
+    currentLimit,
+    api,
+    carId,
+    data?.images, // Add data.images to dependency for better deduplication
+  ]);
+
   const handleUploadComplete = useCallback(async () => {
     try {
+      // Reset additional images since we're doing a full refresh after upload
+      setAdditionalImages([]);
       await mutate();
       setIsUploadDialogOpen(false);
       toast({
@@ -268,6 +913,8 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         description: `${imageIds.length} image(s) deleted successfully`,
       });
       setSelectedImages(new Set());
+      // Reset additional images since we're doing a full refresh after deletion
+      setAdditionalImages([]);
       await mutate();
     } catch (error) {
       console.error("Error deleting images:", error);
@@ -361,6 +1008,100 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     [carId, toast, mutate, api]
   );
 
+  // Initialize currentImageId if not present in URL
+  useEffect(() => {
+    if (!currentImageId && filteredImages.length > 0 && searchParams) {
+      const firstImage = filteredImages[0];
+      if (firstImage) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("image", firstImage.id || firstImage._id);
+        if (!params.get("page")) {
+          params.set("page", "1");
+        }
+        const newUrl = `?${params.toString()}`;
+        // Initialize with the first image when none is selected
+        fastReplace(newUrl, { scroll: false });
+      }
+    }
+  }, [currentImageId, filteredImages, searchParams, fastReplace]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadMoreTimeoutRef.current) {
+        clearTimeout(loadMoreTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Reset pagination and adjust current image when filters change
+  useEffect(() => {
+    // Only reset if we have filtered results and we're not on page 1
+    if (filteredImages.length > 0 && currentPage > 0) {
+      setCurrentPage(0);
+
+      // Update URL to reflect page reset
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", "1");
+
+      // If current image is not in filtered results, select first filtered image
+      const currentImageStillVisible = filteredImages.some(
+        (img) => (img.id || img._id) === currentImageId
+      );
+
+      if (!currentImageStillVisible) {
+        const firstFilteredImage = filteredImages[0];
+        params.set("image", firstFilteredImage.id || firstFilteredImage._id);
+      }
+
+      // Use router replace to update URL without adding to history
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [filters, searchQuery, filteredImages.length]); // Include filteredImages.length to trigger when results change
+
+  // Separate effect to handle when currentPage exceeds available pages
+  useEffect(() => {
+    const maxPage = Math.max(
+      0,
+      Math.ceil(filteredImages.length / itemsPerPage) - 1
+    );
+
+    if (currentPage > maxPage && filteredImages.length > 0) {
+      setCurrentPage(maxPage);
+
+      // Update URL
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", (maxPage + 1).toString());
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [filteredImages.length, currentPage, itemsPerPage, router, searchParams]);
+
+  // Update total count when data changes - using the correct API response structure
+  useEffect(() => {
+    if (data?.pagination?.totalImages !== undefined) {
+      setTotalImagesAvailable(data.pagination.totalImages);
+    } else if (images.length > 0) {
+      // Fallback: if we loaded fewer images than requested, we're probably at the end
+      const isLikelyComplete = images.length < currentLimit;
+      const fallbackTotal = isLikelyComplete ? images.length : undefined;
+      setTotalImagesAvailable(fallbackTotal);
+    }
+  }, [data?.pagination?.totalImages, images.length, currentLimit]);
+
+  // Reset additional images when filters or search change to refetch from server
+  useEffect(() => {
+    // Clear additional images to force fresh API call with new filters
+    setAdditionalImages([]);
+    setTotalImagesAvailable(undefined);
+  }, [filters, searchQuery]);
+
+  // Handle pagination when filteredImages count changes
+  useEffect(() => {
+    if (totalPages > 0 && currentPage >= totalPages) {
+      setCurrentPage(totalPages - 1);
+    }
+  }, [filteredImages.length, currentPage, totalPages]);
+
   return {
     // Data
     images,
@@ -371,7 +1112,9 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     isLoading,
     error,
     totalPages,
-    mainIndex,
+    mainIndex: currentImageIndex,
+    totalImagesAvailable,
+    serverPagination,
 
     // State
     filters,
@@ -384,6 +1127,8 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     selectedUrlOption,
     isReanalyzing,
     isEditMode,
+    isLoadingMore,
+    isNavigating,
 
     // Actions
     setFilters,
@@ -402,6 +1147,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     handleDeleteSelected,
     reanalyzeImage,
     handleSetPrimaryImage,
+    loadMoreImages,
     mutate,
   };
 }

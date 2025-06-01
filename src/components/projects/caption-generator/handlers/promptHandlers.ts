@@ -72,15 +72,21 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
 
   // Fetch prompts
   const fetchPrompts = useCallback(async () => {
-    if (!api) return;
+    if (!api) {
+      console.log("promptHandlers: API not available for fetching prompts");
+      return;
+    }
 
+    console.log("promptHandlers: Starting to fetch caption prompts...");
     updatePromptLoading(true);
     updatePromptError(null);
 
     try {
       const prompts = (await api.get("caption-prompts")) as PromptTemplate[];
+      console.log("promptHandlers: Successfully fetched prompts:", prompts);
       updatePromptList(prompts);
     } catch (error) {
+      console.error("promptHandlers: Error fetching prompts:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to fetch prompts";
       updatePromptError(errorMessage);

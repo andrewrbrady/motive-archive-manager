@@ -27,6 +27,7 @@ import type {
 } from "../projects/caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
 
 export interface CopywriterConfig {
   mode: "car" | "project";
@@ -52,6 +53,9 @@ export interface CopywriterData {
   lengthSettings: any[];
   savedCaptions: ProjectSavedCaption[];
   clientHandle?: string | null;
+  // Load more flags
+  hasMoreEvents?: boolean;
+  hasMoreCaptions?: boolean;
 }
 
 export interface CopywriterCallbacks {
@@ -107,6 +111,10 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
 
+  // Load more functionality state (only loading states, hasMore comes from data)
+  const [loadingMoreEvents, setLoadingMoreEvents] = useState(false);
+  const [loadingMoreCaptions, setLoadingMoreCaptions] = useState(false);
+
   // Form state management - must be called before any early returns
   const { formState, handlers: formHandlers } = useFormState();
 
@@ -139,6 +147,15 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         const fetchedData = await callbacks.onDataFetch();
         setData(fetchedData);
 
+        console.log("BaseCopywriter: Received data:", {
+          carsCount: fetchedData.cars.length,
+          eventsCount: fetchedData.events.length,
+          systemPromptsCount: fetchedData.systemPrompts.length,
+          lengthSettingsCount: fetchedData.lengthSettings.length,
+          savedCaptionsCount: fetchedData.savedCaptions.length,
+          systemPromptsFirst: fetchedData.systemPrompts[0],
+        });
+
         // Auto-select all cars for single car mode
         if (config.mode === "car" && fetchedData.cars.length === 1) {
           setSelectedCarIds([fetchedData.cars[0]._id]);
@@ -157,8 +174,19 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Fetch prompts when component mounts
   useEffect(() => {
+    console.log("BaseCopywriter: useEffect calling fetchPrompts...");
     promptHandlers.fetchPrompts();
-  }, []);
+  }, [promptHandlers.fetchPrompts]);
+
+  // Debug logging for system prompts
+  useEffect(() => {
+    console.log("BaseCopywriter: System prompts data updated:", {
+      count: data.systemPrompts.length,
+      prompts: data.systemPrompts,
+      loading,
+      error,
+    });
+  }, [data.systemPrompts, loading, error]);
 
   // Event selection handlers
   const handleEventSelection = useCallback(
@@ -185,6 +213,23 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     setSelectedEventIds(allEventIds);
     setEventDetails(data.events);
   }, [data.events]);
+
+  // Load more events handler
+  const handleLoadMoreEvents = useCallback(async () => {
+    if (loadingMoreEvents || !data.hasMoreEvents) return;
+
+    setLoadingMoreEvents(true);
+    try {
+      // This would need to be implemented in the callbacks
+      // For now, just log that it was called
+      console.log("🔄 Load more events requested");
+      // TODO: Implement actual load more logic in callbacks
+    } catch (error) {
+      console.error("Error loading more events:", error);
+    } finally {
+      setLoadingMoreEvents(false);
+    }
+  }, [loadingMoreEvents, data.hasMoreEvents]);
 
   // Car selection handlers (for multi-car mode)
   const handleCarSelection = useCallback(
@@ -445,12 +490,25 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     [formHandlers, formState.additionalContext]
   );
 
+  // Load more captions handler
+  const handleLoadMoreCaptions = useCallback(async () => {
+    if (loadingMoreCaptions || !data.hasMoreCaptions) return;
+
+    setLoadingMoreCaptions(true);
+    try {
+      // This would need to be implemented in the callbacks
+      // For now, just log that it was called
+      console.log("🔄 Load more captions requested");
+      // TODO: Implement actual load more logic in callbacks
+    } catch (error) {
+      console.error("Error loading more captions:", error);
+    } finally {
+      setLoadingMoreCaptions(false);
+    }
+  }, [loadingMoreCaptions, data.hasMoreCaptions]);
+
   if (loading) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">
-        Loading {config.title.toLowerCase()}...
-      </div>
-    );
+    return <CarTabSkeleton variant="form" />;
   }
 
   if (error) {
@@ -476,9 +534,11 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             <EventSelection
               projectEvents={data.events}
               selectedEventIds={selectedEventIds}
-              loadingEvents={loading}
+              loadingEvents={loading || loadingMoreEvents}
               onEventSelection={handleEventSelection}
               onSelectAllEvents={handleSelectAllEvents}
+              hasMoreEvents={data.hasMoreEvents}
+              onLoadMoreEvents={handleLoadMoreEvents}
             />
           )}
 
@@ -547,6 +607,9 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onEditTextChange={handleEditTextChange}
             onDeleteCaption={handleDeleteContent}
             onUpdatePreviewCaption={handleUpdatePreviewContent}
+            hasMoreCaptions={data.hasMoreCaptions}
+            onLoadMoreCaptions={handleLoadMoreCaptions}
+            loadingCaptions={loadingMoreCaptions}
           />
         </div>
       </div>

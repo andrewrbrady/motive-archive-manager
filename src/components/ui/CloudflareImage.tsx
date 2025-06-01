@@ -1,18 +1,21 @@
 import Image, { ImageProps } from "next/image";
 import {
-  cloudflareImageLoader,
   CLOUDFLARE_VARIANTS,
   isCloudflareImageUrl,
+  cloudflareImageLoader,
 } from "@/lib/cloudflare-image-loader";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 interface CloudflareImageProps extends Omit<ImageProps, "src" | "loader"> {
   src: string;
   variant?: keyof typeof CLOUDFLARE_VARIANTS;
   fallback?: string;
   showError?: boolean;
+  progressive?: boolean; // Enable progressive loading with blur placeholder
+  retryAttempts?: number; // Number of retry attempts for failed loads
+  cacheKey?: string; // Optional cache key for localStorage caching
 }
 
 export function CloudflareImage({
@@ -22,16 +25,19 @@ export function CloudflareImage({
   alt,
   className,
   showError = true,
+  progressive = false, // Disable by default to prevent issues
+  retryAttempts = 1, // Reduce to prevent issues
+  cacheKey,
   ...props
 }: CloudflareImageProps) {
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Use the URL as-is since the API already returns complete Cloudflare URLs
-  // The variant prop is ignored because the URLs already have the correct variant
+  // Use the URL as-is since it's now a base URL, and let Next.js + custom loader handle sizing
   const optimizedSrc = src;
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    console.warn("Image load error:", src);
     setImageError(true);
     setIsLoading(false);
 
@@ -89,7 +95,6 @@ export function CloudflareImage({
     <Image
       src={optimizedSrc}
       alt={alt}
-      loader={cloudflareImageLoader}
       className={cn(
         "transition-opacity duration-300",
         isLoading ? "opacity-0" : "opacity-100",

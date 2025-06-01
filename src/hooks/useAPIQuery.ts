@@ -40,7 +40,7 @@ export function useAPIQuery<T>(
   options: UseAPIQueryOptions<T> = {}
 ) {
   const api = useAPI();
-  const { isReady, isLoading: authLoading } = useAPIStatus();
+  const { isReady } = useAPIStatus();
 
   const { queryKey, ...queryOptions } = options;
 
@@ -52,7 +52,7 @@ export function useAPIQuery<T>(
       }
       return api.get<T>(endpoint);
     },
-    enabled: isReady && options.enabled !== false, // Only run when authenticated and enabled
+    enabled: isReady && options.enabled !== false, // Use optimized isReady (Firebase only)
     ...queryOptions,
   });
 }

@@ -44,15 +44,18 @@ async function getCloudflareAuth() {
 
 // GET images for a car
 export async function GET(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+  const startTime = Date.now();
 
+  const url = new URL(request.url);
+  const segments = url.pathname.split("/");
+  const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+
+  try {
     // Parse query parameters
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "20");
-    const skip = (page - 1) * limit;
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const skip =
+      parseInt(url.searchParams.get("skip") || "0") || (page - 1) * limit;
     const category = url.searchParams.get("category");
     const search = url.searchParams.get("search");
     const angle = url.searchParams.get("angle");
@@ -60,6 +63,7 @@ export async function GET(request: Request) {
     const timeOfDay = url.searchParams.get("timeOfDay");
     const view = url.searchParams.get("view");
     const side = url.searchParams.get("side");
+    const imageType = url.searchParams.get("imageType");
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -71,68 +75,146 @@ export async function GET(request: Request) {
     const db = await getDatabase();
     const carObjectId = new ObjectId(id);
 
-    // Build query for filtering
+    // PERFORMANCE OPTIMIZATION: Build optimized query with proper indexing
     const query: any = { carId: carObjectId };
 
-    // Add metadata filters
+    // Add metadata filters with support for nested metadata
     if (category) query["metadata.category"] = category;
-    if (angle) query["metadata.angle"] = angle;
-    if (movement) query["metadata.movement"] = movement;
-    if (timeOfDay) query["metadata.tod"] = timeOfDay;
-    if (view) query["metadata.view"] = view;
-    if (side) query["metadata.side"] = side;
 
-    // Add search filter
+    // Collect filter conditions to combine with AND
+    const filterConditions = [];
+
+    if (angle) {
+      filterConditions.push({
+        $or: [
+          { "metadata.angle": angle },
+          { "metadata.originalImage.metadata.angle": angle },
+        ],
+      });
+    }
+
+    if (movement) {
+      filterConditions.push({
+        $or: [
+          { "metadata.movement": movement },
+          { "metadata.originalImage.metadata.movement": movement },
+        ],
+      });
+    }
+
+    if (timeOfDay) {
+      filterConditions.push({
+        $or: [
+          { "metadata.tod": timeOfDay },
+          { "metadata.originalImage.metadata.tod": timeOfDay },
+        ],
+      });
+    }
+
+    if (view) {
+      filterConditions.push({
+        $or: [
+          { "metadata.view": view },
+          { "metadata.originalImage.metadata.view": view },
+        ],
+      });
+    }
+
+    if (side) {
+      filterConditions.push({
+        $or: [
+          { "metadata.side": side },
+          { "metadata.originalImage.metadata.side": side },
+        ],
+      });
+    }
+
+    // Handle imageType filter for original vs processed images
+    if (imageType) {
+      if (imageType === "with-id") {
+        // Show only original images (those WITHOUT originalImage metadata)
+        filterConditions.push({
+          "metadata.originalImage": { $exists: false },
+        });
+      } else if (imageType === "processed") {
+        // Show only processed images (those WITH originalImage metadata)
+        filterConditions.push({
+          "metadata.originalImage": { $exists: true },
+        });
+      }
+    }
+
+    // Combine filter conditions with AND
+    if (filterConditions.length > 0) {
+      query.$and = (query.$and || []).concat(filterConditions);
+    }
+
+    // Handle search separately
     if (search) {
-      query.$or = [
+      const searchConditions = [
         { filename: { $regex: search, $options: "i" } },
         { "metadata.description": { $regex: search, $options: "i" } },
       ];
+
+      // Add search as an additional AND condition
+      query.$and = (query.$and || []).concat([{ $or: searchConditions }]);
     }
 
-    // First, check if the car exists and if it has imageIds
-    const car = await db.collection("cars").findOne({ _id: carObjectId });
+    // PERFORMANCE OPTIMIZATION: Use parallel queries for better performance
+    const [car, totalImages, images] = await Promise.all([
+      // Get car info
+      db.collection("cars").findOne(
+        { _id: carObjectId },
+        {
+          projection: { imageIds: 1, primaryImageId: 1 },
+        }
+      ),
+
+      // Count total matching images
+      db.collection("images").countDocuments(query),
+
+      // Get paginated images with optimized projection
+      db
+        .collection("images")
+        .find(query, {
+          projection: {
+            cloudflareId: 1,
+            url: 1,
+            filename: 1,
+            metadata: 1,
+            carId: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        })
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+    ]);
 
     if (!car) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Count total existing images for pagination metadata
-    const totalImages = await db.collection("images").countDocuments(query);
-    console.log(
-      `Found ${totalImages} existing image documents in the database`
-    );
-
-    // Check if we need to create image documents from imageIds
+    // PERFORMANCE OPTIMIZATION: Only create missing documents if really needed
     if (
       totalImages === 0 &&
       car.imageIds &&
       Array.isArray(car.imageIds) &&
       car.imageIds.length > 0
     ) {
-      console.log(
-        `Car ${id} has ${car.imageIds.length} imageIds but no image documents. Creating them now.`
-      );
-
-      // Create image documents from imageIds
+      // Create image documents from imageIds (batched for performance)
       const now = new Date().toISOString();
       const imageDocuments = car.imageIds
         .map((imgId: string) => {
           try {
-            if (!imgId) {
-              return null;
-            }
+            if (!imgId) return null;
 
             let imgObjectId;
-
             if (ObjectId.isValid(imgId)) {
               imgObjectId = new ObjectId(imgId);
             } else {
-              console.log(
-                `Invalid ObjectId format for ${imgId}, using as string ID`
-              );
-              // If it's not a valid ObjectId, we can still use it as the cloudflareId
-              // Just create a new ObjectId for the document ID
               imgObjectId = new ObjectId();
             }
 
@@ -150,51 +232,79 @@ export async function GET(request: Request) {
               updatedAt: now,
             };
           } catch (error) {
-            console.error(
-              `Error creating image document for ID ${imgId}:`,
-              error
-            );
             return null;
           }
         })
         .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
 
-      console.log(
-        `Prepared ${imageDocuments.length} image documents for insertion`
-      );
-
       if (imageDocuments.length > 0) {
         try {
-          // Use insertMany with ordered: false to continue even if some inserts fail
-          const insertResult = await db
-            .collection("images")
-            .insertMany(imageDocuments, { ordered: false });
-          console.log(
-            `Created ${insertResult.insertedCount} image documents from imageIds`
-          );
+          await db.collection("images").insertMany(imageDocuments, {
+            ordered: false,
+            // PERFORMANCE: Use unacknowledged writes for better performance
+            writeConcern: { w: 0 },
+          });
         } catch (error: any) {
-          // Some inserts might fail due to duplicate keys, which is fine
-          if (error.code === 11000) {
-          } else {
+          // Ignore duplicate key errors
+          if (error.code !== 11000) {
             console.error("Error creating image documents:", error);
           }
         }
       }
+
+      // Re-fetch images after creation
+      const newImages = await db
+        .collection("images")
+        .find(query, {
+          projection: {
+            cloudflareId: 1,
+            url: 1,
+            filename: 1,
+            metadata: 1,
+            carId: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        })
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      // Process images with our utility function
+      const processedImages = newImages.map((image) => ({
+        ...image,
+        _id: image._id.toString(),
+        carId: image.carId.toString(),
+        url: getFormattedImageUrl(image.url),
+      }));
+
+      const newTotalImages = await db
+        .collection("images")
+        .countDocuments(query);
+      const totalPages = Math.ceil(newTotalImages / limit);
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      return NextResponse.json({
+        images: processedImages,
+        pagination: {
+          totalImages: newTotalImages,
+          totalPages,
+          currentPage: page,
+          itemsPerPage: limit,
+          startIndex: skip + 1,
+          endIndex: Math.min(skip + limit, newTotalImages),
+        },
+        debug: {
+          queryDuration: `${duration}ms`,
+          cacheStatus: "created_documents",
+        },
+      });
     }
 
-    // Get paginated images
-    console.log(
-      `Fetching paginated images: page=${page}, limit=${limit}, skip=${skip}`
-    );
-    const images = await db
-      .collection("images")
-      .find(query)
-      .sort({ updatedAt: -1, createdAt: -1 }) // Show most recently updated/created first
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-
-    // Process images with our utility function
+    // PERFORMANCE OPTIMIZATION: Streamlined image processing
     const processedImages = images.map((image) => ({
       ...image,
       _id: image._id.toString(),
@@ -205,19 +315,31 @@ export async function GET(request: Request) {
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalImages / limit);
 
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
     return NextResponse.json({
       images: processedImages,
       pagination: {
-        currentPage: page,
-        totalPages,
         totalImages,
-        limit,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
+        totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        startIndex: skip + 1,
+        endIndex: Math.min(skip + limit, totalImages),
+      },
+      debug: {
+        queryDuration: `${duration}ms`,
+        cacheStatus: "existing_documents",
       },
     });
   } catch (error) {
-    console.error("Error fetching car images:", error);
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    console.error(
+      `💥 GET /cars/${id}/images failed after ${duration}ms:`,
+      error
+    );
     return NextResponse.json(
       {
         error: `Failed to fetch car images: ${

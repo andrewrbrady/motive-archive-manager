@@ -56,7 +56,7 @@ export function SystemPromptSelection({
               }
             />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[300px] overflow-y-auto">
             {systemPrompts.map((prompt) => (
               <SelectItem key={prompt._id} value={prompt._id}>
                 <div className="flex items-center gap-2 w-full">

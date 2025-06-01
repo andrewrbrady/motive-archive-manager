@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 import {
   BaseCopywriter,
@@ -18,6 +18,14 @@ import { useAPI } from "@/hooks/useAPI";
 interface CarCopywriterProps {
   carId: string;
 }
+
+// Simple in-memory cache for static data that rarely changes
+const staticDataCache = {
+  systemPrompts: null as any,
+  lengthSettings: null as any,
+  timestamp: 0,
+  isValid: () => Date.now() - staticDataCache.timestamp < 300000, // 5 minutes
+};
 
 export function CarCopywriter({ carId }: CarCopywriterProps) {
   const api = useAPI();
@@ -44,10 +52,53 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   const callbacks: CopywriterCallbacks = {
     onDataFetch: async (): Promise<CopywriterData> => {
       try {
-        // Fetch car details
-        const carData = (await api.get(`cars/${carId}`)) as any;
+        // CRITICAL PATH: Fetch essentials + cached static data
+        const [carData, carEvents, systemPrompts, lengthSettings] =
+          await Promise.all([
+            // Car details - CRITICAL
+            api.get(`cars/${carId}`) as Promise<any>,
 
-        // Convert to project car format
+            // Events with aggressive limit (only 5 events initially) - CRITICAL
+            api.get(`cars/${carId}/events?limit=6`) as Promise<any[]>, // Fetch 6 to check if there are more
+
+            // System prompts - ESSENTIAL for UI dropdowns (use cache if available)
+            (async () => {
+              if (staticDataCache.isValid() && staticDataCache.systemPrompts) {
+                console.log("Using cached system prompts");
+                return staticDataCache.systemPrompts;
+              }
+              try {
+                const data = (await api.get(`system-prompts/list`)) as any;
+                console.log("Successfully fetched system prompts:", data);
+                staticDataCache.systemPrompts = data;
+                staticDataCache.timestamp = Date.now();
+                return data;
+              } catch (error) {
+                console.error("Error fetching system prompts:", error);
+                return [];
+              }
+            })(),
+
+            // Length settings - ESSENTIAL for UI dropdowns (use cache if available)
+            (async () => {
+              if (staticDataCache.isValid() && staticDataCache.lengthSettings) {
+                console.log("Using cached length settings");
+                return staticDataCache.lengthSettings;
+              }
+              try {
+                const data = (await api.get(`length-settings`)) as any[];
+                console.log("Successfully fetched length settings:", data);
+                staticDataCache.lengthSettings = data;
+                staticDataCache.timestamp = Date.now();
+                return data;
+              } catch (error) {
+                console.error("Error fetching length settings:", error);
+                return [];
+              }
+            })(),
+          ]);
+
+        // Convert to project car format immediately
         const projectCar: ProjectCar = {
           _id: carData._id,
           year: carData.year || 0,
@@ -59,11 +110,19 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           createdAt: new Date().toISOString(),
         };
 
-        // Fetch car events
-        let carEvents: ProjectEvent[] = [];
-        try {
-          const events = (await api.get(`cars/${carId}/events`)) as any[];
-          carEvents = events.map((event: any) => ({
+        // Convert events to project format immediately
+        const hasMoreEventsAvailable = carEvents.length > 5;
+        const eventsToDisplay = carEvents.slice(0, 5); // Only show first 5
+
+        const projectEvents: ProjectEvent[] = eventsToDisplay
+          .filter((event: any) => {
+            if (!event._id) {
+              console.warn("🚨 Event without ID found:", event);
+              return false;
+            }
+            return true;
+          })
+          .map((event: any) => ({
             id: event._id,
             car_id: carId,
             type: event.type,
@@ -79,66 +138,101 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
             createdAt: event.createdAt,
             updatedAt: event.updatedAt,
           }));
-        } catch (error) {
-          console.error("Error fetching car events:", error);
-        }
 
-        // Fetch system prompts
-        const systemPrompts = (await api.get(`system-prompts/active`)) as any;
-
-        // Fetch length settings
-        let lengthSettings = [];
-        try {
-          lengthSettings = (await api.get(`admin/length-settings`)) as any[];
-        } catch (error) {
-          console.error("Error fetching length settings:", error);
-        }
-
-        // Fetch saved captions
-        let savedCaptionsData = [];
-        try {
-          savedCaptionsData = (await api.get(
-            `captions?carId=${carId}`
-          )) as any[];
-        } catch (error) {
-          console.error("Error fetching saved captions:", error);
-        }
-
-        // Convert car captions to project caption format
-        const savedCaptions = savedCaptionsData.map((caption: any) => ({
-          _id: caption._id,
-          platform: caption.platform,
-          context: caption.context,
-          caption: caption.caption,
-          projectId: "",
-          carIds: [caption.carId],
-          eventIds: [],
-          createdAt: caption.createdAt,
-        }));
-
-        // Get client handle
-        let clientHandle: string | null = null;
-        try {
-          const clientId =
-            carData.client || carData.clientId || carData.clientInfo?._id;
-          if (clientId) {
-            const client = (await api.get(`clients/${clientId}`)) as any;
-            if (client.socialMedia?.instagram) {
-              clientHandle = `@${client.socialMedia.instagram.replace(/^@/, "")}`;
+        // FETCH NON-CRITICAL DATA ASYNCHRONOUSLY (captions and client handle)
+        const fetchNonCriticalData = async () => {
+          try {
+            // Always fetch captions fresh (user-specific data)
+            let savedCaptionsData = [];
+            let hasMoreCaptionsAvailable = false;
+            try {
+              savedCaptionsData = (await api.get(
+                `captions?carId=${carId}&limit=4&sort=-createdAt` // Fetch 4 to check if there are more
+              )) as any[];
+              hasMoreCaptionsAvailable = savedCaptionsData.length > 3;
+              savedCaptionsData = savedCaptionsData.slice(0, 3); // Only show first 3
+            } catch (error) {
+              console.error("Error fetching saved captions:", error);
             }
+
+            // Convert car captions to project caption format
+            const savedCaptions = savedCaptionsData.map((caption: any) => ({
+              _id: caption._id,
+              platform: caption.platform,
+              context: caption.context,
+              caption: caption.caption,
+              projectId: "",
+              carIds: [caption.carId],
+              eventIds: [],
+              createdAt: caption.createdAt,
+            }));
+
+            return { savedCaptions, hasMoreCaptionsAvailable };
+          } catch (error) {
+            console.error("Error in background fetch:", error);
+            return { savedCaptions: [], hasMoreCaptionsAvailable: false };
           }
+        };
+
+        // Start background fetch for captions
+        let savedCaptions: any[] = [];
+        let hasMoreCaptionsAvailable = false;
+
+        try {
+          const captionData = await fetchNonCriticalData();
+          savedCaptions = captionData.savedCaptions;
+          hasMoreCaptionsAvailable = captionData.hasMoreCaptionsAvailable;
         } catch (error) {
-          console.error("Error fetching client data:", error);
+          console.error("Background caption fetch failed:", error);
         }
 
-        return {
+        // FETCH CLIENT HANDLE ASYNCHRONOUSLY (lowest priority)
+        const clientId =
+          carData.client || carData.clientId || carData.clientInfo?._id;
+        if (clientId) {
+          const fetchClientHandle = async () => {
+            try {
+              const client = (await api.get(`clients/${clientId}`)) as any;
+
+              if (client.socialMedia?.instagram) {
+                // Client handle is ready but we don't try to update UI directly
+                // The data will be available when the component refreshes or re-fetches
+              }
+            } catch (error) {
+              console.error("Error fetching client handle:", error);
+            }
+          };
+
+          // Fire and forget - lowest priority
+          fetchClientHandle().catch((error) => {
+            console.error("Client handle fetch error (non-critical):", error);
+            // Don't throw - this is non-critical data
+          });
+        }
+
+        // RETURN COMPLETE DATA with all essential fields populated
+        const result = {
           cars: [projectCar],
-          events: carEvents,
-          systemPrompts,
-          lengthSettings,
-          savedCaptions,
-          clientHandle,
+          events: projectEvents,
+          systemPrompts: systemPrompts || [],
+          lengthSettings: lengthSettings || [],
+          savedCaptions: savedCaptions,
+          clientHandle: null, // Will be populated asynchronously
+          hasMoreEvents: hasMoreEventsAvailable,
+          hasMoreCaptions: hasMoreCaptionsAvailable,
         };
+
+        console.log("CarCopywriter: Returning data:", {
+          carsCount: result.cars.length,
+          eventsCount: result.events.length,
+          systemPromptsCount: result.systemPrompts.length,
+          lengthSettingsCount: result.lengthSettings.length,
+          savedCaptionsCount: result.savedCaptions.length,
+          systemPromptsFirst: result.systemPrompts[0],
+          lengthSettingsFirst: result.lengthSettings[0],
+        });
+
+        return result;
       } catch (error) {
         console.error("Error fetching car copywriter data:", error);
         throw error;

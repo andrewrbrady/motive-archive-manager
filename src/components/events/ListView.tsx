@@ -149,7 +149,21 @@ function ListViewContent({
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        if (status !== "authenticated" || !session?.user || !api) {
+        // PROGRESSIVE SESSION: More resilient to progressive session loading
+        // Check for API availability first, then session state
+        if (!api) {
+          console.log("ListView: API not ready yet for fetchUsers");
+          setUsers([]);
+          setUsersLoading(false);
+          return;
+        }
+
+        if (status === "loading") {
+          console.log("ListView: Session still loading for fetchUsers");
+          return; // Don't set loading false, keep waiting
+        }
+
+        if (status !== "authenticated" || !session?.user) {
           console.log(
             "ListView: No authenticated session available for fetchUsers"
           );

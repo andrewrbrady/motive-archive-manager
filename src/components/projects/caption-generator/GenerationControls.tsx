@@ -142,7 +142,7 @@ export function GenerationControls({
                 )}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[300px] overflow-y-auto">
               {promptError && (
                 <SelectItem
                   value="__ERROR__"

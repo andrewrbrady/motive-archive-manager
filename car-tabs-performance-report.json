@@ -1,0 +1,633 @@
+{
+  "timestamp": "2025-06-01T02:34:20.839Z",
+  "carId": "67d13094dc27b630a36fb449",
+  "summary": {
+    "totalTabs": 9,
+    "highPriorityTabs": 3,
+    "optimizedTabs": 1,
+    "criticalPathTabs": 2
+  },
+  "tabs": [
+    {
+      "name": "Image Gallery",
+      "value": "gallery",
+      "component": "CarImageGallery",
+      "file": "cars/CarImageGallery.tsx",
+      "priority": "HIGH",
+      "expectedAPIs": [
+        "images",
+        "cloudflare"
+      ],
+      "criticalPath": true,
+      "analysis": {
+        "totalLines": 209,
+        "useEffectCount": 0,
+        "useStateCount": 0,
+        "apiCallCount": 0,
+        "importCount": 9,
+        "componentSize": "MEDIUM",
+        "hasLazyLoading": false,
+        "hasPagination": false,
+        "hasErrorHandling": false,
+        "hasLoadingStates": true,
+        "complexity": "LOW"
+      },
+      "recommendations": [
+        {
+          "type": "PERFORMANCE",
+          "priority": "MEDIUM",
+          "issue": "Large component not lazy loaded",
+          "solution": "Implement lazy loading with React.lazy()",
+          "example": "const Component = lazy(() => import(\"./Component\"))"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=gallery",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=gallery",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/gallery\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "CRITICAL"
+    },
+    {
+      "name": "Attached Galleries",
+      "value": "car-galleries",
+      "component": "CarGalleries",
+      "file": "cars/CarGalleries.tsx",
+      "priority": "MEDIUM",
+      "expectedAPIs": [
+        "galleries"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 746,
+        "useEffectCount": 5,
+        "useStateCount": 8,
+        "apiCallCount": 7,
+        "importCount": 11,
+        "componentSize": "VERY_LARGE",
+        "hasLazyLoading": false,
+        "hasPagination": true,
+        "hasErrorHandling": true,
+        "hasLoadingStates": true,
+        "complexity": "HIGH"
+      },
+      "recommendations": [
+        {
+          "type": "ARCHITECTURE",
+          "priority": "HIGH",
+          "issue": "Component is 746 lines - too large",
+          "solution": "Split into smaller components using the BaseCopywriter pattern",
+          "example": "Create BaseTab + specific tab implementation"
+        },
+        {
+          "type": "PERFORMANCE",
+          "priority": "MEDIUM",
+          "issue": "Large component not lazy loaded",
+          "solution": "Implement lazy loading with React.lazy()",
+          "example": "const Component = lazy(() => import(\"./Component\"))"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=car-galleries",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=car-galleries",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/car-galleries\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "HIGH"
+    },
+    {
+      "name": "Specifications",
+      "value": "specs",
+      "component": "Specifications",
+      "file": "cars/Specifications.tsx",
+      "priority": "MEDIUM",
+      "expectedAPIs": [
+        "cars"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 1270,
+        "useEffectCount": 3,
+        "useStateCount": 7,
+        "apiCallCount": 4,
+        "importCount": 12,
+        "componentSize": "VERY_LARGE",
+        "hasLazyLoading": false,
+        "hasPagination": false,
+        "hasErrorHandling": true,
+        "hasLoadingStates": false,
+        "complexity": "HIGH"
+      },
+      "recommendations": [
+        {
+          "type": "ARCHITECTURE",
+          "priority": "HIGH",
+          "issue": "Component is 1270 lines - too large",
+          "solution": "Split into smaller components using the BaseCopywriter pattern",
+          "example": "Create BaseTab + specific tab implementation"
+        },
+        {
+          "type": "API",
+          "priority": "HIGH",
+          "issue": "4 API calls without pagination",
+          "solution": "Implement critical path + background loading pattern",
+          "example": "Load essential data first, non-critical data in background"
+        },
+        {
+          "type": "UX",
+          "priority": "MEDIUM",
+          "issue": "Missing loading states for API calls",
+          "solution": "Add skeleton loading and progressive enhancement",
+          "example": "Show immediate UI with placeholders while data loads"
+        },
+        {
+          "type": "PERFORMANCE",
+          "priority": "MEDIUM",
+          "issue": "Large component not lazy loaded",
+          "solution": "Implement lazy loading with React.lazy()",
+          "example": "const Component = lazy(() => import(\"./Component\"))"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=specs",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=specs",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/specs\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "CRITICAL"
+    },
+    {
+      "name": "Copywriter",
+      "value": "captions",
+      "component": "CarCopywriter",
+      "file": "copywriting/CarCopywriter.tsx",
+      "priority": "HIGH",
+      "expectedAPIs": [
+        "events",
+        "system-prompts",
+        "captions",
+        "length-settings"
+      ],
+      "criticalPath": true,
+      "optimized": true,
+      "analysis": {
+        "totalLines": 312,
+        "useEffectCount": 1,
+        "useStateCount": 1,
+        "apiCallCount": 12,
+        "importCount": 6,
+        "componentSize": "LARGE",
+        "hasLazyLoading": false,
+        "hasPagination": true,
+        "hasErrorHandling": true,
+        "hasLoadingStates": false,
+        "complexity": "HIGH"
+      },
+      "recommendations": [
+        {
+          "type": "UX",
+          "priority": "MEDIUM",
+          "issue": "Missing loading states for API calls",
+          "solution": "Add skeleton loading and progressive enhancement",
+          "example": "Show immediate UI with placeholders while data loads"
+        },
+        {
+          "type": "CRITICAL_PATH",
+          "priority": "VERY_HIGH",
+          "issue": "Critical path tab has high complexity",
+          "solution": "Apply aggressive optimization like CarCopywriter",
+          "example": "Reduce to essential data only, background load everything else"
+        },
+        {
+          "type": "PERFORMANCE",
+          "priority": "MEDIUM",
+          "issue": "Large component not lazy loaded",
+          "solution": "Implement lazy loading with React.lazy()",
+          "example": "const Component = lazy(() => import(\"./Component\"))"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=captions",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=captions",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/captions\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "HIGH"
+    },
+    {
+      "name": "Inspections",
+      "value": "inspections",
+      "component": "InspectionTab",
+      "file": "cars/InspectionTab.tsx",
+      "priority": "MEDIUM",
+      "expectedAPIs": [
+        "inspections"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 179,
+        "useEffectCount": 2,
+        "useStateCount": 3,
+        "apiCallCount": 4,
+        "importCount": 9,
+        "componentSize": "MEDIUM",
+        "hasLazyLoading": false,
+        "hasPagination": true,
+        "hasErrorHandling": true,
+        "hasLoadingStates": true,
+        "complexity": "MEDIUM"
+      },
+      "recommendations": [],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=inspections",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=inspections",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/inspections\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "LOW"
+    },
+    {
+      "name": "Documentation",
+      "value": "documentation",
+      "component": "DocumentationFiles",
+      "file": "DocumentationFiles.tsx",
+      "priority": "MEDIUM",
+      "expectedAPIs": [
+        "files",
+        "documents"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 421,
+        "useEffectCount": 2,
+        "useStateCount": 9,
+        "apiCallCount": 5,
+        "importCount": 6,
+        "componentSize": "LARGE",
+        "hasLazyLoading": false,
+        "hasPagination": false,
+        "hasErrorHandling": true,
+        "hasLoadingStates": true,
+        "complexity": "HIGH"
+      },
+      "recommendations": [
+        {
+          "type": "ARCHITECTURE",
+          "priority": "HIGH",
+          "issue": "Component is 421 lines - too large",
+          "solution": "Split into smaller components using the BaseCopywriter pattern",
+          "example": "Create BaseTab + specific tab implementation"
+        },
+        {
+          "type": "API",
+          "priority": "HIGH",
+          "issue": "5 API calls without pagination",
+          "solution": "Implement critical path + background loading pattern",
+          "example": "Load essential data first, non-critical data in background"
+        },
+        {
+          "type": "PERFORMANCE",
+          "priority": "MEDIUM",
+          "issue": "Large component not lazy loaded",
+          "solution": "Implement lazy loading with React.lazy()",
+          "example": "const Component = lazy(() => import(\"./Component\"))"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=documentation",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=documentation",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/documentation\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "CRITICAL"
+    },
+    {
+      "name": "Deliverables",
+      "value": "deliverables",
+      "component": "DeliverablesTab",
+      "file": "deliverables/DeliverablesTab.tsx",
+      "priority": "HIGH",
+      "expectedAPIs": [
+        "deliverables"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 160,
+        "useEffectCount": 0,
+        "useStateCount": 5,
+        "apiCallCount": 4,
+        "importCount": 12,
+        "componentSize": "MEDIUM",
+        "hasLazyLoading": false,
+        "hasPagination": false,
+        "hasErrorHandling": true,
+        "hasLoadingStates": true,
+        "complexity": "MEDIUM"
+      },
+      "recommendations": [
+        {
+          "type": "API",
+          "priority": "HIGH",
+          "issue": "4 API calls without pagination",
+          "solution": "Implement critical path + background loading pattern",
+          "example": "Load essential data first, non-critical data in background"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=deliverables",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=deliverables",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/deliverables\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "CRITICAL"
+    },
+    {
+      "name": "Events",
+      "value": "events",
+      "component": "EventsTab",
+      "file": "cars/EventsTab.tsx",
+      "priority": "MEDIUM",
+      "expectedAPIs": [
+        "events"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 639,
+        "useEffectCount": 2,
+        "useStateCount": 10,
+        "apiCallCount": 9,
+        "importCount": 26,
+        "componentSize": "VERY_LARGE",
+        "hasLazyLoading": false,
+        "hasPagination": false,
+        "hasErrorHandling": true,
+        "hasLoadingStates": true,
+        "complexity": "VERY_HIGH"
+      },
+      "recommendations": [
+        {
+          "type": "ARCHITECTURE",
+          "priority": "HIGH",
+          "issue": "Component is 639 lines - too large",
+          "solution": "Split into smaller components using the BaseCopywriter pattern",
+          "example": "Create BaseTab + specific tab implementation"
+        },
+        {
+          "type": "API",
+          "priority": "HIGH",
+          "issue": "9 API calls without pagination",
+          "solution": "Implement critical path + background loading pattern",
+          "example": "Load essential data first, non-critical data in background"
+        },
+        {
+          "type": "PERFORMANCE",
+          "priority": "MEDIUM",
+          "issue": "Large component not lazy loaded",
+          "solution": "Implement lazy loading with React.lazy()",
+          "example": "const Component = lazy(() => import(\"./Component\"))"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=events",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=events",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/events\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "CRITICAL"
+    },
+    {
+      "name": "Calendar",
+      "value": "calendar",
+      "component": "CalendarTab",
+      "file": "cars/CalendarTab.tsx",
+      "priority": "MEDIUM",
+      "expectedAPIs": [
+        "events",
+        "deliverables"
+      ],
+      "criticalPath": false,
+      "analysis": {
+        "totalLines": 110,
+        "useEffectCount": 2,
+        "useStateCount": 4,
+        "apiCallCount": 9,
+        "importCount": 8,
+        "componentSize": "MEDIUM",
+        "hasLazyLoading": false,
+        "hasPagination": false,
+        "hasErrorHandling": true,
+        "hasLoadingStates": true,
+        "complexity": "HIGH"
+      },
+      "recommendations": [
+        {
+          "type": "API",
+          "priority": "HIGH",
+          "issue": "9 API calls without pagination",
+          "solution": "Implement critical path + background loading pattern",
+          "example": "Load essential data first, non-critical data in background"
+        }
+      ],
+      "performanceTests": {
+        "manual": [
+          "Navigate to /cars/67d13094dc27b630a36fb449?tab=calendar",
+          "Open browser dev tools (F12)",
+          "Go to Network tab and clear",
+          "Refresh the page",
+          "Measure time to first API response",
+          "Measure time to UI interactive",
+          "Note any slow (>1s) API calls"
+        ],
+        "automated": {
+          "lighthouse": "npx lighthouse http://localhost:3000/cars/67d13094dc27b630a36fb449?tab=calendar",
+          "loadTest": "curl -w \"@curl-format.txt\" -o /dev/null -s \"http://localhost:3000/api/cars/67d13094dc27b630a36fb449/calendar\""
+        },
+        "targets": {
+          "tabSwitch": "<200ms (instant feel)",
+          "criticalPath": "<800ms (essential data)",
+          "totalLoad": "<1500ms (full functionality)",
+          "apiCalls": "<500ms each (database queries)"
+        }
+      },
+      "optimizationPriority": "HIGH"
+    }
+  ],
+  "priorityMatrix": [
+    {
+      "tier": "🔥 CRITICAL IMPACT (Fix First)",
+      "tabs": [
+        {
+          "name": "Image Gallery",
+          "reason": "HIGH priority, LOW complexity, 1 issues"
+        },
+        {
+          "name": "Specifications",
+          "reason": "MEDIUM priority, HIGH complexity, 4 issues"
+        },
+        {
+          "name": "Documentation",
+          "reason": "MEDIUM priority, HIGH complexity, 3 issues"
+        },
+        {
+          "name": "Deliverables",
+          "reason": "HIGH priority, MEDIUM complexity, 1 issues"
+        },
+        {
+          "name": "Events",
+          "reason": "MEDIUM priority, VERY_HIGH complexity, 3 issues"
+        }
+      ]
+    },
+    {
+      "tier": "⚡ HIGH IMPACT",
+      "tabs": [
+        {
+          "name": "Attached Galleries",
+          "reason": "746 lines, 7 APIs"
+        },
+        {
+          "name": "Copywriter",
+          "reason": "312 lines, 12 APIs"
+        },
+        {
+          "name": "Calendar",
+          "reason": "110 lines, 9 APIs"
+        }
+      ]
+    },
+    {
+      "tier": "📈 MEDIUM IMPACT",
+      "tabs": []
+    },
+    {
+      "tier": "✅ LOW IMPACT",
+      "tabs": [
+        {
+          "name": "Inspections",
+          "reason": "Simple component"
+        }
+      ]
+    }
+  ]
+}

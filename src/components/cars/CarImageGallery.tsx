@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useCallback, useRef } from "react";
 import { useImageGallery } from "@/hooks/useImageGallery";
 import { ImageFilters } from "./gallery/ImageFilters";
 import { ImageViewer } from "./gallery/ImageViewer";
@@ -8,7 +8,8 @@ import { ImageThumbnails } from "./gallery/ImageThumbnails";
 import { ImageModal } from "./gallery/ImageModal";
 import { UploadDialog } from "./gallery/UploadDialog";
 import { EditModeControls } from "./gallery/EditModeControls";
-import { Loader2 } from "lucide-react";
+import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
+import { useToast } from "@/components/ui/use-toast";
 
 interface CarImageGalleryProps {
   carId: string;
@@ -21,12 +22,16 @@ interface CarImageGalleryProps {
 
 export function CarImageGallery({
   carId,
-  showFilters = false,
+  showFilters = true,
   vehicleInfo,
   onFilterOptionsChange,
   onUploadStarted,
   onUploadEnded,
 }: CarImageGalleryProps) {
+  const { toast } = useToast();
+  const lastCopyTimeRef = useRef<number>(0);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const {
     // Data
     images,
@@ -35,6 +40,8 @@ export function CarImageGallery({
     filterOptions,
     isLoading,
     error,
+    totalImagesAvailable,
+    serverPagination,
 
     // State
     filters,
@@ -45,6 +52,8 @@ export function CarImageGallery({
     isUploadDialogOpen,
     showImageInfo,
     isEditMode,
+    isLoadingMore,
+    isNavigating,
 
     // Actions
     setFilters,
@@ -61,15 +70,203 @@ export function CarImageGallery({
     handleDeleteSelected,
     reanalyzeImage,
     handleSetPrimaryImage,
+    loadMoreImages,
   } = useImageGallery(carId, vehicleInfo);
+
+  // Enhanced URL copying with support for highest quality
+  const copyImageUrl = useCallback(
+    (useHighestQuality = false) => {
+      if (!currentImage) return;
+
+      let urlToCopy = currentImage.url;
+
+      if (currentImage.url.includes("imagedelivery.net")) {
+        // For Cloudflare images, ensure we have proper transformation parameters
+
+        // Remove any existing variant/parameters from the URL
+        const baseUrlMatch = currentImage.url.match(
+          /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+        );
+        if (baseUrlMatch) {
+          const baseUrl = baseUrlMatch[1];
+
+          if (useHighestQuality) {
+            // High quality: max 5000px width, 100% quality
+            urlToCopy = `${baseUrl}/w=5000,q=100`;
+          } else {
+            // Standard quality: reasonable defaults (1200px width, 85% quality)
+            urlToCopy = `${baseUrl}/w=1200,q=85`;
+          }
+        } else {
+          // Fallback: if URL doesn't match expected pattern, just use original
+          urlToCopy = currentImage.url;
+        }
+      }
+
+      navigator.clipboard
+        .writeText(urlToCopy)
+        .then(() => {
+          toast({
+            title: useHighestQuality
+              ? "Highest Quality URL Copied!"
+              : "Image URL Copied!",
+            description: useHighestQuality
+              ? "Maximum resolution image URL copied to clipboard"
+              : "Standard image URL copied to clipboard",
+            duration: 2000,
+          });
+        })
+        .catch(() => {
+          toast({
+            title: "Copy Failed",
+            description: "Failed to copy URL to clipboard",
+            variant: "destructive",
+            duration: 2000,
+          });
+        });
+    },
+    [currentImage, toast]
+  );
+
+  // Keyboard navigation handler
+  const handleKeyboardNavigation = useCallback(
+    (event: KeyboardEvent) => {
+      // Ignore keyboard events when typing in input fields
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      const isShiftPressed = event.shiftKey;
+      const key = event.key;
+
+      // Handle Shift + Key combinations
+      if (isShiftPressed) {
+        switch (key.toLowerCase()) {
+          case "f":
+            event.preventDefault();
+            // Toggle fullscreen lightbox
+            setIsModalOpen(!isModalOpen);
+            break;
+
+          case "i":
+            event.preventDefault();
+            // Toggle image info
+            setShowImageInfo(!showImageInfo);
+            break;
+
+          case "c":
+            event.preventDefault();
+            if (!currentImage) return;
+
+            // Double copy detection for highest quality
+            const now = Date.now();
+            const timeSinceLastCopy = now - lastCopyTimeRef.current;
+
+            if (timeSinceLastCopy < 1000) {
+              // Less than 1 second = double press
+              // Clear any existing timeout
+              if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+                copyTimeoutRef.current = null;
+              }
+              // Copy highest quality URL
+              copyImageUrl(true);
+              lastCopyTimeRef.current = 0; // Reset to prevent triple-click issues
+            } else {
+              // Single press - set timeout to copy standard URL
+              lastCopyTimeRef.current = now;
+              copyTimeoutRef.current = setTimeout(() => {
+                copyImageUrl(false);
+                copyTimeoutRef.current = null;
+              }, 300); // Wait 300ms to see if there's a second press
+            }
+            break;
+
+          case "arrowleft":
+            event.preventDefault();
+            // Navigate to previous page
+            if (currentPage > 0) {
+              setCurrentPage(currentPage - 1);
+            }
+            break;
+
+          case "arrowright":
+            event.preventDefault();
+            // Navigate to next page
+            const totalPages =
+              serverPagination?.totalPages ||
+              Math.ceil(
+                filteredImages.length / (serverPagination?.itemsPerPage || 20)
+              );
+            if (currentPage < totalPages - 1) {
+              setCurrentPage(currentPage + 1);
+            }
+            break;
+        }
+        return;
+      }
+
+      // Handle non-shift key combinations
+      switch (key) {
+        case "ArrowLeft":
+          event.preventDefault();
+          handlePrev();
+          break;
+
+        case "ArrowRight":
+          event.preventDefault();
+          handleNext();
+          break;
+
+        case "Escape":
+          event.preventDefault();
+          if (isModalOpen) {
+            setIsModalOpen(false);
+          }
+          break;
+      }
+    },
+    [
+      isModalOpen,
+      showImageInfo,
+      currentImage,
+      handleNext,
+      handlePrev,
+      setIsModalOpen,
+      setShowImageInfo,
+      copyImageUrl,
+      currentPage,
+      serverPagination,
+      setCurrentPage,
+      filteredImages,
+    ]
+  );
+
+  // Set up keyboard event listeners
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyboardNavigation);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyboardNavigation);
+
+      // Cleanup copy timeout
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, [handleKeyboardNavigation]);
+
+  useEffect(() => {
+    // Only log essential information when data changes
+  }, [carId, images.length]);
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <CarTabSkeleton variant="gallery" />;
   }
 
   // Error state
@@ -133,9 +330,9 @@ export function CarImageGallery({
       )}
 
       {/* Main Gallery Layout */}
-      <div className="flex gap-6">
-        {/* Main Image Viewer - 2/3 width */}
-        <div className="w-2/3">
+      <div className="flex gap-6 h-[calc(100vh-350px)] min-h-[500px]">
+        {/* Main Image Viewer - responsive width */}
+        <div className="flex-1 min-w-0 lg:w-2/3">
           <ImageViewer
             currentImage={currentImage}
             onNext={handleNext}
@@ -147,8 +344,8 @@ export function CarImageGallery({
           />
         </div>
 
-        {/* Thumbnails - 1/3 width */}
-        <div className="w-1/3">
+        {/* Thumbnails - responsive width */}
+        <div className="w-full lg:w-1/3 lg:max-w-[400px] min-w-[280px]">
           <ImageThumbnails
             images={filteredImages}
             currentImage={currentImage}
@@ -156,21 +353,34 @@ export function CarImageGallery({
             currentPage={currentPage}
             isEditMode={isEditMode}
             showImageInfo={showImageInfo}
+            isLoadingMore={isLoadingMore}
+            isNavigating={isNavigating}
+            totalImagesAvailable={totalImagesAvailable}
+            filters={filters}
+            searchQuery={searchQuery}
             onImageSelect={setMainImage}
             onToggleSelection={toggleImageSelection}
             onPageChange={setCurrentPage}
             onToggleInfo={setShowImageInfo}
             onReanalyze={reanalyzeImage}
             onSetPrimary={handleSetPrimaryImage}
+            onLoadMore={loadMoreImages}
+            serverPagination={serverPagination}
           />
         </div>
       </div>
 
-      {/* Full Screen Modal */}
+      {/* Enhanced Full Screen Modal with navigation */}
       <ImageModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         currentImage={currentImage}
+        images={filteredImages}
+        onNext={handleNext}
+        onPrev={handlePrev}
+        showImageInfo={showImageInfo}
+        onToggleInfo={() => setShowImageInfo(!showImageInfo)}
+        onCopyUrl={copyImageUrl}
       />
 
       {/* Upload Dialog */}

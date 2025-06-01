@@ -29,11 +29,62 @@ export async function GET(request: NextRequest) {
     // Build query
     const query: any = {};
 
-    // Add metadata filters
-    if (angle) query["metadata.angle"] = angle;
-    if (movement) query["metadata.movement"] = movement;
-    if (tod) query["metadata.tod"] = tod;
-    if (view) query["metadata.view"] = view;
+    // Collect filter conditions to combine with AND
+    const filterConditions = [];
+
+    // Add metadata filters with support for nested metadata and case-insensitive matching
+    if (angle) {
+      filterConditions.push({
+        $or: [
+          { "metadata.angle": { $regex: new RegExp(`^${angle}$`, "i") } },
+          {
+            "metadata.originalImage.metadata.angle": {
+              $regex: new RegExp(`^${angle}$`, "i"),
+            },
+          },
+        ],
+      });
+    }
+
+    if (movement) {
+      filterConditions.push({
+        $or: [
+          { "metadata.movement": { $regex: new RegExp(`^${movement}$`, "i") } },
+          {
+            "metadata.originalImage.metadata.movement": {
+              $regex: new RegExp(`^${movement}$`, "i"),
+            },
+          },
+        ],
+      });
+    }
+
+    if (tod) {
+      filterConditions.push({
+        $or: [
+          { "metadata.tod": { $regex: new RegExp(`^${tod}$`, "i") } },
+          {
+            "metadata.originalImage.metadata.tod": {
+              $regex: new RegExp(`^${tod}$`, "i"),
+            },
+          },
+        ],
+      });
+    }
+
+    if (view) {
+      filterConditions.push({
+        $or: [
+          { "metadata.view": { $regex: new RegExp(`^${view}$`, "i") } },
+          {
+            "metadata.originalImage.metadata.view": {
+              $regex: new RegExp(`^${view}$`, "i"),
+            },
+          },
+        ],
+      });
+    }
+
     if (carId && carId !== "all") {
       try {
         query.carId = new ObjectId(carId);
@@ -46,12 +97,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Add search filter
+    // Combine filter conditions with AND
+    if (filterConditions.length > 0) {
+      query.$and = (query.$and || []).concat(filterConditions);
+    }
+
+    // Handle search separately
     if (search) {
-      query.$or = [
+      const searchConditions = [
         { filename: { $regex: search, $options: "i" } },
         { "metadata.description": { $regex: search, $options: "i" } },
       ];
+
+      // Add search as an additional AND condition
+      query.$and = (query.$and || []).concat([{ $or: searchConditions }]);
     }
 
     // [REMOVED] // [REMOVED] console.log("[API] MongoDB query:", JSON.stringify(query, null, 2));

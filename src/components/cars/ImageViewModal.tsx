@@ -287,7 +287,7 @@ export function ImageViewModal({
                 src={fullResImageUrl || image.url}
                 alt={image.filename || "Image"}
                 fill
-                sizes="60vw"
+                sizes="(max-width: 768px) 95vw, (max-width: 1200px) 800px, 1200px"
                 className="object-contain"
               />
             </div>

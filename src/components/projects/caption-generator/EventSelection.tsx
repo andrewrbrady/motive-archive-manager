@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "lucide-react";
+import { Calendar, Plus } from "lucide-react";
 import { ProjectEvent } from "./types";
 
 interface EventSelectionProps {
@@ -11,6 +11,9 @@ interface EventSelectionProps {
   loadingEvents: boolean;
   onEventSelection: (eventId: string) => void;
   onSelectAllEvents: () => void;
+  // Optional load more functionality
+  hasMoreEvents?: boolean;
+  onLoadMoreEvents?: () => void;
 }
 
 export function EventSelection({
@@ -19,8 +22,10 @@ export function EventSelection({
   loadingEvents,
   onEventSelection,
   onSelectAllEvents,
+  hasMoreEvents = false,
+  onLoadMoreEvents,
 }: EventSelectionProps) {
-  if (loadingEvents) {
+  if (loadingEvents && projectEvents.length === 0) {
     return (
       <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
         <div className="text-sm text-[hsl(var(--foreground-muted))]">
@@ -53,14 +58,14 @@ export function EventSelection({
       </div>
 
       <div className="grid grid-cols-1 gap-3">
-        {projectEvents.map((event) => {
+        {projectEvents.map((event, index) => {
           const isSelected = selectedEventIds.includes(event.id);
           const eventDate = new Date(event.start);
           const isUpcoming = eventDate > new Date();
 
           return (
             <button
-              key={event.id}
+              key={event.id ? `event-${event.id}` : `event-index-${index}`}
               onClick={() => onEventSelection(event.id)}
               className={`flex items-center space-x-3 p-3 border rounded-lg transition-all text-left w-full ${
                 isSelected
@@ -102,6 +107,28 @@ export function EventSelection({
           );
         })}
       </div>
+
+      {/* Load More Events Button */}
+      {hasMoreEvents && onLoadMoreEvents && (
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLoadMoreEvents}
+            disabled={loadingEvents}
+            className="w-full border-[hsl(var(--border))] text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))]"
+          >
+            {loadingEvents ? (
+              <>Loading more events...</>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-2" />
+                Load More Events
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {selectedEventIds.length > 0 && (
         <div className="text-sm text-[hsl(var(--foreground-muted))]">

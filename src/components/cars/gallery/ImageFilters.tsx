@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -28,18 +29,27 @@ export function ImageFilters({
   onSearchChange,
   onUploadClick,
 }: ImageFiltersProps) {
-  const handleFilterChange = (type: string, value: string) => {
-    const newFilters = { ...filters };
-    if (value === "" || value === "all") {
-      delete newFilters[type as keyof FilterState];
-    } else {
-      newFilters[type as keyof FilterState] = value;
-    }
-    onFiltersChange(newFilters);
+  // Only log when filters actually change
+  const handleFilterChange = useCallback(
+    (type: string, value: string) => {
+      const newFilters = { ...filters };
+      if ((newFilters as any)[type] === value) {
+        delete (newFilters as any)[type];
+      } else {
+        (newFilters as any)[type] = value;
+      }
+      onFiltersChange(newFilters);
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleImageTypeChange = (value: string) => {
+    handleFilterChange("imageType", value);
   };
 
   const clearFilters = () => {
     onFiltersChange({});
+    onSearchChange(""); // Also clear search query
   };
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -56,6 +66,21 @@ export function ImageFilters({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Image Type filter */}
+        <Select
+          value={filters.imageType || "all"}
+          onValueChange={handleImageTypeChange}
+        >
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Image Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All images</SelectItem>
+            <SelectItem value="with-id">With Image ID</SelectItem>
+            <SelectItem value="processed">Processed Only</SelectItem>
+          </SelectContent>
+        </Select>
+
         {/* Angle filter */}
         <Select
           value={filters.angle || "all"}

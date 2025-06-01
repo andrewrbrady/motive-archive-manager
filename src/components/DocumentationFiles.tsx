@@ -6,6 +6,7 @@ import { FileText, Trash2, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "react-hot-toast";
+import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
 
 interface DocumentationFile {
   _id: string;
@@ -361,9 +362,7 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
         </div>
         <div className="divide-y">
           {isLoadingFiles ? (
-            <div className="p-8 flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <CarTabSkeleton variant="list" itemCount={3} />
           ) : files.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-muted-foreground">

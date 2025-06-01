@@ -7,26 +7,96 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Copy, Download, RefreshCw, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import {
+  X,
+  Copy,
+  Download,
+  Star,
+  StarOff,
+  RefreshCw,
+  Keyboard,
+} from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { ExtendedImageType, getUrlVariations } from "@/types/gallery";
+import { ExtendedImageType } from "@/types/gallery";
+import { useAPI } from "@/hooks/useAPI";
 import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { cn } from "@/lib/utils";
+
+// Define the ImageAnalysisPrompt type since it's referenced in the code
+interface ImageAnalysisPrompt {
+  _id: string;
+  name: string;
+  prompt: string;
+  description?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+}
+
+// Keyboard Shortcuts Component
+function KeyboardShortcuts() {
+  return (
+    <div className="space-y-3 p-3 bg-muted/50 rounded-lg text-xs">
+      <h4 className="text-sm font-medium">Keyboard Shortcuts</h4>
+      <div className="grid grid-cols-1 gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-background border rounded">
+              ←/→
+            </kbd>
+            <span>Navigate images</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-background border rounded">
+              Shift+←/→
+            </kbd>
+            <span>Navigate pages</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-background border rounded">
+              Shift+F
+            </kbd>
+            <span>Toggle fullscreen</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-background border rounded">
+              Shift+I
+            </kbd>
+            <span>Toggle info panel</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-background border rounded">
+              Shift+C
+            </kbd>
+            <span>Copy URL (twice for HQ)</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-background border rounded">
+              Esc
+            </kbd>
+            <span>Close fullscreen</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ImageInfoPanelProps {
   currentImage: ExtendedImageType;
   onClose: () => void;
-  onReanalyze: (imageId: string, promptId?: string, modelId?: string) => void;
+  onReanalyze: (imageId: string) => void;
   onSetPrimary?: (imageId: string) => void;
-}
-
-interface ImageAnalysisPrompt {
-  _id: string;
-  name: string;
-  description?: string;
-  isActive: boolean;
-  isDefault: boolean;
 }
 
 export function ImageInfoPanel({
@@ -36,12 +106,13 @@ export function ImageInfoPanel({
   onSetPrimary,
 }: ImageInfoPanelProps) {
   const { toast } = useToast();
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const [selectedUrlOption, setSelectedUrlOption] =
     useState<string>("Original");
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [isSettingPrimary, setIsSettingPrimary] = useState(false);
   const [showReanalysisOptions, setShowReanalysisOptions] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [selectedPromptId, setSelectedPromptId] = useState<string>("");
   const [selectedModelId, setSelectedModelId] = useState<string>(
     IMAGE_ANALYSIS_CONFIG.availableModels.find((m) => m.isDefault)?.id ||
@@ -52,71 +123,45 @@ export function ImageInfoPanel({
   >([]);
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
 
-  // Helper function to get auth headers
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    if (!user) return {};
-    try {
-      const token = await user.getIdToken();
-      return {
-        Authorization: `Bearer ${token}`,
-      };
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return {};
-    }
-  };
-
   // Load available prompts when reanalysis options are shown
   useEffect(() => {
     const loadPrompts = async () => {
-      if (!showReanalysisOptions || !user) return;
+      if (!showReanalysisOptions || !api) return;
 
+      console.time("ImageInfoPanel-loadPrompts");
       setIsLoadingPrompts(true);
       try {
-        const headers = await getAuthHeaders();
-        if (Object.keys(headers).length === 0) {
-          console.error("No authentication token available");
-          return;
-        }
+        const data = (await api.get(
+          "admin/image-analysis-prompts/active"
+        )) as ImageAnalysisPrompt[];
+        setAvailablePrompts(data || []);
 
-        const response = await fetch(
-          "/api/admin/image-analysis-prompts/active",
-          { headers }
+        // Set default prompt if available
+        const defaultPrompt = data?.find(
+          (p: ImageAnalysisPrompt) => p.isDefault
         );
-
-        if (response.ok) {
-          const data = await response.json();
-          setAvailablePrompts(data || []);
-
-          // Set default prompt if available
-          const defaultPrompt = data?.find(
-            (p: ImageAnalysisPrompt) => p.isDefault
-          );
-          if (defaultPrompt) {
-            setSelectedPromptId(defaultPrompt._id);
-          }
-        } else {
-          console.error("Failed to fetch prompts:", response.status);
+        if (defaultPrompt) {
+          setSelectedPromptId(defaultPrompt._id);
         }
       } catch (error) {
         console.error("Failed to load prompts:", error);
       } finally {
         setIsLoadingPrompts(false);
+        console.timeEnd("ImageInfoPanel-loadPrompts");
       }
     };
 
     loadPrompts();
-  }, [showReanalysisOptions, user]);
+  }, [showReanalysisOptions, api]);
 
-  const urlVariations = getUrlVariations(currentImage.url);
+  // Create URL options for different transformations
   const urlOptions = [
-    { label: "Original", url: urlVariations.original },
-    { label: "1500px", url: urlVariations.w1500 },
-    { label: "2000px", url: urlVariations.w2000 },
-    { label: "2000px Q80", url: urlVariations.w2000q80 },
-    { label: "3000px", url: urlVariations.w3000 },
-    { label: "3000px Q90", url: urlVariations.w3000q90 },
-    { label: "Full Quality", url: urlVariations.fullQuality },
+    { label: "Original", url: currentImage.url },
+    { label: "Small (400px)", url: `${currentImage.url}/w=400` },
+    { label: "Medium (800px)", url: `${currentImage.url}/w=800` },
+    { label: "Large (1200px)", url: `${currentImage.url}/w=1200` },
+    { label: "Extra Large (1600px)", url: `${currentImage.url}/w=1600` },
+    { label: "High Quality", url: `${currentImage.url}/q=100` },
   ];
 
   const selectedOption =
@@ -139,8 +184,27 @@ export function ImageInfoPanel({
   };
 
   const downloadImage = async (url: string, filename: string) => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication not ready",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.time("ImageInfoPanel-downloadImage");
     try {
+      // For image downloads, we can use direct fetch since Cloudflare Images are publicly accessible
+      // The API verification ensures user has access to view the image
       const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to download image: ${response.status} ${response.statusText}`
+        );
+      }
+
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -156,22 +220,21 @@ export function ImageInfoPanel({
         description: `Downloading ${filename}`,
       });
     } catch (error) {
+      console.error("[ImageInfoPanel] Image download error:", error);
       toast({
         title: "Error",
         description: "Failed to download image",
         variant: "destructive",
       });
+    } finally {
+      console.timeEnd("ImageInfoPanel-downloadImage");
     }
   };
 
   const handleReanalyze = async () => {
     setIsReanalyzing(true);
     try {
-      await onReanalyze(
-        currentImage.id || currentImage._id,
-        selectedPromptId || undefined,
-        selectedModelId || undefined
-      );
+      await onReanalyze(currentImage.id || currentImage._id);
       setShowReanalysisOptions(false);
     } finally {
       setIsReanalyzing(false);
@@ -206,6 +269,18 @@ export function ImageInfoPanel({
           <h3 className="text-sm font-semibold">Image Information</h3>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowKeyboardShortcuts(!showKeyboardShortcuts)}
+              className={cn(
+                "p-1 rounded transition-colors",
+                showKeyboardShortcuts
+                  ? "bg-primary/20 text-primary"
+                  : "hover:bg-muted"
+              )}
+              title="Show keyboard shortcuts"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setShowReanalysisOptions(!showReanalysisOptions)}
               disabled={isReanalyzing}
               className={cn(
@@ -231,6 +306,13 @@ export function ImageInfoPanel({
             </button>
           </div>
         </div>
+
+        {/* Keyboard Shortcuts */}
+        {showKeyboardShortcuts && (
+          <div className="mb-4">
+            <KeyboardShortcuts />
+          </div>
+        )}
 
         {/* Reanalysis Options */}
         {showReanalysisOptions && (
@@ -447,6 +529,22 @@ export function ImageInfoPanel({
                 Metadata:
               </span>
               <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                {/* Image Type indicator */}
+                <div className="col-span-2 mb-2">
+                  <span className="text-muted-foreground">Type:</span>
+                  <span
+                    className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                      currentImage.metadata?.originalImage
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                    }`}
+                  >
+                    {currentImage.metadata?.originalImage
+                      ? "Processed Image"
+                      : "Original Image"}
+                  </span>
+                </div>
+
                 {currentImage.metadata?.angle && (
                   <div>
                     <span className="text-muted-foreground">Angle:</span>

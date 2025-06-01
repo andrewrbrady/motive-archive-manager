@@ -131,14 +131,7 @@ interface SpecificationItemProps {
 }
 
 const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
-  // Add detailed logging for each specification item
-  // [REMOVED] // [REMOVED] console.log(`\n=== ${label} Specification Item Debug ===`);
-  // [REMOVED] // [REMOVED] console.log("Raw value:", JSON.stringify(value, null, 2));
-  // [REMOVED] // [REMOVED] console.log("Unit:", unit);
-  // [REMOVED] // [REMOVED] console.log("Value type:", typeof value);
-
   if (value === null || value === undefined || value === "") {
-    // [REMOVED] // [REMOVED] console.log(`${label}: Skipping null/undefined/empty value`);
     return null;
   }
 
@@ -146,50 +139,57 @@ const SpecificationItem = ({ label, value, unit }: SpecificationItemProps) => {
 
   // Handle MongoDB number format
   if (value && typeof value === "object") {
-    console.log(
-      `${label}: Processing object value:`,
-      JSON.stringify(value, null, 2)
-    );
+    // Only log processing for complex object values during development
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `${label}: Processing object value:`,
+        JSON.stringify(value, null, 2)
+      );
+    }
 
     if ("$numberInt" in value && value.$numberInt !== null) {
       displayValue = Number(value.$numberInt);
-      // [REMOVED] // [REMOVED] console.log(`${label}: Extracted $numberInt:`, displayValue);
     } else if ("$numberDouble" in value && value.$numberDouble !== null) {
       displayValue = Number(value.$numberDouble);
-      // [REMOVED] // [REMOVED] console.log(`${label}: Extracted $numberDouble:`, displayValue);
     } else if ("value" in value && value.value !== null) {
       // Handle nested value object (e.g. dimensions.gvwr.value)
       const nestedValue = value.value;
-      console.log(
-        `${label}: Processing nested value:`,
-        JSON.stringify(nestedValue, null, 2)
-      );
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `${label}: Processing nested value:`,
+          JSON.stringify(nestedValue, null, 2)
+        );
+      }
 
       if (nestedValue && typeof nestedValue === "object") {
         if ("$numberInt" in nestedValue && nestedValue.$numberInt !== null) {
           displayValue = Number(nestedValue.$numberInt);
-          // [REMOVED] // [REMOVED] console.log(`${label}: Extracted nested $numberInt:`, displayValue);
         } else if (
           "$numberDouble" in nestedValue &&
           nestedValue.$numberDouble !== null
         ) {
           displayValue = Number(nestedValue.$numberDouble);
-          console.log(
-            `${label}: Extracted nested $numberDouble:`,
-            displayValue
-          );
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `${label}: Extracted nested $numberDouble:`,
+              displayValue
+            );
+          }
         }
       } else if (nestedValue !== null) {
         displayValue = nestedValue;
-        // [REMOVED] // [REMOVED] console.log(`${label}: Using nested value directly:`, displayValue);
       }
     }
   }
 
-  console.log(`${label} final display value:`, {
-    displayValue,
-    type: typeof displayValue,
-  });
+  // Only log final values in development mode for debugging
+  if (process.env.NODE_ENV === "development") {
+    console.log(`${label} final display value:`, {
+      displayValue,
+      type: typeof displayValue,
+    });
+  }
 
   return (
     <div className="flex justify-between py-2 border-b border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20">

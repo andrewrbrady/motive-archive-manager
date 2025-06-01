@@ -10,6 +10,7 @@ import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
  * - All API calls are automatically authenticated
  * - Components handle loading states properly
  * - No API calls can be made without authentication
+ * - OPTIMIZED: Returns API client as soon as Firebase auth is ready (doesn't wait for API validation)
  *
  * Usage:
  * ```typescript
@@ -21,14 +22,16 @@ import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
  */
 
 export function useAPI() {
-  const { isAuthenticated, hasValidToken, loading } = useFirebaseAuth();
+  const { isAuthenticated, loading } = useFirebaseAuth();
 
-  // Only return API client when user is properly authenticated
-  if (loading || !isAuthenticated || !hasValidToken) {
-    return null; // Forces components to handle loading/auth states
+  // PERFORMANCE OPTIMIZATION: Only wait for Firebase auth, not API validation
+  // The API client handles auth failures gracefully with retries and refresh
+  if (loading || !isAuthenticated) {
+    return null; // Only block for Firebase auth, not API validation
   }
 
   // Return the singleton API client - it handles authentication automatically
+  // If the token is invalid, the API client will refresh it automatically
   return APIClient.getInstance();
 }
 
@@ -40,7 +43,8 @@ export function useAPIStatus() {
   const { isAuthenticated, hasValidToken, loading, error } = useFirebaseAuth();
 
   return {
-    isReady: !loading && isAuthenticated && hasValidToken,
+    isReady: !loading && isAuthenticated, // Ready as soon as Firebase auth is ready
+    isFullyValidated: !loading && isAuthenticated && hasValidToken, // Includes API validation
     isLoading: loading,
     isAuthenticated,
     hasValidToken,

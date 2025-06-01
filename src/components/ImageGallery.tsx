@@ -839,7 +839,7 @@ export function ImageGallery({
       )}
 
       <div className={getGridClasses()}>
-        {galleryImages.map((image) => (
+        {galleryImages.map((image, index) => (
           <div key={image.id} className="relative group cursor-pointer">
             <CloudflareImage
               src={image.url}
@@ -849,6 +849,7 @@ export function ImageGallery({
               className="rounded-md"
               onClick={() => handleImageClick(image)}
               variant="gallery"
+              priority={index < 4}
             />
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
               <Button
@@ -1008,8 +1009,9 @@ export function ImageGalleryWithData({
   }));
 
   // Find primary image
-  const primaryImageId = images.find((img: any) => img.metadata?.isPrimary)?.id || 
-                        images.find((img: any) => img.metadata?.isPrimary)?._id;
+  const primaryImageId =
+    images.find((img: any) => img.metadata?.isPrimary)?.id ||
+    images.find((img: any) => img.metadata?.isPrimary)?._id;
 
   const handleRemoveImage = async (
     indices: number[],

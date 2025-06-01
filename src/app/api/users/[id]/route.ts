@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { User } from "@/models/User";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { getUserWithAuth, updateUserRoles } from "@/lib/firestore/users";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";

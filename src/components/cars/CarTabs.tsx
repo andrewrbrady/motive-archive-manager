@@ -3,25 +3,45 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
 import { CustomTabs } from "@/components/ui/custom-tabs";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { CarImageGallery } from "./CarImageGallery";
 import { toast } from "react-hot-toast";
+import { useAPI } from "@/hooks/useAPI";
+import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
 
 // Lazy load heavy tab components
 const DeliverablesTab = lazy(() => import("../deliverables/DeliverablesTab"));
-const EventsTab = lazy(() => import("./EventsTab"));
-const ProductionTab = lazy(() => import("./ProductionTab"));
+const EventsOptimized = lazy(() =>
+  import("./optimized/events/EventsOptimized").then((m) => ({
+    default: m.EventsOptimized,
+  }))
+);
 const CalendarTab = lazy(() => import("./CalendarTab"));
 const InspectionTab = lazy(() => import("./InspectionTab"));
-const Specifications = lazy(() => import("./Specifications"));
-const CarGalleries = lazy(() => import("./CarGalleries"));
-const CarCopywriter = lazy(() =>
-  import("./CarCopywriter").then((m) => ({ default: m.CarCopywriter }))
+// Use optimized Specifications instead of original
+const SpecificationsOptimized = lazy(() =>
+  import("./optimized/SpecificationsOptimized").then((m) => ({
+    default: m.SpecificationsOptimized,
+  }))
 );
-const Scripts = lazy(() => import("./Scripts"));
-const ShotList = lazy(() => import("./ShotList"));
-
-// Import components that might not be lazy-loaded
-import DocumentationFiles from "../DocumentationFiles";
+// Use optimized Documentation instead of original (Phase 1C)
+const DocumentationOptimized = lazy(() =>
+  import("./optimized/documentation/DocumentationOptimized").then((m) => ({
+    default: m.default,
+  }))
+);
+// Use optimized Galleries instead of original (Phase 1E)
+const GalleriesOptimized = lazy(() =>
+  import("./optimized/galleries/GalleriesOptimized").then((m) => ({
+    default: m.GalleriesOptimized,
+  }))
+);
+const CarImageGallery = lazy(() =>
+  import("./CarImageGallery").then((m) => ({ default: m.CarImageGallery }))
+);
+const CarCopywriter = lazy(() =>
+  import("../copywriting/CarCopywriter").then((m) => ({
+    default: m.CarCopywriter,
+  }))
+);
 
 interface CarTabsProps {
   carId: string;
@@ -29,11 +49,7 @@ interface CarTabsProps {
 }
 
 // Loading fallback component
-const TabLoadingFallback = () => (
-  <div className="flex items-center justify-center py-12">
-    <LoadingSpinner size="lg" />
-  </div>
-);
+const TabLoadingFallback = () => <CarTabSkeleton variant="full" />;
 
 // Wrapper component for Specifications that provides edit functionality
 const SpecificationsWrapper = ({
@@ -45,6 +61,7 @@ const SpecificationsWrapper = ({
 }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [vehicleData, setVehicleData] = useState(vehicleInfo);
+  const api = useAPI();
 
   // Sync vehicle data when vehicleInfo prop changes
   useEffect(() => {
@@ -56,20 +73,13 @@ const SpecificationsWrapper = ({
   };
 
   const handleSave = async (editedSpecs: any) => {
+    if (!api) {
+      toast.error("Authentication not ready");
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(editedSpecs),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save specifications");
-      }
-
-      const updatedCar = await response.json();
+      const updatedCar = await api.patch(`cars/${carId}`, editedSpecs);
       setVehicleData(updatedCar);
       setIsEditMode(false);
       toast.success("Specifications saved successfully");
@@ -85,13 +95,15 @@ const SpecificationsWrapper = ({
   };
 
   const handleRefresh = async () => {
+    if (!api) {
+      toast.error("Authentication not ready");
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/cars/${carId}`);
-      if (response.ok) {
-        const updatedCar = await response.json();
-        setVehicleData(updatedCar);
-        toast.success("Specifications refreshed");
-      }
+      const updatedCar = await api.get(`cars/${carId}`);
+      setVehicleData(updatedCar);
+      toast.success("Specifications refreshed");
     } catch (error) {
       console.error("Error refreshing specifications:", error);
       toast.error("Failed to refresh specifications");
@@ -99,8 +111,9 @@ const SpecificationsWrapper = ({
   };
 
   return (
-    <Specifications
-      car={vehicleData}
+    <SpecificationsOptimized
+      carId={carId}
+      vehicleInfo={vehicleData}
       isEditMode={isEditMode}
       onEdit={handleEdit}
       onSave={handleSave}
@@ -116,11 +129,13 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       value: "gallery",
       label: "Image Gallery",
       content: (
-        <CarImageGallery
-          carId={carId}
-          showFilters={true}
-          vehicleInfo={vehicleInfo}
-        />
+        <Suspense fallback={<TabLoadingFallback />}>
+          <CarImageGallery
+            carId={carId}
+            showFilters={true}
+            vehicleInfo={vehicleInfo}
+          />
+        </Suspense>
       ),
     },
     {
@@ -128,7 +143,7 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       label: "Attached Galleries",
       content: (
         <Suspense fallback={<TabLoadingFallback />}>
-          <CarGalleries carId={carId} />
+          <GalleriesOptimized carId={carId} />
         </Suspense>
       ),
     },
@@ -138,33 +153,6 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       content: (
         <Suspense fallback={<TabLoadingFallback />}>
           <SpecificationsWrapper carId={carId} vehicleInfo={vehicleInfo} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "shoots",
-      label: "Photo Shoots",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <ProductionTab carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "shot-lists",
-      label: "Shot Lists",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <ShotList carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "scripts",
-      label: "Scripts",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <Scripts carId={carId} />
         </Suspense>
       ),
     },
@@ -189,7 +177,11 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
     {
       value: "documentation",
       label: "Documentation",
-      content: <DocumentationFiles carId={carId} />,
+      content: (
+        <Suspense fallback={<TabLoadingFallback />}>
+          <DocumentationOptimized carId={carId} />
+        </Suspense>
+      ),
     },
     {
       value: "deliverables",
@@ -205,7 +197,7 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
       label: "Events",
       content: (
         <Suspense fallback={<TabLoadingFallback />}>
-          <EventsTab carId={carId} />
+          <EventsOptimized carId={carId} />
         </Suspense>
       ),
     },
