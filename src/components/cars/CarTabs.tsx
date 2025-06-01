@@ -1,42 +1,69 @@
 "use client";
 
-import React, { Suspense, lazy, useState, useEffect } from "react";
+import React, {
+  Suspense,
+  lazy,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { CustomTabs } from "@/components/ui/custom-tabs";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "react-hot-toast";
 import { useAPI } from "@/hooks/useAPI";
-import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
+import { usePrefetchAPI } from "@/hooks/useAPIQuery";
 
-// Lazy load heavy tab components
-const DeliverablesTab = lazy(() => import("../deliverables/DeliverablesTab"));
+// Lazy load heavy tab components with better chunking
+const DeliverablesTab = lazy(() =>
+  import("../deliverables/DeliverablesTab").then((module) => ({
+    default: module.default,
+  }))
+);
+
 const EventsOptimized = lazy(() =>
   import("./optimized/events/EventsOptimized").then((m) => ({
     default: m.EventsOptimized,
   }))
 );
-const CalendarTab = lazy(() => import("./CalendarTab"));
-const InspectionTab = lazy(() => import("./InspectionTab"));
+
+const CalendarTab = lazy(() =>
+  import("./CalendarTab").then((module) => ({
+    default: module.default,
+  }))
+);
+
+const InspectionTab = lazy(() =>
+  import("./InspectionTab").then((module) => ({
+    default: module.default,
+  }))
+);
+
 // Use optimized Specifications instead of original
 const SpecificationsOptimized = lazy(() =>
   import("./optimized/SpecificationsOptimized").then((m) => ({
     default: m.SpecificationsOptimized,
   }))
 );
+
 // Use optimized Documentation instead of original (Phase 1C)
 const DocumentationOptimized = lazy(() =>
   import("./optimized/documentation/DocumentationOptimized").then((m) => ({
     default: m.default,
   }))
 );
+
 // Use optimized Galleries instead of original (Phase 1E)
 const GalleriesOptimized = lazy(() =>
   import("./optimized/galleries/GalleriesOptimized").then((m) => ({
     default: m.GalleriesOptimized,
   }))
 );
+
 const CarImageGallery = lazy(() =>
   import("./CarImageGallery").then((m) => ({ default: m.CarImageGallery }))
 );
+
 const CarCopywriter = lazy(() =>
   import("../copywriting/CarCopywriter").then((m) => ({
     default: m.CarCopywriter,
@@ -48,169 +75,260 @@ interface CarTabsProps {
   vehicleInfo?: any;
 }
 
-// Loading fallback component
-const TabLoadingFallback = () => <CarTabSkeleton variant="full" />;
+// Memoized loading fallback component - simple spinner to match gallery
+const TabLoadingFallback = React.memo(() => (
+  <div className="flex items-center justify-center h-96">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+));
+TabLoadingFallback.displayName = "TabLoadingFallback";
 
-// Wrapper component for Specifications that provides edit functionality
-const SpecificationsWrapper = ({
-  carId,
-  vehicleInfo,
-}: {
-  carId: string;
-  vehicleInfo: any;
-}) => {
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [vehicleData, setVehicleData] = useState(vehicleInfo);
-  const api = useAPI();
+// Memoized wrapper component for Specifications that provides edit functionality
+const SpecificationsWrapper = React.memo(
+  ({ carId, vehicleInfo }: { carId: string; vehicleInfo: any }) => {
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [vehicleData, setVehicleData] = useState(vehicleInfo);
+    const api = useAPI();
 
-  // Sync vehicle data when vehicleInfo prop changes
-  useEffect(() => {
-    setVehicleData(vehicleInfo);
-  }, [vehicleInfo]);
+    // Sync vehicle data when vehicleInfo prop changes
+    useEffect(() => {
+      setVehicleData(vehicleInfo);
+    }, [vehicleInfo]);
 
-  const handleEdit = () => {
-    setIsEditMode(true);
-  };
+    const handleEdit = useCallback(() => {
+      setIsEditMode(true);
+    }, []);
 
-  const handleSave = async (editedSpecs: any) => {
-    if (!api) {
-      toast.error("Authentication not ready");
-      return;
-    }
+    const handleSave = useCallback(
+      async (editedSpecs: any) => {
+        if (!api) {
+          toast.error("Authentication not ready");
+          return;
+        }
 
-    try {
-      const updatedCar = await api.patch(`cars/${carId}`, editedSpecs);
-      setVehicleData(updatedCar);
+        try {
+          const updatedCar = await api.patch(`cars/${carId}`, editedSpecs);
+          setVehicleData(updatedCar);
+          setIsEditMode(false);
+          toast.success("Specifications saved successfully");
+        } catch (error) {
+          console.error("Error saving specifications:", error);
+          toast.error("Failed to save specifications");
+          throw error;
+        }
+      },
+      [api, carId]
+    );
+
+    const handleCancel = useCallback(() => {
       setIsEditMode(false);
-      toast.success("Specifications saved successfully");
-    } catch (error) {
-      console.error("Error saving specifications:", error);
-      toast.error("Failed to save specifications");
-      throw error;
-    }
-  };
+    }, []);
 
-  const handleCancel = () => {
-    setIsEditMode(false);
-  };
+    const handleRefresh = useCallback(() => {
+      // Refresh specifications data if needed
+      window.location.reload();
+    }, []);
 
-  const handleRefresh = async () => {
-    if (!api) {
-      toast.error("Authentication not ready");
-      return;
-    }
+    return (
+      <SpecificationsOptimized
+        carId={carId}
+        vehicleInfo={vehicleData}
+        isEditMode={isEditMode}
+        onEdit={handleEdit}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        onRefresh={handleRefresh}
+      />
+    );
+  },
+  (prevProps, nextProps) => {
+    // Simple comparison - avoid expensive JSON.stringify
+    return prevProps.carId === nextProps.carId;
+  }
+);
+SpecificationsWrapper.displayName = "SpecificationsWrapper";
 
-    try {
-      const updatedCar = await api.get(`cars/${carId}`);
-      setVehicleData(updatedCar);
-      toast.success("Specifications refreshed");
-    } catch (error) {
-      console.error("Error refreshing specifications:", error);
-      toast.error("Failed to refresh specifications");
-    }
-  };
-
-  return (
-    <SpecificationsOptimized
+// Simplified memoized wrapper components - remove expensive comparisons
+const MemoizedCarImageGallery = React.memo(
+  ({ carId, vehicleInfo }: { carId: string; vehicleInfo: any }) => (
+    <CarImageGallery
       carId={carId}
-      vehicleInfo={vehicleData}
-      isEditMode={isEditMode}
-      onEdit={handleEdit}
-      onSave={handleSave}
-      onCancel={handleCancel}
-      onRefresh={handleRefresh}
+      showFilters={true}
+      vehicleInfo={vehicleInfo}
     />
-  );
-};
+  ),
+  (prevProps, nextProps) => {
+    // Simple comparison only
+    return prevProps.carId === nextProps.carId;
+  }
+);
+MemoizedCarImageGallery.displayName = "MemoizedCarImageGallery";
+
+const MemoizedGalleriesOptimized = React.memo(
+  ({ carId }: { carId: string }) => <GalleriesOptimized carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedGalleriesOptimized.displayName = "MemoizedGalleriesOptimized";
+
+const MemoizedCarCopywriter = React.memo(
+  ({ carId }: { carId: string }) => <CarCopywriter carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedCarCopywriter.displayName = "MemoizedCarCopywriter";
+
+const MemoizedInspectionTab = React.memo(
+  ({ carId }: { carId: string }) => <InspectionTab carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedInspectionTab.displayName = "MemoizedInspectionTab";
+
+const MemoizedDocumentationOptimized = React.memo(
+  ({ carId }: { carId: string }) => <DocumentationOptimized carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedDocumentationOptimized.displayName = "MemoizedDocumentationOptimized";
+
+const MemoizedDeliverablesTab = React.memo(
+  ({ carId }: { carId: string }) => <DeliverablesTab carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedDeliverablesTab.displayName = "MemoizedDeliverablesTab";
+
+const MemoizedEventsOptimized = React.memo(
+  ({ carId }: { carId: string }) => <EventsOptimized carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedEventsOptimized.displayName = "MemoizedEventsOptimized";
+
+const MemoizedCalendarTab = React.memo(
+  ({ carId }: { carId: string }) => <CalendarTab carId={carId} />,
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedCalendarTab.displayName = "MemoizedCalendarTab";
 
 export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
-  const tabItems = [
-    {
-      value: "gallery",
-      label: "Image Gallery",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <CarImageGallery
-            carId={carId}
-            showFilters={true}
-            vehicleInfo={vehicleInfo}
-          />
-        </Suspense>
-      ),
+  const { prefetch } = usePrefetchAPI();
+
+  // Optimized prefetch function with debouncing to prevent excessive calls
+  const prefetchTabData = useCallback(
+    async (tabValue: string) => {
+      try {
+        switch (tabValue) {
+          case "inspections":
+            await prefetch(`cars/${carId}/inspections`, 5 * 60 * 1000); // 5 min cache
+            break;
+          case "events":
+            await prefetch(`cars/${carId}/events`, 5 * 60 * 1000);
+            break;
+          case "gallery":
+            // Gallery data is likely already cached, but prefetch if needed
+            await prefetch(`cars/${carId}/images?limit=25`, 2 * 60 * 1000); // 2 min cache
+            break;
+          case "documentation":
+            await prefetch(`cars/${carId}/documentation`, 3 * 60 * 1000); // 3 min cache
+            break;
+          default:
+            // No prefetch needed for other tabs
+            break;
+        }
+      } catch (error) {
+        // Silently handle prefetch errors - they shouldn't block UX
+        console.debug("Prefetch error for tab", tabValue, error);
+      }
     },
-    {
-      value: "car-galleries",
-      label: "Attached Galleries",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <GalleriesOptimized carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "specs",
-      label: "Specifications",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <SpecificationsWrapper carId={carId} vehicleInfo={vehicleInfo} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "captions",
-      label: "Copywriter",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <CarCopywriter carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "inspections",
-      label: "Inspections",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <InspectionTab carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "documentation",
-      label: "Documentation",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <DocumentationOptimized carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "deliverables",
-      label: "Deliverables",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <DeliverablesTab carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "events",
-      label: "Events",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <EventsOptimized carId={carId} />
-        </Suspense>
-      ),
-    },
-    {
-      value: "calendar",
-      label: "Calendar",
-      content: (
-        <Suspense fallback={<TabLoadingFallback />}>
-          <CalendarTab carId={carId} />
-        </Suspense>
-      ),
-    },
-  ];
+    [carId, prefetch]
+  );
+
+  // Simplified tab items with minimal dependencies
+  const tabItems = useMemo(
+    () => [
+      {
+        value: "gallery",
+        label: "Image Gallery",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedCarImageGallery carId={carId} vehicleInfo={vehicleInfo} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "car-galleries",
+        label: "Attached Galleries",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedGalleriesOptimized carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "specs",
+        label: "Specifications",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <SpecificationsWrapper carId={carId} vehicleInfo={vehicleInfo} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "captions",
+        label: "Copywriter",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedCarCopywriter carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "inspections",
+        label: "Inspections",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedInspectionTab carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "documentation",
+        label: "Documentation",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedDocumentationOptimized carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "deliverables",
+        label: "Deliverables",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedDeliverablesTab carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "events",
+        label: "Events",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedEventsOptimized carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "calendar",
+        label: "Calendar",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedCalendarTab carId={carId} />
+          </Suspense>
+        ),
+      },
+    ],
+    [carId] // Only recreate when carId changes, not vehicleInfo
+  );
 
   return (
     <CustomTabs

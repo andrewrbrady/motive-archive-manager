@@ -14,9 +14,9 @@ interface DocumentationEditorProps {
 }
 
 /**
- * DocumentationEditor - Heavy upload operations component
- * Part of Phase 1C optimization - lazy loaded for upload functionality
- * Contains drag/drop, progress tracking, and batch operations
+ * DocumentationEditor - Non-blocking upload operations component
+ * Part of Phase 3F optimization - converted from blocking modal to inline component
+ * Users can switch tabs during upload operations
  */
 export default function DocumentationEditor({
   carId,
@@ -196,138 +196,151 @@ export default function DocumentationEditor({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background border rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto m-4">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Upload Documentation Files</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+    <div className="border rounded-lg shadow-sm bg-background">
+      {/* Non-blocking upload message */}
+      {uploading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-t-lg p-3">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <span className="text-sm text-blue-700 font-medium">
+              Files uploading in background
+            </span>
+          </div>
+          <p className="text-xs text-blue-600 mt-1">
+            You can switch tabs while files upload
+          </p>
         </div>
+      )}
 
-        {/* Content */}
-        <div className="p-4 space-y-4">
-          {/* Drag and drop area */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border dark:border-border"
-            }`}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <div className="flex flex-col items-center justify-center space-y-2 text-center">
-              <Upload className="h-8 w-8 text-muted-foreground" />
-              <h3 className="text-lg font-medium">
-                Drop files here or click to upload
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Upload documentation files related to this car such as user
-                manuals, service records, ownership documents, etc.
-              </p>
-              <div className="mt-4">
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-md"
-                >
-                  <span>Select Files</span>
-                  <input
-                    id="file-upload"
-                    name="file-upload"
-                    type="file"
-                    className="sr-only"
-                    multiple
-                    onChange={handleFileSelect}
-                    disabled={uploading}
-                  />
-                </label>
-              </div>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b">
+        <h2 className="text-lg font-semibold">Upload Documentation Files</h2>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 space-y-4">
+        {/* Drag and drop area */}
+        <div
+          className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-border dark:border-border"
+          }`}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          <div className="flex flex-col items-center justify-center space-y-2 text-center">
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <h3 className="text-lg font-medium">
+              Drop files here or click to upload
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Upload documentation files related to this car such as user
+              manuals, service records, ownership documents, etc.
+            </p>
+            <div className="mt-4">
+              <label
+                htmlFor="file-upload"
+                className="cursor-pointer inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-md"
+              >
+                <span>Select Files</span>
+                <input
+                  id="file-upload"
+                  name="file-upload"
+                  type="file"
+                  className="sr-only"
+                  multiple
+                  onChange={handleFileSelect}
+                  disabled={uploading}
+                />
+              </label>
             </div>
           </div>
-
-          {/* Selected files list */}
-          {selectedFiles.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-medium">Selected Files</h4>
-              <div className="max-h-40 overflow-y-auto border rounded-md divide-y">
-                {selectedFiles.map((file, index) => (
-                  <div
-                    key={`${file.name}-${index}`}
-                    className="flex items-center justify-between p-2"
-                  >
-                    <div className="flex items-center space-x-2 min-w-0">
-                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm truncate max-w-xs">
-                        {file.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {uploadProgress[file.name] > 0 && (
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{ width: `${uploadProgress[file.name]}%` }}
-                          ></div>
-                        </div>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setSelectedFiles((prev) =>
-                            prev.filter((_, i) => i !== index)
-                          )
-                        }
-                        disabled={uploading}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-between">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setSelectedFiles([])}
-                  disabled={uploading}
-                >
-                  Clear All
-                </Button>
-                <Button
-                  onClick={handleUpload}
-                  disabled={uploading || selectedFiles.length === 0}
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    "Upload"
-                  )}
-                </Button>
-              </div>
-
-              {/* Error display */}
-              {error && (
-                <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
-                  <p className="text-destructive text-sm">{error}</p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Selected files list */}
+        {selectedFiles.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="font-medium">Selected Files</h4>
+            <div className="max-h-40 overflow-y-auto border rounded-md divide-y">
+              {selectedFiles.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  className="flex items-center justify-between p-2"
+                >
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm truncate max-w-xs">
+                      {file.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatFileSize(file.size)}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {uploadProgress[file.name] > 0 && (
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all"
+                          style={{ width: `${uploadProgress[file.name]}%` }}
+                        ></div>
+                      </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setSelectedFiles((prev) =>
+                          prev.filter((_, i) => i !== index)
+                        )
+                      }
+                      disabled={uploading}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-between">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setSelectedFiles([])}
+                disabled={uploading}
+              >
+                Clear All
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={uploading || selectedFiles.length === 0}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload"
+                )}
+              </Button>
+            </div>
+
+            {/* Error display */}
+            {error && (
+              <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
+                <p className="text-destructive text-sm">{error}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

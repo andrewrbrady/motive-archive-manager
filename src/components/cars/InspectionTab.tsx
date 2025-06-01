@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +15,7 @@ import {
 import { Inspection } from "@/types/inspection";
 import { toast } from "sonner";
 import InspectionList from "./InspectionList";
-import { useAPI } from "@/hooks/useAPI";
-import { InspectionSkeleton } from "./optimized/inspections";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 
 interface InspectionTabProps {
   carId: string;
@@ -24,62 +23,77 @@ interface InspectionTabProps {
 
 export default function InspectionTab({ carId }: InspectionTabProps) {
   const router = useRouter();
-  const api = useAPI();
-  const [inspections, setInspections] = useState<Inspection[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch inspections for this car
-  const fetchInspections = async () => {
-    if (!api) return;
+  // Use optimized query hook for data fetching
+  const {
+    data: inspectionsData,
+    isLoading,
+    error,
+    refetch: fetchInspections,
+  } = useAPIQuery<{ inspections?: Inspection[] }>(`cars/${carId}/inspections`, {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+  });
 
-    try {
-      setIsLoading(true);
-      const data = (await api.get(`cars/${carId}/inspections`)) as {
-        inspections?: Inspection[];
+  // Memoize inspections array
+  const inspections = useMemo(() => {
+    return inspectionsData?.inspections || [];
+  }, [inspectionsData?.inspections]);
+
+  // Memoize computed statistics
+  const { passedInspections, failedInspections, totalInspections } =
+    useMemo(() => {
+      const passed = inspections.filter((i) => i.status === "pass").length;
+      const failed = inspections.filter(
+        (i) => i.status === "needs_attention"
+      ).length;
+      const total = inspections.length;
+
+      return {
+        passedInspections: passed,
+        failedInspections: failed,
+        totalInspections: total,
       };
-      setInspections(data.inspections || []);
-    } catch (error) {
-      console.error("Error fetching inspections:", error);
-      toast.error("Failed to load inspections");
-      setInspections([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    }, [inspections]);
 
-  useEffect(() => {
-    if (carId && api) {
-      fetchInspections();
-    }
-  }, [carId, api]);
+  // Handle error state
+  if (error) {
+    console.error("Error fetching inspections:", error);
+    toast.error("Failed to load inspections");
+  }
 
-  const handleCreateInspection = () => {
-    // Navigate to the new inspection page
+  // Memoized navigation handlers
+  const handleCreateInspection = useCallback(() => {
     router.push(`/cars/${carId}/inspections/new`);
-  };
+  }, [router, carId]);
 
-  const handleEditInspection = (inspection: Inspection) => {
-    // Navigate to the edit inspection page
-    router.push(`/cars/${carId}/inspections/${inspection._id}/edit`);
-  };
+  const handleEditInspection = useCallback(
+    (inspection: Inspection) => {
+      router.push(`/cars/${carId}/inspections/${inspection._id}/edit`);
+    },
+    [router, carId]
+  );
 
-  const handleViewInspection = (inspection: Inspection) => {
-    // Navigate to the view inspection page
-    router.push(`/cars/${carId}/inspections/${inspection._id}`);
-  };
+  const handleViewInspection = useCallback(
+    (inspection: Inspection) => {
+      router.push(`/cars/${carId}/inspections/${inspection._id}`);
+    },
+    [router, carId]
+  );
 
-  // Summary stats
-  const passedInspections = inspections.filter(
-    (i) => i.status === "pass"
-  ).length;
-  const failedInspections = inspections.filter(
-    (i) => i.status === "needs_attention"
-  ).length;
-  const totalInspections = inspections.length;
-
-  // Show skeleton loading state
+  // Show consistent spinner loading state
   if (isLoading) {
-    return <InspectionSkeleton />;
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">
+            Loading inspections...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

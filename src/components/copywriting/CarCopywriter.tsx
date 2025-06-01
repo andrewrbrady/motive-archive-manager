@@ -1,7 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   BaseCopywriter,
   CopywriterConfig,
@@ -13,24 +17,143 @@ import type {
   ProjectCar,
   ProjectEvent,
 } from "../projects/caption-generator/types";
-import { useAPI } from "@/hooks/useAPI";
 
 interface CarCopywriterProps {
   carId: string;
 }
 
-// Simple in-memory cache for static data that rarely changes
-const staticDataCache = {
-  systemPrompts: null as any,
-  lengthSettings: null as any,
-  timestamp: 0,
-  isValid: () => Date.now() - staticDataCache.timestamp < 300000, // 5 minutes
-};
-
+/**
+ * CarCopywriter - Non-blocking copywriter for individual cars
+ * Part of Phase 3F optimization - uses useAPIQuery for all data fetching
+ * Users can switch tabs while data loads in background
+ */
 export function CarCopywriter({ carId }: CarCopywriterProps) {
   const api = useAPI();
 
-  if (!api) return <div>Loading...</div>;
+  // Use optimized query hook for car data - non-blocking, cached
+  const {
+    data: carData,
+    isLoading: isLoadingCar,
+    error: carError,
+  } = useAPIQuery<any>(`cars/${carId}`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Use optimized query hook for events - non-blocking, cached
+  const {
+    data: eventsData,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+  } = useAPIQuery<any[]>(`cars/${carId}/events?limit=6`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Use optimized query hook for system prompts - non-blocking, cached
+  const {
+    data: systemPromptsData,
+    isLoading: isLoadingSystemPrompts,
+    error: systemPromptsError,
+  } = useAPIQuery<any[]>(`system-prompts/list`, {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for static data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Use optimized query hook for length settings - non-blocking, cached
+  const {
+    data: lengthSettingsData,
+    isLoading: isLoadingLengthSettings,
+    error: lengthSettingsError,
+  } = useAPIQuery<any[]>(`length-settings`, {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for static data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Use optimized query hook for saved captions - non-blocking, cached
+  const {
+    data: captionsData,
+    isLoading: isLoadingCaptions,
+    error: captionsError,
+    refetch: refetchCaptions,
+  } = useAPIQuery<any[]>(`captions?carId=${carId}&limit=4&sort=-createdAt`, {
+    staleTime: 1 * 60 * 1000, // 1 minute cache for user data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Determine overall loading state
+  const isLoading =
+    isLoadingCar ||
+    isLoadingEvents ||
+    isLoadingSystemPrompts ||
+    isLoadingLengthSettings;
+  const hasError =
+    carError ||
+    eventsError ||
+    systemPromptsError ||
+    lengthSettingsError ||
+    captionsError;
+
+  // Show non-blocking loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Loading car copywriter...
+          </p>
+          <p className="text-xs text-muted-foreground text-center">
+            You can switch tabs while this loads
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show non-blocking error state
+  if (hasError && !carData) {
+    return (
+      <div className="py-8">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-4 max-w-md mx-auto">
+          <p className="text-destructive text-sm text-center mb-3">
+            Failed to load car copywriter data. Tab switching is still
+            available.
+          </p>
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!api || !carData) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   const config: CopywriterConfig = {
     mode: "car",
@@ -52,53 +175,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   const callbacks: CopywriterCallbacks = {
     onDataFetch: async (): Promise<CopywriterData> => {
       try {
-        // CRITICAL PATH: Fetch essentials + cached static data
-        const [carData, carEvents, systemPrompts, lengthSettings] =
-          await Promise.all([
-            // Car details - CRITICAL
-            api.get(`cars/${carId}`) as Promise<any>,
-
-            // Events with aggressive limit (only 5 events initially) - CRITICAL
-            api.get(`cars/${carId}/events?limit=6`) as Promise<any[]>, // Fetch 6 to check if there are more
-
-            // System prompts - ESSENTIAL for UI dropdowns (use cache if available)
-            (async () => {
-              if (staticDataCache.isValid() && staticDataCache.systemPrompts) {
-                console.log("Using cached system prompts");
-                return staticDataCache.systemPrompts;
-              }
-              try {
-                const data = (await api.get(`system-prompts/list`)) as any;
-                console.log("Successfully fetched system prompts:", data);
-                staticDataCache.systemPrompts = data;
-                staticDataCache.timestamp = Date.now();
-                return data;
-              } catch (error) {
-                console.error("Error fetching system prompts:", error);
-                return [];
-              }
-            })(),
-
-            // Length settings - ESSENTIAL for UI dropdowns (use cache if available)
-            (async () => {
-              if (staticDataCache.isValid() && staticDataCache.lengthSettings) {
-                console.log("Using cached length settings");
-                return staticDataCache.lengthSettings;
-              }
-              try {
-                const data = (await api.get(`length-settings`)) as any[];
-                console.log("Successfully fetched length settings:", data);
-                staticDataCache.lengthSettings = data;
-                staticDataCache.timestamp = Date.now();
-                return data;
-              } catch (error) {
-                console.error("Error fetching length settings:", error);
-                return [];
-              }
-            })(),
-          ]);
-
-        // Convert to project car format immediately
+        // Convert to project car format
         const projectCar: ProjectCar = {
           _id: carData._id,
           year: carData.year || 0,
@@ -110,9 +187,10 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           createdAt: new Date().toISOString(),
         };
 
-        // Convert events to project format immediately
-        const hasMoreEventsAvailable = carEvents.length > 5;
-        const eventsToDisplay = carEvents.slice(0, 5); // Only show first 5
+        // Convert events to project format
+        const events = eventsData || [];
+        const hasMoreEventsAvailable = events.length > 5;
+        const eventsToDisplay = events.slice(0, 5);
 
         const projectEvents: ProjectEvent[] = eventsToDisplay
           .filter((event: any) => {
@@ -139,102 +217,34 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
             updatedAt: event.updatedAt,
           }));
 
-        // FETCH NON-CRITICAL DATA ASYNCHRONOUSLY (captions and client handle)
-        const fetchNonCriticalData = async () => {
-          try {
-            // Always fetch captions fresh (user-specific data)
-            let savedCaptionsData = [];
-            let hasMoreCaptionsAvailable = false;
-            try {
-              savedCaptionsData = (await api.get(
-                `captions?carId=${carId}&limit=4&sort=-createdAt` // Fetch 4 to check if there are more
-              )) as any[];
-              hasMoreCaptionsAvailable = savedCaptionsData.length > 3;
-              savedCaptionsData = savedCaptionsData.slice(0, 3); // Only show first 3
-            } catch (error) {
-              console.error("Error fetching saved captions:", error);
-            }
+        // Process captions
+        const captions = captionsData || [];
+        const hasMoreCaptionsAvailable = captions.length > 3;
+        const captionsToDisplay = captions.slice(0, 3);
 
-            // Convert car captions to project caption format
-            const savedCaptions = savedCaptionsData.map((caption: any) => ({
-              _id: caption._id,
-              platform: caption.platform,
-              context: caption.context,
-              caption: caption.caption,
-              projectId: "",
-              carIds: [caption.carId],
-              eventIds: [],
-              createdAt: caption.createdAt,
-            }));
+        const savedCaptions = captionsToDisplay.map((caption: any) => ({
+          _id: caption._id,
+          platform: caption.platform,
+          context: caption.context,
+          caption: caption.caption,
+          projectId: "",
+          carIds: [caption.carId],
+          eventIds: [],
+          createdAt: caption.createdAt,
+        }));
 
-            return { savedCaptions, hasMoreCaptionsAvailable };
-          } catch (error) {
-            console.error("Error in background fetch:", error);
-            return { savedCaptions: [], hasMoreCaptionsAvailable: false };
-          }
-        };
-
-        // Start background fetch for captions
-        let savedCaptions: any[] = [];
-        let hasMoreCaptionsAvailable = false;
-
-        try {
-          const captionData = await fetchNonCriticalData();
-          savedCaptions = captionData.savedCaptions;
-          hasMoreCaptionsAvailable = captionData.hasMoreCaptionsAvailable;
-        } catch (error) {
-          console.error("Background caption fetch failed:", error);
-        }
-
-        // FETCH CLIENT HANDLE ASYNCHRONOUSLY (lowest priority)
-        const clientId =
-          carData.client || carData.clientId || carData.clientInfo?._id;
-        if (clientId) {
-          const fetchClientHandle = async () => {
-            try {
-              const client = (await api.get(`clients/${clientId}`)) as any;
-
-              if (client.socialMedia?.instagram) {
-                // Client handle is ready but we don't try to update UI directly
-                // The data will be available when the component refreshes or re-fetches
-              }
-            } catch (error) {
-              console.error("Error fetching client handle:", error);
-            }
-          };
-
-          // Fire and forget - lowest priority
-          fetchClientHandle().catch((error) => {
-            console.error("Client handle fetch error (non-critical):", error);
-            // Don't throw - this is non-critical data
-          });
-        }
-
-        // RETURN COMPLETE DATA with all essential fields populated
-        const result = {
+        return {
           cars: [projectCar],
           events: projectEvents,
-          systemPrompts: systemPrompts || [],
-          lengthSettings: lengthSettings || [],
+          systemPrompts: systemPromptsData || [],
+          lengthSettings: lengthSettingsData || [],
           savedCaptions: savedCaptions,
-          clientHandle: null, // Will be populated asynchronously
+          clientHandle: null, // TODO: Implement client handle fetching if needed
           hasMoreEvents: hasMoreEventsAvailable,
           hasMoreCaptions: hasMoreCaptionsAvailable,
         };
-
-        console.log("CarCopywriter: Returning data:", {
-          carsCount: result.cars.length,
-          eventsCount: result.events.length,
-          systemPromptsCount: result.systemPrompts.length,
-          lengthSettingsCount: result.lengthSettings.length,
-          savedCaptionsCount: result.savedCaptions.length,
-          systemPromptsFirst: result.systemPrompts[0],
-          lengthSettingsFirst: result.lengthSettings[0],
-        });
-
-        return result;
       } catch (error) {
-        console.error("Error fetching car copywriter data:", error);
+        console.error("Error processing car copywriter data:", error);
         throw error;
       }
     },
@@ -313,8 +323,8 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     },
 
     onRefresh: async (): Promise<void> => {
-      // This will be handled by the BaseCopywriter component
-      // by re-calling onDataFetch when needed
+      // Refresh captions data
+      await refetchCaptions();
     },
   };
 

@@ -1,28 +1,51 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit3, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { Edit3, ExternalLink, Image as ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import LazyImage from "@/components/LazyImage";
-import { useAPI } from "@/hooks/useAPI";
-import { GalleriesSkeleton } from "./GalleriesSkeleton";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { Gallery, GalleriesProps } from "./index";
 
 interface BaseGalleriesProps extends GalleriesProps {
   onManageGalleries?: () => void;
 }
 
+/**
+ * BaseGalleries - Critical path component for Galleries tab
+ * Part of Phase 3E optimization - uses useAPIQuery for non-blocking data fetching
+ * Heavy gallery management operations are delegated to GalleriesEditor (lazy loaded)
+ *
+ * PHASE 3E OPTIMIZATION: Uses useAPIQuery for non-blocking data fetching
+ */
 export function BaseGalleries({
   carId,
   onManageGalleries,
 }: BaseGalleriesProps) {
-  const api = useAPI();
   const router = useRouter();
-  const [attachedGalleries, setAttachedGalleries] = useState<Gallery[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Use optimized query hook - non-blocking, cached data fetching
+  const {
+    data: carData,
+    isLoading,
+    error,
+    refetch: refreshGalleries,
+  } = useAPIQuery<{ galleries?: Gallery[] }>(
+    `cars/${carId}?includeGalleries=true`,
+    {
+      staleTime: 3 * 60 * 1000, // 3 minutes cache
+      retry: 2,
+      retryDelay: 1000,
+      // This ensures the query is enabled and won't block tab switching
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Memoize galleries array for performance
+  const attachedGalleries = carData?.galleries || [];
 
   // Navigate to gallery page
   const navigateToGallery = useCallback(
@@ -44,45 +67,9 @@ export function BaseGalleries({
     [navigateToGallery]
   );
 
-  // Fetch attached galleries - optimized for critical path
-  const fetchCarGalleries = useCallback(async () => {
-    if (!carId || !api) return;
-
-    console.time("BaseGalleries-fetchCarGalleries");
-    try {
-      const car = (await api.get(`cars/${carId}?includeGalleries=true`)) as {
-        galleries?: Gallery[];
-      };
-      console.log("[BaseGalleries] Car galleries from API:", car.galleries);
-      setAttachedGalleries(car.galleries || []);
-    } catch (error: any) {
-      console.error("[BaseGalleries] Error fetching car galleries:", error);
-      toast.error("Failed to fetch attached galleries");
-      setAttachedGalleries([]);
-    } finally {
-      console.timeEnd("BaseGalleries-fetchCarGalleries");
-    }
-  }, [carId, api]);
-
-  // Initial load effect - critical path only
-  useEffect(() => {
-    if (!carId || !api) return;
-
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        await fetchCarGalleries();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [carId, api, fetchCarGalleries]);
-
-  // Show loading state when API is not ready or during data loading
-  if (!api || isLoading) {
-    return <GalleriesSkeleton variant="grid" itemCount={4} />;
+  // Handle error state without blocking UI
+  if (error) {
+    console.error("Error fetching attached galleries:", error);
   }
 
   return (
@@ -104,8 +91,37 @@ export function BaseGalleries({
         </Button>
       </div>
 
-      {/* Attached Galleries Display */}
-      {attachedGalleries.length === 0 ? (
+      {/* Error display - non-blocking */}
+      {error && (
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
+          <p className="text-destructive text-sm">
+            Failed to load attached galleries. Tab switching is still available.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshGalleries()}
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Gallery list - non-blocking loading */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-muted-foreground">
+              Loading galleries...
+            </p>
+            <p className="text-xs text-muted-foreground text-center">
+              You can switch tabs while this loads
+            </p>
+          </div>
+        </div>
+      ) : attachedGalleries.length === 0 ? (
         <div className="text-center text-muted-foreground py-12">
           <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg">No galleries attached to this car</p>

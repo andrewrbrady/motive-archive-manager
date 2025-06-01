@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
@@ -27,7 +30,6 @@ import type {
 } from "../projects/caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
 
 export interface CopywriterConfig {
   mode: "car" | "project";
@@ -71,22 +73,43 @@ interface BaseCopywriterProps {
   callbacks: CopywriterCallbacks;
 }
 
+/**
+ * BaseCopywriter - Non-blocking copywriter component
+ * Part of Phase 3F optimization - converted from blocking useEffect to useQuery
+ * Users can switch tabs while data loads in background
+ */
 export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const { user } = useFirebaseAuth();
 
-  // Data state
-  const [data, setData] = useState<CopywriterData>({
-    cars: [],
-    events: [],
-    systemPrompts: [],
-    lengthSettings: [],
-    savedCaptions: [],
-    clientHandle: null,
+  // Use optimized query hook - non-blocking, cached data fetching
+  const {
+    data,
+    isLoading,
+    error,
+    refetch: refreshData,
+  } = useQuery<CopywriterData>({
+    queryKey: [`copywriter-data-${config.entityId}`],
+    queryFn: callbacks.onDataFetch,
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    // This ensures the query is enabled and won't block tab switching
+    refetchOnWindowFocus: false,
   });
 
-  // Loading states
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Memoize data with fallbacks for performance
+  const memoizedData = useMemo(() => {
+    return {
+      cars: data?.cars || [],
+      events: data?.events || [],
+      systemPrompts: data?.systemPrompts || [],
+      lengthSettings: data?.lengthSettings || [],
+      savedCaptions: data?.savedCaptions || [],
+      clientHandle: data?.clientHandle || null,
+      hasMoreEvents: data?.hasMoreEvents || false,
+      hasMoreCaptions: data?.hasMoreCaptions || false,
+    };
+  }, [data]);
 
   // Selection states
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
@@ -126,7 +149,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Derive length from selected prompt template
   const derivedLength = promptHandlers.selectedPrompt
-    ? data.lengthSettings.find(
+    ? memoizedData.lengthSettings.find(
         (l) => l.key === promptHandlers.selectedPrompt?.length
       ) || null
     : null;
@@ -138,55 +161,33 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   // Content saving - must be called before any early returns
   const { saveCaption } = useCaptionSaver();
 
-  // Initialize data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const fetchedData = await callbacks.onDataFetch();
-        setData(fetchedData);
-
-        console.log("BaseCopywriter: Received data:", {
-          carsCount: fetchedData.cars.length,
-          eventsCount: fetchedData.events.length,
-          systemPromptsCount: fetchedData.systemPrompts.length,
-          lengthSettingsCount: fetchedData.lengthSettings.length,
-          savedCaptionsCount: fetchedData.savedCaptions.length,
-          systemPromptsFirst: fetchedData.systemPrompts[0],
-        });
-
-        // Auto-select all cars for single car mode
-        if (config.mode === "car" && fetchedData.cars.length === 1) {
-          setSelectedCarIds([fetchedData.cars[0]._id]);
-          setCarDetails(fetchedData.cars);
-        }
-      } catch (err) {
-        console.error("Error fetching copywriter data:", err);
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [config.entityId]);
+  // Auto-select car for single car mode
+  React.useEffect(() => {
+    if (
+      config.mode === "car" &&
+      memoizedData.cars.length === 1 &&
+      selectedCarIds.length === 0
+    ) {
+      setSelectedCarIds([memoizedData.cars[0]._id]);
+      setCarDetails(memoizedData.cars);
+    }
+  }, [config.mode, memoizedData.cars, selectedCarIds.length]);
 
   // Fetch prompts when component mounts
-  useEffect(() => {
+  React.useEffect(() => {
     console.log("BaseCopywriter: useEffect calling fetchPrompts...");
     promptHandlers.fetchPrompts();
   }, [promptHandlers.fetchPrompts]);
 
   // Debug logging for system prompts
-  useEffect(() => {
+  React.useEffect(() => {
     console.log("BaseCopywriter: System prompts data updated:", {
-      count: data.systemPrompts.length,
-      prompts: data.systemPrompts,
-      loading,
+      count: memoizedData.systemPrompts.length,
+      prompts: memoizedData.systemPrompts,
+      loading: isLoading,
       error,
     });
-  }, [data.systemPrompts, loading, error]);
+  }, [memoizedData.systemPrompts, isLoading, error]);
 
   // Event selection handlers
   const handleEventSelection = useCallback(
@@ -197,7 +198,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           : [...prev, eventId];
 
         // Update event details based on selection
-        const details = data.events.filter((event) =>
+        const details = memoizedData.events.filter((event) =>
           newSelection.includes(event.id)
         );
         setEventDetails(details);
@@ -205,18 +206,18 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         return newSelection;
       });
     },
-    [data.events]
+    [memoizedData.events]
   );
 
   const handleSelectAllEvents = useCallback(() => {
-    const allEventIds = data.events.map((event) => event.id);
+    const allEventIds = memoizedData.events.map((event) => event.id);
     setSelectedEventIds(allEventIds);
-    setEventDetails(data.events);
-  }, [data.events]);
+    setEventDetails(memoizedData.events);
+  }, [memoizedData.events]);
 
   // Load more events handler
   const handleLoadMoreEvents = useCallback(async () => {
-    if (loadingMoreEvents || !data.hasMoreEvents) return;
+    if (loadingMoreEvents || !memoizedData.hasMoreEvents) return;
 
     setLoadingMoreEvents(true);
     try {
@@ -229,7 +230,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     } finally {
       setLoadingMoreEvents(false);
     }
-  }, [loadingMoreEvents, data.hasMoreEvents]);
+  }, [loadingMoreEvents, memoizedData.hasMoreEvents]);
 
   // Car selection handlers (for multi-car mode)
   const handleCarSelection = useCallback(
@@ -242,7 +243,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           : [...prev, carId];
 
         // Update car details based on selection
-        const details = data.cars.filter((car) =>
+        const details = memoizedData.cars.filter((car) =>
           newSelection.includes(car._id)
         );
         setCarDetails(details);
@@ -250,16 +251,16 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         return newSelection;
       });
     },
-    [data.cars, config.features.allowMultipleCars]
+    [memoizedData.cars, config.features.allowMultipleCars]
   );
 
   const handleSelectAllCars = useCallback(() => {
     if (!config.features.allowMultipleCars) return;
 
-    const allCarIds = data.cars.map((car) => car._id);
+    const allCarIds = memoizedData.cars.map((car) => car._id);
     setSelectedCarIds(allCarIds);
-    setCarDetails(data.cars);
-  }, [data.cars, config.features.allowMultipleCars]);
+    setCarDetails(memoizedData.cars);
+  }, [memoizedData.cars, config.features.allowMultipleCars]);
 
   // System prompt handler
   const handleSystemPromptChange = useCallback((promptId: string) => {
@@ -273,7 +274,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     let llmText = "";
 
     // Add system prompt context
-    const systemPrompt = data.systemPrompts.find(
+    const systemPrompt = memoizedData.systemPrompts.find(
       (p) => p._id === selectedSystemPromptId
     );
     if (systemPrompt) {
@@ -348,7 +349,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   }, [
     carDetails,
     selectedSystemPromptId,
-    data.systemPrompts,
+    memoizedData.systemPrompts,
     formState,
     eventDetails,
     derivedLength,
@@ -418,7 +419,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       derivedLength,
       useMinimalCarData,
       editableLLMText,
-      clientHandle: data.clientHandle || null,
+      clientHandle: memoizedData.clientHandle || null,
     };
 
     await generateCaption(context, formState);
@@ -492,7 +493,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Load more captions handler
   const handleLoadMoreCaptions = useCallback(async () => {
-    if (loadingMoreCaptions || !data.hasMoreCaptions) return;
+    if (loadingMoreCaptions || !memoizedData.hasMoreCaptions) return;
 
     setLoadingMoreCaptions(true);
     try {
@@ -505,14 +506,44 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     } finally {
       setLoadingMoreCaptions(false);
     }
-  }, [loadingMoreCaptions, data.hasMoreCaptions]);
+  }, [loadingMoreCaptions, memoizedData.hasMoreCaptions]);
 
-  if (loading) {
-    return <CarTabSkeleton variant="form" />;
+  // Handle error state without blocking UI
+  if (error) {
+    console.error("Error fetching copywriter data:", error);
   }
 
+  // Non-blocking loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading copywriter...</p>
+          <p className="text-xs text-muted-foreground text-center">
+            You can switch tabs while this loads
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error display - non-blocking
   if (error) {
-    return <div className="py-8 text-center text-destructive-500">{error}</div>;
+    return (
+      <div className="py-8">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-4 max-w-md mx-auto">
+          <p className="text-destructive text-sm text-center mb-3">
+            Failed to load copywriter data. Tab switching is still available.
+          </p>
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={() => refreshData()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -522,9 +553,9 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         <div className="space-y-6">
           {/* Car Selection */}
           <CarSelection
-            projectCars={data.cars}
+            projectCars={memoizedData.cars}
             selectedCarIds={selectedCarIds}
-            loadingCars={loading}
+            loadingCars={isLoading}
             onCarSelection={handleCarSelection}
             onSelectAllCars={handleSelectAllCars}
           />
@@ -532,22 +563,22 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           {/* Event Selection */}
           {config.features.allowEventSelection && (
             <EventSelection
-              projectEvents={data.events}
+              projectEvents={memoizedData.events}
               selectedEventIds={selectedEventIds}
-              loadingEvents={loading || loadingMoreEvents}
+              loadingEvents={isLoading || loadingMoreEvents}
               onEventSelection={handleEventSelection}
               onSelectAllEvents={handleSelectAllEvents}
-              hasMoreEvents={data.hasMoreEvents}
+              hasMoreEvents={memoizedData.hasMoreEvents}
               onLoadMoreEvents={handleLoadMoreEvents}
             />
           )}
 
           {/* System Prompt Selection */}
           <SystemPromptSelection
-            systemPrompts={data.systemPrompts}
+            systemPrompts={memoizedData.systemPrompts}
             selectedSystemPromptId={selectedSystemPromptId}
-            loadingSystemPrompts={loading}
-            systemPromptError={error}
+            loadingSystemPrompts={isLoading}
+            systemPromptError={error ? String(error) : null}
             onSystemPromptChange={handleSystemPromptChange}
           />
 
@@ -577,9 +608,9 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onEditableLLMTextChange={setEditableLLMText}
             onRefreshLLMText={handleRefreshLLMText}
             selectedSystemPromptId={selectedSystemPromptId}
-            systemPrompts={data.systemPrompts}
-            projectCars={data.cars}
-            projectEvents={data.events}
+            systemPrompts={memoizedData.systemPrompts}
+            projectCars={memoizedData.cars}
+            projectEvents={memoizedData.events}
             model={formState.model}
             temperature={formState.temperature}
             isGenerating={generationState.isGenerating}
@@ -598,7 +629,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onSaveCaption={handleSaveContent}
             viewMode={contentViewMode}
             onViewModeChange={setContentViewMode}
-            savedCaptions={data.savedCaptions}
+            savedCaptions={memoizedData.savedCaptions}
             editingCaptionId={editingCaptionId}
             editingText={editingText}
             onStartEdit={handleStartEdit}
@@ -607,7 +638,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onEditTextChange={handleEditTextChange}
             onDeleteCaption={handleDeleteContent}
             onUpdatePreviewCaption={handleUpdatePreviewContent}
-            hasMoreCaptions={data.hasMoreCaptions}
+            hasMoreCaptions={memoizedData.hasMoreCaptions}
             onLoadMoreCaptions={handleLoadMoreCaptions}
             loadingCaptions={loadingMoreCaptions}
           />
@@ -623,7 +654,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         model={formState.model}
         provider={formState.provider}
         temperature={formState.temperature}
-        clientHandle={data.clientHandle || null}
+        clientHandle={memoizedData.clientHandle || null}
         onPromptSaved={(prompt: PromptTemplate) => {
           promptHandlers.handlePromptSaved(prompt);
         }}

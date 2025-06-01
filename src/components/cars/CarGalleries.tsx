@@ -39,7 +39,6 @@ import {
 import { toast } from "sonner";
 import LazyImage from "@/components/LazyImage";
 import { useAPI } from "@/hooks/useAPI";
-import { GalleriesSkeleton } from "@/components/cars/optimized/galleries";
 
 interface Gallery {
   _id: string;
@@ -398,7 +397,14 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
   // Show loading state when API is not ready or during data loading
   if (!api || isLoading) {
-    return <GalleriesSkeleton variant="grid" itemCount={4} />;
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading galleries...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

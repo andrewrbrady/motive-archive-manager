@@ -71,7 +71,7 @@ export function ImageThumbnails({
   const bottomLoadTriggerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(400);
-  const preloadedPagesRef = useRef<Set<number>>(new Set());
+  const preloadedPagesRef = useRef<Set<number | string>>(new Set());
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate page information based on server pagination or filtered results
@@ -170,12 +170,26 @@ export function ImageThumbnails({
     [images]
   );
 
-  // Smart preloading: preload next page when user reaches 80% of current page
+  // Phase 2B Task 2: Get previous page images for back navigation preloading
+  const getPreviousPageImages = useCallback(
+    (targetPage: number): ExtendedImageType[] => {
+      const prevPageStartIndex = targetPage * ITEMS_PER_PAGE;
+      return images.slice(
+        prevPageStartIndex,
+        prevPageStartIndex + ITEMS_PER_PAGE
+      );
+    },
+    [images]
+  );
+
+  // Phase 2B Task 2: Enhanced smart preloading with requestIdleCallback and adjacent page support
   const handleSmartPreloading = useCallback(() => {
-    if (
-      !scrollContainerRef.current ||
-      preloadedPagesRef.current.has(currentPage + 1)
-    ) {
+    if (!scrollContainerRef.current) {
+      return;
+    }
+
+    // Phase 2B Fix: Don't interfere with user navigation
+    if (isNavigating) {
       return;
     }
 
@@ -183,45 +197,98 @@ export function ImageThumbnails({
     const scrollPercentage =
       (container.scrollTop + container.clientHeight) / container.scrollHeight;
 
-    // Trigger preloading when user reaches 80% of current page
+    // Phase 2B Task 2: Preload next page when user reaches 80% of current page
     if (scrollPercentage >= 0.8) {
       const nextPage = currentPage + 1;
-      const nextPageImages = getNextPageImages(nextPage);
 
-      if (nextPageImages.length > 0) {
-        preloadedPagesRef.current.add(nextPage);
+      if (!preloadedPagesRef.current.has(nextPage)) {
+        const nextPageImages = getNextPageImages(nextPage);
 
-        // Preload next page images with thumbnail variant
-        const imageUrls = nextPageImages.map((img) => img.url);
-        preloadImages(imageUrls, "thumbnail").catch((error) => {
-          console.error("Failed to preload next page images:", error);
-        });
+        if (nextPageImages.length > 0) {
+          preloadedPagesRef.current.add(nextPage);
 
-        console.log(
-          `🖼️ Preloaded ${imageUrls.length} images for page ${nextPage + 1}`
-        );
+          // Phase 2B Task 2: Use requestIdleCallback for non-blocking preload execution
+          const preloadNextPage = () => {
+            // Preload first 5 images of next page for faster pagination
+            const imagesToPreload = nextPageImages
+              .slice(0, 5)
+              .map((img) => img.url);
+
+            preloadImages(imagesToPreload, "thumbnail").catch((error) => {
+              console.error("Failed to preload next page images:", error);
+            });
+
+            console.log(
+              `🚀 Phase 2B: Preloaded ${imagesToPreload.length} images for next page ${nextPage + 1}`
+            );
+          };
+
+          // Use requestIdleCallback if available, otherwise setTimeout
+          if (typeof requestIdleCallback !== "undefined") {
+            requestIdleCallback(preloadNextPage, { timeout: 2000 });
+          } else {
+            setTimeout(preloadNextPage, 100);
+          }
+        }
       }
     }
-  }, [currentPage, getNextPageImages]);
 
-  // Debounced scroll handler for smart preloading
+    // Phase 2B Task 2: Preload previous page for back navigation when user scrolls to top 20%
+    if (scrollPercentage <= 0.2 && currentPage > 0) {
+      const prevPage = currentPage - 1;
+      const prevPageKey = `prev-${prevPage}`;
+
+      if (!preloadedPagesRef.current.has(prevPageKey)) {
+        const prevPageImages = getPreviousPageImages(prevPage);
+
+        if (prevPageImages.length > 0) {
+          preloadedPagesRef.current.add(prevPageKey);
+
+          // Phase 2B Task 2: Use requestIdleCallback for non-blocking preload execution
+          const preloadPrevPage = () => {
+            // Preload last 5 images of previous page for faster back navigation
+            const imagesToPreload = prevPageImages
+              .slice(-5)
+              .map((img) => img.url);
+
+            preloadImages(imagesToPreload, "thumbnail").catch((error) => {
+              console.error("Failed to preload previous page images:", error);
+            });
+
+            console.log(
+              `🚀 Phase 2B: Preloaded ${imagesToPreload.length} images for previous page ${prevPage + 1}`
+            );
+          };
+
+          // Use requestIdleCallback if available, otherwise setTimeout
+          if (typeof requestIdleCallback !== "undefined") {
+            requestIdleCallback(preloadPrevPage, { timeout: 2000 });
+          } else {
+            setTimeout(preloadPrevPage, 100);
+          }
+        }
+      }
+    }
+  }, [currentPage, getNextPageImages, getPreviousPageImages, isNavigating]); // Phase 2B Fix: Add isNavigating dependency
+
+  // Phase 2B Task 2: Re-enable and enhance scroll handler for smart preloading
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
       const target = e.target as HTMLDivElement;
       setScrollTop(target.scrollTop);
 
-      // Temporarily disable smart preloading
-      // // Clear existing timeout
-      // if (preloadTimeoutRef.current) {
-      //   clearTimeout(preloadTimeoutRef.current);
-      // }
+      // Phase 2B Task 2: Enable smart preloading with debouncing
+      // Clear existing timeout
+      if (preloadTimeoutRef.current) {
+        clearTimeout(preloadTimeoutRef.current);
+      }
 
-      // // Debounce preloading to avoid excessive calls
-      // preloadTimeoutRef.current = setTimeout(() => {
-      //   handleSmartPreloading();
-      // }, 150);
+      // Debounce preloading to avoid excessive calls (reduced from 150ms to 100ms for better responsiveness)
+      preloadTimeoutRef.current = setTimeout(() => {
+        handleSmartPreloading();
+      }, 100);
     },
-    [] // Remove handleSmartPreloading dependency temporarily
+    [handleSmartPreloading] // Phase 2B Task 2: Re-enable handleSmartPreloading dependency
   );
 
   // Track container size for virtual scrolling calculations
@@ -352,7 +419,7 @@ export function ImageThumbnails({
     };
   }, [handleIntersection]);
 
-  // Preload adjacent images when current image changes (for gallery navigation)
+  // Phase 2B Task 2: Enhanced preload adjacent images when current image changes (for gallery navigation)
   const preloadAdjacentImages = useCallback(() => {
     if (!currentImage) return;
 
@@ -375,19 +442,40 @@ export function ImageThumbnails({
     }
 
     if (adjacentImages.length > 0) {
-      preloadImages(adjacentImages, "medium").catch((error) => {
-        console.error("Failed to preload adjacent images:", error);
-      });
+      // Phase 2B Task 2: Use requestIdleCallback for non-blocking adjacent image preloading
+      const preloadAdjacent = () => {
+        preloadImages(adjacentImages, "medium").catch((error) => {
+          console.error("Failed to preload adjacent images:", error);
+        });
 
-      console.log(`🖼️ Preloaded ${adjacentImages.length} adjacent images`);
+        console.log(
+          `🚀 Phase 2B: Preloaded ${adjacentImages.length} adjacent images for gallery navigation`
+        );
+      };
+
+      // Use requestIdleCallback if available, otherwise setTimeout
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(preloadAdjacent, { timeout: 1000 });
+      } else {
+        setTimeout(preloadAdjacent, 50);
+      }
     }
-  }, [currentImage, images]);
+  }, [currentImage?.id || currentImage?._id, images.length]); // Phase 2B Fix: Only depend on currentImage ID and images length to prevent excessive re-renders
 
-  // Effect for preloading adjacent images
+  // Phase 2B Task 2: Re-enable adjacent image preloading effect with optimized dependencies
   useEffect(() => {
-    // Temporarily disable preloading to prevent issues
-    // preloadAdjacentImages();
-  }, [preloadAdjacentImages]);
+    // Only preload if we have a current image and it's stable (prevent rapid changes during navigation)
+    if (currentImage) {
+      const debounceTimer = setTimeout(() => {
+        preloadAdjacentImages();
+      }, 100); // Small debounce to prevent rapid re-triggers during navigation
+
+      return () => clearTimeout(debounceTimer);
+    }
+
+    // Return undefined when no cleanup is needed
+    return undefined;
+  }, [currentImage?.id || currentImage?._id]); // Phase 2B Fix: Only depend on currentImage ID, not the full callback
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -398,16 +486,38 @@ export function ImageThumbnails({
     };
   }, []);
 
-  // Critical above-fold images for link preload
+  // Phase 2B Task 2: Enhanced critical above-fold images for link preload
   const criticalImages = useMemo(() => {
-    // Temporarily disable critical image preloading
+    if (currentPage === 0 && paginatedImages.length > 0) {
+      // First 6 images are considered above-fold and critical for LCP
+      const criticalImageUrls = paginatedImages
+        .slice(0, 6)
+        .map((img) => img.url);
+
+      // Phase 2B Task 2: Use requestIdleCallback to preload critical images without blocking
+      if (criticalImageUrls.length > 0) {
+        const preloadCritical = () => {
+          preloadImages(criticalImageUrls, "thumbnail").catch((error) => {
+            console.error("Failed to preload critical images:", error);
+          });
+
+          console.log(
+            `🚀 Phase 2B: Preloaded ${criticalImageUrls.length} critical above-fold images`
+          );
+        };
+
+        // Use requestIdleCallback if available, otherwise immediate execution
+        if (typeof requestIdleCallback !== "undefined") {
+          requestIdleCallback(preloadCritical, { timeout: 500 });
+        } else {
+          setTimeout(preloadCritical, 0);
+        }
+      }
+
+      return criticalImageUrls;
+    }
     return [];
-    // if (currentPage === 0) {
-    //   // First 6 images are considered above-fold
-    //   return paginatedImages.slice(0, 6).map((img) => img.url);
-    // }
-    // return [];
-  }, [currentPage, paginatedImages]);
+  }, [currentPage, paginatedImages.length]); // Phase 2B Fix: Only depend on currentPage and paginatedImages length to prevent excessive re-renders
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -608,8 +718,8 @@ const ThumbnailItem = React.memo<{
             className="object-cover transition-transform duration-300 group-hover:scale-110 w-full h-auto"
             sizes="140px"
             variant="thumbnail"
-            priority={isAboveFold}
-            loading={isAboveFold ? "eager" : "lazy"}
+            isAboveFold={isAboveFold}
+            useIntersectionLazyLoad={!isAboveFold}
           />
         </div>
 

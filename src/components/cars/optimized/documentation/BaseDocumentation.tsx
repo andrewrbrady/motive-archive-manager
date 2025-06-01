@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { useAPI } from "@/hooks/useAPI";
 import { FileText, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,99 +28,94 @@ interface BaseDocumentationProps {
  * BaseDocumentation - Critical path component for Documentation tab
  * Part of Phase 1C optimization - loads file list immediately with minimal operations
  * Heavy upload operations are delegated to DocumentationEditor (lazy loaded)
+ *
+ * PHASE 3B OPTIMIZATION: Uses useAPIQuery for non-blocking data fetching
  */
 export default function BaseDocumentation({
   carId,
   onRequestUpload,
 }: BaseDocumentationProps) {
+  // Use hooks at component level
   const api = useAPI();
-  const [files, setFiles] = useState<DocumentationFile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Use optimized query hook - non-blocking, cached data fetching
+  const {
+    data: filesData,
+    isLoading,
+    error,
+    refetch: refreshFiles,
+  } = useAPIQuery<{ files: DocumentationFile[] }>(
+    `cars/${carId}/documentation?fields=_id,filename,contentType,size,url,createdAt`,
+    {
+      staleTime: 3 * 60 * 1000, // 3 minutes cache
+      retry: 2,
+      retryDelay: 1000,
+      // This ensures the query is enabled and won't block tab switching
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchFiles();
-  }, [carId, api]);
-
-  /**
-   * Critical path API call - loads file metadata only
-   * Optimized query: fields=name,size,type,date for minimal payload
-   */
-  const fetchFiles = async () => {
-    if (!api) return;
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Critical path: load file list with minimal metadata for fast initial display
-      const data = (await api.get(
-        `cars/${carId}/documentation?fields=_id,filename,contentType,size,url,createdAt`
-      )) as {
-        files: DocumentationFile[];
-      };
-
-      setFiles(data.files || []);
-    } catch (error) {
-      console.error("Error fetching documentation files:", error);
-      setError("Failed to load documentation files");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Memoize files array for performance
+  const files = useMemo(() => {
+    return filesData?.files || [];
+  }, [filesData?.files]);
 
   /**
-   * Optimized delete operation - minimal UI updates
+   * Optimized delete operation - uses callback to prevent re-renders
    */
-  const handleDelete = async (fileId: string) => {
-    if (!api) return;
-    setIsDeletingFile(fileId);
+  const handleDelete = useCallback(
+    async (fileId: string) => {
+      if (!api) return;
+      setIsDeletingFile(fileId);
 
-    try {
-      await api.deleteWithBody("documentation/delete", { fileId, carId });
+      try {
+        await api.deleteWithBody("documentation/delete", { fileId, carId });
 
-      // Optimistic update for instant UI response
-      setFiles((prev) => prev.filter((file) => file._id !== fileId));
-      toast.success("File deleted successfully");
-    } catch (error) {
-      console.error("Error deleting file:", error);
-      toast.error("Failed to delete file");
-      // Refresh files on error to ensure consistency
-      fetchFiles();
-    } finally {
-      setIsDeletingFile(null);
-    }
-  };
+        // Refresh data after successful delete
+        refreshFiles();
+        toast.success("File deleted successfully");
+      } catch (error) {
+        console.error("Error deleting file:", error);
+        toast.error("Failed to delete file");
+      } finally {
+        setIsDeletingFile(null);
+      }
+    },
+    [api, carId, refreshFiles]
+  );
 
   /**
-   * Utility functions - moved to component scope for better performance
+   * Memoized utility functions for better performance
    */
-  const formatFileSize = (bytes: number) => {
+  const formatFileSize = useCallback((bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  }, []);
 
-  const truncateFilename = (filename: string, maxLength: number = 40) => {
-    if (filename.length <= maxLength) return filename;
-    const extension = filename.split(".").pop() || "";
-    const nameWithoutExtension = filename.substring(
-      0,
-      filename.length - extension.length - 1
-    );
-    const truncatedName =
-      nameWithoutExtension.substring(0, maxLength - extension.length - 3) +
-      "...";
-    return `${truncatedName}.${extension}`;
-  };
+  const truncateFilename = useCallback(
+    (filename: string, maxLength: number = 40) => {
+      if (filename.length <= maxLength) return filename;
+      const extension = filename.split(".").pop() || "";
+      const nameWithoutExtension = filename.substring(
+        0,
+        filename.length - extension.length - 1
+      );
+      const truncatedName =
+        nameWithoutExtension.substring(0, maxLength - extension.length - 3) +
+        "...";
+      return `${truncatedName}.${extension}`;
+    },
+    []
+  );
 
-  // Early return for API loading
-  if (!api) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">Loading...</div>
-    );
+  // Handle error state without blocking UI
+  if (error) {
+    console.error("Error fetching documentation files:", error);
   }
 
   return (
@@ -139,14 +135,25 @@ export default function BaseDocumentation({
         </div>
       </div>
 
-      {/* Error display */}
+      {/* Error display - non-blocking */}
       {error && (
         <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
-          <p className="text-destructive text-sm">{error}</p>
+          <p className="text-destructive text-sm">
+            Failed to load documentation files. Tab switching is still
+            available.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshFiles()}
+            className="mt-2"
+          >
+            Retry
+          </Button>
         </div>
       )}
 
-      {/* File list - critical path display */}
+      {/* File list - non-blocking loading */}
       <div className="border rounded-md">
         <div className="p-4 border-b">
           <h3 className="text-lg font-medium">Uploaded Documentation</h3>
@@ -159,7 +166,17 @@ export default function BaseDocumentation({
 
         <div className="divide-y">
           {isLoading ? (
-            <FileListSkeleton count={3} />
+            <div className="p-4">
+              <div className="flex items-center justify-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">
+                  Loading files...
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                You can switch tabs while this loads
+              </p>
+            </div>
           ) : files.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-muted-foreground">
@@ -225,23 +242,23 @@ export function useDocumentationSync(
   carId: string,
   onFilesUpdate: (files: DocumentationFile[]) => void
 ) {
-  const api = useAPI();
+  const { data, refetch } = useAPIQuery<{ files: DocumentationFile[] }>(
+    `cars/${carId}/documentation?fields=_id,filename,contentType,size,url,createdAt`,
+    {
+      staleTime: 3 * 60 * 1000,
+    }
+  );
 
-  const refreshFiles = async () => {
-    if (!api) return;
-
+  const refreshFiles = useCallback(async () => {
     try {
-      const data = (await api.get(
-        `cars/${carId}/documentation?fields=_id,filename,contentType,size,url,createdAt`
-      )) as {
-        files: DocumentationFile[];
-      };
-
-      onFilesUpdate(data.files || []);
+      await refetch();
+      if (data?.files) {
+        onFilesUpdate(data.files);
+      }
     } catch (error) {
       console.error("Error refreshing documentation files:", error);
     }
-  };
+  }, [refetch, data?.files, onFilesUpdate]);
 
   return { refreshFiles };
 }

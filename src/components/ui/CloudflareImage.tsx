@@ -16,6 +16,8 @@ interface CloudflareImageProps extends Omit<ImageProps, "src" | "loader"> {
   progressive?: boolean; // Enable progressive loading with blur placeholder
   retryAttempts?: number; // Number of retry attempts for failed loads
   cacheKey?: string; // Optional cache key for localStorage caching
+  isAboveFold?: boolean; // New: Indicates if image is above the fold for fetch priority
+  useIntersectionLazyLoad?: boolean; // New: Use intersection observer for lazy loading
 }
 
 export function CloudflareImage({
@@ -25,24 +27,97 @@ export function CloudflareImage({
   alt,
   className,
   showError = true,
-  progressive = false, // Disable by default to prevent issues
-  retryAttempts = 1, // Reduce to prevent issues
+  progressive = false, // Keep disabled by default for compatibility
+  retryAttempts = 1, // Keep reduced to prevent issues
   cacheKey,
+  isAboveFold = false, // New: Default to false
+  useIntersectionLazyLoad = false, // New: Default to false for backward compatibility
   ...props
 }: CloudflareImageProps) {
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInView, setIsInView] = useState(!useIntersectionLazyLoad); // Load immediately if not using intersection observer
+  const imageRef = useRef<HTMLImageElement>(null);
+  const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
 
   // Use the URL as-is since it's now a base URL, and let Next.js + custom loader handle sizing
   const optimizedSrc = src;
 
+  // Phase 2B Task 1: Add cache optimization headers for Cloudflare URLs
+  const getCacheOptimizedSrc = useCallback((src: string) => {
+    // Cloudflare Images already have aggressive CDN caching built-in
+    // Adding cache parameters via URL can break the image service
+    // Return the URL as-is since Cloudflare handles caching automatically
+    return src;
+  }, []);
+
+  // Phase 2B Task 1: Intersection Observer for lazy loading with fallback
+  useEffect(() => {
+    if (!useIntersectionLazyLoad || !imageRef.current) {
+      return;
+    }
+
+    // Only create intersection observer if explicitly enabled
+    try {
+      // Create intersection observer for smart lazy loading
+      intersectionObserverRef.current = new IntersectionObserver(
+        (entries) => {
+          const [entry] = entries;
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            // Disconnect observer once image is in view
+            if (intersectionObserverRef.current) {
+              intersectionObserverRef.current.disconnect();
+            }
+          }
+        },
+        {
+          // Start loading when image is 50px away from viewport
+          rootMargin: "50px",
+          threshold: 0.1,
+        }
+      );
+
+      intersectionObserverRef.current.observe(imageRef.current);
+    } catch (error) {
+      console.warn(
+        "Failed to create intersection observer, falling back to immediate load:",
+        error
+      );
+      setIsInView(true); // Fallback to immediate loading
+    }
+
+    return () => {
+      if (intersectionObserverRef.current) {
+        intersectionObserverRef.current.disconnect();
+      }
+    };
+  }, [useIntersectionLazyLoad]);
+
+  // Cleanup intersection observer on unmount
+  useEffect(() => {
+    return () => {
+      if (intersectionObserverRef.current) {
+        intersectionObserverRef.current.disconnect();
+      }
+    };
+  }, []);
+
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.warn("Image load error:", src);
+    const target = e.target as HTMLImageElement;
+    console.error("CloudflareImage load error:", {
+      originalSrc: src,
+      optimizedSrc: getCacheOptimizedSrc(optimizedSrc),
+      finalSrc: target.src,
+      error: e,
+      isAboveFold,
+      useIntersectionLazyLoad,
+    });
     setImageError(true);
     setIsLoading(false);
 
     if (fallback) {
-      (e.target as HTMLImageElement).src = fallback;
+      target.src = fallback;
     }
 
     props.onError?.(e);
@@ -77,6 +152,7 @@ export function CloudflareImage({
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-label="Failed to load image icon"
           >
             <path
               strokeLinecap="round"
@@ -91,37 +167,115 @@ export function CloudflareImage({
     );
   }
 
+  // Phase 2B Task 1: Show placeholder while waiting for intersection observer
+  if (useIntersectionLazyLoad && !isInView) {
+    return (
+      <div
+        ref={imageRef}
+        className={cn(
+          "flex items-center justify-center bg-muted/50 rounded-md animate-pulse",
+          className
+        )}
+        style={{
+          width: props.width,
+          height: props.height,
+          aspectRatio:
+            props.width && props.height
+              ? `${props.width}/${props.height}`
+              : undefined,
+        }}
+      >
+        <svg
+          className="w-8 h-8 text-muted-foreground/50"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-label="Loading image placeholder icon"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  // Phase 2B Task 1: Build optimized image props with fetch priority and loading strategy
+  // Extract and filter out potentially conflicting props
+  const {
+    priority: oldPriority,
+    loading: oldLoading,
+    ...filteredProps
+  } = props;
+
+  const imageProps: ImageProps = {
+    src: getCacheOptimizedSrc(optimizedSrc),
+    className: cn(
+      "transition-opacity duration-300",
+      isLoading ? "opacity-0" : "opacity-100",
+      className
+    ),
+    onError: handleError,
+    onLoad: handleLoad,
+    // Phase 2B Task 1: Add fetchpriority for above-fold images
+    fetchPriority: isAboveFold ? "high" : "auto",
+    // Phase 2B Task 1: Intelligent loading strategy - only set if above fold or using intersection observer
+    ...(isAboveFold ? { priority: true } : { loading: "lazy" }),
+    ...filteredProps, // Use filtered props to avoid conflicts
+    // Ensure alt prop is always present and comes after filteredProps to override any conflicts
+    alt: alt || "",
+  };
+
+  // Phase 2B Task 1: Handle intersection observer case separately due to ref typing
+  if (useIntersectionLazyLoad) {
+    return <Image {...imageProps} alt={alt || ""} ref={imageRef} />;
+  }
+
+  return <Image {...imageProps} alt={alt || ""} />;
+}
+
+// Specialized components for common use cases with Phase 2B optimizations
+export function ThumbnailImage(props: Omit<CloudflareImageProps, "variant">) {
   return (
-    <Image
-      src={optimizedSrc}
-      alt={alt}
-      className={cn(
-        "transition-opacity duration-300",
-        isLoading ? "opacity-0" : "opacity-100",
-        className
-      )}
-      onError={handleError}
-      onLoad={handleLoad}
+    <CloudflareImage
       {...props}
+      variant="thumbnail"
+      useIntersectionLazyLoad={true} // Phase 2B: Enable lazy loading for thumbnails
     />
   );
 }
 
-// Specialized components for common use cases
-export function ThumbnailImage(props: Omit<CloudflareImageProps, "variant">) {
-  return <CloudflareImage {...props} variant="thumbnail" />;
-}
-
 export function HeroImage(props: Omit<CloudflareImageProps, "variant">) {
-  return <CloudflareImage {...props} variant="hero" />;
+  return (
+    <CloudflareImage
+      {...props}
+      variant="hero"
+      isAboveFold={true} // Phase 2B: Hero images are above fold, load with high priority
+    />
+  );
 }
 
 export function GalleryImage(props: Omit<CloudflareImageProps, "variant">) {
-  return <CloudflareImage {...props} variant="gallery" />;
+  return (
+    <CloudflareImage
+      {...props}
+      variant="gallery"
+      useIntersectionLazyLoad={true} // Phase 2B: Enable lazy loading for gallery images
+    />
+  );
 }
 
 export function SquareImage(props: Omit<CloudflareImageProps, "variant">) {
-  return <CloudflareImage {...props} variant="square" />;
+  return (
+    <CloudflareImage
+      {...props}
+      variant="square"
+      useIntersectionLazyLoad={true} // Phase 2B: Enable lazy loading for square images
+    />
+  );
 }
 
 export function WideImage(props: Omit<CloudflareImageProps, "variant">) {

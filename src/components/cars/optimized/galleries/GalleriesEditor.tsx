@@ -28,14 +28,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import LazyImage from "@/components/LazyImage";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { useAPI } from "@/hooks/useAPI";
-import { GalleriesSkeleton } from "./GalleriesSkeleton";
 import { Gallery, GalleriesProps } from "./index";
 
 interface GalleriesEditorProps extends GalleriesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  attachedGalleries: Gallery[];
   onGalleriesUpdated: () => void;
 }
 
@@ -43,7 +42,6 @@ export function GalleriesEditor({
   carId,
   open,
   onOpenChange,
-  attachedGalleries,
   onGalleriesUpdated,
 }: GalleriesEditorProps) {
   const api = useAPI();
@@ -58,6 +56,20 @@ export function GalleriesEditor({
 
   // Use refs to prevent unnecessary re-renders
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Fetch attached galleries using useAPIQuery
+  const { data: carData, refetch: refreshAttachedGalleries } = useAPIQuery<{
+    galleries?: Gallery[];
+  }>(`cars/${carId}?includeGalleries=true`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    enabled: open, // Only fetch when dialog is open
+  });
+
+  // Memoize attached galleries for performance
+  const attachedGalleries = carData?.galleries || [];
 
   // Navigate to gallery page
   const navigateToGallery = useCallback(
@@ -324,7 +336,14 @@ export function GalleriesEditor({
         </DialogHeader>
 
         {isLoading ? (
-          <GalleriesSkeleton variant="management" />
+          <div className="flex items-center justify-center h-96">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">
+                Loading galleries...
+              </p>
+            </div>
+          </div>
         ) : (
           <div className="space-y-6 py-4">
             {/* Currently Attached Galleries */}

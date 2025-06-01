@@ -23,20 +23,13 @@ export function ImageViewer({
   showImageInfo,
   onReanalyze,
 }: ImageViewerProps) {
-  if (!currentImage) {
-    return (
-      <div className="bg-background rounded-lg h-full flex items-center justify-center">
-        <p className="text-muted-foreground">No image selected</p>
-      </div>
-    );
-  }
-
+  // No fallback needed since gallery handles conditional rendering
   return (
     <div className="bg-background rounded-lg h-full">
       <div className="relative w-full h-full">
         <CloudflareImage
-          src={currentImage.url}
-          alt={currentImage.metadata?.description || `Image`}
+          src={currentImage!.url}
+          alt={currentImage!.metadata?.description || `Image`}
           fill
           className="object-contain"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 600px, 800px"

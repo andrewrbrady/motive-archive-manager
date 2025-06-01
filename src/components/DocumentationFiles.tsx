@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAPI } from "@/hooks/useAPI";
 import { FileText, Trash2, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "react-hot-toast";
-import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
 
 interface DocumentationFile {
   _id: string;
@@ -362,7 +361,14 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
         </div>
         <div className="divide-y">
           {isLoadingFiles ? (
-            <CarTabSkeleton variant="list" itemCount={3} />
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground">
+                  Loading documentation...
+                </p>
+              </div>
+            </div>
           ) : files.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-muted-foreground">

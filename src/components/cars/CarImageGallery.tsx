@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback, useRef } from "react";
+import React, { useEffect, useCallback, useRef, useMemo } from "react";
 import { useImageGallery } from "@/hooks/useImageGallery";
 import { ImageFilters } from "./gallery/ImageFilters";
 import { ImageViewer } from "./gallery/ImageViewer";
@@ -8,7 +8,7 @@ import { ImageThumbnails } from "./gallery/ImageThumbnails";
 import { ImageModal } from "./gallery/ImageModal";
 import { UploadDialog } from "./gallery/UploadDialog";
 import { EditModeControls } from "./gallery/EditModeControls";
-import { CarTabSkeleton } from "@/components/ui/CarTabSkeleton";
+import { NoResultsFound } from "./gallery/NoResultsFound";
 import { useToast } from "@/components/ui/use-toast";
 
 interface CarImageGalleryProps {
@@ -32,6 +32,13 @@ export function CarImageGallery({
   const lastCopyTimeRef = useRef<number>(0);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Pre-determine if this car has images to show appropriate loading state
+  const hasImages = useMemo(() => {
+    const imageIds = vehicleInfo?.imageIds?.length || 0;
+    const processedImageIds = vehicleInfo?.processedImageIds?.length || 0;
+    return imageIds > 0 || processedImageIds > 0;
+  }, [vehicleInfo?.imageIds, vehicleInfo?.processedImageIds]);
+
   const {
     // Data
     images,
@@ -54,6 +61,7 @@ export function CarImageGallery({
     isEditMode,
     isLoadingMore,
     isNavigating,
+    isInitialLoad,
 
     // Actions
     setFilters,
@@ -264,9 +272,40 @@ export function CarImageGallery({
     // Only log essential information when data changes
   }, [carId, images.length]);
 
-  // Loading state
+  // Clear filters handler
+  const handleClearFilters = useCallback(() => {
+    setFilters({});
+  }, [setFilters]);
+
+  // Clear search handler
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery("");
+  }, [setSearchQuery]);
+
+  // Check if we have active filters or search
+  const hasActiveFilters = Object.values(filters).some(
+    (value) => value !== undefined && value !== ""
+  );
+  const hasActiveSearch = searchQuery.trim() !== "";
+
+  // CRITICAL FIX: Only show "no results found" when we have EXPLICIT filters/search with no results
+  // This prevents any flash during initial load or filtering calculation
+  const hasExplicitFilters =
+    hasActiveFilters &&
+    Object.entries(filters).some(([key, value]) => value && value !== "all");
+  const hasExplicitSearch = hasActiveSearch && searchQuery.trim().length > 0;
+  const shouldShowNoResults = hasExplicitFilters || hasExplicitSearch;
+
+  // SIMPLIFIED: Just use a clean spinner for all loading states
   if (isLoading) {
-    return <CarTabSkeleton variant="gallery" />;
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading gallery...</p>
+        </div>
+      </div>
+    );
   }
 
   // Error state
@@ -279,8 +318,13 @@ export function CarImageGallery({
     );
   }
 
-  // Empty state
-  if (images.length === 0) {
+  // FIXED: Better empty state logic - only after loading is complete
+  const isTrulyEmpty = !hasImages && images.length === 0;
+  const hasFilteredResults = filteredImages.length > 0;
+  const hasActiveFiltersOrSearch = hasActiveFilters || hasActiveSearch;
+
+  // Show upload dialog only when truly empty AND no active filters/search AND loading is complete
+  if (isTrulyEmpty && !hasActiveFiltersOrSearch && !isLoading) {
     return (
       <UploadDialog
         isOpen={isUploadDialogOpen}
@@ -293,6 +337,10 @@ export function CarImageGallery({
     );
   }
 
+  // SIMPLIFIED: Just show the normal gallery layout when loading is complete
+  // NoResultsFound will be handled within the gallery components if needed
+
+  // Normal gallery view when we have filtered results
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -331,18 +379,22 @@ export function CarImageGallery({
 
       {/* Main Gallery Layout */}
       <div className="flex gap-6 h-[calc(100vh-350px)] min-h-[500px]">
-        {/* Main Image Viewer - responsive width */}
-        <div className="flex-1 min-w-0 lg:w-2/3">
-          <ImageViewer
-            currentImage={currentImage}
-            onNext={handleNext}
-            onPrev={handlePrev}
-            onOpenModal={() => setIsModalOpen(true)}
-            onToggleInfo={() => setShowImageInfo(!showImageInfo)}
-            showImageInfo={showImageInfo}
-            onReanalyze={reanalyzeImage}
-          />
-        </div>
+        {/* Main Image Viewer - responsive width - only render when we have content */}
+        {currentImage && filteredImages.length > 0 ? (
+          <div className="flex-1 min-w-0 lg:w-2/3">
+            <ImageViewer
+              currentImage={currentImage}
+              onNext={handleNext}
+              onPrev={handlePrev}
+              onOpenModal={() => setIsModalOpen(true)}
+              onToggleInfo={() => setShowImageInfo(!showImageInfo)}
+              showImageInfo={showImageInfo}
+              onReanalyze={reanalyzeImage}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 min-w-0 lg:w-2/3 bg-background rounded-lg" />
+        )}
 
         {/* Thumbnails - responsive width */}
         <div className="w-full lg:w-1/3 lg:max-w-[400px] min-w-[280px]">

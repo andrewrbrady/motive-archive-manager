@@ -5,6 +5,7 @@ import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { FilterState, ExtendedImageType } from "@/types/gallery";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
 import { useAPI } from "@/hooks/useAPI";
+import { useDebounce } from "@/hooks/useDebounce"; // Import useDebounce for search input
 
 // Enhanced caching utilities for image gallery
 interface ImageGalleryCacheItem {
@@ -245,6 +246,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const isEditMode = searchParams?.get("mode") === "edit";
   const urlPage = searchParams?.get("page");
   const currentImageId = searchParams?.get("image");
+  const urlSearchQuery = searchParams?.get("search") || ""; // Initialize search from URL
 
   // Enhanced caching state
   const [cachedData, setCachedData] = useState<any>(null);
@@ -260,6 +262,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const [currentLimit, setCurrentLimit] = useState(50);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [totalImagesAvailable, setTotalImagesAvailable] = useState<
     number | undefined
   >(undefined);
@@ -272,13 +275,16 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<FilterState>({});
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery); // Initialize from URL
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [showImageInfo, setShowImageInfo] = useState(false);
   const [selectedUrlOption, setSelectedUrlOption] =
     useState<string>("Original");
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+
+  // Debounce search query to prevent excessive API calls and page refreshes
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const itemsPerPage = 15;
 
@@ -290,14 +296,14 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   // Check for cached data before making API call
   useEffect(() => {
     // Temporarily disable caching to prevent issues
-    // const cached = cacheUtils.getCacheData(carId, filters, searchQuery, carLastModified);
+    // const cached = cacheUtils.getCacheData(carId, filters, debouncedSearchQuery, carLastModified);
     // if (cached) {
     //   setCachedData(cached);
     // } else {
     //   setCachedData(null);
     // }
     setCachedData(null);
-  }, [carId, filters, searchQuery, carLastModified]);
+  }, [carId, filters, debouncedSearchQuery, carLastModified]); // Use debouncedSearchQuery
 
   // Extract image type arrays from vehicle info for filtering
   const originalImageIds = useMemo(() => {
@@ -329,12 +335,12 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       if (filters.side) params.append("side", filters.side);
       if (filters.imageType) params.append("imageType", filters.imageType);
 
-      // Add search query
-      if (searchQuery) params.append("search", searchQuery);
+      // Add search query - use debounced version to prevent excessive API calls
+      if (debouncedSearchQuery) params.append("search", debouncedSearchQuery);
 
       return params.toString();
     },
-    [filters, searchQuery]
+    [filters, debouncedSearchQuery]
   );
 
   // API Query for initial data fetching with enhanced caching
@@ -358,11 +364,30 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     // initialData: cachedData,
   });
 
+  // Sync debounced search query to URL to enable sharing and prevent page refresh
+  useEffect(() => {
+    if (searchParams && debouncedSearchQuery !== urlSearchQuery) {
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (debouncedSearchQuery.trim()) {
+        params.set("search", debouncedSearchQuery);
+      } else {
+        params.delete("search");
+      }
+
+      // Reset to page 1 when search changes
+      params.set("page", "1");
+
+      // Use router.replace to update URL without adding to history
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [debouncedSearchQuery, urlSearchQuery, searchParams, router]);
+
   // Cache successful API responses when data changes (disabled for now)
   useEffect(() => {
     // Temporarily disable caching to prevent issues
     // if (data) {
-    //   cacheUtils.setCacheData(carId, filters, searchQuery, data, carLastModified);
+    //   cacheUtils.setCacheData(carId, filters, debouncedSearchQuery, data, carLastModified);
     //
     //   // Cache image metadata for faster access
     //   data.images?.forEach((image: ExtendedImageType) => {
@@ -371,7 +396,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     //     }
     //   });
     // }
-  }, [data, carId, filters, searchQuery, carLastModified]);
+  }, [data, carId, filters, debouncedSearchQuery, carLastModified]); // Use debouncedSearchQuery
 
   // Enhanced image data with cached metadata (simplified for now)
   const enhancedImages = useMemo(() => {
@@ -487,12 +512,15 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       const imageId = image.id || image._id;
 
       // Check if any filters are active
-      if (Object.keys(filters).length === 0 && !searchQuery) {
+      if (Object.keys(filters).length === 0 && !debouncedSearchQuery) {
         return true;
       }
 
-      // Apply search query filter first
-      if (searchQuery && !matchesSearchQuery(image, searchQuery)) {
+      // Apply search query filter first - use debounced version
+      if (
+        debouncedSearchQuery &&
+        !matchesSearchQuery(image, debouncedSearchQuery)
+      ) {
         return false;
       }
 
@@ -529,7 +557,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   }, [
     images,
     filters,
-    searchQuery,
+    debouncedSearchQuery,
     originalImageIds,
     processedImageIds,
     matchesSearchQuery,
@@ -1057,7 +1085,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       // Use router replace to update URL without adding to history
       router.replace(`?${params.toString()}`, { scroll: false });
     }
-  }, [filters, searchQuery, filteredImages.length]); // Include filteredImages.length to trigger when results change
+  }, [filters, debouncedSearchQuery, filteredImages.length]); // Use debouncedSearchQuery to prevent reset on every keystroke
 
   // Separate effect to handle when currentPage exceeds available pages
   useEffect(() => {
@@ -1086,14 +1114,25 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       const fallbackTotal = isLikelyComplete ? images.length : undefined;
       setTotalImagesAvailable(fallbackTotal);
     }
-  }, [data?.pagination?.totalImages, images.length, currentLimit]);
+
+    // Mark initial load as complete once we have data
+    if (data && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [
+    data?.pagination?.totalImages,
+    images.length,
+    currentLimit,
+    data,
+    isInitialLoad,
+  ]);
 
   // Reset additional images when filters or search change to refetch from server
   useEffect(() => {
     // Clear additional images to force fresh API call with new filters
     setAdditionalImages([]);
     setTotalImagesAvailable(undefined);
-  }, [filters, searchQuery]);
+  }, [filters, debouncedSearchQuery]); // Use debouncedSearchQuery to prevent excessive API calls
 
   // Handle pagination when filteredImages count changes
   useEffect(() => {
@@ -1129,6 +1168,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     isEditMode,
     isLoadingMore,
     isNavigating,
+    isInitialLoad,
 
     // Actions
     setFilters,
