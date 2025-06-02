@@ -118,10 +118,13 @@ export function MultiSelect({
             onBlur={(e) => {
               // Only close if not clicking inside the dropdown
               setTimeout(() => {
-                if (
-                  e.currentTarget &&
-                  !e.currentTarget.closest("[data-multi-select-dropdown]")
-                ) {
+                // If currentTarget is null, user clicked outside, so close dropdown
+                // If currentTarget exists, check if click was outside dropdown
+                const shouldClose =
+                  !e.currentTarget ||
+                  !e.currentTarget.closest("[data-multi-select-dropdown]");
+
+                if (shouldClose) {
                   setOpen(false);
                   setInputValue("");
                 }
