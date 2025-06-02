@@ -926,33 +926,112 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     }
   }, [mutate, toast]);
 
-  const handleDeleteSelected = useCallback(async () => {
-    if (selectedImages.size === 0 || !api) return;
+  const handleDeleteSelected = useCallback(
+    async (deleteFromStorage = true) => {
+      if (selectedImages.size === 0 || !api) return;
 
-    try {
-      const imageIds = Array.from(selectedImages);
-      await api.deleteWithBody(`cars/${carId}/images`, {
-        imageIds,
-        deleteFromStorage: true,
-      });
+      try {
+        const imageIds = Array.from(selectedImages);
+        await api.deleteWithBody(`cars/${carId}/images`, {
+          imageIds,
+          deleteFromStorage,
+        });
 
-      toast({
-        title: "Success",
-        description: `${imageIds.length} image(s) deleted successfully`,
-      });
-      setSelectedImages(new Set());
-      // Reset additional images since we're doing a full refresh after deletion
-      setAdditionalImages([]);
-      await mutate();
-    } catch (error) {
-      console.error("Error deleting images:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete images",
-        variant: "destructive",
-      });
-    }
-  }, [selectedImages, carId, toast, mutate, api]);
+        toast({
+          title: "Success",
+          description: `${imageIds.length} image(s) deleted successfully`,
+        });
+        setSelectedImages(new Set());
+        // Reset additional images since we're doing a full refresh after deletion
+        setAdditionalImages([]);
+        await mutate();
+      } catch (error) {
+        console.error("Error deleting images:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete images",
+          variant: "destructive",
+        });
+      }
+    },
+    [selectedImages, carId, toast, mutate, api]
+  );
+
+  const handleDeleteSingle = useCallback(
+    async (imageId: string, deleteFromStorage = true) => {
+      if (!api) return;
+
+      try {
+        await api.deleteWithBody(`cars/${carId}/images`, {
+          imageIds: [imageId],
+          deleteFromStorage,
+        });
+
+        toast({
+          title: "Success",
+          description: "Image deleted successfully",
+        });
+
+        // Clear the selection if the deleted image was selected
+        setSelectedImages((prev) => {
+          const newSelection = new Set(prev);
+          newSelection.delete(imageId);
+          return newSelection;
+        });
+
+        // If the deleted image was the current image, switch to another image
+        if (currentImageId === imageId && images.length > 1) {
+          const currentIndex = images.findIndex(
+            (img) => (img.id || img._id) === imageId
+          );
+          let newImageIndex = 0;
+
+          if (currentIndex >= 0) {
+            // Try to select the next image, or previous if it was the last
+            newImageIndex =
+              currentIndex < images.length - 1
+                ? currentIndex
+                : currentIndex - 1;
+          }
+
+          const newImage = images[newImageIndex];
+          if (newImage && (newImage.id || newImage._id) !== imageId) {
+            const params = new URLSearchParams(searchParams?.toString() || "");
+            params.set("image", newImage.id || newImage._id);
+            router.replace(`?${params.toString()}`, { scroll: false });
+          }
+        }
+
+        // Reset additional images since we're doing a full refresh after deletion
+        setAdditionalImages([]);
+        await mutate();
+      } catch (error) {
+        console.error("Error deleting image:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete image",
+          variant: "destructive",
+        });
+        throw error; // Re-throw so the UI can handle the error state
+      }
+    },
+    [carId, toast, mutate, api, currentImageId, images, searchParams, router]
+  );
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedImages(new Set());
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    const allImageIds = new Set(
+      filteredImages.map((image) => image.id || image._id)
+    );
+    setSelectedImages(allImageIds);
+  }, [filteredImages]);
+
+  const handleSelectNone = useCallback(() => {
+    setSelectedImages(new Set());
+  }, []);
 
   const reanalyzeImage = useCallback(
     async (imageId: string, promptId?: string, modelId?: string) => {
@@ -1185,6 +1264,10 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     setSelectedUrlOption,
     handleUploadComplete,
     handleDeleteSelected,
+    handleDeleteSingle,
+    handleClearSelection,
+    handleSelectAll,
+    handleSelectNone,
     reanalyzeImage,
     handleSetPrimaryImage,
     loadMoreImages,
