@@ -118,7 +118,10 @@ export function MultiSelect({
             onBlur={(e) => {
               // Only close if not clicking inside the dropdown
               setTimeout(() => {
-                if (!e.currentTarget.closest("[data-multi-select-dropdown]")) {
+                if (
+                  e.currentTarget &&
+                  !e.currentTarget.closest("[data-multi-select-dropdown]")
+                ) {
                   setOpen(false);
                   setInputValue("");
                 }
